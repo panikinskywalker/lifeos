@@ -1,25 +1,56 @@
 {
   "expo": {
-    "name": "lifeos",
+    "name": "LifeOS",
     "slug": "lifeos",
-    "version": "1.0.0",
-    "orientation": "portrait",
+    "version": "0.1.0",
+    "scheme": "lifeos",
+    "orientation": "default",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "app.lifeos.mobile",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "LifeOS attaches photos and receipts to your records.",
+        "NSCameraUsageDescription": "LifeOS lets you photograph receipts and documents."
+      }
     },
     "android": {
+      "package": "app.lifeos.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": true,
+      "permissions": ["RECEIVE_BOOT_COMPLETED", "SCHEDULE_EXACT_ALARM"]
     },
     "web": {
+      "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-notifications",
+      "expo-background-task",
+      [
+        "expo-image-picker",
+        { "photosPermission": "LifeOS attaches photos and receipts to your records." }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }

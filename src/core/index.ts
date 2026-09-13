@@ -1,0 +1,15 @@
+export * from './db';
+export * from './domain';
+export * from './events/bus';
+export * from './registry';
+export * from './repo/entityRepo';
+export * from './repo/sideRepos';
+export * from './repo/timelineRepo';
+export * from './query/filter';
+export * from './search/searchIndex';
+export * from './sync/changeLog';
+export * from './automation';
+export * from './ai';
+export * from './format';
+export * from './lifeos';
+export { coreModule } from './coreModule';

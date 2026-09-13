@@ -1,0 +1,101 @@
+import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
+import type { LifeOSContext } from '@core/registry/context';
+import { bus } from '@core/events/bus';
+import { OSProvider } from '@ui/hooks/useOS';
+import { ThemeProvider, useTheme } from '@ui/theme/ThemeProvider';
+import { Loading, Text } from '@ui/components/primitives';
+import { bootLifeOS, setNavigator } from '../src/platform/boot';
+import { AppState } from 'react-native';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+  });
+}
+
+export default function RootLayout() {
+  const [os, setOS] = useState<LifeOSContext | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    setNavigator((p) => router.push(p as never));
+    bootLifeOS()
+      .then((o) => {
+        setOS(o);
+        SplashScreen.hideAsync().catch(() => {});
+      })
+      .catch((e) => {
+        console.error(e);
+        setError(String(e?.message ?? e));
+        SplashScreen.hideAsync().catch(() => {});
+      });
+  }, [router]);
+
+  // Foreground → run scheduler; tapping a notification → open the record.
+  useEffect(() => {
+    if (!os) return;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') {
+        bus.emit('app.foreground', { at: Date.now() });
+        void os.scheduler.tick();
+      }
+    });
+    let nsub: { remove: () => void } | null = null;
+    if (Platform.OS !== 'web') {
+      nsub = Notifications.addNotificationResponseReceivedListener((r) => {
+        const d = r.notification.request.content.data as { entityId?: string; entityType?: string } | undefined;
+        if (d?.entityId && d.entityType) router.push(`/entity/${d.entityType}/${d.entityId}` as never);
+        else router.push('/reminders' as never);
+      });
+      Notifications.requestPermissionsAsync().catch(() => {});
+    }
+    return () => {
+      sub.remove();
+      nsub?.remove();
+    };
+  }, [os, router]);
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          {error ? (
+            <Loading />
+          ) : !os ? (
+            <Loading />
+          ) : (
+            <OSProvider os={os}>
+              <Navigator />
+            </OSProvider>
+          )}
+          {error ? <Text style={{ padding: 24 }}>Failed to start: {error}</Text> : null}
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+function Navigator() {
+  const t = useTheme();
+  return (
+    <>
+      <StatusBar style={t.dark ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.colors.background }, animation: Platform.OS === 'android' ? 'slide_from_right' : 'default' }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="entity/[type]/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="entity/[type]/[id]/edit" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="automation/new" options={{ presentation: 'modal' }} />
+      </Stack>
+    </>
+  );
+}
