@@ -1,8 +1,10 @@
 import { Platform } from 'react-native';
-import { openDatabaseAsync, openDatabaseSync } from 'expo-sqlite';
+import { openDatabaseSync } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { createExpoAdapter } from '@core/db/expoAdapter';
+import { createSqlJsAdapter } from '@core/db/sqljsAdapter';
+import type { DatabaseAdapter } from '@core/db/adapter';
 import { createLifeOS } from '@core/lifeos';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
@@ -23,21 +25,21 @@ export function setNavigator(fn: (path: string) => void) {
  */
 export async function bootLifeOS(): Promise<LifeOSContext> {
   if (instance) return instance;
+  let db: DatabaseAdapter;
   if (Platform.OS === 'web') {
-    // The web worker compiles wa-sqlite on first use; the sync bridge has a
-    // short spin-wait, so warm the worker with an async open first.
-    const warm = await openDatabaseAsync('lifeos.db');
-    await warm.closeAsync().catch(() => {});
-  }
-  const sqlite = openDatabaseSync('lifeos.db');
-  for (const pragma of ['PRAGMA journal_mode = WAL', 'PRAGMA foreign_keys = ON', 'PRAGMA busy_timeout = 3000']) {
-    try {
-      sqlite.execSync(pragma);
-    } catch {
-      /* not supported on this platform (e.g. web) */
+    // sql.js on the main thread: no SharedArrayBuffer / COOP-COEP needed.
+    db = await createSqlJsAdapter({ wasmUrl: '/sql-wasm.wasm' });
+  } else {
+    const sqlite = openDatabaseSync('lifeos.db');
+    for (const pragma of ['PRAGMA journal_mode = WAL', 'PRAGMA foreign_keys = ON', 'PRAGMA busy_timeout = 3000']) {
+      try {
+        sqlite.execSync(pragma);
+      } catch {
+        /* unsupported on this platform */
+      }
     }
+    db = createExpoAdapter(sqlite);
   }
-  const db = createExpoAdapter(sqlite);
 
   const os = await createLifeOS({
     db,
