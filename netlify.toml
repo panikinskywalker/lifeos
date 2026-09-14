@@ -1,0 +1,14 @@
+[build]
+  publish = "dist"
+  command = "npx expo export --platform web --output-dir dist"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "credentialless"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
