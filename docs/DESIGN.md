@@ -39,6 +39,13 @@ Apple-Health-style bento grid, but calmer: warm bone ground, muted pastel module
 ### Dark
 Ground `#141614`, tile `#1E211E`, raised `#262A27`, fg.primary `#F1F0EA`, fg.secondary `#9AA19C`, line `#2C302D`. Tints keep hue, drop to ~30% lightness with ink at ~80%. Mustard stays `#F3C84B`.
 
+### Working values (not yet in the canvas)
+Set in `src/ui/theme/tokens.ts` and marked "working value" there; replace from the canvas.
+Light: `bg.pressed` `#E2E0D8` · `bg.scrim` `#17201C66` · `fg.onBar` `#9AA19C` · `fg.onBarActive` `#F4F3EE` · `alert.coralFill` `#F7D5D1`.
+Dark: `bg.bar` `#262A27` (the light bar is too close to the dark ground) · `fg.tertiary` `#6B726D` · `alert.coralFill` `#4A2825`.
+Dark tints (fill / ink): Finance `#594E36`/`#E8D6B0` · Upkeep `#38573C`/`#BDDBC7` · People `#593A36`/`#DEBDBA` · Tasks `#364759`/`#B9CDDF` · Health `#36594C`/`#B8E0D5` · Memory `#433659`/`#C7BFD9` · Travel `#594536`/`#E7C7B1` · Documents `#524E3D`/`#CFCEC9`.
+Type: `label` 13/18 700 for tile and row labels.
+
 ### Type
 Family: **Manrope** (fallback Plus Jakarta Sans, DM Sans). Tabular numerals everywhere numbers appear.
 

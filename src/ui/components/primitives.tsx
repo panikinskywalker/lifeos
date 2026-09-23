@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme/ThemeProvider';
-import type { Theme } from '../theme/tokens';
+import { fontForWeight, type Theme } from '../theme/tokens';
 
 /* ------------------------------------------------------------------ */
 /* Icon — Ionicons everywhere, with a small alias table so modules can  */
@@ -41,9 +41,12 @@ export function Icon({ name, size = 20, color, style }: { name: string; size?: n
 type Variant = keyof Theme['type'];
 export function Text({ variant = 'body', color, style, children, ...rest }: TextProps & { variant?: Variant; color?: 'primary' | 'secondary' | 'tertiary' | string }) {
   const t = useTheme();
-  const c = color === 'secondary' ? t.colors.textSecondary : color === 'tertiary' ? t.colors.textTertiary : color && color !== 'primary' ? color : t.colors.text;
+  const c = color === 'secondary' ? t.c.fg.secondary : color === 'tertiary' ? t.c.fg.tertiary : color && color !== 'primary' ? color : t.c.fg.primary;
+  // Android ignores fontWeight on custom families: turn a weight override into the matching Manrope face.
+  const flat = StyleSheet.flatten(style) as TextStyle | undefined;
+  const face = flat?.fontWeight !== undefined && !flat.fontFamily ? { fontFamily: fontForWeight(flat.fontWeight), fontWeight: undefined } : null;
   return (
-    <RNText {...rest} style={[t.type[variant] as TextStyle, { color: c }, style]}>
+    <RNText {...rest} style={[t.type[variant] as TextStyle, { color: c }, flat, face]}>
       {children}
     </RNText>
   );

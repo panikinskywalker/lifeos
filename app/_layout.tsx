@@ -6,6 +6,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from '@expo-google-fonts/manrope/useFonts';
+import { Manrope_400Regular } from '@expo-google-fonts/manrope/400Regular';
+import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
+import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
+import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
+import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { OSProvider } from '@ui/hooks/useOS';
@@ -26,20 +32,23 @@ export default function RootLayout() {
   const [os, setOS] = useState<LifeOSContext | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  // Native builds embed these via the expo-font plugin; this also covers web and dev clients.
+  const [fontsLoaded, fontError] = useFonts({ Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold });
+  const fontsReady = fontsLoaded || !!fontError;
 
   useEffect(() => {
     setNavigator((p) => router.push(p as never));
     bootLifeOS()
-      .then((o) => {
-        setOS(o);
-        SplashScreen.hideAsync().catch(() => {});
-      })
+      .then((o) => setOS(o))
       .catch((e) => {
         console.error(e);
         setError(String(e?.message ?? e));
-        SplashScreen.hideAsync().catch(() => {});
       });
   }, [router]);
+
+  useEffect(() => {
+    if (fontsReady && (os || error)) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsReady, os, error]);
 
   // Foreground → run scheduler; tapping a notification → open the record.
   useEffect(() => {
@@ -71,7 +80,7 @@ export default function RootLayout() {
         <ThemeProvider>
           {error ? (
             <Loading />
-          ) : !os ? (
+          ) : !os || !fontsReady ? (
             <Loading />
           ) : (
             <OSProvider os={os}>
