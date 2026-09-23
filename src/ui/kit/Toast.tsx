@@ -37,6 +37,8 @@ export function ToastProvider({ children, bottomOffset = 0 }: { children: React.
   const [toast, setToast] = useState<(ToastOptions & { id: number }) | null>(null);
   const idRef = useRef(0);
   const hide = useCallback(() => setToast(null), []);
+  // A toast may only dismiss itself, so a late fade-out never hides its replacement.
+  const dismiss = useCallback((id: number) => setToast((cur) => (cur?.id === id ? null : cur)), []);
   const show = useCallback((o: ToastOptions) => {
     idRef.current += 1;
     setToast({ ...o, id: idRef.current });
@@ -45,21 +47,22 @@ export function ToastProvider({ children, bottomOffset = 0 }: { children: React.
   return (
     <ToastContext.Provider value={{ show, hide }}>
       {children}
-      {toast ? <ToastView key={toast.id} toast={toast} onDone={hide} bottomOffset={bottomOffset} /> : null}
+      {toast ? <ToastView key={toast.id} toast={toast} dismiss={dismiss} bottomOffset={bottomOffset} /> : null}
     </ToastContext.Provider>
   );
 }
 
-function ToastView({ toast, onDone, bottomOffset }: { toast: ToastOptions; onDone: () => void; bottomOffset: number }) {
+function ToastView({ toast, dismiss, bottomOffset }: { toast: ToastOptions & { id: number }; dismiss: (id: number) => void; bottomOffset: number }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const anim = useRef(new Animated.Value(0)).current;
   const used = useRef(false);
+  const onDone = () => dismiss(toast.id);
   useEffect(() => {
     Animated.timing(anim, { toValue: 1, duration: 160, useNativeDriver: true }).start();
-    const timer = setTimeout(() => Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }).start(onDone), toast.duration ?? (toast.undo ? UNDO_MS : 4000));
+    const timer = setTimeout(() => Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }).start(() => dismiss(toast.id)), toast.duration ?? (toast.undo ? UNDO_MS : 4000));
     return () => clearTimeout(timer);
-  }, [anim, onDone, toast]);
+  }, [anim, dismiss, toast]);
   return (
     <Animated.View
       pointerEvents="box-none"
@@ -79,8 +82,8 @@ function ToastView({ toast, onDone, bottomOffset }: { toast: ToastOptions; onDon
             onPress={() => {
               if (used.current) return;
               used.current = true;
-              void toast.undo?.();
               onDone();
+              void toast.undo?.();
             }}
             style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 12, borderRadius: t.radius.chip, backgroundColor: pressed ? t.c.accent.mustardInk : 'transparent' })}
           >

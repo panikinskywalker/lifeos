@@ -15,7 +15,7 @@ Order is deliberate: the design system first (so nothing gets built twice), then
 - [x] Components: Tile (bento cell, 1×1/2×1/2×2), StatTile, StackedBar, Ring, RowItem, Chip/FilterChip, Sheet, Toast-with-Undo, EmptyState, Segmented, FormField set, RecordHeader, SectionCard.
 - [ ] Bottom bar: Today · Upkeep · **Talk** (centre, raised) · Browse · You.
 - [ ] Dark mode tokens and a theme toggle in You.
-- [ ] Storybook-style gallery screen at `/dev/components` showing every component in both themes (used to review against the Claude Design canvas).
+- [x] Storybook-style gallery screen at `/dev/components` showing every component in both themes (used to review against the Claude Design canvas).
 - [ ] Core additions needed by later milestones, migrations v3: `cycles`, `meter_readings`, `facts`, `groups` + `group_members`, `notification_rules`, `ingest_queue`.
 - [ ] Rebuild the generic screens on the new components: list, record, form, tag page, search.
 

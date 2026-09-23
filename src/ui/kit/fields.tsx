@@ -23,12 +23,12 @@ export function Field({ label, required, hint, error, children }: { label?: stri
       {label ? (
         <Text variant="label" color="secondary">
           {label}
-          {required ? <Text variant="label" color={t.c.alert.coral}> *</Text> : null}
+          {required ? <Text variant="label" color={t.c.alert.coralText}> *</Text> : null}
         </Text>
       ) : null}
       {children}
       {error ? (
-        <Text variant="caption" color={t.c.alert.coral} accessibilityLiveRegion="polite">
+        <Text variant="caption" color={t.c.alert.coralText} accessibilityLiveRegion="polite">
           {error}
         </Text>
       ) : hint ? (
@@ -163,21 +163,23 @@ export function MoneyField({ label, required, hint, error, value, onChange, symb
 
 function PressField({ label, required, hint, error, icon, text, placeholder, onPress, onClear }: { label?: string; required?: boolean; hint?: string; error?: string; icon?: IconName; text?: string | null; placeholder: string; onPress: () => void; onClear?: () => void }) {
   const t = useTheme();
+  const box = useInputBox(false, error);
   return (
     <Field label={label} required={required} hint={hint} error={error}>
-      <Pressable accessibilityRole="button" accessibilityLabel={label ? `${label}: ${text || placeholder}` : text || placeholder} onPress={onPress} style={useInputBox(false, error)}>
-        {icon ? <Icon name={icon} size={18} color={t.c.fg.secondary} /> : null}
-        <Text variant="body" color={text ? 'primary' : 'tertiary'} style={{ flex: 1 }} numberOfLines={1}>
-          {text || placeholder}
-        </Text>
+      <View style={[box, { paddingHorizontal: 0, gap: 0 }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={label ? `${label}: ${text || placeholder}` : text || placeholder} onPress={onPress} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch', paddingLeft: 14 }}>
+          {icon ? <Icon name={icon} size={18} color={t.c.fg.secondary} /> : null}
+          <Text variant="body" color={text ? 'primary' : 'tertiary'} style={{ flex: 1 }} numberOfLines={1}>
+            {text || placeholder}
+          </Text>
+          {!(text && onClear) ? <Icon name="chevron-down" size={18} color={t.c.fg.tertiary} style={{ marginRight: 14 }} /> : null}
+        </Pressable>
         {text && onClear ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`Clear ${label ?? ''}`} hitSlop={12} onPress={onClear}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Clear ${label ?? ''}`} onPress={onClear} style={{ width: 48, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="x-circle" size={18} color={t.c.fg.tertiary} />
           </Pressable>
-        ) : (
-          <Icon name="chevron-down" size={18} color={t.c.fg.tertiary} />
-        )}
-      </Pressable>
+        ) : null}
+      </View>
     </Field>
   );
 }
@@ -320,19 +322,25 @@ export function PickerSheet({ visible, onClose, title, items, selected = [], onS
   );
 }
 
-/** Linked records shown as chips; tapping "Choose" asks the caller to open a picker. */
+/** Linked records as removable chips; "Choose" asks the caller to open a picker. */
 export function RelationField({ label, required, hint, error, value, onOpen, onRemove, placeholder = 'Choose' }: { label?: string; required?: boolean; hint?: string; error?: string; value: Array<{ id: string; title: string }>; onOpen: () => void; onRemove: (id: string) => void; placeholder?: string }) {
   const t = useTheme();
   return (
     <Field label={label} required={required} hint={hint} error={error}>
-      <Pressable accessibilityRole="button" accessibilityLabel={label ? `${label}: ${value.map((v) => v.title).join(', ') || placeholder}` : placeholder} onPress={onOpen} style={[useInputBox(false, error), { flexWrap: 'wrap', paddingVertical: 10 }]}>
+      <View style={[useInputBox(false, error), { flexWrap: 'wrap', paddingVertical: 10, paddingRight: 6 }]}>
         <Icon name="link" size={18} color={t.c.fg.secondary} />
-        {value.length ? value.map((v) => <Chip key={v.id} label={v.title} icon="x" onPress={() => onRemove(v.id)} />) : (
-          <Text variant="body" color="tertiary" style={{ flex: 1 }}>
-            {placeholder}
-          </Text>
-        )}
-      </Pressable>
+        {value.map((v) => (
+          <Chip key={v.id} label={v.title} icon="x" onPress={() => onRemove(v.id)} />
+        ))}
+        <Pressable accessibilityRole="button" accessibilityLabel={label ? `Choose ${label}` : placeholder} onPress={onOpen} style={{ flexGrow: 1, minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: value.length ? 'flex-end' : 'space-between', gap: 6 }}>
+          {value.length ? null : (
+            <Text variant="body" color="tertiary">
+              {placeholder}
+            </Text>
+          )}
+          <Icon name="plus" size={18} color={t.c.fg.secondary} style={{ marginRight: 8 }} />
+        </Pressable>
+      </View>
     </Field>
   );
 }
@@ -380,7 +388,7 @@ export function SwitchField({ label, hint, value, onChange }: { label: string; h
           </Text>
         ) : null}
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ false: t.c.line, true: t.c.accent.mustard }} thumbColor={t.c.bg.tileRaised} ios_backgroundColor={t.c.line} />
+      <Switch value={value} onValueChange={onChange} trackColor={{ false: t.c.line, true: t.c.accent.mustard }} thumbColor={t.c.bg.tileRaised} ios_backgroundColor={t.c.line} {...({ activeThumbColor: t.c.bg.tileRaised } as object)} />
     </Pressable>
   );
 }

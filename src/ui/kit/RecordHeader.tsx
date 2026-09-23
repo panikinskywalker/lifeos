@@ -46,11 +46,11 @@ export function RecordHeader({ tint, icon, title, subtitle, status, stats, onBac
       </View>
       {status ? <Chip label={status.label} tone={status.tone ?? 'neutral'} /> : null}
       {stats?.length ? (
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 24, rowGap: 8 }}>
           {stats.slice(0, 3).map((s) => (
-            <View key={s.label} style={{ flex: 1, minWidth: 0 }}>
+            <View key={s.label}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-                <Text variant="stat" color={s.tone === 'alert' ? t.c.alert.coral : tone.ink} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                <Text variant="stat" color={s.tone === 'alert' ? t.c.alert.coralText : tone.ink} numberOfLines={1}>
                   {s.value}
                 </Text>
                 {s.unit ? (

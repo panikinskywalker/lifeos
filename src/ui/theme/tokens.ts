@@ -16,8 +16,9 @@ export interface Colors {
   fg: { primary: string; secondary: string; tertiary: string; onBar: string; onBarActive: string };
   line: string;
   accent: { mustard: string; mustardInk: string };
-  alert: { coral: string; coralInk: string; coralFill: string };
-  ok: { sage: string; sageInk: string };
+  /** coral/sage are for fills, rings and dots; *Text variants are the AA-contrast versions for text. */
+  alert: { coral: string; coralText: string; coralInk: string; coralFill: string };
+  ok: { sage: string; sageText: string; sageInk: string };
 }
 
 export const lightTokens: Colors = {
@@ -38,8 +39,8 @@ export const lightTokens: Colors = {
   },
   line: '#E2E0D8',
   accent: { mustard: '#F3C84B', mustardInk: '#5A4300' },
-  alert: { coral: '#E9635A', coralInk: '#FFFFFF', coralFill: '#F7D5D1' },
-  ok: { sage: '#8FB59B', sageInk: '#1B1F1D' },
+  alert: { coral: '#E9635A', coralText: '#A8362E', coralInk: '#FFFFFF', coralFill: '#F7D5D1' }, // coralText: working value, 4.8:1 on coralFill
+  ok: { sage: '#8FB59B', sageText: '#2E5A3C', sageInk: '#1B1F1D' },
 };
 
 export const darkTokens: Colors = {
@@ -60,8 +61,8 @@ export const darkTokens: Colors = {
   },
   line: '#2C302D',
   accent: { mustard: '#F3C84B', mustardInk: '#5A4300' },
-  alert: { coral: '#E9635A', coralInk: '#FFFFFF', coralFill: '#4A2825' },
-  ok: { sage: '#8FB59B', sageInk: '#141614' },
+  alert: { coral: '#E9635A', coralText: '#F08A82', coralInk: '#FFFFFF', coralFill: '#4A2825' },
+  ok: { sage: '#8FB59B', sageText: '#8FB59B', sageInk: '#141614' },
 };
 
 export type TintKey = 'finance' | 'upkeep' | 'people' | 'tasks' | 'health' | 'memory' | 'travel' | 'documents';
@@ -271,7 +272,7 @@ function legacyColors(c: Colors, accents: typeof palette): ThemeColors {
     fillSecondary: c.bg.tile,
     tint: accents.blue,
     tabBar: c.bg.bar,
-    danger: c.alert.coral,
+    danger: c.alert.coralText,
     success: accents.green,
     warning: accents.orange,
     overlay: c.bg.scrim,

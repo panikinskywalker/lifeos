@@ -48,6 +48,8 @@ export interface TileProps {
   meta?: string;
   /** Tile body — a stat, a short list, a chart. */
   children?: React.ReactNode;
+  /** Stats sit at the bottom (default); lists read better from the top. */
+  bodyAlign?: 'top' | 'bottom';
   /** Pinned to the bottom (e.g. a StackedBar). */
   footer?: React.ReactNode;
   onPress?: () => void;
@@ -60,7 +62,7 @@ export interface TileProps {
  * Inside a BentoGrid it fills its cell; standalone it sizes to content
  * (1×1 keeps a square aspect ratio).
  */
-export function Tile({ size = '1x1', tint, filled, icon, label, meta, children, footer, onPress, accessibilityLabel, style }: TileProps) {
+export function Tile({ size = '1x1', tint, filled, icon, label, meta, children, bodyAlign = 'bottom', footer, onPress, accessibilityLabel, style }: TileProps) {
   const t = useTheme();
   const cell = useContext(CellContext);
   const tone = tint ? t.tints[tint] : null;
@@ -86,7 +88,7 @@ export function Tile({ size = '1x1', tint, filled, icon, label, meta, children, 
           ) : null}
         </View>
       ) : null}
-      <View style={{ flex: 1, justifyContent: 'flex-end', minHeight: 0 }}>{children}</View>
+      <View style={{ flex: 1, justifyContent: bodyAlign === 'top' ? 'flex-start' : 'flex-end', minHeight: 0 }}>{children}</View>
       {footer ? <View>{footer}</View> : null}
     </>
   );
@@ -102,7 +104,7 @@ export function Tile({ size = '1x1', tint, filled, icon, label, meta, children, 
 /** Big tabular number with a unit and a caption. Used inside tiles and headers. */
 export function Stat({ value, unit, caption, tone, color, large }: { value: string; unit?: string; caption?: string; tone?: 'alert' | 'ok'; color?: string; large?: boolean }) {
   const t = useTheme();
-  const c = color ?? (tone === 'alert' ? t.c.alert.coral : t.c.fg.primary);
+  const c = color ?? (tone === 'alert' ? t.c.alert.coralText : t.c.fg.primary);
   return (
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
@@ -116,7 +118,7 @@ export function Stat({ value, unit, caption, tone, color, large }: { value: stri
         ) : null}
       </View>
       {caption ? (
-        <Text variant="caption" color={tone === 'ok' ? t.c.ok.sage : 'secondary'} numberOfLines={2}>
+        <Text variant="caption" color={tone === 'ok' ? t.c.ok.sageText : 'secondary'} numberOfLines={2}>
           {caption}
         </Text>
       ) : null}

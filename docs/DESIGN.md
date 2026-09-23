@@ -44,7 +44,10 @@ Set in `src/ui/theme/tokens.ts` and marked "working value" there; replace from t
 Light: `bg.pressed` `#E2E0D8` · `bg.scrim` `#17201C66` · `fg.onBar` `#9AA19C` · `fg.onBarActive` `#F4F3EE` · `alert.coralFill` `#F7D5D1`.
 Dark: `bg.bar` `#262A27` (the light bar is too close to the dark ground) · `fg.tertiary` `#6B726D` · `alert.coralFill` `#4A2825`.
 Dark tints (fill / ink): Finance `#594E36`/`#E8D6B0` · Upkeep `#38573C`/`#BDDBC7` · People `#593A36`/`#DEBDBA` · Tasks `#364759`/`#B9CDDF` · Health `#36594C`/`#B8E0D5` · Memory `#433659`/`#C7BFD9` · Travel `#594536`/`#E7C7B1` · Documents `#524E3D`/`#CFCEC9`.
+Text-contrast variants (AA 4.5:1): `alert.coralText` `#A8362E` light / `#F08A82` dark, `ok.sageText` `#2E5A3C` light / `#8FB59B` dark. Coral and sage themselves fail AA as text on the light ground (2.0–2.9:1), so they are used for fills, rings, bars and dots only.
 Type: `label` 13/18 700 for tile and row labels.
+
+**Open contrast issue (needs the canvas):** `fg.secondary` `#6F7773` on `bg.tile` `#ECEBE5` is 3.85:1 — below AA for caption-size text. `fg.tertiary` on `bg.tileRaised` is 2.4:1 (placeholders only).
 
 ### Type
 Family: **Manrope** (fallback Plus Jakarta Sans, DM Sans). Tabular numerals everywhere numbers appear.

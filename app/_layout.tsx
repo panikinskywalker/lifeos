@@ -104,6 +104,7 @@ function Navigator() {
         <Stack.Screen name="entity/[type]/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="entity/[type]/[id]/edit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="automation/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="dev/components" />
       </Stack>
     </>
   );

@@ -14,7 +14,7 @@ export function Chip({ label, tint, tone = 'neutral', icon, onPress, small }: { 
     ? [t.tints[tint].fill, t.tints[tint].ink]
     : {
         neutral: [t.c.bg.tile, t.c.fg.primary],
-        alert: [t.c.alert.coralFill, t.c.alert.coral],
+        alert: [t.c.alert.coralFill, t.c.alert.coralText],
         ok: [t.tints.upkeep.fill, t.tints.upkeep.ink],
         accent: [t.c.accent.mustard, t.c.accent.mustardInk],
       }[tone];
