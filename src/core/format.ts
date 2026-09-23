@@ -16,12 +16,13 @@ function toDate(ts: number | string | Date): Date {
 
 export function createFormatters(get: () => LocaleSettings): Formatters {
   const nf = new Map<string, Intl.NumberFormat>();
-  const currencyFmt = (c: string) => {
+  // Whole amounts print without decimals (₹24,000); anything else keeps two (₹719.50).
+  const currencyFmt = (c: string, whole: boolean) => {
     const s = get();
-    const key = `${s.locale}:${c}`;
+    const key = `${s.locale}:${c}:${whole ? 0 : 2}`;
     if (!nf.has(key)) {
       try {
-        nf.set(key, new Intl.NumberFormat(s.locale, { style: 'currency', currency: c, maximumFractionDigits: 2 }));
+        nf.set(key, new Intl.NumberFormat(s.locale, { style: 'currency', currency: c, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }));
       } catch {
         nf.set(key, new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }));
       }
@@ -30,7 +31,7 @@ export function createFormatters(get: () => LocaleSettings): Formatters {
   };
   return {
     defaultCurrency: () => get().currency,
-    currency: (amount, c) => currencyFmt(c ?? get().currency).format(amount),
+    currency: (amount, c) => currencyFmt(c ?? get().currency, Number.isInteger(amount)).format(amount),
     number: (n, digits = 0) => new Intl.NumberFormat(get().locale, { maximumFractionDigits: digits }).format(n),
     date: (ts, style = 'medium') => {
       const d = toDate(ts);
