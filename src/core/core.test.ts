@@ -117,6 +117,34 @@ describe('entity store', () => {
     expect(os.entities.get(t.id)).toBeDefined();
   });
 
+  it('restore undoes a delete: record, its links, search, change log and an event', () => {
+    const t = os.entities.create({ type: 'txn', data: { amount: 900, date: '2026-09-01', merchant: 'Houseboat' } });
+    const trip = os.entities.create({ type: 'trip', data: { destination: 'Alleppey' } });
+    const other = os.entities.create({ type: 'trip', data: { destination: 'Goa' } });
+    os.relations.link(t.id, trip.id, 'trip');
+    os.relations.link(t.id, other.id, 'related');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-23T09:00:00Z'));
+    os.relations.unlink(t.id, other.id, 'related'); // removed by hand earlier: must stay removed
+    vi.setSystemTime(new Date('2026-09-23T09:05:00Z'));
+    os.entities.delete(t.id);
+    vi.useRealTimers();
+    expect(os.relations.forEntity(trip.id)).toHaveLength(0);
+
+    const seen: string[] = [];
+    const off = bus.on('entity.restored', ({ entity }) => void seen.push(entity.id));
+    os.entities.restore(t.id);
+    off();
+
+    expect(seen).toEqual([t.id]);
+    expect(os.relations.forEntity(t.id).map((r) => r.other.id)).toEqual([trip.id]);
+    expect(os.entities.search.search('houseboat').map((h) => h.id)).toEqual([t.id]);
+    const last = os.db.get<{ op: string; row_id: string }>(`SELECT op, row_id FROM changes WHERE tbl = 'entities' ORDER BY seq DESC LIMIT 1`);
+    expect(last).toEqual({ op: 'update', row_id: t.id });
+    os.entities.restore(t.id); // restoring a live record is a no-op
+    expect(seen).toEqual([t.id]);
+  });
+
   it('seeds default views on install', () => {
     expect(os.views.forType('txn').map((v) => v.name)).toContain('Food');
   });

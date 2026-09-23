@@ -9,6 +9,7 @@ export type CoreEvents = {
   'entity.created': { entity: Entity; actor: Actor };
   'entity.updated': { entity: Entity; previous: Entity; changed: string[]; actor: Actor };
   'entity.deleted': { entity: Entity; actor: Actor };
+  'entity.restored': { entity: Entity; actor: Actor };
   'entity.status': { entity: Entity; from: string | null; to: string | null; actor: Actor };
   'relation.added': { relation: Relation; actor: Actor };
   'relation.removed': { relation: Relation; actor: Actor };

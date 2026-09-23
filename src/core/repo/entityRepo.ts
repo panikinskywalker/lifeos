@@ -225,10 +225,20 @@ export class EntityRepo {
     bus.emit('entity.deleted', { entity: e, actor });
   }
 
-  restore(id: string): void {
-    this.db.run(`UPDATE entities SET deleted_at=NULL, updated_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
+  /** Undo a soft delete, including the relations that delete() removed with it. */
+  restore(id: string, actor: Actor = 'user'): void {
+    const row = this.db.get<{ deleted_at: number | null; version: number }>(`SELECT deleted_at, version FROM entities WHERE id=?`, [id]);
+    if (!row?.deleted_at) return;
+    this.db.transaction(() => {
+      this.db.run(`UPDATE entities SET deleted_at=NULL, updated_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
+      // delete() tombstones the record and its relations with one timestamp; links removed earlier keep theirs.
+      this.db.run(`UPDATE relations SET deleted_at=NULL, version=version+1 WHERE deleted_at=? AND (from_id=? OR to_id=?)`, [row.deleted_at, id, id]);
+      this.changes.record('entities', id, 'update', row.version + 1);
+    });
     const e = this.get(id);
-    if (e) this.search.index(e, this.def(e.type));
+    if (!e) return;
+    this.search.index(e, this.def(e.type));
+    bus.emit('entity.restored', { entity: e, actor });
   }
 
   /** The universal query: same DSL for screens, widgets, automations and AI. */
