@@ -1,37 +1,18 @@
 import React from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View, type PressableProps, type ScrollViewProps, type StyleProp, type TextProps, type TextStyle, type ViewProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Icon as SvgIcon } from '../icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontForWeight, type Theme } from '../theme/tokens';
 
 /* ------------------------------------------------------------------ */
-/* Icon — Ionicons everywhere, with a small alias table so modules can  */
-/* use SF-symbol-ish names ("house", "creditcard", "figure.run")        */
+/* Icon — inline SVG from src/ui/icons (legacy SF-style names resolve)  */
 /* ------------------------------------------------------------------ */
 
-const ALIASES: Record<string, keyof typeof Ionicons.glyphMap> = {
-  house: 'home', 'house.fill': 'home', creditcard: 'card', 'creditcard.fill': 'card', banknote: 'cash', 'chart.pie': 'pie-chart', 'chart.bar': 'bar-chart', 'chart.line': 'trending-up',
-  'figure.run': 'fitness', heart: 'heart', 'heart.fill': 'heart', person: 'person', 'person.2': 'people', airplane: 'airplane', 'airplane.departure': 'airplane', cube: 'cube', 'cube.box': 'cube',
-  doc: 'document', 'doc.text': 'document-text', folder: 'folder', brain: 'bulb', 'lightbulb': 'bulb', 'checkmark.circle': 'checkmark-circle', checklist: 'checkbox', 'list.bullet': 'list', repeat: 'repeat',
-  'shippingbox': 'archive', bolt: 'flash', 'bolt.fill': 'flash', sparkles: 'sparkles', magnifyingglass: 'search', gear: 'settings', gearshape: 'settings', plus: 'add', 'plus.circle.fill': 'add-circle',
-  'chevron.right': 'chevron-forward', 'chevron.left': 'chevron-back', 'chevron.down': 'chevron-down', 'chevron.up': 'chevron-up', xmark: 'close', 'xmark.circle.fill': 'close-circle', star: 'star', 'star.fill': 'star',
-  tag: 'pricetag', bell: 'notifications', 'bell.fill': 'notifications', paperclip: 'attach', 'bubble.left': 'chatbubble', link: 'link', clock: 'time', calendar: 'calendar', car: 'car', 'car.fill': 'car', target: 'locate',
-  flag: 'flag', trash: 'trash', pencil: 'pencil', 'square.and.pencil': 'create', 'arrow.up.arrow.down': 'swap-vertical', 'arrow.right': 'arrow-forward', 'arrow.left.arrow.right': 'swap-horizontal', wallet: 'wallet',
-  'cart': 'cart', 'fork.knife': 'restaurant', 'bag': 'bag', 'bus': 'bus', 'film': 'film', 'pills': 'medkit', 'bolt.horizontal': 'flash', 'house.lodge': 'business', 'gift': 'gift', 'graduationcap': 'school',
-  'wrench': 'construct', 'tv': 'tv', 'phone': 'call', 'globe': 'globe', 'drop': 'water', 'flame': 'flame', 'moon': 'moon', 'sun.max': 'sunny', 'book': 'book', 'note.text': 'reader', 'ellipsis': 'ellipsis-horizontal',
-  'square.grid.2x2': 'grid', 'slider.horizontal.3': 'options', 'line.3.horizontal.decrease': 'funnel', 'arrow.clockwise': 'refresh', 'play': 'play', 'pause': 'pause', 'info.circle': 'information-circle',
-  'exclamationmark.triangle': 'warning', 'lock': 'lock-closed', 'key': 'key', 'eye': 'eye', 'eye.slash': 'eye-off', 'archivebox': 'archive', 'square.and.arrow.up': 'share-outline', 'square.and.arrow.down': 'download',
-  'checkmark': 'checkmark', 'circle': 'ellipse-outline', 'circle.fill': 'ellipse', 'minus': 'remove', 'dollarsign.circle': 'cash', 'indianrupeesign': 'cash', 'building.columns': 'business', 'trophy': 'trophy',
-  'camera': 'camera', 'photo': 'image', 'mic': 'mic', 'map': 'map', 'location': 'location', 'bed.double': 'bed', 'scalemass': 'scale', 'dumbbell': 'barbell', 'lungs': 'pulse', 'waveform.path.ecg': 'pulse',
-  'leaf': 'leaf', 'paintbrush': 'color-palette', 'hammer': 'hammer', 'cross.case': 'medkit', 'signature': 'create', 'briefcase': 'briefcase', 'text.book.closed': 'book',
-};
-
-export function Icon({ name, size = 20, color, style }: { name: string; size?: number; color?: string; style?: StyleProp<TextStyle> }) {
+export function Icon({ name, size = 20, color, style }: { name: string; size?: number; color?: string; style?: StyleProp<ViewStyle> }) {
   const theme = useTheme();
-  const glyph = (ALIASES[name] ?? (name in Ionicons.glyphMap ? name : 'ellipse')) as keyof typeof Ionicons.glyphMap;
-  return <Ionicons name={glyph} size={size} color={color ?? theme.colors.text} style={style} />;
+  return <SvgIcon name={name} size={size} color={color ?? theme.c.fg.primary} style={style} />;
 }
 
 /* ------------------------------------------------------------------ */
