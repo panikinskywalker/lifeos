@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { Entity, EntityTypeDef, FieldDef } from '@core/domain/types';
 import { ZodError } from 'zod';
 import { useTheme } from '../theme/ThemeProvider';
-import { Button, Card, Icon, Input, Screen, Text, IconButton, Chip } from '../components/primitives';
+import { Button, Field, FilterChip, IconButton, Screen, SectionCard, Text, TextField } from '../kit';
 import { FieldInput, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 
@@ -17,7 +17,6 @@ export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type:
   const t = useTheme();
   const router = useRouter();
   const def: EntityTypeDef = os.registry.type(type);
-  const accent = os.registry.colorFor(type) ?? t.colors.tint;
   const existing = useLive((o) => (id ? o.entities.get(id) : undefined), [id]);
   const customFields = useLive((o) => o.customFields.forType(type), [type]);
   const existingTags = useLive((o) => (id ? o.tags.forEntity(id).map((x) => x.name) : []), [id]);
@@ -45,19 +44,19 @@ export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type:
     return [...map.entries()];
   }, [def.fields, customFields]);
 
+  const close = () => (router.canGoBack() ? router.back() : router.replace(`/entity/${type}`));
+
   const save = () => {
     setSaving(true);
     setErrors({});
     try {
       const clean: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(data)) if (v !== undefined && v !== '') clean[k] = v;
-      let saved: Entity;
-      if (id) saved = os.entities.update(id, { title: hasTitleField ? title : undefined, data: clean, status });
-      else saved = os.entities.create({ type, title: hasTitleField ? title : undefined, data: clean, status });
+      const saved = id ? os.entities.update(id, { title: hasTitleField ? title : undefined, data: clean, status }) : os.entities.create({ type, title: hasTitleField ? title : undefined, data: clean, status });
       os.tags.set(saved.id, tags);
       if (linkTo && !id) os.relations.link(saved.id, linkTo.id, linkTo.kind);
       if (onSaved) onSaved(saved);
-      else if (id) router.back();
+      else if (id) close();
       else router.replace(`/entity/${type}/${saved.id}`);
     } catch (e) {
       if (e instanceof ZodError) {
@@ -65,61 +64,50 @@ export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type:
         for (const issue of e.issues) errs[String(issue.path[0] ?? '_')] = issue.message;
         setErrors(errs);
       } else {
-        Alert.alert('Could not save', (e as Error).message);
+        setErrors({ _: (e as Error).message });
       }
     } finally {
       setSaving(false);
     }
   };
 
+  const errorCount = Object.keys(errors).length;
   return (
-    <Screen title={id ? `Edit ${def.label}` : `New ${def.label}`} right={<IconButton icon="xmark" bg onPress={() => router.back()} color={t.colors.textSecondary} />}>
-      <View style={{ gap: 12 }}>
-        {hasTitleField ? (
-          <Card style={{ gap: 12 }}>
-            <Input value={title} onChangeText={setTitle} placeholder={`${def.label} title`} autoFocus={!id} style={{ fontSize: 20, fontWeight: '600' }} error={errors.title} />
-          </Card>
-        ) : null}
-        {def.statuses?.length ? (
-          <Card>
-            <Text variant="footnote" color="secondary" style={{ marginBottom: 6 }}>
-              Status
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-              {def.statuses.map((s) => (
-                <Chip key={s.value} label={s.label} selected={status === s.value} color={s.color ?? accent} onPress={() => setStatus(s.value)} />
+    <Screen title={id ? `Edit ${def.label.toLowerCase()}` : `New ${def.label.toLowerCase()}`} eyebrow={id ? existing?.title : os.registry.modules.get(def.module)?.name} right={<IconButton icon="x" accessibilityLabel="Close" filled onPress={close} />}>
+      {hasTitleField ? <TextField label="Name" required value={title} onChange={setTitle} placeholder={`${def.label} name`} autoFocus={!id} error={errors.title} /> : null}
+      {def.statuses?.length ? (
+        <Field label="Status">
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {def.statuses.map((s) => (
+              <FilterChip key={s.value} label={s.label} selected={status === s.value} onPress={() => setStatus(s.value)} />
+            ))}
+          </View>
+        </Field>
+      ) : null}
+      {sections.map(([section, fields], si) =>
+        section ? (
+          <SectionCard key={section} title={section}>
+            <View style={{ gap: 16 }}>
+              {fields.map((f) => (
+                <FieldInput key={f.key} field={f} value={data[f.key]} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} error={errors[f.key]} />
               ))}
             </View>
-          </Card>
-        ) : null}
-        {sections.map(([section, fields], si) => (
-          <Card key={section || '_'} style={{ gap: 14 }}>
-            {section ? (
-              <Text variant="headline" color={accent}>
-                {section}
-              </Text>
-            ) : null}
+          </SectionCard>
+        ) : (
+          <View key="_" style={{ gap: 16 }}>
             {fields.map((f, i) => (
-              <FieldInput key={f.key} field={f} value={data[f.key]} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} error={errors[f.key]} accent={accent} autoFocus={!id && !hasTitleField && si === 0 && i === 0 && f.type !== 'date'} />
+              <FieldInput key={f.key} field={f} value={data[f.key]} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} error={errors[f.key]} autoFocus={!id && !hasTitleField && si === 0 && i === 0 && f.type !== 'date'} />
             ))}
-          </Card>
-        ))}
-        <Card style={{ gap: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Icon name="tag" size={14} color={accent} />
-            <Text variant="headline" color={accent}>
-              Tags
-            </Text>
           </View>
-          <TagEditor tags={tags} onChange={setTags} accent={accent} />
-        </Card>
-        {errors._ ? (
-          <Text color={t.colors.danger} variant="footnote">
-            {errors._}
-          </Text>
-        ) : null}
-        <Button title={id ? 'Save changes' : `Add ${def.label}`} onPress={save} loading={saving} color={accent} />
-      </View>
+        ),
+      )}
+      <TagEditor label="Tags" tags={tags} onChange={setTags} />
+      {errorCount ? (
+        <Text variant="caption" color={t.c.alert.coralText} accessibilityLiveRegion="polite">
+          {errors._ ?? `Check ${errorCount === 1 ? 'the highlighted field' : `${errorCount} highlighted fields`}.`}
+        </Text>
+      ) : null}
+      <Button title={id ? 'Save changes' : `Add ${def.label.toLowerCase()}`} icon="check" block onPress={save} loading={saving} />
     </Screen>
   );
 }

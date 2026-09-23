@@ -3,11 +3,11 @@ import { Pressable, View } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 
-/** Pill track on tile; the selected segment is raised (colour only, no shadow). */
+/** Pill track in the line colour (reads on ground and tile); the selected segment is raised (colour only, no shadow). */
 export function Segmented<T extends string>({ options, value, onChange }: { options: Array<{ value: T; label: string }>; value: T; onChange: (v: T) => void }) {
   const t = useTheme();
   return (
-    <View accessibilityRole="tablist" style={{ flexDirection: 'row', backgroundColor: t.c.bg.tile, borderRadius: t.radius.chip, padding: 4, gap: 4 }}>
+    <View accessibilityRole="tablist" style={{ flexDirection: 'row', backgroundColor: t.c.line, borderRadius: t.radius.chip, padding: 4, gap: 4 }}>
       {options.map((o) => {
         const sel = o.value === value;
         return (

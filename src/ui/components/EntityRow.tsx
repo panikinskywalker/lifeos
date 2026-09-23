@@ -2,20 +2,18 @@ import React from 'react';
 import { useRouter } from 'expo-router';
 import type { Entity } from '@core/domain/types';
 import { useOS } from '../hooks';
-import { Row } from './primitives';
-import { useTheme } from '../theme/ThemeProvider';
+import { RowItem } from '../kit';
+import { tintForModule } from '../theme/moduleTint';
 
 /**
- * Generic list row for any entity: icon in module colour, title, subtitle or
- * summary fields, and a right-hand value if the type has a currency field.
- * Modules can pass `render` overrides but rarely need to.
+ * Generic list row for any entity: module-tinted icon-box, title, subtitle
+ * from summary fields, amount on the right when the type has a currency
+ * field, and a status chip when the record is past its first status.
  */
-export function EntityRow({ entity, first, last, onPress, showType, value, subtitle }: { entity: Entity; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null }) {
+export function EntityRow({ entity, last, onPress, showType, value, subtitle }: { entity: Entity; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null }) {
   const os = useOS();
-  const t = useTheme();
   const router = useRouter();
   const def = os.registry.entityTypes.get(entity.type);
-  const accent = os.registry.colorFor(entity.type) ?? t.colors.tint;
   const currencyField = def?.fields.find((f) => f.type === 'currency');
   const amount = currencyField ? (entity.data[currencyField.key] as number | undefined) : undefined;
   const statusDef = def?.statuses?.find((s) => s.value === entity.status);
@@ -37,19 +35,18 @@ export function EntityRow({ entity, first, last, onPress, showType, value, subti
           .join(' · ') ||
         (entity.occurredAt ? os.format.date(entity.occurredAt, 'relative') : null);
   const kind = entity.data.kind as string | undefined;
-  const valueColor = kind === 'income' ? t.colors.success : undefined;
+  const money = amount != null ? os.format.currency(amount, (entity.data.currency as string) || undefined) : null;
+  const shownValue = value !== undefined ? value : money != null ? `${kind === 'expense' ? '−' : kind === 'income' ? '+' : ''}${money}` : undefined;
+  const status = statusDef && def?.statuses && def.statuses.length > 1 && statusDef.value !== def.statuses[0]!.value ? statusDef.label : null;
   return (
-    <Row
+    <RowItem
       title={entity.title}
-      subtitle={showType && def ? `${def.label}${sub ? ` · ${sub}` : ''}` : sub}
+      subtitle={[showType ? def?.label : null, status, sub].filter(Boolean).join(' · ') || null}
       icon={def?.icon}
-      iconColor={accent}
-      value={value !== undefined ? value : amount != null ? `${kind === 'expense' ? '−' : kind === 'income' ? '+' : ''}${os.format.currency(amount, (entity.data.currency as string) || undefined)}` : undefined}
-      valueColor={valueColor}
-      first={first}
-      last={last}
-      badge={statusDef && def?.statuses && def.statuses.length > 1 && statusDef.value !== def.statuses[0].value ? statusDef.label : undefined}
-      badgeColor={statusDef?.color ?? accent}
+      tint={tintForModule(def?.module)}
+      value={shownValue}
+      valueTone={kind === 'income' ? 'ok' : 'default'}
+      divider={!last}
       onPress={onPress ?? (() => router.push(`/entity/${entity.type}/${entity.id}`))}
     />
   );

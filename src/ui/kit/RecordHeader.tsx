@@ -20,7 +20,7 @@ export interface HeaderStat {
  * Top of a Record screen: a band in the module tint running under the status
  * bar, with back/actions, icon-box, title, status chip and up to three key stats.
  */
-export function RecordHeader({ tint, icon, title, subtitle, status, stats, onBack, actions }: { tint: TintKey; icon?: IconName | (string & {}); title: string; subtitle?: string | null; status?: { label: string; tone?: ChipTone }; stats?: HeaderStat[]; onBack?: () => void; actions?: React.ReactNode }) {
+export function RecordHeader({ tint, icon, title, subtitle, status, stats, onBack, actions }: { tint: TintKey; icon?: IconName | (string & {}); title: string; subtitle?: string | null; status?: { label: string; tone?: ChipTone; onPress?: () => void }; stats?: HeaderStat[]; onBack?: () => void; actions?: React.ReactNode }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const tone = t.tints[tint];
@@ -44,7 +44,7 @@ export function RecordHeader({ tint, icon, title, subtitle, status, stats, onBac
           ) : null}
         </View>
       </View>
-      {status ? <Chip label={status.label} tone={status.tone ?? 'neutral'} /> : null}
+      {status ? <Chip label={status.label} tone={status.tone ?? 'neutral'} icon={status.onPress ? 'chevron-down' : undefined} onPress={status.onPress} /> : null}
       {stats?.length ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 24, rowGap: 8 }}>
           {stats.slice(0, 3).map((s) => (

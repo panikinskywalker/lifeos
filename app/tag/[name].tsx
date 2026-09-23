@@ -1,19 +1,29 @@
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useLive } from '@ui/hooks';
-import { Card, IconButton, Screen, Text } from '@ui/components/primitives';
+import type { Entity } from '@core/domain/types';
+import { useLive, useOS } from '@ui/hooks';
 import { EntityRow } from '@ui/components/EntityRow';
+import { EmptyState, Screen, SectionCard } from '@ui/kit';
 
+/** Everything with one tag, grouped by record type. */
 export default function TagRoute() {
+  const os = useOS();
   const router = useRouter();
   const { name } = useLocalSearchParams<{ name: string }>();
   const tag = decodeURIComponent(name ?? '');
   const items = useLive((o) => o.entities.query(null, { filter: { and: [{ field: 'tag', op: 'hasTag', value: tag }] }, sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 300 }), [tag]);
+  const byType = new Map<string, Entity[]>();
+  for (const e of items) byType.set(e.type, [...(byType.get(e.type) ?? []), e]);
   return (
-    <Screen title={`#${tag}`} padded={false} right={<IconButton icon="xmark" bg onPress={() => router.back()} />}>
-      <Card padded={false} style={{ marginHorizontal: 16 }}>
-        {items.length === 0 ? <Text color="tertiary" style={{ padding: 16 }}>Nothing tagged.</Text> : items.map((e, i) => <EntityRow key={e.id} entity={e} showType last={i === items.length - 1} />)}
-      </Card>
+    <Screen title={`#${tag}`} eyebrow={`${items.length} ${items.length === 1 ? 'record' : 'records'}`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/tag'))}>
+      {items.length === 0 ? <EmptyState icon="tag" line="Nothing has this tag any more." /> : null}
+      {[...byType.entries()].map(([type, list]) => (
+        <SectionCard key={type} title={os.registry.entityTypes.get(type)?.labelPlural ?? type} flush>
+          {list.map((e, i) => (
+            <EntityRow key={e.id} entity={e} last={i === list.length - 1} />
+          ))}
+        </SectionCard>
+      ))}
     </Screen>
   );
 }

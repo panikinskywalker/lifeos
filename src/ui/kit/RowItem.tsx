@@ -39,7 +39,7 @@ export interface RowItemProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** icon-box · title / sub · trailing value or checkbox. Min 56 high. */
+/** icon-box · title / sub · trailing value or checkbox. Min 56 high. The value never truncates; the title does. */
 export function RowItem({ title, subtitle, icon, tint, value, valueTone = 'default', checked, onToggle, trailing, chevron, onPress, onLongPress, divider, destructive, style }: RowItemProps) {
   const t = useTheme();
   const valueColor = { default: t.c.fg.primary, alert: t.c.alert.coralText, ok: t.c.ok.sageText, secondary: t.c.fg.secondary }[valueTone];
@@ -54,7 +54,7 @@ export function RowItem({ title, subtitle, icon, tint, value, valueTone = 'defau
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 10, paddingHorizontal: 16 }}>
         {icon ? <IconBox icon={icon} tint={tint} /> : null}
-        <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flex: 1, minWidth: 96 }}>
           <Text variant="body" numberOfLines={1} color={destructive ? t.c.alert.coralText : done ? 'secondary' : undefined} style={done ? { textDecorationLine: 'line-through' } : undefined}>
             {title}
           </Text>
@@ -65,7 +65,7 @@ export function RowItem({ title, subtitle, icon, tint, value, valueTone = 'defau
           ) : null}
         </View>
         {value ? (
-          <Text variant="body" color={valueColor} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontWeight: '700' }}>
+          <Text variant="body" color={valueColor} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontWeight: '700', flexShrink: 0 }}>
             {value}
           </Text>
         ) : null}

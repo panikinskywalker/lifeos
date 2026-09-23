@@ -17,3 +17,6 @@ export { SectionCard } from './SectionCard';
 export { Icon, icons, type IconName } from '../icons';
 export { BottomBar, useBottomBarInset, type BottomBarItem } from './BottomBar';
 export { Screen, ScreenHeader } from './Screen';
+export { DetailRow } from './DetailRow';
+export { Timeline, type TimelineEntry } from './Timeline';
+export { ActionSheet, type SheetAction } from './ActionSheet';

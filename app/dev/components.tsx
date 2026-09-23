@@ -6,12 +6,14 @@ import { ThemeProvider, useTheme } from '@ui/theme/ThemeProvider';
 import { TINT_KEYS } from '@ui/theme/tokens';
 import { ICON_NAMES } from '@ui/icons';
 import {
+  ActionSheet,
   BentoGrid,
   BottomBar,
   Button,
   ChipRow,
   Chip,
   DateField,
+  DetailRow,
   EmptyState,
   FilterChip,
   Icon,
@@ -35,6 +37,7 @@ import {
   Text,
   TextField,
   Tile,
+  Timeline,
   ToastProvider,
   useToast,
 } from '@ui/kit';
@@ -344,7 +347,7 @@ function Header() {
         icon="car"
         title="Creta"
         subtitle="Hyundai · MH 12 AB 1234"
-        status={{ label: 'Service in 12 days', tone: 'accent' }}
+        status={{ label: 'Service in 12 days', tone: 'accent', onPress: () => {} }}
         stats={[{ label: 'Odometer', value: '35,120', unit: 'km' }, { label: 'This year', value: '₹18.4k' }, { label: 'Overdue', value: '1', tone: 'alert' }]}
         onBack={() => {}}
         actions={<IconButton icon="edit" accessibilityLabel="Edit" />}
@@ -379,6 +382,52 @@ function Headers() {
   );
 }
 
+function Details() {
+  return (
+    <SectionCard title="Details" flush>
+      <DetailRow label="Make" value="Hyundai" divider />
+      <DetailRow label="Registration" value="MH 12 AB 1234" divider />
+      <DetailRow label="Insurer" value="HDFC Ergo" onPress={() => {}} divider />
+      <DetailRow label="Notes" value="Spare key in the kitchen drawer. Service book in the glovebox." />
+    </SectionCard>
+  );
+}
+
+function History() {
+  return (
+    <SectionCard title="Timeline" flush>
+      <Timeline
+        entries={[
+          { id: '1', icon: 'wrench', title: 'Service done · ₹6,400', body: 'At Hyundai, 35,120 km. Next in 6 months or 10,000 km.', meta: '23 Sep, 9:40 am · agent', actor: 'assistant' },
+          { id: '2', icon: 'tag', title: 'Tagged #car', meta: '12 Sep, 6:02 pm' },
+          { id: '3', icon: 'bolt', title: 'Flagged big spend', meta: '2 Sep, 8:15 am · automation', actor: 'automation' },
+          { id: '4', icon: 'plus-circle', title: 'Created', meta: '14 Mar 2026' },
+        ]}
+      />
+    </SectionCard>
+  );
+}
+
+function Actions() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button title="Open action sheet" variant="secondary" onPress={() => setOpen(true)} />
+      <ActionSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        title="Creta"
+        actions={[
+          { label: 'Edit', icon: 'edit', onPress: () => {} },
+          { label: 'Duplicate', icon: 'file', onPress: () => {} },
+          { label: 'Archive', icon: 'archive', onPress: () => {} },
+          { label: 'Delete', icon: 'trash', destructive: true, onPress: () => {} },
+        ]}
+      />
+    </>
+  );
+}
+
 const SECTIONS: Array<[string, React.ComponentType]> = [
   ['Colour', Colours],
   ['Type', Type],
@@ -393,6 +442,9 @@ const SECTIONS: Array<[string, React.ComponentType]> = [
   ['Sheet · Toast with Undo', SheetAndToast],
   ['Form fields', Fields],
   ['RecordHeader', Header],
+  ['DetailRow', Details],
+  ['Timeline', History],
+  ['ActionSheet', Actions],
   ['ScreenHeader', Headers],
   ['BottomBar', Bar],
 ];

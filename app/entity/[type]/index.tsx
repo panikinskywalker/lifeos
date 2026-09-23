@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import type { FilterClause } from '@core/domain/types';
 import { EntityListScreen } from '@ui/screens/EntityListScreen';
 import { useOS } from '@ui/hooks';
-import { EmptyState } from '@ui/components/primitives';
+import { EmptyState, Screen } from '@ui/kit';
 
 /**
  * /entity/<type>?category=..&from=..&to=..&projectId=..&personId=..&tag=..
@@ -12,7 +12,11 @@ import { EmptyState } from '@ui/components/primitives';
 export default function EntityListRoute() {
   const os = useOS();
   const { type, ...params } = useLocalSearchParams<{ type: string; [k: string]: string }>();
-  if (!type || !os.registry.hasType(type)) return <EmptyState icon="cube" title="Unknown record type" />;
+  if (!type || !os.registry.hasType(type)) return (
+      <Screen title="Not found">
+        <EmptyState icon="box" line={`There is no record type called “${type}”.`} />
+      </Screen>
+    );
   const and: FilterClause[] = [];
   for (const [k, v] of Object.entries(params)) {
     if (!v) continue;

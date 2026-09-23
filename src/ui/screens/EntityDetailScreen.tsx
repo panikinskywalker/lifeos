@@ -1,363 +1,381 @@
 import React, { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import type { Entity, FieldDef } from '@core/domain/types';
 import { describeRRule } from '@core/automation/recurrence';
+import type { LifeOSContext } from '@core/registry/context';
 import { useTheme } from '../theme/ThemeProvider';
-import { Badge, Button, Card, Chip, Divider, EmptyState, GroupLabel, Icon, IconButton, Input, Row, Screen, SectionHeader, Text } from '../components/primitives';
-import { ActionSheet, Sheet } from '../components/Sheet';
-import { EntityPicker, TagEditor, DateField } from '../components/fields';
+import { tintForModule } from '../theme/moduleTint';
+import type { TintKey } from '../theme/tokens';
+import { ActionSheet, Button, Chip, DateField, DetailRow, EmptyState, Field, FilterChip, IconButton, RecordHeader, RowItem, SectionCard, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
+import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 
+type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags';
+
 /**
- * Universal record page: fields, relations, tags, reminders, attachments,
- * comments and the full timeline. Modules add sections via
- * manifest.detailSections without touching this file.
+ * Universal record page: tinted header with key stats, fields, module
+ * sections, tags, relations, reminders, attachments, notes and the full
+ * timeline. Modules add sections via manifest.detailSections.
  */
 export function EntityDetailScreen({ id }: { id: string }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
   const entity = useLive((o) => o.entities.get(id), [id]);
-  const [menu, setMenu] = useState(false);
-  if (!entity) return <EmptyState icon="trash" title="Record not found" body="It may have been deleted." action="Go back" onAction={() => router.back()} />;
+  const tags = useLive((o) => o.tags.forEntity(id), [id]);
+  const [panel, setPanel] = useState<Panel>(null);
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/browse'));
+  if (!entity) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.c.bg.ground, paddingTop: insets.top + 48 }}>
+        <EmptyState icon="trash" line="This record no longer exists. It may have been deleted." action="Go back" onAction={back} />
+      </View>
+    );
+  }
   const def = os.registry.type(entity.type);
-  const accent = os.registry.colorFor(entity.type) ?? t.colors.tint;
-  const module = os.registry.modules.get(def.module);
+  const tint = tintForModule(def.module);
   const statusDef = def.statuses?.find((s) => s.value === entity.status);
   const sections = os.registry.detailSections.filter((s) => s.entityType === '*' || s.entityType === entity.type);
+  const close = () => setPanel(null);
 
   const remove = () => {
-    const doIt = () => {
-      os.entities.delete(entity.id);
-      router.back();
-    };
-    if (Platform.OS === 'web') doIt();
-    else Alert.alert(`Delete ${def.label.toLowerCase()}?`, 'You can restore it from Settings › Data for 30 days.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: doIt }]);
+    os.entities.delete(entity.id);
+    back();
+    toast.show({ message: `${def.label} deleted`, icon: 'trash', undo: () => os.entities.restore(entity.id) });
   };
 
   return (
-    <Screen padded={false} largeTitle={false}>
-      {/* Header */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <IconButton icon="chevron.left" bg onPress={() => router.back()} />
-          <View style={{ flex: 1 }} />
-          <IconButton icon={entity.starred ? 'star.fill' : 'star'} bg color={entity.starred ? t.colors.accents.yellow : t.colors.textSecondary} onPress={() => os.entities.update(entity.id, { starred: !entity.starred })} />
-          <IconButton icon="pencil" bg onPress={() => router.push(`/entity/${entity.type}/${entity.id}/edit`)} />
-          <IconButton icon="ellipsis" bg onPress={() => setMenu(true)} />
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Icon name={def.icon} size={14} color={accent} />
-          <Text variant="footnote" color={accent} style={{ fontWeight: '600' }}>
-            {def.label.toUpperCase()}
-          </Text>
-          {module ? (
-            <Text variant="footnote" color="tertiary">
-              · {module.name}
-            </Text>
-          ) : null}
-        </View>
-        <Text variant="title1">{entity.title}</Text>
-        {entity.subtitle ? (
-          <Text variant="body" color="secondary">
-            {entity.subtitle}
-          </Text>
-        ) : null}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          {def.statuses?.length ? <StatusPicker entity={entity} accent={accent} /> : null}
-          {entity.occurredAt ? <Badge label={os.format.date(entity.occurredAt, 'medium')} /> : null}
-          {entity.archived ? <Badge label="Archived" /> : null}
-        </View>
-      </View>
+    <View style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
+        <RecordHeader
+          tint={tint}
+          icon={def.icon}
+          title={entity.title}
+          subtitle={[def.label, entity.subtitle].filter(Boolean).join(' · ')}
+          status={def.statuses?.length ? { label: statusDef?.label ?? 'No status', onPress: () => setPanel('status') } : undefined}
+          stats={headerStats(os, entity, def.fields)}
+          onBack={back}
+          actions={
+            <>
+              <IconButton icon="star" accessibilityLabel={entity.starred ? 'Unstar' : 'Star'} filled={entity.starred ? t.c.accent.mustard : undefined} color={entity.starred ? t.c.accent.mustardInk : t.tints[tint].ink} onPress={() => os.entities.update(entity.id, { starred: !entity.starred })} />
+              <IconButton icon="edit" accessibilityLabel="Edit" color={t.tints[tint].ink} onPress={() => router.push(`/entity/${entity.type}/${entity.id}/edit`)} />
+              <IconButton icon="more" accessibilityLabel="More" color={t.tints[tint].ink} onPress={() => setPanel('menu')} />
+            </>
+          }
+        />
 
-      <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 16 }}>
-        <FieldsCard entity={entity} fields={def.fields} accent={accent} />
-        {sections.map((s) => {
-          const C = s.component;
-          return (
-            <View key={s.key}>
-              <C entity={entity} ctx={os} />
-            </View>
-          );
-        })}
-        <TagsCard entity={entity} accent={accent} />
-        <RelationsCard entity={entity} accent={accent} />
-        <RemindersCard entity={entity} accent={accent} />
-        <AttachmentsCard entity={entity} accent={accent} />
-        <CommentsCard entity={entity} accent={accent} />
-        <TimelineCard entity={entity} accent={accent} />
-        <Text variant="caption" color="tertiary" style={{ textAlign: 'center', paddingVertical: 8 }}>
-          Created {os.format.dateTime(entity.createdAt)} · Updated {os.format.dateTime(entity.updatedAt)} · v{entity.version}
-        </Text>
-      </View>
+        <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 16, gap: 20 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Chip label="Remind" icon="bell" onPress={() => setPanel('remind')} />
+            <Chip label="Attach" icon="paperclip" onPress={() => setPanel('attach')} />
+            <Chip label="Link" icon="link" onPress={() => setPanel('link')} />
+            <Chip label={tags.length ? 'Tags' : 'Tag'} icon="tag" onPress={() => setPanel('tags')} />
+            {entity.archived ? <Chip label="Archived" icon="archive" tone="accent" /> : null}
+          </View>
+
+          <DetailsCard entity={entity} fields={def.fields} />
+          {sections.map((s) => {
+            const C = s.component;
+            return (
+              <View key={s.key}>
+                <C entity={entity} ctx={os} />
+              </View>
+            );
+          })}
+          {tags.length ? (
+            <SectionCard title="Tags" action="Edit" onAction={() => setPanel('tags')}>
+              <TagChips tags={tags.map((x) => x.name)} module={def.module} onPress={(name) => router.push(`/tag/${encodeURIComponent(name)}`)} />
+            </SectionCard>
+          ) : null}
+          <RelationsCard entity={entity} onLink={() => setPanel('link')} />
+          <RemindersCard entity={entity} tint={tint} />
+          <AttachmentsCard entity={entity} />
+          <NotesCard entity={entity} />
+          <TimelineCard entity={entity} />
+          <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>
+            Created {os.format.dateTime(entity.createdAt)} · updated {os.format.dateTime(entity.updatedAt)}
+          </Text>
+        </View>
+      </ScrollView>
 
       <ActionSheet
-        visible={menu}
-        onClose={() => setMenu(false)}
+        visible={panel === 'menu'}
+        onClose={close}
         title={entity.title}
         actions={[
-          { label: 'Edit', icon: 'pencil', onPress: () => router.push(`/entity/${entity.type}/${entity.id}/edit`) },
-          { label: 'Duplicate', icon: 'doc', onPress: () => {
-            const copy = os.entities.create({ type: entity.type, title: `${entity.title} (copy)`, data: entity.data, status: entity.status });
-            router.push(`/entity/${copy.type}/${copy.id}`);
-          } },
-          { label: entity.archived ? 'Unarchive' : 'Archive', icon: 'archivebox', onPress: () => os.entities.update(entity.id, { archived: !entity.archived }) },
-          { label: 'Delete', destructive: true, onPress: remove },
+          { label: 'Edit', icon: 'edit', onPress: () => router.push(`/entity/${entity.type}/${entity.id}/edit`) },
+          {
+            label: 'Duplicate',
+            icon: 'file',
+            onPress: () => {
+              const copy = os.entities.create({ type: entity.type, title: `${entity.title} (copy)`, data: entity.data, status: entity.status });
+              router.push(`/entity/${copy.type}/${copy.id}`);
+            },
+          },
+          { label: entity.archived ? 'Unarchive' : 'Archive', icon: 'archive', onPress: () => os.entities.update(entity.id, { archived: !entity.archived }) },
+          { label: 'Delete', icon: 'trash', destructive: true, onPress: remove },
         ]}
       />
-    </Screen>
-  );
-}
-
-function StatusPicker({ entity, accent }: { entity: Entity; accent: string }) {
-  const os = useOS();
-  const def = os.registry.type(entity.type);
-  const [open, setOpen] = useState(false);
-  const cur = def.statuses?.find((s) => s.value === entity.status);
-  return (
-    <>
-      <Chip label={cur?.label ?? 'No status'} selected color={cur?.color ?? accent} onPress={() => setOpen(true)} icon="chevron.down" />
-      <Sheet visible={open} onClose={() => setOpen(false)} title="Status">
-        <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {def.statuses!.map((s) => (
-            <Chip
-              key={s.value}
-              label={s.label}
-              selected={s.value === entity.status}
-              color={s.color ?? accent}
-              onPress={() => {
-                os.entities.setStatus(entity.id, s.value);
-                setOpen(false);
-              }}
-            />
-          ))}
-        </View>
+      {def.statuses?.length ? (
+        <Sheet visible={panel === 'status'} onClose={close} title="Status">
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {def.statuses.map((s) => (
+              <FilterChip
+                key={s.value}
+                label={s.label}
+                selected={s.value === entity.status}
+                onPress={() => {
+                  os.entities.setStatus(entity.id, s.value);
+                  close();
+                }}
+              />
+            ))}
+          </View>
+        </Sheet>
+      ) : null}
+      <Sheet visible={panel === 'tags'} onClose={close} title="Tags" footer={<Button title="Done" block onPress={close} />}>
+        <TagEditor tags={tags.map((x) => x.name)} onChange={(names) => os.tags.set(entity.id, names)} />
       </Sheet>
-    </>
+      <ReminderSheet visible={panel === 'remind'} onClose={close} entity={entity} />
+      <AttachSheet visible={panel === 'attach'} onClose={close} entity={entity} />
+      <LinkSheet visible={panel === 'link'} onClose={close} entity={entity} />
+    </View>
   );
 }
 
-function FieldsCard({ entity, fields, accent }: { entity: Entity; fields: FieldDef[]; accent: string }) {
+/** Display text for a field value, plus a target when it points at another record. */
+function renderValue(os: LifeOSContext, entity: Entity, f: FieldDef, v: unknown): { text: string; target?: Entity } {
+  switch (f.type) {
+    case 'currency':
+      return { text: os.format.currency(Number(v), (entity.data.currency as string) || undefined) };
+    case 'number':
+      // Years read as 2022, not 2,022.
+      return { text: /year/i.test(f.key) ? String(v) : os.format.number(Number(v), 2) };
+    case 'boolean':
+      return { text: v ? 'Yes' : 'No' };
+    case 'date':
+      return { text: os.format.date(String(v)) };
+    case 'datetime':
+      return { text: os.format.dateTime(Number(v)) };
+    case 'select':
+      return { text: f.options?.find((x) => x.value === v)?.label ?? String(v) };
+    case 'multiselect':
+      return { text: (v as string[]).map((x) => f.options?.find((o) => o.value === x)?.label ?? x).join(', ') };
+    case 'relation': {
+      const refs = os.entities.getMany(Array.isArray(v) ? (v as string[]) : [String(v)]);
+      return { text: refs.map((r) => r.title).join(', ') || '—', target: refs.length === 1 ? refs[0] : undefined };
+    }
+    case 'json':
+      return { text: typeof v === 'string' ? v : JSON.stringify(v) };
+    default:
+      return { text: String(v) };
+  }
+}
+
+const hasValue = (v: unknown) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0);
+
+/** Up to three header stats: money first, then summary fields, then the record's date. */
+function headerStats(os: LifeOSContext, entity: Entity, fields: FieldDef[]): HeaderStat[] {
+  const picked = [...fields.filter((f) => f.type === 'currency'), ...fields.filter((f) => f.summary && f.type !== 'currency' && f.type !== 'longtext' && f.type !== 'relation')].filter((f) => hasValue(entity.data[f.key]));
+  const stats = picked.slice(0, 3).map((f) => ({ label: f.label, value: renderValue(os, entity, f, entity.data[f.key]).text }));
+  if (stats.length < 3 && entity.occurredAt) stats.push({ label: 'Date', value: os.format.date(entity.occurredAt, 'medium') });
+  return stats.filter((s) => s.value.length <= 16);
+}
+
+function DetailsCard({ entity, fields }: { entity: Entity; fields: FieldDef[] }) {
   const os = useOS();
-  const t = useTheme();
   const router = useRouter();
   const custom = useLive((o) => o.customFields.forType(entity.type), [entity.type]);
   const all: FieldDef[] = [...fields, ...custom.map((c) => ({ key: `custom_${c.key}`, label: c.label, type: c.fieldType, options: c.options.options }))];
-  const rows = all
-    .map((f) => ({ f, v: entity.data[f.key] }))
-    .filter(({ v }) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
+  const rows = all.filter((f) => hasValue(entity.data[f.key]));
   if (!rows.length) return null;
-  const render = (f: FieldDef, v: unknown): { text: string; onPress?: () => void; color?: string } => {
-    switch (f.type) {
-      case 'currency':
-        return { text: os.format.currency(Number(v), (entity.data.currency as string) || undefined) };
-      case 'number':
-        return { text: os.format.number(Number(v), 2) };
-      case 'boolean':
-        return { text: v ? 'Yes' : 'No' };
-      case 'date':
-        return { text: os.format.date(String(v)) };
-      case 'datetime':
-        return { text: os.format.dateTime(Number(v)) };
-      case 'select': {
-        const o = f.options?.find((x) => x.value === v);
-        return { text: o?.label ?? String(v), color: o?.color };
-      }
-      case 'multiselect':
-        return { text: (v as string[]).map((x) => f.options?.find((o) => o.value === x)?.label ?? x).join(', ') };
-      case 'relation': {
-        const ids = Array.isArray(v) ? (v as string[]) : [String(v)];
-        const refs = os.entities.getMany(ids);
-        return { text: refs.map((r) => r.title).join(', ') || '—', onPress: refs.length === 1 ? () => router.push(`/entity/${refs[0].type}/${refs[0].id}`) : undefined, color: t.colors.tint };
-      }
-      case 'json':
-        return { text: typeof v === 'string' ? v : JSON.stringify(v) };
-      default:
-        return { text: String(v) };
-    }
-  };
   return (
-    <Card padded={false}>
-      {rows.map(({ f, v }, i) => {
-        const r = render(f, v);
-        const long = f.type === 'longtext' || r.text.length > 40;
-        return (
-          <Pressable key={f.key} onPress={r.onPress} disabled={!r.onPress}>
-            <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: long ? 'column' : 'row', gap: long ? 4 : 12, alignItems: long ? 'stretch' : 'center' }}>
-              <Text variant="subhead" color="secondary" style={{ flexShrink: 0 }}>
-                {f.label}
-              </Text>
-              <Text variant="body" color={r.color} style={{ flex: long ? undefined : 1, textAlign: long ? 'left' : 'right' }} selectable>
-                {r.text}
-              </Text>
-            </View>
-            {i < rows.length - 1 ? <Divider inset={16} /> : null}
-          </Pressable>
-        );
+    <SectionCard title="Details" flush>
+      {rows.map((f, i) => {
+        const r = renderValue(os, entity, f, entity.data[f.key]);
+        return <DetailRow key={f.key} label={f.label} value={r.text} stacked={f.type === 'longtext' ? true : undefined} divider={i < rows.length - 1} onPress={r.target ? () => router.push(`/entity/${r.target!.type}/${r.target!.id}`) : undefined} />;
       })}
-    </Card>
+    </SectionCard>
   );
 }
 
-function TagsCard({ entity, accent }: { entity: Entity; accent: string }) {
+function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void }) {
   const os = useOS();
   const router = useRouter();
-  const tags = useLive((o) => o.tags.forEntity(entity.id), [entity.id]);
-  const [edit, setEdit] = useState(false);
-  return (
-    <View>
-      <SectionHeader title="Tags" icon="tag" color={accent} action={edit ? 'Done' : 'Edit'} onAction={() => setEdit((e) => !e)} />
-      <Card>
-        {edit ? (
-          <TagEditor tags={tags.map((x) => x.name)} onChange={(names) => os.tags.set(entity.id, names)} accent={accent} />
-        ) : tags.length ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {tags.map((tag) => (
-              <Chip key={tag.id} label={`#${tag.name}`} color={tag.color ?? accent} onPress={() => router.push(`/tag/${encodeURIComponent(tag.name)}`)} />
-            ))}
-          </View>
-        ) : (
-          <Text color="tertiary">No tags</Text>
-        )}
-      </Card>
-    </View>
-  );
-}
-
-function RelationsCard({ entity, accent }: { entity: Entity; accent: string }) {
-  const os = useOS();
-  const t = useTheme();
-  const router = useRouter();
+  const toast = useToast();
   const rels = useLive((o) => o.relations.forEntity(entity.id), [entity.id]);
-  const [pick, setPick] = useState(false);
-  const [kind, setKind] = useState('related');
+  if (!rels.length) return null;
   const def = os.registry.type(entity.type);
-  const kinds = [...new Set(['related', ...(def.relations?.map((r) => r.kind) ?? []), ...rels.map((r) => r.relation.kind)])];
-  const grouped = new Map<string, typeof rels>();
-  for (const r of rels) {
-    const k = r.relation.kind;
-    if (!grouped.has(k)) grouped.set(k, []);
-    grouped.get(k)!.push(r);
-  }
   const kindLabel = (k: string) => def.relations?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
   return (
-    <View>
-      <SectionHeader title="Related" icon="link" color={accent} action="Link" onAction={() => setPick(true)} />
-      {rels.length ? (
-        [...grouped.entries()].map(([k, items]) => (
-          <View key={k} style={{ marginBottom: 10 }}>
-            <Text variant="footnote" color="secondary" style={{ marginBottom: 4, marginLeft: 4 }}>
-              {kindLabel(k)}
-            </Text>
-            <Card padded={false}>
-              {items.map((r, i) => {
-                const d = os.registry.entityTypes.get(r.other.type);
-                return (
-                  <Row
-                    key={r.relation.id}
-                    title={r.other.title}
-                    subtitle={d?.label}
-                    icon={d?.icon}
-                    iconColor={os.registry.colorFor(r.other.type)}
-                    last={i === items.length - 1}
-                    onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)}
-                    onLongPress={() => os.relations.unlink(entity.id, r.other.id, r.relation.kind)}
-                  />
-                );
-              })}
-            </Card>
-          </View>
-        ))
-      ) : (
-        <Card>
-          <Text color="tertiary">Not linked to anything yet. Link people, trips, projects, accounts…</Text>
-        </Card>
-      )}
-      <Sheet visible={pick} onClose={() => setPick(false)} title="Link as…">
-        <View style={{ paddingHorizontal: 16, gap: 12 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {kinds.map((k) => (
-              <Chip key={k} label={kindLabel(k)} selected={kind === k} onPress={() => setKind(k)} color={accent} />
-            ))}
-          </ScrollView>
-          <Input placeholder="Or type a custom kind" value={kinds.includes(kind) ? '' : kind} onChangeText={setKind} />
-          <PickInline onPick={(id) => { os.relations.link(entity.id, id, kind || 'related'); setPick(false); }} exclude={[entity.id]} />
-        </View>
-      </Sheet>
-      {/* keep t referenced for potential theming */}
-      <View style={{ height: 0, backgroundColor: t.colors.background }} />
-    </View>
+    <SectionCard title="Related" action="Link" onAction={onLink} flush>
+      {rels.map((r, i) => {
+        const d = os.registry.entityTypes.get(r.other.type);
+        return (
+          <RowItem
+            key={r.relation.id}
+            title={r.other.title}
+            subtitle={`${kindLabel(r.relation.kind)} · ${d?.label ?? r.other.type}`}
+            icon={d?.icon}
+            tint={tintForModule(d?.module)}
+            divider={i < rels.length - 1}
+            onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)}
+            onLongPress={() => {
+              const { kind } = r.relation;
+              os.relations.unlink(entity.id, r.other.id, kind);
+              toast.show({ message: `Unlinked ${r.other.title}`, icon: 'link', undo: () => void os.relations.link(entity.id, r.other.id, kind) });
+            }}
+          />
+        );
+      })}
+    </SectionCard>
   );
 }
 
-function PickInline({ onPick, exclude }: { onPick: (id: string) => void; exclude: string[] }) {
-  const [open, setOpen] = useState(false);
+function LinkSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: Entity }) {
+  const os = useOS();
+  const toast = useToast();
+  const [kind, setKind] = useState('related');
+  const [picking, setPicking] = useState(false);
+  const def = os.registry.type(entity.type);
+  const kinds = [...new Set(['related', ...(def.relations?.map((r) => r.kind) ?? [])])];
+  const kindLabel = (k: string) => def.relations?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
   return (
     <>
-      <Button title="Choose record" variant="secondary" icon="magnifyingglass" onPress={() => setOpen(true)} />
-      <EntityPicker visible={open} onClose={() => setOpen(false)} types={[]} exclude={exclude} onSelect={(id) => { setOpen(false); onPick(id); }} />
+      <Sheet visible={visible && !picking} onClose={onClose} title="Link to…" footer={<Button title="Choose record" icon="search" block onPress={() => setPicking(true)} />}>
+        <Field label="Link as">
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {kinds.map((k) => (
+              <FilterChip key={k} label={kindLabel(k)} selected={kind === k} onPress={() => setKind(k)} />
+            ))}
+          </View>
+        </Field>
+        <TextField label="Or a custom kind" value={kinds.includes(kind) ? '' : kind} onChange={(v) => setKind(v || 'related')} placeholder="e.g. vendor, gift for" />
+      </Sheet>
+      <EntityPicker
+        visible={visible && picking}
+        onClose={() => setPicking(false)}
+        types={[]}
+        exclude={[entity.id]}
+        onSelect={(otherId) => {
+          os.relations.link(entity.id, otherId, kind || 'related');
+          setPicking(false);
+          onClose();
+          toast.show({ message: `Linked as ${kindLabel(kind).toLowerCase()}`, icon: 'link', undo: () => os.relations.unlink(entity.id, otherId, kind || 'related') });
+        }}
+      />
     </>
   );
 }
 
-function RemindersCard({ entity, accent }: { entity: Entity; accent: string }) {
+function RemindersCard({ entity, tint }: { entity: Entity; tint: TintKey }) {
   const os = useOS();
   const t = useTheme();
-  const reminders = useLive((o) => o.reminders.forEntity(entity.id), [entity.id]);
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [due, setDue] = useState<number | undefined>(undefined);
-  const [rrule, setRrule] = useState<string | null>(null);
-  const active = reminders.filter((r) => !r.doneAt);
+  const toast = useToast();
+  const active = useLive((o) => o.reminders.forEntity(entity.id), [entity.id]).filter((r) => !r.doneAt);
+  if (!active.length) return null;
   return (
-    <View>
-      <SectionHeader title="Reminders" icon="bell" color={accent} action="Add" onAction={() => { setTitle(`Follow up: ${entity.title}`); setDue(Date.now() + 86400000); setOpen(true); }} />
-      {active.length ? (
-        <Card padded={false}>
-          {active.map((r, i) => (
-            <Row
-              key={r.id}
-              title={r.title}
-              subtitle={`${os.format.dateTime(r.snoozedUntil ?? r.nextAt ?? r.dueAt)} · ${describeRRule(r.rrule)}`}
-              icon="bell"
-              iconColor={(r.nextAt ?? r.dueAt) < Date.now() ? t.colors.danger : accent}
-              last={i === active.length - 1}
-              chevron={false}
-              right={<IconButton icon="checkmark.circle" onPress={() => os.reminders.complete(r.id)} color={t.colors.success} />}
-              onLongPress={() => os.reminders.remove(r.id)}
-            />
-          ))}
-        </Card>
-      ) : null}
-      <Sheet visible={open} onClose={() => setOpen(false)} title="New reminder">
-        <View style={{ paddingHorizontal: 16, gap: 12 }}>
-          <Input value={title} onChangeText={setTitle} placeholder="Reminder" autoFocus />
-          <DateField field={{ key: 'due', label: 'When', type: 'datetime' }} value={due} onChange={(v) => setDue(v as number | undefined)} />
-          <Text variant="footnote" color="secondary">
-            Repeat
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {[[null, 'Once'], ['FREQ=DAILY;INTERVAL=1', 'Daily'], ['FREQ=WEEKLY;INTERVAL=1', 'Weekly'], ['FREQ=MONTHLY;INTERVAL=1', 'Monthly'], ['FREQ=YEARLY;INTERVAL=1', 'Yearly']].map(([v, l]) => (
-              <Chip key={l} label={l!} selected={rrule === v} onPress={() => setRrule(v)} color={accent} />
-            ))}
-          </View>
-          <Button title="Save reminder" color={accent} disabled={!title || !due} onPress={() => { os.reminders.create({ entityId: entity.id, title, dueAt: due!, rrule }); setOpen(false); }} />
-        </View>
-      </Sheet>
-    </View>
+    <SectionCard title="Reminders" flush>
+      {active.map((r, i) => {
+        const at = r.snoozedUntil ?? r.nextAt ?? r.dueAt;
+        return (
+          <RowItem
+            key={r.id}
+            icon="bell"
+            tint={tint}
+            title={r.title}
+            subtitle={`${os.format.dateTime(at)} · ${describeRRule(r.rrule)}`}
+            value={at < Date.now() ? 'Overdue' : undefined}
+            valueTone="alert"
+            divider={i < active.length - 1}
+            trailing={
+              <IconButton
+                icon="check-circle"
+                accessibilityLabel={`Done: ${r.title}`}
+                color={t.c.ok.sageText}
+                onPress={() => {
+                  os.reminders.complete(r.id);
+                  toast.show({ message: r.rrule ? 'Done · rolled to the next one' : 'Reminder done', icon: 'check' });
+                }}
+              />
+            }
+            onLongPress={() => os.reminders.remove(r.id)}
+          />
+        );
+      })}
+    </SectionCard>
   );
 }
 
-function AttachmentsCard({ entity, accent }: { entity: Entity; accent: string }) {
+const REPEATS: Array<[string | null, string]> = [
+  [null, 'Once'],
+  ['FREQ=DAILY;INTERVAL=1', 'Daily'],
+  ['FREQ=WEEKLY;INTERVAL=1', 'Weekly'],
+  ['FREQ=MONTHLY;INTERVAL=1', 'Monthly'],
+  ['FREQ=YEARLY;INTERVAL=1', 'Yearly'],
+];
+
+function ReminderSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: Entity }) {
+  const os = useOS();
+  const toast = useToast();
+  const [title, setTitle] = useState(`Follow up: ${entity.title}`);
+  const [due, setDue] = useState<number | undefined>(() => Date.now() + 86400000);
+  const [rrule, setRrule] = useState<string | null>(null);
+  const save = () => {
+    const r = os.reminders.create({ entityId: entity.id, title, dueAt: due!, rrule });
+    onClose();
+    toast.show({ message: `Reminder set for ${os.format.dateTime(due!)}`, icon: 'bell', undo: () => os.reminders.remove(r.id) });
+  };
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Remind me" footer={<Button title="Save reminder" block disabled={!title || !due} onPress={save} />}>
+      <TextField label="What" value={title} onChange={setTitle} />
+      <DateField label="When" withTime value={due} onChange={(v) => setDue(typeof v === 'number' ? v : v ? new Date(v).getTime() : undefined)} />
+      <Field label="Repeat">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {REPEATS.map(([v, l]) => (
+            <FilterChip key={l} label={l} selected={rrule === v} onPress={() => setRrule(v)} />
+          ))}
+        </View>
+      </Field>
+    </Sheet>
+  );
+}
+
+function AttachmentsCard({ entity }: { entity: Entity }) {
   const os = useOS();
   const t = useTheme();
   const items = useLive((o) => o.attachments.forEntity(entity.id), [entity.id]);
-  const [menu, setMenu] = useState(false);
+  if (!items.length) return null;
+  const images = items.filter((a) => a.kind === 'image' || a.kind === 'receipt' || a.mime?.startsWith('image/'));
+  const files = items.filter((a) => !images.includes(a));
+  return (
+    <SectionCard title="Attachments" flush>
+      {images.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 8 }}>
+          {images.map((a) => (
+            <Pressable key={a.id} accessibilityRole="imagebutton" accessibilityLabel={a.name} onLongPress={() => os.attachments.remove(a.id)} onPress={() => Linking.openURL(a.uri).catch(() => {})}>
+              <Image source={{ uri: a.uri }} style={{ width: 96, height: 96, borderRadius: t.radius.iconBox, backgroundColor: t.c.bg.pressed }} contentFit="cover" />
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+      {files.map((a, i) => (
+        <RowItem key={a.id} icon="file" title={a.name} subtitle={[a.mime, a.size ? `${Math.round(a.size / 1024)} KB` : null].filter(Boolean).join(' · ')} divider={i < files.length - 1} onPress={() => Linking.openURL(a.uri).catch(() => {})} onLongPress={() => os.attachments.remove(a.id)} />
+      ))}
+    </SectionCard>
+  );
+}
+
+function AttachSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: Entity }) {
+  const os = useOS();
   const pickDoc = async () => {
     const r = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
     if (r.canceled || !r.assets?.[0]) return;
@@ -373,95 +391,74 @@ function AttachmentsCard({ entity, accent }: { entity: Entity; accent: string })
     const uri = await persistAttachment(a.uri, name);
     os.attachments.add({ entityId: entity.id, name, mime: a.mimeType ?? 'image/jpeg', size: a.fileSize ?? null, uri, kind: entity.type === 'transaction' ? 'receipt' : 'image' });
   };
-  const images = items.filter((a) => a.kind === 'image' || a.kind === 'receipt' || a.mime?.startsWith('image/'));
-  const files = items.filter((a) => !images.includes(a));
   return (
-    <View>
-      <SectionHeader title="Attachments" icon="paperclip" color={accent} action="Add" onAction={() => setMenu(true)} />
-      {items.length ? (
-        <Card padded={false}>
-          {images.length ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 8 }}>
-              {images.map((a) => (
-                <Pressable key={a.id} onLongPress={() => os.attachments.remove(a.id)} onPress={() => Linking.openURL(a.uri).catch(() => {})}>
-                  <Image source={{ uri: a.uri }} style={{ width: 96, height: 96, borderRadius: 10, backgroundColor: t.colors.fillSecondary }} contentFit="cover" />
-                </Pressable>
-              ))}
-            </ScrollView>
-          ) : null}
-          {files.map((a, i) => (
-            <Row key={a.id} title={a.name} subtitle={[a.mime, a.size ? `${Math.round(a.size / 1024)} KB` : null].filter(Boolean).join(' · ')} icon="doc" iconColor={accent} last={i === files.length - 1} onPress={() => Linking.openURL(a.uri).catch(() => {})} onLongPress={() => os.attachments.remove(a.id)} />
-          ))}
-        </Card>
-      ) : null}
-      <ActionSheet visible={menu} onClose={() => setMenu(false)} title="Attach" actions={[
-        { label: 'Take photo', onPress: () => void pickImage(true) },
-        { label: 'Choose photo', onPress: () => void pickImage(false) },
-        { label: 'Choose file', onPress: () => void pickDoc() },
-      ]} />
-    </View>
+    <ActionSheet
+      visible={visible}
+      onClose={onClose}
+      title="Attach"
+      actions={[
+        { label: 'Take photo', icon: 'camera', onPress: () => void pickImage(true) },
+        { label: 'Choose photo', icon: 'image', onPress: () => void pickImage(false) },
+        { label: 'Choose file', icon: 'file', onPress: () => void pickDoc() },
+      ]}
+    />
   );
 }
 
-function CommentsCard({ entity, accent }: { entity: Entity; accent: string }) {
+function NotesCard({ entity }: { entity: Entity }) {
   const os = useOS();
   const t = useTheme();
   const comments = useLive((o) => o.comments.forEntity(entity.id), [entity.id]);
   const [text, setText] = useState('');
+  const send = () => {
+    if (!text.trim()) return;
+    os.comments.add(entity.id, text.trim());
+    setText('');
+  };
   return (
-    <View>
-      <SectionHeader title="Notes & comments" icon="bubble.left" color={accent} />
-      <Card style={{ gap: 10 }}>
+    <SectionCard title="Notes">
+      <View style={{ gap: 12 }}>
         {comments.map((c) => (
-          <Pressable key={c.id} onLongPress={() => os.comments.remove(c.id)} style={{ gap: 2 }}>
-            <Text variant="body">{c.body}</Text>
+          <Pressable key={c.id} accessibilityHint="Long-press to delete" onLongPress={() => os.comments.remove(c.id)} style={{ gap: 2 }}>
+            <Text variant="body" selectable>
+              {c.body}
+            </Text>
             <Text variant="caption" color="tertiary">
-              {c.author === 'user' ? 'You' : c.author} · {os.format.dateTime(c.createdAt)}
+              {c.author === 'user' ? 'You' : c.author === 'assistant' ? 'Agent' : 'Automation'} · {os.format.dateTime(c.createdAt)}
             </Text>
           </Pressable>
         ))}
-        <Input value={text} onChangeText={setText} placeholder="Add a note…" multiline right={text.trim() ? <IconButton icon="arrow.up.circle.fill" onPress={() => { os.comments.add(entity.id, text.trim()); setText(''); }} color={accent} /> : undefined} style={{ minHeight: 44 }} />
-      </Card>
-      <View style={{ height: 0, backgroundColor: t.colors.background }} />
-    </View>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <TextField value={text} onChange={setText} placeholder="Add a note…" multiline />
+          </View>
+          <IconButton icon="send" accessibilityLabel="Add note" filled={text.trim() ? t.c.accent.mustard : true} color={text.trim() ? t.c.accent.mustardInk : t.c.fg.tertiary} disabled={!text.trim()} onPress={send} size={44} style={{ marginBottom: 4 }} />
+        </View>
+      </View>
+    </SectionCard>
   );
 }
 
-function TimelineCard({ entity, accent }: { entity: Entity; accent: string }) {
+const TIMELINE_ICON: Record<string, string> = { created: 'plus-circle', updated: 'edit', status: 'check-circle', comment: 'comment', attachment: 'paperclip', relation: 'link', reminder: 'bell', tag: 'tag', 'cycle.done': 'repeat' };
+
+function TimelineCard({ entity }: { entity: Entity }) {
   const os = useOS();
-  const t = useTheme();
   const events = useLive((o) => o.entities.timeline.forEntity(entity.id, 60), [entity.id]);
   const [all, setAll] = useState(false);
+  if (!events.length) return null;
   const shown = all ? events : events.slice(0, 6);
-  const iconFor = (k: string) => ({ created: 'plus.circle.fill', updated: 'pencil', status: 'flag', comment: 'bubble.left', attachment: 'paperclip', relation: 'link', reminder: 'bell', tag: 'tag' })[k] ?? 'circle.fill';
   return (
-    <View>
-      <SectionHeader title="Timeline" icon="clock" color={accent} action={events.length > 6 ? (all ? 'Less' : `All ${events.length}`) : undefined} onAction={() => setAll((a) => !a)} />
-      <Card padded={false}>
-        {shown.map((e, i) => (
-          <View key={e.id} style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
-            <View style={{ alignItems: 'center', width: 20 }}>
-              <Icon name={iconFor(e.kind)} size={16} color={e.actor === 'automation' ? t.colors.accents.purple : e.actor === 'assistant' ? t.colors.accents.indigo : accent} />
-              {i < shown.length - 1 ? <View style={{ width: 2, flex: 1, backgroundColor: t.colors.separator, marginTop: 4 }} /> : null}
-            </View>
-            <View style={{ flex: 1, paddingBottom: 4 }}>
-              <Text variant="subhead">{e.title}</Text>
-              {e.body ? (
-                <Text variant="footnote" color="secondary" numberOfLines={3}>
-                  {e.body}
-                </Text>
-              ) : null}
-              <Text variant="caption" color="tertiary">
-                {os.format.dateTime(e.occurredAt)}
-                {e.actor !== 'user' ? ` · ${e.actor}` : ''}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </Card>
-    </View>
+    <SectionCard title="Timeline" action={events.length > 6 ? (all ? 'Less' : `All ${events.length}`) : undefined} onAction={() => setAll((a) => !a)} flush>
+      <Timeline
+        entries={shown.map((e) => ({
+          id: e.id,
+          icon: TIMELINE_ICON[e.kind] ?? 'circle',
+          title: e.title,
+          body: e.body,
+          actor: e.actor,
+          meta: `${os.format.dateTime(e.occurredAt)}${e.actor === 'assistant' ? ' · agent' : e.actor === 'automation' ? ' · automation' : ''}`,
+        }))}
+      />
+    </SectionCard>
   );
 }
-
-// re-export for modules that want to compose the standard blocks
-export { GroupLabel };

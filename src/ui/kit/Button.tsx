@@ -11,10 +11,10 @@ function tap() {
   if (Platform.OS !== 'web') void Haptics.selectionAsync().catch(() => {});
 }
 
-/** Primary = mustard; secondary = tile; ghost = text only; destructive = coral. 48 high (40 when small). */
+/** Primary = mustard; secondary = line fill (reads on ground and tile); ghost = text only; destructive = coral. 48 high (40 when small). */
 export function Button({ title, onPress, variant = 'primary', icon, loading, disabled, small, block, style, accessibilityLabel }: { title: string; onPress?: () => void; variant?: ButtonVariant; icon?: IconName | (string & {}); loading?: boolean; disabled?: boolean; small?: boolean; block?: boolean; style?: StyleProp<ViewStyle>; accessibilityLabel?: string }) {
   const t = useTheme();
-  const bg = { primary: t.c.accent.mustard, secondary: t.c.bg.tile, ghost: 'transparent', destructive: t.c.alert.coral }[variant];
+  const bg = { primary: t.c.accent.mustard, secondary: t.c.line, ghost: 'transparent', destructive: t.c.alert.coral }[variant];
   const fg = { primary: t.c.accent.mustardInk, secondary: t.c.fg.primary, ghost: t.c.fg.primary, destructive: t.c.alert.coralInk }[variant];
   return (
     <Pressable

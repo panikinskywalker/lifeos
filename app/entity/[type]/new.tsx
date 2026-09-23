@@ -2,13 +2,17 @@ import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { EntityFormScreen } from '@ui/screens/EntityFormScreen';
 import { useOS } from '@ui/hooks';
-import { EmptyState } from '@ui/components/primitives';
+import { EmptyState, Screen } from '@ui/kit';
 
 /** /entity/<type>/new?<field>=<value>&linkId=..&linkKind=.. — prefill + auto-link. */
 export default function NewEntityRoute() {
   const os = useOS();
   const { type, linkId, linkKind, ...prefill } = useLocalSearchParams() as Record<string, string | undefined> & { type: string; linkId?: string; linkKind?: string };
-  if (!type || !os.registry.hasType(type)) return <EmptyState icon="cube" title="Unknown record type" />;
+  if (!type || !os.registry.hasType(type)) return (
+      <Screen title="Not found">
+        <EmptyState icon="box" line={`There is no record type called “${type}”.`} />
+      </Screen>
+    );
   const def = os.registry.type(type);
   const initial: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(prefill)) {

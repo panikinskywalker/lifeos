@@ -17,7 +17,7 @@ Order is deliberate: the design system first (so nothing gets built twice), then
 - [x] Dark mode tokens and a theme toggle in You.
 - [x] Storybook-style gallery screen at `/dev/components` showing every component in both themes (used to review against the Claude Design canvas).
 - [x] Core additions needed by later milestones, migrations v3: `cycles`, `meter_readings`, `facts`, `groups` + `group_members`, `notification_rules`, `ingest_queue`. *(Group is an entity type, per M2 and PRODUCT §4, so v3 adds `group_members` only — no separate `groups` table.)*
-- [ ] Rebuild the generic screens on the new components: list, record, form, tag page, search.
+- [x] Rebuild the generic screens on the new components: list, record, form, tag page, search.
 
 **Demo:** open app → Today (placeholder tiles) → Browse → a record → edit → dark mode. Icons everywhere.
 

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import type { EntityTypeDef, FieldDef, FilterClause, FilterGroup, FilterOp, ViewDefinition } from '@core/domain/types';
 import { useTheme } from '../theme/ThemeProvider';
-import { Button, Card, Chip, Icon, IconButton, Input, Text } from './primitives';
+import { Button, ChipRow, FilterChip, IconButton, Text } from '../kit';
 import { FieldInput } from './fields';
 import { useLive, useOS } from '../hooks';
 
@@ -31,7 +31,7 @@ export function filterableFields(def: EntityTypeDef): FieldDef[] {
   return [...envelope, ...def.fields.filter((f) => f.type !== 'json').map((f) => ({ ...f, key: `data.${f.key}` }))];
 }
 
-export function FilterEditor({ type, value, onChange, accent }: { type: string; value: ViewDefinition; onChange: (v: ViewDefinition) => void; accent?: string }) {
+export function FilterEditor({ type, value, onChange }: { type: string; value: ViewDefinition; onChange: (v: ViewDefinition) => void; accent?: string }) {
   const os = useOS();
   const t = useTheme();
   const def = os.registry.type(type);
@@ -42,95 +42,104 @@ export function FilterEditor({ type, value, onChange, accent }: { type: string; 
   const sortFields = fields.filter((f) => f.key !== 'tag' && f.type !== 'boolean');
   const groupFields: Array<{ key: string; label: string }> = [{ key: '', label: 'None' }, ...(def.statuses?.length ? [{ key: 'status', label: 'Status' }] : []), { key: 'month', label: 'Month' }, { key: 'day', label: 'Day' }, ...def.fields.filter((f) => f.type === 'select' || f.type === 'relation').map((f) => ({ key: `data.${f.key}`, label: f.label }))];
   const tags = useLive((o) => o.tags.counts(), []);
+  const card = { backgroundColor: t.c.bg.tile, borderRadius: t.radius.card, padding: 12, gap: 10 };
 
   return (
-    <View style={{ paddingHorizontal: 16, gap: 16 }}>
-      <View style={{ gap: 8 }}>
-        <Text variant="headline">Conditions</Text>
+    <View style={{ gap: 24 }}>
+      <View style={{ gap: 10 }}>
+        <Text variant="label" color="secondary">
+          Conditions
+        </Text>
         {clauses.map((c, i) => {
           const f = fields.find((x) => x.key === c.field) ?? (c.op === 'hasTag' ? fields.find((x) => x.key === 'tag') : undefined);
           if (!f) return null;
           const ops = f.key === 'tag' ? [{ op: 'hasTag' as FilterOp, label: 'has' }] : opsFor(f);
           const needsValue = !['isNull', 'notNull'].includes(c.op);
           return (
-            <Card key={i} style={{ gap: 8, padding: 12 }}>
+            <View key={i} style={card}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text variant="subhead" style={{ fontWeight: '600', flex: 1 }}>
+                <Text variant="body" style={{ flex: 1 }}>
                   {f.label}
                 </Text>
-                <IconButton icon="trash" color={t.colors.danger} onPress={() => setClauses(clauses.filter((_, j) => j !== i))} />
+                <IconButton icon="trash" accessibilityLabel={`Remove ${f.label} condition`} color={t.c.alert.coralText} onPress={() => setClauses(clauses.filter((_, j) => j !== i))} />
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              <ChipRow style={{ marginHorizontal: -12 }}>
                 {ops.map((o) => (
-                  <Chip key={o.op} label={o.label} selected={c.op === o.op} color={accent} onPress={() => setClauses(clauses.map((x, j) => (j === i ? { ...x, op: o.op } : x)))} />
+                  <FilterChip key={o.op} label={o.label} selected={c.op === o.op} onPress={() => setClauses(clauses.map((x, j) => (j === i ? { ...x, op: o.op } : x)))} />
                 ))}
-              </ScrollView>
+              </ChipRow>
               {needsValue ? (
                 f.key === 'tag' ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                     {tags.map((tag) => (
-                      <Chip key={tag.id} label={`#${tag.name}`} selected={c.value === tag.name} color={accent} onPress={() => setClauses(clauses.map((x, j) => (j === i ? { ...x, value: tag.name } : x)))} />
+                      <FilterChip key={tag.id} label={`#${tag.name}`} selected={c.value === tag.name} onPress={() => setClauses(clauses.map((x, j) => (j === i ? { ...x, value: tag.name } : x)))} />
                     ))}
-                  </ScrollView>
+                  </View>
                 ) : (
-                  <FieldInput field={{ ...f, label: 'Value', type: f.type === 'datetime' ? 'datetime' : f.type === 'multiselect' ? 'select' : f.type }} value={c.field === 'createdAt' && typeof c.value === 'number' ? c.value : c.value} onChange={(v) => setClauses(clauses.map((x, j) => (j === i ? { ...x, value: normalise(f, v) } : x)))} accent={accent} />
+                  <FieldInput field={{ ...f, label: 'Value', type: f.type === 'multiselect' ? 'select' : f.type }} value={c.value} onChange={(v) => setClauses(clauses.map((x, j) => (j === i ? { ...x, value: normalise(f, v) } : x)))} />
                 )
               ) : null}
-            </Card>
+            </View>
           );
         })}
         {adding ? (
-          <Card style={{ padding: 12, gap: 8 }}>
-            <Text variant="footnote" color="secondary">
-              Add condition on…
+          <View style={card}>
+            <Text variant="caption" color="secondary">
+              Add a condition on…
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {fields.map((f) => (
-                <Chip key={f.key} label={f.label} color={accent} onPress={() => {
-                  const op: FilterOp = f.key === 'tag' ? 'hasTag' : opsFor(f)[0].op;
-                  setClauses([...clauses, { field: f.key, op, value: f.type === 'boolean' ? true : undefined }]);
-                  setAdding(false);
-                }} />
+                <FilterChip
+                  key={f.key}
+                  label={f.label}
+                  onPress={() => {
+                    const op: FilterOp = f.key === 'tag' ? 'hasTag' : opsFor(f)[0]!.op;
+                    setClauses([...clauses, { field: f.key, op, value: f.type === 'boolean' ? true : undefined }]);
+                    setAdding(false);
+                  }}
+                />
               ))}
             </View>
-          </Card>
+          </View>
         ) : (
-          <Button title="Add condition" icon="plus" variant="secondary" small color={accent} onPress={() => setAdding(true)} style={{ alignSelf: 'flex-start' }} />
+          <Button title="Add condition" icon="plus" variant="secondary" small onPress={() => setAdding(true)} />
         )}
       </View>
 
-      <View style={{ gap: 8 }}>
-        <Text variant="headline">Sort by</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+      <View style={{ gap: 10 }}>
+        <Text variant="label" color="secondary">
+          Sort by
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {sortFields.map((f) => {
             const cur = value.sort?.[0];
             const sel = cur?.field === f.key;
-            return <Chip key={f.key} label={`${f.label}${sel ? (cur!.dir === 'asc' ? ' ↑' : ' ↓') : ''}`} selected={sel} color={accent} onPress={() => onChange({ ...value, sort: [{ field: f.key, dir: sel && cur!.dir === 'desc' ? 'asc' : 'desc' }] })} />;
+            return <FilterChip key={f.key} label={f.label} icon={sel ? (cur!.dir === 'asc' ? 'chevron-up' : 'chevron-down') : undefined} selected={sel} onPress={() => onChange({ ...value, sort: [{ field: f.key, dir: sel && cur!.dir === 'desc' ? 'asc' : 'desc' }] })} />;
           })}
-        </ScrollView>
-      </View>
-
-      <View style={{ gap: 8 }}>
-        <Text variant="headline">Group by</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-          {groupFields.map((g) => (
-            <Chip key={g.key} label={g.label} selected={(value.groupBy ?? '') === g.key} color={accent} onPress={() => onChange({ ...value, groupBy: g.key || undefined })} />
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={{ gap: 8 }}>
-        <Text variant="headline">Layout</Text>
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          <Chip label="List" icon="list.bullet" selected={(value.layout ?? 'list') === 'list'} color={accent} onPress={() => onChange({ ...value, layout: 'list' })} />
-          {def.statuses?.length ? <Chip label="Board" icon="square.grid.2x2" selected={value.layout === 'board'} color={accent} onPress={() => onChange({ ...value, layout: 'board' })} /> : null}
-          <Chip label={value.includeArchived ? 'Archived shown' : 'Archived hidden'} icon="archivebox" selected={!!value.includeArchived} color={accent} onPress={() => onChange({ ...value, includeArchived: !value.includeArchived })} />
         </View>
       </View>
-      <View style={{ height: 0 }}>
-        <Icon name="circle" size={0} />
+
+      <View style={{ gap: 10 }}>
+        <Text variant="label" color="secondary">
+          Group by
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {groupFields.map((g) => (
+            <FilterChip key={g.key} label={g.label} selected={(value.groupBy ?? '') === g.key} onPress={() => onChange({ ...value, groupBy: g.key || undefined })} />
+          ))}
+        </View>
       </View>
-      <Input style={{ display: 'none' }} />
+
+      <View style={{ gap: 10 }}>
+        <Text variant="label" color="secondary">
+          Layout
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          <FilterChip label="List" icon="list" selected={(value.layout ?? 'list') === 'list'} onPress={() => onChange({ ...value, layout: 'list' })} />
+          {def.statuses?.length ? <FilterChip label="Board" icon="grid" selected={value.layout === 'board'} onPress={() => onChange({ ...value, layout: 'board' })} /> : null}
+          <FilterChip label="Show archived" icon="archive" selected={!!value.includeArchived} onPress={() => onChange({ ...value, includeArchived: !value.includeArchived })} />
+        </View>
+      </View>
     </View>
   );
 }

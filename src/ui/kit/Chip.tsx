@@ -13,7 +13,7 @@ export function Chip({ label, tint, tone = 'neutral', icon, onPress, small }: { 
   const [bg, fg] = tint
     ? [t.tints[tint].fill, t.tints[tint].ink]
     : {
-        neutral: [t.c.bg.tile, t.c.fg.primary],
+        neutral: [t.c.line, t.c.fg.primary],
         alert: [t.c.alert.coralFill, t.c.alert.coralText],
         ok: [t.tints.upkeep.fill, t.tints.upkeep.ink],
         accent: [t.c.accent.mustard, t.c.accent.mustardInk],
@@ -37,7 +37,8 @@ export function Chip({ label, tint, tone = 'neutral', icon, onPress, small }: { 
 /** Selectable chip for filters. Selected = mustard. 36 high, 48 target. */
 export function FilterChip({ label, selected, onPress, icon, count }: { label: string; selected?: boolean; onPress?: () => void; icon?: IconName | (string & {}); count?: number }) {
   const t = useTheme();
-  const bg = selected ? t.c.accent.mustard : t.c.bg.tile;
+  // line, not tile: unselected chips must read on ground, tile and raised surfaces alike.
+  const bg = selected ? t.c.accent.mustard : t.c.line;
   const fg = selected ? t.c.accent.mustardInk : t.c.fg.primary;
   return (
     <Pressable
@@ -46,7 +47,7 @@ export function FilterChip({ label, selected, onPress, icon, count }: { label: s
       accessibilityLabel={count != null ? `${label}, ${count}` : label}
       hitSlop={6}
       onPress={onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 14, borderRadius: t.radius.chip, backgroundColor: pressed && !selected ? t.c.bg.pressed : bg })}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 14, borderRadius: t.radius.chip, backgroundColor: pressed && !selected ? t.c.fg.tertiary : bg })}
     >
       {icon ? <Icon name={icon} size={16} color={fg} /> : null}
       <Text variant="label" color={fg}>
