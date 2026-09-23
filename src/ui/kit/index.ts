@@ -15,3 +15,5 @@ export { Field, TextField, NumberField, MoneyField, DateField, SelectField, Rela
 export { RecordHeader, type HeaderStat } from './RecordHeader';
 export { SectionCard } from './SectionCard';
 export { Icon, icons, type IconName } from '../icons';
+export { BottomBar, useBottomBarInset, type BottomBarItem } from './BottomBar';
+export { Screen, ScreenHeader } from './Screen';

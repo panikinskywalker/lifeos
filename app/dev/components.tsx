@@ -7,6 +7,7 @@ import { TINT_KEYS } from '@ui/theme/tokens';
 import { ICON_NAMES } from '@ui/icons';
 import {
   BentoGrid,
+  BottomBar,
   Button,
   ChipRow,
   Chip,
@@ -22,6 +23,7 @@ import {
   RelationField,
   RowItem,
   Ring,
+  ScreenHeader,
   SectionCard,
   Segmented,
   SelectField,
@@ -351,6 +353,32 @@ function Header() {
   );
 }
 
+function Bar() {
+  const [tab, setTab] = useState('today');
+  return (
+    <View style={{ paddingTop: 24, gap: 12 }}>
+      <BottomBar floating={false} active={tab} onPress={setTab} items={DEMO_TABS} />
+    </View>
+  );
+}
+
+const DEMO_TABS = [
+  { key: 'today', label: 'Today', icon: 'home' as const },
+  { key: 'upkeep', label: 'Upkeep', icon: 'wrench' as const },
+  { key: 'talk', label: 'Talk', icon: 'sparkle' as const, primary: true },
+  { key: 'browse', label: 'Browse', icon: 'grid' as const },
+  { key: 'you', label: 'You', icon: 'user' as const },
+];
+
+function Headers() {
+  return (
+    <View style={{ marginHorizontal: -20, gap: 8 }}>
+      <ScreenHeader eyebrow="Wednesday, 23 September" title="Today" right={<IconButton icon="search" accessibilityLabel="Search" filled />} />
+      <ScreenHeader title="Vehicles" onBack={() => {}} right={<IconButton icon="plus" accessibilityLabel="Add" filled />} />
+    </View>
+  );
+}
+
 const SECTIONS: Array<[string, React.ComponentType]> = [
   ['Colour', Colours],
   ['Type', Type],
@@ -365,4 +393,6 @@ const SECTIONS: Array<[string, React.ComponentType]> = [
   ['Sheet · Toast with Undo', SheetAndToast],
   ['Form fields', Fields],
   ['RecordHeader', Header],
+  ['ScreenHeader', Headers],
+  ['BottomBar', Bar],
 ];

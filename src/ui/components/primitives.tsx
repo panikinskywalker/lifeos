@@ -331,8 +331,8 @@ export function Spacer({ h = 16 }: { h?: number }) {
 export function Loading() {
   const t = useTheme();
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.colors.background }}>
-      <ActivityIndicator />
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.c.bg.ground }}>
+      <ActivityIndicator color={t.c.fg.secondary} />
     </View>
   );
 }

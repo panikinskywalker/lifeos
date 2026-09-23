@@ -8,15 +8,17 @@ import type { AiToolDef } from '@core/registry/types';
 import { useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Card, Chip, Icon, IconButton, Input, Text } from '@ui/components/primitives';
+import { useBottomBarInset } from '@ui/kit';
 import { getApiKey } from '../../src/platform/boot';
 
 const SUGGESTIONS = ['How much did I spend this month?', 'Spent 450 on lunch at Blue Tokai', 'What\'s due today?', 'Add a task: renew car insurance, due next Friday', 'Which subscriptions renew this week?', 'Remind me every Monday at 9am to review budgets', 'Who haven\'t I talked to in a while?'];
 
-export default function AssistantTab() {
+export default function TalkTab() {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const barInset = useBottomBarInset();
   const model = useSettings((s) => s.aiModel);
   const [key, setKey] = useState<string | null | undefined>(undefined);
   const [turns, setTurns] = useState<AssistantTurn[]>([]);
@@ -69,7 +71,7 @@ export default function AssistantTab() {
     return (
       <View style={{ flex: 1, backgroundColor: t.colors.background, paddingTop: insets.top + 8, paddingHorizontal: 16 }}>
         <Text variant="largeTitle" style={{ marginBottom: 12 }}>
-          Assistant
+          Talk
         </Text>
         <Card style={{ gap: 12 }}>
           <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: t.colors.accents.indigo + '1A', alignItems: 'center', justifyContent: 'center' }}>
@@ -88,7 +90,7 @@ export default function AssistantTab() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.colors.background }} keyboardVerticalOffset={0}>
       <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }}>
         <Text variant="largeTitle" style={{ flex: 1 }}>
-          Assistant
+          Talk
         </Text>
         <IconButton icon="square.and.pencil" bg onPress={() => { setTurns([]); assistant.current?.reset(); assistant.current = new Assistant(os, { provider: createClaudeProvider({ apiKey: key, model }), onTurn: (turn) => setTurns((ts) => [...ts, turn]) }); }} />
       </View>
@@ -117,7 +119,7 @@ export default function AssistantTab() {
           </View>
         ) : null}
       </ScrollView>
-      <View style={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 90, paddingTop: 8, backgroundColor: t.colors.background }}>
+      <View style={{ paddingHorizontal: 16, paddingBottom: barInset + 24, paddingTop: 8, backgroundColor: t.colors.background }}>
         <Input value={text} onChangeText={setText} placeholder="Ask or tell LifeOS anything…" onSubmitEditing={() => void send()} returnKeyType="send" blurOnSubmit={false} multiline right={<IconButton icon="arrow.up.circle.fill" size={28} color={text.trim() ? t.colors.accents.indigo : t.colors.textTertiary} onPress={() => void send()} />} style={{ maxHeight: 120 }} />
       </View>
     </KeyboardAvoidingView>

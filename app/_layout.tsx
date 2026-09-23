@@ -15,6 +15,7 @@ import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { OSProvider } from '@ui/hooks/useOS';
+import { ToastProvider } from '@ui/kit';
 import { ThemeProvider, useTheme } from '@ui/theme/ThemeProvider';
 import { Loading, Text } from '@ui/components/primitives';
 import { bootLifeOS, setNavigator } from '../src/platform/boot';
@@ -84,7 +85,9 @@ export default function RootLayout() {
             <Loading />
           ) : (
             <OSProvider os={os}>
-              <Navigator />
+              <ToastProvider bottomOffset={74}>
+                <Navigator />
+              </ToastProvider>
             </OSProvider>
           )}
           {error ? <Text style={{ padding: 24 }}>Failed to start: {error}</Text> : null}
@@ -99,12 +102,13 @@ function Navigator() {
   return (
     <>
       <StatusBar style={t.dark ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.colors.background }, animation: Platform.OS === 'android' ? 'slide_from_right' : 'default' }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.c.bg.ground }, animation: Platform.OS === 'android' ? 'slide_from_right' : 'default' }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="entity/[type]/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="entity/[type]/[id]/edit" options={{ presentation: 'modal' }} />
         <Stack.Screen name="automation/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="dev/components" />
+        <Stack.Screen name="search" />
       </Stack>
     </>
   );

@@ -81,7 +81,7 @@ export function DashboardScreen() {
           { label: 'Set as home', onPress: () => useSettings.getState().set('homeDashboardId', active.id) },
           { label: 'New dashboard', onPress: () => { const d = os.dashboards.create('Dashboard', 'square.grid.2x2'); setActiveId(d.id); setEditing(true); } },
           ...(dashboards.length > 1 ? [{ label: 'Delete dashboard', destructive: true, onPress: () => { os.dashboards.remove(active.id); setActiveId(null); } }] : []),
-          { label: 'Settings', onPress: () => router.push('/settings') },
+          { label: 'Settings', onPress: () => router.push('/you') },
         ]}
       />
       <Sheet visible={rename} onClose={() => setRename(false)} title="Rename dashboard">
