@@ -3,7 +3,7 @@ import { Alert, Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLive, useOS, useSettings } from '@ui/hooks';
 import { tintForModule } from '@ui/theme/moduleTint';
-import { RowItem, Screen, SectionCard, SwitchField, Text, useToast } from '@ui/kit';
+import { RowItem, Screen, SectionCard, Segmented, SwitchField, Text, useToast } from '@ui/kit';
 import { seedDemoData } from '../../src/platform/seed';
 
 /** You — settings, modules, agent, data. PRODUCT.md §6. */
@@ -19,6 +19,18 @@ export default function YouTab() {
   const schema = os.db.get<{ v: number }>('SELECT MAX(version) v FROM _migrations')?.v;
   return (
     <Screen tab title="You">
+      <SectionCard title="Appearance">
+        <Segmented
+          value={s.appearance}
+          onChange={(v) => s.set('appearance', v)}
+          options={[
+            { value: 'system', label: 'System' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+        />
+      </SectionCard>
+
       <SectionCard title="Agent" flush>
         <RowItem icon="sparkle" tint="memory" title="Claude API key & model" subtitle={s.aiModel} onPress={() => router.push('/settings/ai')} />
       </SectionCard>

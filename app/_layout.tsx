@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavThemeProvider, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
+import * as SystemUI from 'expo-system-ui';
 import { useFonts } from '@expo-google-fonts/manrope/useFonts';
 import { Manrope_400Regular } from '@expo-google-fonts/manrope/400Regular';
 import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
@@ -99,8 +100,17 @@ export default function RootLayout() {
 
 function Navigator() {
   const t = useTheme();
+  // Root view colour shows during transitions and behind the keyboard; keep it on the ground.
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(t.c.bg.ground).catch(() => {});
+  }, [t.c.bg.ground]);
+  // Navigator surfaces (scene backgrounds, cards) take the ground and line colours.
+  const navTheme = useMemo(() => {
+    const base = t.dark ? DarkTheme : DefaultTheme;
+    return { ...base, colors: { ...base.colors, background: t.c.bg.ground, card: t.c.bg.ground, border: t.c.line, text: t.c.fg.primary, primary: t.c.accent.mustard } };
+  }, [t]);
   return (
-    <>
+    <NavThemeProvider value={navTheme}>
       <StatusBar style={t.dark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.c.bg.ground }, animation: Platform.OS === 'android' ? 'slide_from_right' : 'default' }}>
         <Stack.Screen name="(tabs)" />
@@ -110,6 +120,6 @@ function Navigator() {
         <Stack.Screen name="dev/components" />
         <Stack.Screen name="search" />
       </Stack>
-    </>
+    </NavThemeProvider>
   );
 }
