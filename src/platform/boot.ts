@@ -1,16 +1,13 @@
 import { Platform } from 'react-native';
-import { openDatabaseSync } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
-import { createExpoAdapter } from '@core/db/expoAdapter';
-import { createSqlJsAdapter } from '@core/db/sqljsAdapter';
-import type { DatabaseAdapter } from '@core/db/adapter';
 import { createLifeOS } from '@core/lifeos';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { installedModules } from '@modules/index';
 import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
 import { registerBackgroundTick } from './background';
+import { openDatabase } from './openDatabase';
 
 let instance: LifeOSContext | null = null;
 let navigateRef: (path: string) => void = () => {};
@@ -25,21 +22,7 @@ export function setNavigator(fn: (path: string) => void) {
  */
 export async function bootLifeOS(): Promise<LifeOSContext> {
   if (instance) return instance;
-  let db: DatabaseAdapter;
-  if (Platform.OS === 'web') {
-    // sql.js on the main thread: no SharedArrayBuffer / COOP-COEP needed.
-    db = await createSqlJsAdapter({ wasmUrl: '/sql-wasm.wasm' });
-  } else {
-    const sqlite = openDatabaseSync('lifeos.db');
-    for (const pragma of ['PRAGMA journal_mode = WAL', 'PRAGMA foreign_keys = ON', 'PRAGMA busy_timeout = 3000']) {
-      try {
-        sqlite.execSync(pragma);
-      } catch {
-        /* unsupported on this platform */
-      }
-    }
-    db = createExpoAdapter(sqlite);
-  }
+  const db = await openDatabase();
 
   const os = await createLifeOS({
     db,
