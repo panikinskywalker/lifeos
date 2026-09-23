@@ -100,6 +100,7 @@ export class TagRepo {
   }
   remove(entityId: string, tagId: string) {
     this.db.run(`DELETE FROM entity_tags WHERE entity_id=? AND tag_id=?`, [entityId, tagId]);
+    bus.emit('data.changed', { table: 'entity_tags', id: entityId });
   }
   set(entityId: string, names: string[], actor: Actor = 'user') {
     const current = this.forEntity(entityId);
@@ -137,6 +138,7 @@ export class AttachmentRepo {
   remove(id: string) {
     this.db.run(`UPDATE attachments SET deleted_at=? WHERE id=?`, [Date.now(), id]);
     this.changes.record('attachments', id, 'delete', 1);
+    bus.emit('data.changed', { table: 'attachments', id: id });
   }
 }
 function toAttachment(r: Row): Attachment {
@@ -166,6 +168,7 @@ export class CommentRepo {
   }
   remove(id: string) {
     this.db.run(`UPDATE comments SET deleted_at=? WHERE id=?`, [Date.now(), id]);
+    bus.emit('data.changed', { table: 'comments', id: id });
   }
 }
 
@@ -225,6 +228,7 @@ export class ReminderRepo {
   }
   snooze(id: string, until: number) {
     this.db.run(`UPDATE reminders SET snoozed_until=?, notification_id=NULL, updated_at=?, version=version+1 WHERE id=?`, [until, Date.now(), id]);
+    bus.emit('data.changed', { table: 'reminders', id: id });
   }
   setNotificationId(id: string, notificationId: string | null) {
     this.db.run(`UPDATE reminders SET notification_id=? WHERE id=?`, [notificationId, id]);
@@ -232,6 +236,7 @@ export class ReminderRepo {
   remove(id: string) {
     this.db.run(`UPDATE reminders SET deleted_at=? WHERE id=?`, [Date.now(), id]);
     this.changes.record('reminders', id, 'delete', 1);
+    bus.emit('data.changed', { table: 'reminders', id: id });
   }
 }
 function toReminder(r: Row): Reminder {
@@ -258,10 +263,12 @@ export class CustomFieldRepo {
     const id = newId(now);
     const key = def.key.replace(/[^a-zA-Z0-9_]/g, '_');
     this.db.run(`INSERT INTO custom_field_defs(id,entity_type,key,label,field_type,options,sort_order,created_at) VALUES (?,?,?,?,?,?,?,?)`, [id, def.entityType, key, def.label, def.fieldType, JSON.stringify(def.options ?? {}), def.sortOrder ?? 0, now]);
+    bus.emit('data.changed', { table: 'custom_field_defs', id: id });
     return { ...def, key, id, sortOrder: def.sortOrder ?? 0 };
   }
   remove(id: string) {
     this.db.run(`UPDATE custom_field_defs SET deleted_at=? WHERE id=?`, [Date.now(), id]);
+    bus.emit('data.changed', { table: 'custom_field_defs', id: id });
   }
 }
 
@@ -288,14 +295,17 @@ export class ViewRepo {
     const now = Date.now();
     if (v.id && this.get(v.id)) {
       this.db.run(`UPDATE saved_views SET name=?, icon=?, definition=?, is_default=?, updated_at=? WHERE id=?`, [v.name, v.icon ?? null, JSON.stringify(v.definition), v.isDefault ? 1 : 0, now, v.id]);
+      bus.emit('data.changed', { table: 'saved_views', id: v.id });
       return this.get(v.id)!;
     }
     const id = v.id ?? newId(now);
     this.db.run(`INSERT INTO saved_views(id,entity_type,name,icon,definition,is_default,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`, [id, entityType, v.name, v.icon ?? null, JSON.stringify(v.definition), v.isDefault ? 1 : 0, v.sortOrder ?? 0, now, now]);
+    bus.emit('data.changed', { table: 'saved_views', id: id });
     return this.get(id)!;
   }
   remove(id: string) {
     this.db.run(`UPDATE saved_views SET deleted_at=? WHERE id=?`, [Date.now(), id]);
+    bus.emit('data.changed', { table: 'saved_views', id: id });
   }
 }
 function toView(r: Row): SavedView {
@@ -320,16 +330,20 @@ export class DashboardRepo {
     const id = newId(now);
     const order = Number(this.db.get<{ n: number }>(`SELECT COALESCE(MAX(sort_order),-1)+1 AS n FROM dashboards`)?.n ?? 0);
     this.db.run(`INSERT INTO dashboards(id,name,icon,layout,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, [id, name, icon ?? null, JSON.stringify(layout), order, now, now]);
+    bus.emit('data.changed', { table: 'dashboards', id: id });
     return { id, name, icon: icon ?? null, layout, sortOrder: order };
   }
   setLayout(id: string, layout: WidgetInstance[]) {
     this.db.run(`UPDATE dashboards SET layout=?, updated_at=? WHERE id=?`, [JSON.stringify(layout), Date.now(), id]);
+    bus.emit('data.changed', { table: 'dashboards', id: id });
   }
   rename(id: string, name: string, icon?: string) {
     this.db.run(`UPDATE dashboards SET name=?, icon=COALESCE(?, icon), updated_at=? WHERE id=?`, [name, icon ?? null, Date.now(), id]);
+    bus.emit('data.changed', { table: 'dashboards', id: id });
   }
   remove(id: string) {
     this.db.run(`UPDATE dashboards SET deleted_at=? WHERE id=?`, [Date.now(), id]);
+    bus.emit('data.changed', { table: 'dashboards', id: id });
   }
   addWidget(id: string, w: Omit<WidgetInstance, 'id'>): WidgetInstance {
     const d = this.get(id);

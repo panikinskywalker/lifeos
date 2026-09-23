@@ -22,6 +22,8 @@ export type CoreEvents = {
   'schedule.tick': { at: number };
   'app.foreground': { at: number };
   'module.installed': { moduleId: string };
+  /** Any other stored change (removals, snoozes, views, dashboards) so live queries refresh. */
+  'data.changed': { table: string; id: string };
 };
 
 export type Actor = 'user' | 'automation' | 'assistant' | 'system';

@@ -150,6 +150,39 @@ describe('entity store', () => {
   });
 });
 
+describe('live-query events', () => {
+  it('every stored change emits an event, so live screens refresh', () => {
+    const e = os.entities.create({ type: 'txn', data: { amount: 1, date: '2026-09-01', merchant: 'Chai' } });
+    const events: string[] = [];
+    const off = bus.onAny((name) => void events.push(name));
+    const emits = (label: string, fn: () => void) => {
+      const before = events.length;
+      fn();
+      expect(events.length, label).toBeGreaterThan(before);
+    };
+    os.tags.apply(e.id, 'snack');
+    emits('tag removed', () => os.tags.set(e.id, []));
+    const c = os.comments.add(e.id, 'ok');
+    emits('comment removed', () => os.comments.remove(c.id));
+    const a = os.attachments.add({ entityId: e.id, name: 'r.jpg', mime: 'image/jpeg', size: 1, uri: 'file://r.jpg', kind: 'receipt' });
+    emits('attachment removed', () => os.attachments.remove(a.id));
+    const r = os.reminders.create({ entityId: e.id, title: 'x', dueAt: Date.now() + 1000 });
+    emits('reminder snoozed', () => os.reminders.snooze(r.id, Date.now() + 5000));
+    emits('reminder removed', () => os.reminders.remove(r.id));
+    let fieldId = '';
+    emits('custom field added', () => void (fieldId = os.customFields.add({ entityType: 'txn', key: 'vendor', label: 'Vendor', fieldType: 'text', options: {} }).id));
+    emits('custom field removed', () => os.customFields.remove(fieldId));
+    let viewId = '';
+    emits('view saved', () => void (viewId = os.views.save('txn', { name: 'Chai', definition: {} }).id));
+    emits('view removed', () => os.views.remove(viewId));
+    let dashId = '';
+    emits('dashboard created', () => void (dashId = os.dashboards.create('Home').id));
+    emits('dashboard renamed', () => os.dashboards.rename(dashId, 'Today'));
+    emits('dashboard removed', () => os.dashboards.remove(dashId));
+    off();
+  });
+});
+
 describe('relations, tags, comments, attachments', () => {
   it('links bidirectionally and filters by relatedTo', () => {
     const trip = os.entities.create({ type: 'trip', data: { destination: 'Tokyo' } });
