@@ -12,7 +12,7 @@ Order is deliberate: the design system first (so nothing gets built twice), then
 
 - [x] Apply `docs/DESIGN.md` tokens: colours (bone ground, tile, mustard accent, module tints), type scale, radii, spacing. Replace `src/ui/theme/tokens.ts`.
 - [x] Inline SVG icon set (`src/ui/icons/`) — one component per icon, stroke-based, no icon fonts. Every icon named in DESIGN.md exists.
-- [ ] Components: Tile (bento cell, 1×1/2×1/2×2), StatTile, StackedBar, Ring, RowItem, Chip/FilterChip, Sheet, Toast-with-Undo, EmptyState, Segmented, FormField set, RecordHeader, SectionCard.
+- [x] Components: Tile (bento cell, 1×1/2×1/2×2), StatTile, StackedBar, Ring, RowItem, Chip/FilterChip, Sheet, Toast-with-Undo, EmptyState, Segmented, FormField set, RecordHeader, SectionCard.
 - [ ] Bottom bar: Today · Upkeep · **Talk** (centre, raised) · Browse · You.
 - [ ] Dark mode tokens and a theme toggle in You.
 - [ ] Storybook-style gallery screen at `/dev/components` showing every component in both themes (used to review against the Claude Design canvas).

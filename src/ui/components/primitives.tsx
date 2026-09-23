@@ -1,10 +1,10 @@
 import React from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View, type PressableProps, type ScrollViewProps, type StyleProp, type TextProps, type TextStyle, type ViewProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type PressableProps, type ScrollViewProps, type StyleProp, type TextProps, type TextStyle, type ViewProps, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon as SvgIcon } from '../icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme/ThemeProvider';
-import { fontForWeight, type Theme } from '../theme/tokens';
+import { Text } from '../kit/Text';
 
 /* ------------------------------------------------------------------ */
 /* Icon — inline SVG from src/ui/icons (legacy SF-style names resolve)  */
@@ -19,19 +19,7 @@ export function Icon({ name, size = 20, color, style }: { name: string; size?: n
 /* Text                                                                */
 /* ------------------------------------------------------------------ */
 
-type Variant = keyof Theme['type'];
-export function Text({ variant = 'body', color, style, children, ...rest }: TextProps & { variant?: Variant; color?: 'primary' | 'secondary' | 'tertiary' | string }) {
-  const t = useTheme();
-  const c = color === 'secondary' ? t.c.fg.secondary : color === 'tertiary' ? t.c.fg.tertiary : color && color !== 'primary' ? color : t.c.fg.primary;
-  // Android ignores fontWeight on custom families: turn a weight override into the matching Manrope face.
-  const flat = StyleSheet.flatten(style) as TextStyle | undefined;
-  const face = flat?.fontWeight !== undefined && !flat.fontFamily ? { fontFamily: fontForWeight(flat.fontWeight), fontWeight: undefined } : null;
-  return (
-    <RNText {...rest} style={[t.type[variant] as TextStyle, { color: c }, flat, face]}>
-      {children}
-    </RNText>
-  );
-}
+export { Text } from '../kit/Text';
 
 /* ------------------------------------------------------------------ */
 /* Layout                                                              */
