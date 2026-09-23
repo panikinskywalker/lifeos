@@ -250,4 +250,144 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_fts_title ON entities_fts(title)`,
     ],
   },
+  {
+    version: 3,
+    name: 'cycles-facts-groups-ingest',
+    up: [
+      // A cycle is "this recurs" on any object (vehicle, subscription, item,
+      // routine, person, document). kind: interval | fixed | meter | either
+      // (time OR meter, whichever first). History lives on the timeline as
+      // `cycle.done` events with meta.cycleId.
+      `CREATE TABLE IF NOT EXISTS cycles (
+        id TEXT PRIMARY KEY,
+        entity_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('interval', 'fixed', 'meter', 'either')),
+        every_n INTEGER,
+        every_unit TEXT CHECK (every_unit IS NULL OR every_unit IN ('day', 'week', 'month', 'year')),
+        meter TEXT,
+        meter_every REAL,
+        last_done_at INTEGER,
+        last_meter REAL,
+        next_due_at INTEGER,
+        next_due_meter REAL,
+        lead_days INTEGER NOT NULL DEFAULT 0,
+        overdue TEXT NOT NULL DEFAULT 'remind',
+        cost_estimate REAL,
+        currency TEXT,
+        vendor_id TEXT,
+        notes TEXT,
+        prefs TEXT NOT NULL DEFAULT '{}',
+        template TEXT,
+        snoozed_until INTEGER,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_cycles_entity ON cycles(entity_id, deleted_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_cycles_due ON cycles(deleted_at, enabled, next_due_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_timeline_cycle ON timeline_events(json_extract(meta, '$.cycleId'), occurred_at DESC)`,
+
+      // Readings of a meter on an object (odometer km, engine hours, uses).
+      `CREATE TABLE IF NOT EXISTS meter_readings (
+        id TEXT PRIMARY KEY,
+        entity_id TEXT NOT NULL,
+        meter TEXT NOT NULL DEFAULT 'odometer',
+        value REAL NOT NULL,
+        unit TEXT,
+        read_at INTEGER NOT NULL,
+        source TEXT NOT NULL DEFAULT 'user',
+        note TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_meter_entity ON meter_readings(entity_id, meter, read_at DESC)`,
+
+      // One-line things said in passing ("Dad hates surprises"). Indexed in
+      // entities_fts with type 'fact' alongside records and notes. subject_id
+      // links an object; subject_key covers non-object subjects
+      // ("category:groceries", "merchant:swiggy").
+      `CREATE TABLE IF NOT EXISTS facts (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        subject_id TEXT,
+        subject_key TEXT,
+        source TEXT NOT NULL CHECK (source IN ('talk', 'notification', 'note', 'correction', 'user')),
+        source_ref TEXT,
+        stated_at INTEGER NOT NULL,
+        confidence REAL NOT NULL DEFAULT 1,
+        active INTEGER NOT NULL DEFAULT 1,
+        superseded_by TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_subject ON facts(subject_id, active)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_key ON facts(subject_key, active)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_recent ON facts(active, stated_at DESC)`,
+
+      // Members of a Group. The Group itself is an entity (type 'group') so
+      // it has a record page, timeline and search. member_id is a person
+      // entity id, or 'me' for the owner of the phone.
+      `CREATE TABLE IF NOT EXISTS group_members (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL,
+        member_id TEXT NOT NULL,
+        default_share REAL NOT NULL DEFAULT 1,
+        joined_at INTEGER,
+        left_at INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE(group_id, member_id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_group_members_member ON group_members(member_id)`,
+
+      // Allow-list of Android apps whose notifications are read, and which
+      // parser handles each (gpay, phonepe, paytm, hdfc, amex, generic).
+      `CREATE TABLE IF NOT EXISTS notification_rules (
+        id TEXT PRIMARY KEY,
+        package TEXT NOT NULL UNIQUE,
+        label TEXT NOT NULL,
+        parser TEXT NOT NULL DEFAULT 'generic',
+        config TEXT NOT NULL DEFAULT '{}',
+        enabled INTEGER NOT NULL DEFAULT 1,
+        builtin INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+
+      // Raw captured notifications on their way to becoming records.
+      `CREATE TABLE IF NOT EXISTS ingest_queue (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL DEFAULT 'notification',
+        package TEXT,
+        rule_id TEXT,
+        received_at INTEGER NOT NULL,
+        raw_title TEXT,
+        raw_text TEXT NOT NULL,
+        raw_extra TEXT NOT NULL DEFAULT '{}',
+        parsed TEXT,
+        dedupe_key TEXT,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'proposed', 'confirmed', 'dismissed', 'duplicate', 'failed')),
+        entity_id TEXT,
+        error TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_ingest_status ON ingest_queue(status, received_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_ingest_dedupe ON ingest_queue(dedupe_key)`,
+    ],
+  },
 ];

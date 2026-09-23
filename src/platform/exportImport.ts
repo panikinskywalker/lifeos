@@ -1,6 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
-
-const TABLES = ['entities', 'relations', 'timeline_events', 'attachments', 'reminders', 'tags', 'entity_tags', 'custom_field_defs', 'comments', 'saved_views', 'dashboards', 'automation_rules', 'scheduled_jobs', 'settings'];
+import { BACKUP_TABLES as TABLES } from '@core/db/backupTables';
 
 export function exportAll(os: LifeOSContext) {
   const out: Record<string, unknown[]> = {};

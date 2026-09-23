@@ -1,7 +1,8 @@
 import type { DatabaseAdapter } from './adapter';
-import { migrations } from './migrations';
+import { migrations as allMigrations, type Migration } from './migrations';
 
-export function migrate(db: DatabaseAdapter): { from: number; to: number } {
+/** Applies pending migrations. `migrations` is overridable so tests can stop at an older version. */
+export function migrate(db: DatabaseAdapter, migrations: Migration[] = allMigrations): { from: number; to: number } {
   db.exec(`CREATE TABLE IF NOT EXISTS _migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL)`);
   const row = db.get<{ v: number | null }>(`SELECT MAX(version) AS v FROM _migrations`);
   const current = row?.v ?? 0;
