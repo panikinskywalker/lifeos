@@ -70,5 +70,8 @@
     "prebuild": "expo prebuild",
     "postinstall": "patch-package"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": ">=22.14"
+  }
 }
