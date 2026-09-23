@@ -4,7 +4,6 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavThemeProvider, useR
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { useFonts } from '@expo-google-fonts/manrope/useFonts';
@@ -20,15 +19,14 @@ import { ToastProvider } from '@ui/kit';
 import { ThemeProvider, useTheme } from '@ui/theme/ThemeProvider';
 import { Loading, Text } from '@ui/components/primitives';
 import { bootLifeOS, setNavigator } from '../src/platform/boot';
+import { notifications } from '../src/platform/notifications';
 import { AppState } from 'react-native';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
-  });
-}
+notifications()?.setNotificationHandler({
+  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+});
 
 export default function RootLayout() {
   const [os, setOS] = useState<LifeOSContext | null>(null);
@@ -62,7 +60,8 @@ export default function RootLayout() {
       }
     });
     let nsub: { remove: () => void } | null = null;
-    if (Platform.OS !== 'web') {
+    const Notifications = notifications();
+    if (Notifications) {
       nsub = Notifications.addNotificationResponseReceivedListener((r) => {
         const d = r.notification.request.content.data as { entityId?: string; entityType?: string } | undefined;
         if (d?.entityId && d.entityType) router.push(`/entity/${d.entityType}/${d.entityId}` as never);

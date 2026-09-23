@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { createLifeOS } from '@core/lifeos';
 import type { LifeOSContext } from '@core/registry/context';
@@ -7,6 +6,7 @@ import { bus } from '@core/events/bus';
 import { installedModules } from '@modules/index';
 import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
 import { registerBackgroundTick } from './background';
+import { notifications } from './notifications';
 import { openDatabase } from './openDatabase';
 
 let instance: LifeOSContext | null = null;
@@ -29,7 +29,8 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     modules: installedModules,
     navigate: (p) => navigateRef(p),
     notify: async (n) => {
-      if (Platform.OS === 'web') return null;
+      const Notifications = notifications();
+      if (!Notifications) return null;
       try {
         const id = await Notifications.scheduleNotificationAsync({
           content: { title: n.title, body: n.body, data: n.data },
@@ -42,7 +43,8 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
       }
     },
     cancelNotification: async (id) => {
-      if (Platform.OS === 'web') return;
+      const Notifications = notifications();
+      if (!Notifications) return;
       await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
     },
   });
@@ -79,7 +81,8 @@ export function getOS(): LifeOSContext | null {
 }
 
 async function syncReminderNotifications(os: LifeOSContext) {
-  if (Platform.OS === 'web') return;
+  const Notifications = notifications();
+  if (!Notifications) return;
   try {
     const perm = await Notifications.getPermissionsAsync();
     if (!perm.granted) return;
