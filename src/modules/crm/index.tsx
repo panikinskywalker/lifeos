@@ -85,7 +85,7 @@ function PersonSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContex
       </Card>
       {txns.length ? (
         <View>
-          <SectionHeader title="Shared expenses" icon="banknote" color={palette.green} action="All" onAction={() => router.push({ pathname: '/entity/transaction', params: { personId: entity.id } })} />
+          <SectionHeader title="Shared expenses" icon="banknote" color={palette.green} action="All" onAction={() => router.push({ pathname: '/entity/[type]', params: { type: 'transaction', personId: entity.id } })} />
           <Card padded={false}>
             {txns.map((r, i) => {
               const e = ctx.entities.get(r.other.id);

@@ -350,7 +350,7 @@ function ProjectSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext })
         </View>
       </Card>
       <View>
-        <SectionHeader title="Tasks" icon="checkmark.circle" color={PROJECTS_COLOR} action="Board" onAction={() => router.push({ pathname: '/entity/task', params: { projectId: entity.id } })} />
+        <SectionHeader title="Tasks" icon="checkmark.circle" color={PROJECTS_COLOR} action="Board" onAction={() => router.push({ pathname: '/entity/[type]', params: { type: 'task', projectId: entity.id } })} />
         <View style={{ gap: 8 }}>
           <TaskList tasks={open} empty="No open tasks." />
           <QuickAdd projectId={entity.id} accent={PROJECTS_COLOR} />

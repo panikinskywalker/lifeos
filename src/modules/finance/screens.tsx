@@ -69,7 +69,7 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
               {data.byCat.map((c, i) => {
                 const cat = categoryOf(c.category);
                 return (
-                  <Row key={c.category} title={cat.label} subtitle={`${c.count} transaction${c.count === 1 ? '' : 's'}`} icon={cat.icon} iconColor={cat.color} value={ctx.format.currency(c.total)} last={i === data.byCat.length - 1} onPress={() => router.push({ pathname: '/entity/transaction', params: { category: c.category, from: m.start, to: m.end } })} />
+                  <Row key={c.category} title={cat.label} subtitle={`${c.count} transaction${c.count === 1 ? '' : 's'}`} icon={cat.icon} iconColor={cat.color} value={ctx.format.currency(c.total)} last={i === data.byCat.length - 1} onPress={() => router.push({ pathname: '/entity/[type]', params: { type: 'transaction', category: c.category, from: m.start, to: m.end } })} />
                 );
               })}
             </Card>
@@ -154,7 +154,7 @@ export function AccountSection({ entity, ctx }: { entity: Entity<any>; ctx: Life
         ) : null}
       </Card>
       <View>
-        <SectionHeader title="Transactions" icon="arrow.up.arrow.down" color={FINANCE_COLOR} action="Add" onAction={() => router.push({ pathname: '/entity/transaction/new', params: { accountId: entity.id } })} />
+        <SectionHeader title="Transactions" icon="arrow.up.arrow.down" color={FINANCE_COLOR} action="Add" onAction={() => router.push({ pathname: '/entity/[type]/new', params: { type: 'transaction', accountId: entity.id } })} />
         <Card padded={false}>
           {txns.length === 0 ? <Text color="tertiary" style={{ padding: 16 }}>No transactions on this account.</Text> : txns.map((e, i) => <EntityRow key={e.id} entity={e} last={i === txns.length - 1} />)}
         </Card>
@@ -179,7 +179,7 @@ export function BudgetSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeO
         </Text>
       </Card>
       <View>
-        <SectionHeader title="Recent in category" icon="list.bullet" color={FINANCE_COLOR} action="All" onAction={() => router.push({ pathname: '/entity/transaction', params: { category: b.data.category } })} />
+        <SectionHeader title="Recent in category" icon="list.bullet" color={FINANCE_COLOR} action="All" onAction={() => router.push({ pathname: '/entity/[type]', params: { type: 'transaction', category: b.data.category } })} />
         <Card padded={false}>{txns.map((e, i) => <EntityRow key={e.id} entity={e} last={i === txns.length - 1} />)}</Card>
       </View>
     </View>

@@ -98,7 +98,7 @@ function TripSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext 
         ) : null}
       </Card>
       <View>
-        <SectionHeader title="Expenses" icon="banknote" color={palette.green} action="Add" onAction={() => router.push({ pathname: '/entity/transaction/new', params: { tripId: entity.id, currency: trip.data.localCurrency ?? '' } })} />
+        <SectionHeader title="Expenses" icon="banknote" color={palette.green} action="Add" onAction={() => router.push({ pathname: '/entity/[type]/new', params: { type: 'transaction', tripId: entity.id, currency: trip.data.localCurrency ?? '' } })} />
         <Card padded={false}>
           {data.recent.length === 0 ? <Text color="tertiary" style={{ padding: 16 }}>No expenses linked yet. New transactions with this trip selected show up here.</Text> : data.recent.map((e, i) => <EntityRow key={e.id} entity={e} last={i === data.recent.length - 1} />)}
         </Card>
