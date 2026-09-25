@@ -35,7 +35,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Agent & API key screen moved onto the kit.
 
 **D2 — data components (with M2)**
-- [ ] Charts kit: sparkline, line chart (dotted grid), stacked column chart, target progress bar, day timeline; stat trio; "Attention required" card; quick-action chips.
+- [ ] Charts kit: sparkline, line chart (dotted grid), stacked column chart, target progress bar, day timeline; stat trio; "Attention required" card; quick-action chips. *(Done so far: sparkline, line, column, progress bar, legend.)*
 - [ ] Record pages (Vehicle, Subscription, Person) take the Stitch layouts using cycles, meter readings and splits.
 - [ ] Upkeep + This week in the Stitch style; Finance month view with the new charts.
 
@@ -59,7 +59,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Cycle-driven reminders through the existing scheduler → local notifications.
 - [x] Subscription auto-post transaction on due (automation template, on by default).
 - [x] Finance: Debt entity, **Group** entity, split sheet on a transaction (equal/exact/percent/shares), balances per person and per group, settle-up.
-- [ ] Reports: Month view, Subscriptions run-rate, Net worth over time.
+- [x] Reports: Month view, Subscriptions run-rate, Net worth over time.
 
 **Demo:** add Creta with odometer, add Jio subscription, add "laundry every 4 days", open Upkeep → mark laundry done → next due rolls; split a dinner 3 ways → Priya owes you.
 

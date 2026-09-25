@@ -47,3 +47,34 @@ describe('subscriptions × cycles', () => {
     expect(os.cycles.all()).toHaveLength(1);
   });
 });
+
+describe('reports', () => {
+  it('run-rate converts every billing cycle to per month', async () => {
+    const { perMonth, subscriptionRunRate } = await import('./reports');
+    expect(perMonth(1200, 'FREQ=YEARLY;INTERVAL=1')).toBe(100);
+    expect(perMonth(300, 'FREQ=MONTHLY;INTERVAL=3')).toBe(100);
+    expect(perMonth(399, 'FREQ=DAILY;INTERVAL=84')).toBeCloseTo(144.58, 1);
+    os.entities.create({ type: 'subscription', data: { name: 'Netflix', amount: 649, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-10-01' }, status: 'active' });
+    os.entities.create({ type: 'subscription', data: { name: 'Old gym', amount: 5000, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-10-01' }, status: 'cancelled' });
+    const r = subscriptionRunRate(os);
+    expect(r.rows.map((x) => x.sub.data.name)).toEqual(['Netflix']);
+    expect(r).toMatchObject({ monthly: 649, yearly: 7788 });
+  });
+
+  it('month report and net worth over time', async () => {
+    const { monthReport, netWorthSeries } = await import('./reports');
+    const now = new Date('2026-09-20T12:00:00');
+    const bank = os.entities.create({ type: 'account', data: { name: 'HDFC', kind: 'bank', openingBalance: 10000 } });
+    const tx = (amount: number, kind: string, date: string, category = 'food') => os.entities.create({ type: 'transaction', data: { amount, kind, category, date, accountId: bank.id } });
+    tx(50000, 'income', '2026-08-01', 'salary');
+    tx(2000, 'expense', '2026-08-10');
+    tx(50000, 'income', '2026-09-01', 'salary');
+    tx(3000, 'expense', '2026-09-05');
+    tx(1000, 'expense', '2026-09-06', 'transport');
+    const m = monthReport(os, 0, now);
+    expect(m).toMatchObject({ spend: 4000, income: 50000, net: 46000, vsLast: 1 });
+    expect(m.byCategory.map((c) => [c.category, c.share])).toEqual([['food', 0.75], ['transport', 0.25]]);
+    expect(m.daily).toHaveLength(30);
+    expect(netWorthSeries(os, 3, now).map((p) => p.total)).toEqual([10000, 58000, 104000]);
+  });
+});

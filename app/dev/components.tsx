@@ -29,6 +29,10 @@ import {
   MoneyField,
   NumberField,
   ProgressBar,
+  LineChart,
+  ColumnChart,
+  ChartLegend,
+  Sparkline,
   RecordHeader,
   RelationField,
   Ring,
@@ -544,6 +548,19 @@ function Bar() {
   );
 }
 
+function ChartsDemo() {
+  const t = useTheme();
+  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  return (
+    <>
+      <Sparkline values={[16, 14, 19, 11, 15, 6, 8]} accessibilityLabel="Resting HR trend" />
+      <ChartLegend items={[{ label: 'Spend', color: t.c.chart[0] }, { label: 'Budget', color: t.c.accent.gold }]} />
+      <LineChart labels={['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']} series={[{ label: 'Net worth', color: t.c.chart[0], values: [4.1, 4.4, 4.3, 4.9, 5.2, 5.6] }, { label: 'Target', color: t.c.accent.gold, values: [4, 4.3, 4.6, 4.9, 5.2, 5.5], dashed: true }]} formatY={(n) => `${n.toFixed(1)}L`} accessibilityLabel="Net worth over six months" />
+      <ColumnChart labels={days} highlight={5} series={[{ label: 'Food', color: t.c.chart[0], values: [400, 900, 300, 1200, 600, 2600, 450] }, { label: 'Transport', color: t.c.chart[1], values: [120, 0, 200, 0, 1200, 0, 90] }]} formatY={(n) => `${Math.round(n / 100) / 10}k`} accessibilityLabel="Spend this week" />
+    </>
+  );
+}
+
 function Progress() {
   const t = useTheme();
   return (
@@ -558,6 +575,7 @@ function Progress() {
 
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
   ['Progress bar', '8 tall · pill · optional target tick', Progress],
+  ['Charts', 'sparkline · line · columns · legend (Stitch)', ChartsDemo],
   ['Colour', 'surfaces · tints · chart', Colours],
   ['Type', 'Plus Jakarta Sans · tabular numerals', Type],
   ['Icons · IconBox', '2px stroke · round caps · tint + ink', Icons],

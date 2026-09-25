@@ -8,7 +8,8 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Card, SectionHeader, Stat, Text, Row } from '@ui/components/primitives';
 import { Bars, ProgressBar, StackedBar } from '@ui/components/charts';
 import { EntityRow } from '@ui/components/EntityRow';
-import { budgetStatus, dailySpend, monthRange, netWorth, spendByCategory, spendInRange, monthlySubscriptionCost } from './lib';
+import { budgetStatus, dailySpend, monthRange, netWorth, spendByCategory, spendInRange } from './lib';
+import { monthlySubscriptionCost } from './reports';
 import { categoryOf, FINANCE_COLOR, type BudgetData, type SubscriptionData } from './types';
 
 function SpendThisMonth({ size, ctx }: WidgetProps) {

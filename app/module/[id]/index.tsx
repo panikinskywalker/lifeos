@@ -27,6 +27,9 @@ export default function ModuleRoute() {
     <Screen title={m.name} subtitle={`${total} ${total === 1 ? 'record' : 'records'}`} onBack={back}>
       <RowList>
         {hasHome ? <RowItem icon={m.icon} tint={tint} title="Overview" subtitle={m.description} onPress={() => router.push(`/module/${m.id}/index`)} /> : null}
+        {(m.screens ?? []).filter((sc) => sc.key !== 'index').map((sc) => (
+          <RowItem key={sc.key} icon={sc.key === 'reports' ? 'chart' : 'grid'} tint={tint} title={sc.title} subtitle={sc.key === 'reports' ? 'Month, subscriptions run-rate, net worth' : null} onPress={() => router.push(`/module/${m.id}/${sc.key}` as never)} />
+        ))}
         {m.id === 'automation' ? (
           <>
             <RowItem icon="bolt" tint={tint} title="Rules" subtitle="Triggers, conditions, actions" onPress={() => router.push('/automation')} />

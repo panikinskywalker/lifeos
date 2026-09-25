@@ -115,11 +115,3 @@ export function postDueSubscriptions(os: LifeOSContext, today = iso(new Date()))
   return n;
 }
 
-export function monthlySubscriptionCost(os: LifeOSContext): number {
-  const subs = os.entities.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } });
-  return subs.reduce((sum, s) => {
-    const r = s.data.rrule;
-    const perMonth = r.includes('WEEKLY') ? 4.33 : r.includes('YEARLY') ? 1 / 12 : r.includes('INTERVAL=3') ? 1 / 3 : 1;
-    return sum + s.data.amount * perMonth;
-  }, 0);
-}

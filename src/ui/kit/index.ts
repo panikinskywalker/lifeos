@@ -25,3 +25,4 @@ export { AgentCard, ChatBubble } from './AgentCard';
 export { Composer } from './Composer';
 export { Surface, useSurface, useControlFill } from './Surface';
 export { ProgressBar } from './ProgressBar';
+export { ChartLegend, ColumnChart, LineChart, Sparkline, niceMax, type ChartSeries } from './Charts';

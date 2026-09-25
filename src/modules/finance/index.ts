@@ -3,9 +3,11 @@ import type { ModuleManifest } from '@core/registry/types';
 import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES, debtType } from './types';
 import { financeWidgets } from './widgets';
 import { AccountSection, BudgetSection, FinanceHome, SubscriptionSection } from './screens';
-import { budgetStatus, monthRange, netWorth, postDueSubscriptions, spendByCategory, spendInRange, incomeInRange, monthlySubscriptionCost } from './lib';
+import { budgetStatus, monthRange, netWorth, postDueSubscriptions, spendByCategory, spendInRange, incomeInRange } from './lib';
+import { monthlySubscriptionCost } from './reports';
 import type { BudgetData } from './types';
 import { GroupBalanceSection, PersonBalanceSection, SplitSection } from './splitScreens';
+import { ReportsScreen } from './reportsScreen';
 
 export const financeModule: ModuleManifest = {
   id: 'finance',
@@ -15,7 +17,7 @@ export const financeModule: ModuleManifest = {
   icon: 'banknote',
   color: FINANCE_COLOR,
   entityTypes: [accountType, transactionType, budgetType, subscriptionType, debtType],
-  screens: [{ key: 'index', title: 'Finance', component: FinanceHome }],
+  screens: [{ key: 'index', title: 'Finance', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }],
   widgets: financeWidgets,
   defaultWidgets: [{ type: 'finance.spend', size: 'medium' }, { type: 'finance.networth', size: 'small' }, { type: 'finance.budgets', size: 'small' }],
   quickActions: [
