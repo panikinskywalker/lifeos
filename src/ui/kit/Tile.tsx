@@ -3,7 +3,8 @@ import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { IconName } from '../icons';
 import { useTheme } from '../theme/ThemeProvider';
 import type { TintKey } from '../theme/tokens';
-import { IconBox } from './IconBox';
+import { IconBox, type IconBoxTone } from './IconBox';
+import { Surface } from './Surface';
 import { packBento, TILE_SPAN, type TileSize } from './layout';
 import { Text } from './Text';
 
@@ -39,13 +40,15 @@ export function BentoGrid({ children, style }: { children: React.ReactNode; styl
 
 export interface TileProps {
   size?: TileSize;
-  /** Module tint for the icon-box; with `filled` the whole tile takes the tint. */
+  /** Module tint for the header icon-box; with `filled` the whole tile takes the tint. */
   tint?: TintKey;
+  /** Header icon-box tone instead of a tint (alert for Overdue, accent for reminders). */
+  iconTone?: IconBoxTone;
   filled?: boolean;
   icon?: IconName | (string & {});
   label?: string;
-  /** Right side of the header row: a count, a date, "3 due". */
-  meta?: string;
+  /** Right side of the header: a count, a date, or a node (a small chip). */
+  meta?: React.ReactNode;
   /** Tile body — a stat, a short list, a chart. */
   children?: React.ReactNode;
   /** Stats sit at the bottom (default); lists read better from the top. */
@@ -58,57 +61,62 @@ export interface TileProps {
 }
 
 /**
- * Bento cell. Header row = icon-box + label + meta; body; optional footer.
- * Inside a BentoGrid it fills its cell; standalone it sizes to content
- * (1×1 keeps a square aspect ratio).
+ * Bento cell: tile colour, radius 20, padding 16. Header = 28 icon-box +
+ * tile title (14/700) + meta; body; optional footer. Inside a BentoGrid it
+ * fills its cell; standalone it sizes to content (1×1 keeps a square).
  */
-export function Tile({ size = '1x1', tint, filled, icon, label, meta, children, bodyAlign = 'bottom', footer, onPress, accessibilityLabel, style }: TileProps) {
+export function Tile({ size = '1x1', tint, iconTone, filled, icon, label, meta, children, bodyAlign = 'bottom', footer, onPress, accessibilityLabel, style }: TileProps) {
   const t = useTheme();
   const cell = useContext(CellContext);
   const tone = tint ? t.tints[tint] : null;
   const bg = filled && tone ? tone.fill : t.c.bg.tile;
-  const ink = filled && tone ? tone.ink : t.c.fg.secondary;
-  const sizing: ViewStyle = cell ? { flex: 1 } : TILE_SPAN[size].cols === 1 && TILE_SPAN[size].rows === 1 ? { aspectRatio: 1 } : TILE_SPAN[size].rows === 2 ? { minHeight: 320 } : { minHeight: 150 };
+  const sizing: ViewStyle = cell ? { flex: 1 } : TILE_SPAN[size].cols === 1 && TILE_SPAN[size].rows === 1 ? { aspectRatio: 1 } : {};
   const body = (
-    <>
+    <Surface kind="tile">
       {icon || label || meta ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {icon ? <IconBox icon={icon} tint={tint} inverse={!!(filled && tone)} /> : null}
+          {icon ? <IconBox icon={icon} tint={tint} tone={filled && tone ? 'overlay' : iconTone} size={28} /> : null}
           {label ? (
-            <Text variant="label" color={ink} numberOfLines={1} style={{ flex: 1 }}>
+            <Text variant="tileTitle" numberOfLines={1} style={{ flex: 1 }}>
               {label}
             </Text>
           ) : (
             <View style={{ flex: 1 }} />
           )}
-          {meta ? (
-            <Text variant="caption" color={ink} numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>
+          {typeof meta === 'string' ? (
+            <Text variant="caption" color="secondary" numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>
               {meta}
             </Text>
-          ) : null}
+          ) : (
+            meta ?? null
+          )}
         </View>
       ) : null}
-      <View style={{ flex: 1, justifyContent: bodyAlign === 'top' ? 'flex-start' : 'flex-end', minHeight: 0 }}>{children}</View>
+      <View style={{ flex: cell ? 1 : undefined, justifyContent: bodyAlign === 'top' ? 'flex-start' : 'flex-end', minHeight: 0, gap: 4 }}>{children}</View>
       {footer ? <View>{footer}</View> : null}
-    </>
+    </Surface>
   );
-  const base: StyleProp<ViewStyle> = [{ backgroundColor: bg, borderRadius: t.radius.tile, padding: 16, gap: 12, overflow: 'hidden' }, sizing, style];
+  const base: StyleProp<ViewStyle> = [{ backgroundColor: bg, borderRadius: t.radius.tile, padding: 16, gap: 12, overflow: 'hidden', justifyContent: 'space-between' }, sizing, style];
   if (!onPress) return <View style={base}>{body}</View>;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} onPress={onPress} style={({ pressed }) => [base, pressed && { transform: [{ scale: 0.98 }], opacity: 0.92 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} onPress={onPress} style={({ pressed }) => [base, pressed && { opacity: 0.85 }]}>
       {body}
     </Pressable>
   );
 }
 
-/** Big tabular number with a unit and a caption. Used inside tiles and headers. */
-export function Stat({ value, unit, caption, tone, color, large }: { value: string; unit?: string; caption?: string; tone?: 'alert' | 'ok'; color?: string; large?: boolean }) {
+/**
+ * Big tabular number and a caption. Sizes from the canvas: 'hero' 36 (spend),
+ * 'count' 40 (a tile's single number), default 28, 'small' 20 (header stats).
+ */
+export function Stat({ value, unit, caption, tone, color, size = 'default', large }: { value: string; unit?: string; caption?: string; tone?: 'alert' | 'ok'; color?: string; size?: 'hero' | 'count' | 'default' | 'small'; /** @deprecated size="hero" */ large?: boolean }) {
   const t = useTheme();
-  const c = color ?? (tone === 'alert' ? t.c.alert.coralText : t.c.fg.primary);
+  const c = color ?? (tone === 'alert' ? t.c.alert.coral : t.c.fg.primary);
+  const fontSize = { hero: 36, count: 40, default: 28, small: 20 }[large ? 'hero' : size];
   return (
-    <View>
+    <View style={{ gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
-        <Text variant={large ? 'display' : 'stat'} color={c} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        <Text variant="stat" color={c} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize, lineHeight: Math.round(fontSize * 1.05) }}>
           {value}
         </Text>
         {unit ? (
@@ -127,12 +135,12 @@ export function Stat({ value, unit, caption, tone, color, large }: { value: stri
 }
 
 /** A Tile whose body is a single Stat. */
-export function StatTile({ value, unit, caption, tone, ...tile }: Omit<TileProps, 'children'> & { value: string; unit?: string; caption?: string; tone?: 'alert' | 'ok' }) {
+export function StatTile({ value, unit, caption, tone, statSize, ...tile }: Omit<TileProps, 'children'> & { value: string; unit?: string; caption?: string; tone?: 'alert' | 'ok'; statSize?: 'hero' | 'count' | 'default' }) {
   const t = useTheme();
   const color = tile.filled && tile.tint && tone !== 'alert' ? t.tints[tile.tint].ink : undefined;
   return (
     <Tile {...tile}>
-      <Stat value={value} unit={unit} caption={caption} tone={tone} color={color} large={tile.size === '2x2'} />
+      <Stat value={value} unit={unit} caption={caption} tone={tone} color={color} size={statSize ?? (tile.size === '2x2' ? 'hero' : 'default')} />
     </Tile>
   );
 }

@@ -3,25 +3,37 @@ import { Pressable, ScrollView, View, type StyleProp, type ViewStyle } from 'rea
 import { Icon, type IconName } from '../icons';
 import { useTheme } from '../theme/ThemeProvider';
 import type { TintKey } from '../theme/tokens';
+import { useControlFill } from './Surface';
 import { Text } from './Text';
 
-export type ChipTone = 'neutral' | 'alert' | 'ok' | 'accent';
+/**
+ * neutral: control fill, ink · muted: control fill, secondary ("in 3 d") ·
+ * alert: coral fill and text · alertText: control fill, coral text (an
+ * overdue item in a checklist) · accent: mustard · ok: sage tint.
+ */
+export type ChipTone = 'neutral' | 'muted' | 'alert' | 'alertText' | 'accent' | 'ok';
 
-/** Static label: status, tag, count. Tinted by module or by tone. */
-export function Chip({ label, tint, tone = 'neutral', icon, onPress, small }: { label: string; tint?: TintKey; tone?: ChipTone; icon?: IconName | (string & {}); onPress?: () => void; small?: boolean }) {
+/**
+ * Static chip. md (7/12, 13/700) for checklists and related records; sm
+ * (3/8, 11/700) for category tags and status. `overlay` puts it on a tinted band.
+ */
+export function Chip({ label, tint, tone = 'neutral', icon, onPress, small, overlay }: { label: string; tint?: TintKey; tone?: ChipTone; icon?: IconName | (string & {}); onPress?: () => void; small?: boolean; overlay?: boolean }) {
   const t = useTheme();
+  const control = useControlFill();
   const [bg, fg] = tint
     ? [t.tints[tint].fill, t.tints[tint].ink]
     : {
-        neutral: [t.c.line, t.c.fg.primary],
+        neutral: [control, t.c.fg.primary],
+        muted: [control, t.c.fg.secondary],
         alert: [t.c.alert.coralFill, t.c.alert.coralText],
-        ok: [t.tints.upkeep.fill, t.tints.upkeep.ink],
+        alertText: [control, t.c.alert.coralText],
         accent: [t.c.accent.mustard, t.c.accent.mustardInk],
+        ok: [t.tints.upkeep.fill, t.tints.upkeep.ink],
       }[tone];
   const body = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: small ? 24 : 28, paddingHorizontal: small ? 8 : 10, borderRadius: t.radius.chip, backgroundColor: bg, alignSelf: 'flex-start' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: small ? 3 : 7, paddingHorizontal: small ? 8 : 12, borderRadius: t.radius.chip, backgroundColor: overlay ? t.c.bg.overlay : bg, alignSelf: 'flex-start' }}>
       {icon ? <Icon name={icon} size={small ? 12 : 14} color={fg} /> : null}
-      <Text variant="caption" color={fg} numberOfLines={1}>
+      <Text variant={small ? 'nav' : 'label'} color={fg} numberOfLines={1}>
         {label}
       </Text>
     </View>
@@ -34,30 +46,25 @@ export function Chip({ label, tint, tone = 'neutral', icon, onPress, small }: { 
   );
 }
 
-/** Selectable chip for filters. Selected = mustard. 36 high, 48 target. */
+/** Selectable filter pill (8/14, 13/700). Selected = mustard. 48dp target. */
 export function FilterChip({ label, selected, onPress, icon, count }: { label: string; selected?: boolean; onPress?: () => void; icon?: IconName | (string & {}); count?: number }) {
   const t = useTheme();
-  // line, not tile: unselected chips must read on ground, tile and raised surfaces alike.
-  const bg = selected ? t.c.accent.mustard : t.c.line;
+  const control = useControlFill();
   const fg = selected ? t.c.accent.mustardInk : t.c.fg.primary;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
+      aria-selected={!!selected}
       accessibilityLabel={count != null ? `${label}, ${count}` : label}
-      hitSlop={6}
+      hitSlop={8}
       onPress={onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 14, borderRadius: t.radius.chip, backgroundColor: pressed && !selected ? t.c.fg.tertiary : bg })}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: t.radius.chip, backgroundColor: selected ? t.c.accent.mustard : control, opacity: pressed ? 0.75 : 1 })}
     >
-      {icon ? <Icon name={icon} size={16} color={fg} /> : null}
+      {icon ? <Icon name={icon} size={14} color={fg} /> : null}
       <Text variant="label" color={fg}>
-        {label}
+        {count != null ? `${label} · ${count}` : label}
       </Text>
-      {count != null ? (
-        <Text variant="caption" color={selected ? fg : t.c.fg.secondary} style={{ fontVariant: ['tabular-nums'] }}>
-          {count}
-        </Text>
-      ) : null}
     </Pressable>
   );
 }

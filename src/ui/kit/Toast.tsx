@@ -13,6 +13,8 @@ export interface ToastOptions {
   icon?: IconName;
   /** Shows an Undo button; called once if tapped before the toast expires. */
   undo?: () => void | Promise<void>;
+  /** Any other single action (Retry). Ignored when `undo` is set. */
+  action?: { label: string; onPress: () => void };
   duration?: number;
 }
 
@@ -60,7 +62,7 @@ function ToastView({ toast, dismiss, bottomOffset }: { toast: ToastOptions & { i
   const onDone = () => dismiss(toast.id);
   useEffect(() => {
     Animated.timing(anim, { toValue: 1, duration: 160, useNativeDriver: true }).start();
-    const timer = setTimeout(() => Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }).start(() => dismiss(toast.id)), toast.duration ?? (toast.undo ? UNDO_MS : 4000));
+    const timer = setTimeout(() => Animated.timing(anim, { toValue: 0, duration: 160, useNativeDriver: true }).start(() => dismiss(toast.id)), toast.duration ?? (toast.undo || toast.action ? UNDO_MS : 4000));
     return () => clearTimeout(timer);
   }, [anim, dismiss, toast]);
   return (
@@ -69,27 +71,28 @@ function ToastView({ toast, dismiss, bottomOffset }: { toast: ToastOptions & { i
       accessibilityLiveRegion="polite"
       style={{ position: 'absolute', left: t.layout.gutter, right: t.layout.gutter, bottom: insets.bottom + bottomOffset + 12, opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingLeft: 16, paddingRight: 6, borderRadius: t.radius.card, backgroundColor: t.c.bg.bar }}>
-        {toast.icon ? <Icon name={toast.icon} size={18} color={t.c.fg.onBarActive} /> : null}
-        <Text variant="body" color={t.c.fg.onBarActive} style={{ flex: 1, paddingVertical: 12 }} numberOfLines={2}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingLeft: 14, paddingRight: 8, borderRadius: t.radius.card, backgroundColor: t.c.bg.bar }}>
+        {toast.icon ? <Icon name={toast.icon} size={18} color={t.c.fg.onBarText} /> : null}
+        <Text variant="tileTitle" color={t.c.fg.onBarText} style={{ flex: 1, paddingVertical: 12 }} numberOfLines={2}>
           {toast.message}
         </Text>
-        {toast.undo ? (
+        {toast.undo || toast.action ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Undo"
+            accessibilityLabel={toast.undo ? 'Undo' : toast.action!.label}
             hitSlop={8}
             onPress={() => {
               if (used.current) return;
               used.current = true;
               onDone();
-              void toast.undo?.();
+              if (toast.undo) void toast.undo();
+              else toast.action!.onPress();
             }}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 12, borderRadius: t.radius.chip, backgroundColor: pressed ? t.c.accent.mustardInk : 'transparent' })}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 8, opacity: pressed ? 0.7 : 1 })}
           >
-            <Icon name="undo" size={16} color={t.c.accent.mustard} />
-            <Text variant="label" color={t.c.accent.mustard}>
-              Undo
+            {toast.undo ? <Icon name="undo" size={16} color={t.c.accent.mustard} /> : null}
+            <Text variant="tileTitle" color={t.c.accent.mustard} style={{ fontWeight: '800' }}>
+              {toast.undo ? 'Undo' : toast.action!.label}
             </Text>
           </Pressable>
         ) : null}

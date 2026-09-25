@@ -5,7 +5,7 @@ import type { IconName } from '../icons';
 import { useTheme } from '../theme/ThemeProvider';
 import type { TintKey } from '../theme/tokens';
 import { IconButton } from './Button';
-import { Chip, type ChipTone } from './Chip';
+import { Chip } from './Chip';
 import { IconBox } from './IconBox';
 import { Text } from './Text';
 
@@ -17,55 +17,54 @@ export interface HeaderStat {
 }
 
 /**
- * Top of a Record screen: a band in the module tint running under the status
- * bar, with back/actions, icon-box, title, status chip and up to three key stats.
+ * Canvas record header: the module tint runs under the status bar and ends
+ * in 28px bottom corners. Round overlay controls (back · actions), a 48
+ * overlay icon-box, 26/800 title, 13/700 subtitle in the module ink, a small
+ * status chip, and up to three 20/800 stats with ink labels.
  */
-export function RecordHeader({ tint, icon, title, subtitle, status, stats, onBack, actions }: { tint: TintKey; icon?: IconName | (string & {}); title: string; subtitle?: string | null; status?: { label: string; tone?: ChipTone; onPress?: () => void }; stats?: HeaderStat[]; onBack?: () => void; actions?: React.ReactNode }) {
+export function RecordHeader({ tint, icon, title, subtitle, status, stats, onBack, actions }: { tint: TintKey; icon?: IconName | (string & {}); title: string; subtitle?: string | null; status?: { label: string; tone?: 'alert' | 'neutral'; onPress?: () => void }; stats?: HeaderStat[]; onBack?: () => void; actions?: React.ReactNode }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const tone = t.tints[tint];
   return (
-    <View style={{ backgroundColor: tone.fill, paddingTop: insets.top + 4, paddingHorizontal: t.layout.gutter, paddingBottom: 20, borderBottomLeftRadius: t.radius.tile, borderBottomRightRadius: t.radius.tile, gap: 14 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: -8, minHeight: 48 }}>
-        {onBack ? <IconButton icon="chevron-left" onPress={onBack} accessibilityLabel="Back" color={tone.ink} /> : null}
+    <View style={{ backgroundColor: tone.fill, paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: 22, borderBottomLeftRadius: t.radius.band, borderBottomRightRadius: t.radius.band, gap: 18 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {onBack ? <IconButton icon="chevron-left" onPress={onBack} accessibilityLabel="Back" filled="overlay" /> : null}
         <View style={{ flex: 1 }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>{actions}</View>
+        {actions}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        {icon ? <IconBox icon={icon} tint={tint} inverse size={44} /> : null}
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="title" color={tone.ink} numberOfLines={2} accessibilityRole="header">
+      <View style={{ gap: 10 }}>
+        {icon ? <IconBox icon={icon} tint={tint} tone="overlay" size={48} color={t.c.fg.primary} /> : null}
+        <View style={{ gap: 4 }}>
+          <Text variant="title" numberOfLines={2} accessibilityRole="header" style={{ fontSize: 26, lineHeight: 29 }}>
             {title}
           </Text>
           {subtitle ? (
-            <Text variant="caption" color={tone.ink} numberOfLines={1} style={{ opacity: 0.8 }}>
+            <Text variant="label" color={tone.ink} numberOfLines={1}>
               {subtitle}
             </Text>
           ) : null}
         </View>
-      </View>
-      {status ? <Chip label={status.label} tone={status.tone ?? 'neutral'} icon={status.onPress ? 'chevron-down' : undefined} onPress={status.onPress} /> : null}
-      {stats?.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 24, rowGap: 8 }}>
-          {stats.slice(0, 3).map((s) => (
-            <View key={s.label}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-                <Text variant="stat" color={s.tone === 'alert' ? t.c.alert.coralText : tone.ink} numberOfLines={1}>
-                  {s.value}
+        {status ? (
+          <View style={{ flexDirection: 'row' }}>
+            <Chip label={status.label} small overlay tone={status.tone === 'alert' ? 'alertText' : 'neutral'} icon={status.onPress ? 'chevron-down' : undefined} onPress={status.onPress} />
+          </View>
+        ) : null}
+        {stats?.length ? (
+          <View style={{ flexDirection: 'row', gap: 12, paddingTop: 4 }}>
+            {stats.slice(0, 3).map((s) => (
+              <View key={s.label} style={{ flex: 1, minWidth: 0, gap: 3 }}>
+                <Text variant="stat" color={s.tone === 'alert' ? t.c.alert.coralText : undefined} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: 20, lineHeight: 22 }}>
+                  {s.unit ? `${s.value} ${s.unit}` : s.value}
                 </Text>
-                {s.unit ? (
-                  <Text variant="caption" color={tone.ink}>
-                    {s.unit}
-                  </Text>
-                ) : null}
+                <Text variant="labelCaps" color={tone.ink} numberOfLines={1} style={{ letterSpacing: 0 }}>
+                  {s.label}
+                </Text>
               </View>
-              <Text variant="caption" color={tone.ink} numberOfLines={1} style={{ opacity: 0.8 }}>
-                {s.label}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
+            ))}
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

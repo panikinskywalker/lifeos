@@ -14,13 +14,19 @@
 
 export interface Colors {
   /** tileRaised = the canvas's "nested / control" surface: controls sitting on a tile. */
-  bg: { ground: string; tile: string; tileRaised: string; bar: string; pressed: string; scrim: string };
+  /** overlay: controls on a tinted record band; pill: the Done pill and an off toggle's thumb. */
+  bg: { ground: string; tile: string; tileRaised: string; bar: string; pressed: string; scrim: string; overlay: string; pill: string };
   /** onBar / onBarActive: nav bar icon+label, inactive and active (active is mustard for the icon). */
-  fg: { primary: string; secondary: string; tertiary: string; onBar: string; onBarActive: string };
+  /** onBarText: text on the bar colour (toast). */
+  fg: { primary: string; secondary: string; tertiary: string; onBar: string; onBarActive: string; onBarText: string };
   /** Track: segmented, toggle and chip tracks, hairlines. */
   line: string;
   /** Unfilled part of a Ring. */
   ringTrack: string;
+  /** Timeline rail. */
+  rail: string;
+  /** Spending chart series, in order: sage · peach · rose · sky · stone (canvas). */
+  chart: readonly [string, string, string, string, string];
   /** mustardSoft: the reminder / highlight icon-box behind a bell. */
   accent: { mustard: string; mustardInk: string; mustardSoft: string };
   /** coral / sage are fills, rings and dots; *Text variants are for text and icons. */
@@ -36,6 +42,8 @@ export const lightTokens: Colors = {
     bar: '#17201C',
     pressed: '#E4E4DD', // working value: pressed = track
     scrim: '#17201C47', // canvas: scrim 28%
+    overlay: '#FFFFFF8C', // canvas: white 55%
+    pill: '#FFFFFF',
   },
   fg: {
     primary: '#1B1F1D',
@@ -43,9 +51,12 @@ export const lightTokens: Colors = {
     tertiary: '#A3A9A5',
     onBar: '#AEB5B0',
     onBarActive: '#F3C84B',
+    onBarText: '#EDEEEA',
   },
   line: '#E4E4DD',
   ringTrack: '#E3E3DB',
+  rail: '#D3D3CB',
+  chart: ['#5F7F65', '#C9825A', '#B96E6A', '#6C8DB0', '#B5B2A6'],
   accent: { mustard: '#F3C84B', mustardInk: '#1B1F1D', mustardSoft: '#FBEFC6' },
   alert: { coral: '#E9635A', coralText: '#B8382F', coralInk: '#FFFFFF', coralFill: '#F8D9D5' },
   ok: { sage: '#8FB596', sageText: '#2F6142', sageInk: '#1B1F1D' },
@@ -58,7 +69,9 @@ export const darkTokens: Colors = {
     tileRaised: '#272B27',
     bar: '#242A26',
     pressed: '#333833', // working value: pressed = track
-    scrim: '#00000070', // working value
+    scrim: '#00000073', // canvas: black 45%
+    overlay: '#FFFFFF1A', // canvas: white 10%
+    pill: '#2E332E',
   },
   fg: {
     primary: '#EDEEEA',
@@ -66,9 +79,12 @@ export const darkTokens: Colors = {
     tertiary: '#6C736E',
     onBar: '#8F978F',
     onBarActive: '#F3C84B',
+    onBarText: '#EDEEEA',
   },
   line: '#333833',
   ringTrack: '#343934',
+  rail: '#2E332E',
+  chart: ['#8FB596', '#E0A27E', '#D9908B', '#93B1D1', '#7F7E76'],
   accent: { mustard: '#F3C84B', mustardInk: '#1B1F1D', mustardSoft: '#5D533C' },
   alert: { coral: '#F07A71', coralText: '#F5A29B', coralInk: '#1B1F1D', coralFill: '#4A2724' },
   ok: { sage: '#5F7F65', sageText: '#BCDCC0', sageInk: '#EDEEEA' },
