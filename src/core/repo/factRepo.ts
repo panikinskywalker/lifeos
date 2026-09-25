@@ -4,7 +4,7 @@ import { bus } from '../events/bus';
 import type { ChangeLog } from '../sync/changeLog';
 import { normAlias } from './aliasRepo';
 
-export type FactSource = 'talk' | 'notification' | 'note' | 'correction' | 'user';
+export type FactSource = 'talk' | 'notification' | 'note' | 'correction' | 'user' | 'dump';
 
 export interface Fact {
   id: string;

@@ -17,7 +17,7 @@ const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 /** A [[title]] → record id: exact title first (case-insensitive), then a learned alias. Null when unsure. */
 export function resolveLink(os: LifeOSContext, title: string, exclude?: string): string | null {
   const t = norm(title);
-  const exact = os.entities.search.search(title, { limit: 20 }).filter((h) => h.type !== 'fact' && h.id !== exclude && norm(h.title) === t);
+  const exact = os.entities.search.search(title, { limit: 20 }).filter((h) => h.type !== 'fact' && h.type !== 'dump' && h.id !== exclude && norm(h.title) === t);
   if (exact.length === 1) return exact[0]!.id;
   if (exact.length > 1) return null;
   const alias = os.aliases.lookup(title).find((a) => norm(a.alias) === t && a.entityId !== exclude);

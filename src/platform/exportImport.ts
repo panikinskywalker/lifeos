@@ -14,10 +14,12 @@ export function importAll(os: LifeOSContext, backup: { tables: Record<string, Re
       const rows = backup.tables[t] ?? [];
       for (const r of rows) {
         const cols = Object.keys(r);
-        os.db.run(`INSERT OR REPLACE INTO ${t}(${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, cols.map((c) => r[c] as never));
+        os.db.run(`INSERT OR ${t === 'dumps' ? 'IGNORE' : 'REPLACE'} INTO ${t}(${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, cols.map((c) => r[c] as never));
       }
     }
   });
   const all = os.entities.query(null, { includeArchived: true }, { limit: 100000 });
   os.entities.search.rebuild(all, (ty) => os.registry.entityTypes.get(ty));
+  os.facts.reindex();
+  os.dumps.reindex();
 }

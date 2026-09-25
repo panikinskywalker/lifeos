@@ -33,7 +33,7 @@ export const LEGACY_ICON_ALIASES: Record<string, IconName> = {
   airplane: 'plane', 'airplane.departure': 'plane',
   cube: 'box', 'cube.box': 'box', shippingbox: 'box', archivebox: 'archive',
   doc: 'file', 'doc.text': 'file', 'note.text': 'book', 'text.book.closed': 'book', graduationcap: 'book',
-  brain: 'bulb', lightbulb: 'bulb',
+  lightbulb: 'bulb',
   'checkmark.circle': 'check-circle', checkmark: 'check', checklist: 'list', 'list.bullet': 'list',
   'bolt.fill': 'bolt', 'bolt.horizontal': 'bolt',
   sparkles: 'sparkle', magnifyingglass: 'search', gear: 'settings', gearshape: 'settings', 'slider.horizontal.3': 'settings',

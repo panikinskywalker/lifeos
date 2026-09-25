@@ -99,10 +99,10 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 **Why:** after M1–M3 the app was an agent with a filing cabinet. `docs/PRODUCT.md` v4 says what it must be: a personal data dashboard + an almanac, fed automatically. This milestone turns the existing build into that. Nothing from M1–M3 is thrown away; the shell, the entity core, cycles, splits and the agent all stay.
 
 ### M4.0 — Audit first (half a day, no new code)
-- [ ] Walk every screen on a real phone against PRODUCT.md v4 §5 golden flows. Write `docs/AUDIT.md`: what exists, what's missing, what's wrong. Rutvij reviews before M4.1 starts.
+- [x] Walk every screen on a real phone against PRODUCT.md v4 §5 golden flows. Write `docs/AUDIT.md`: what exists, what's missing, what's wrong. Rutvij reviews before M4.1 starts. *(Audit written from the code; the phone walk is deferred until the M4 build, per Rutvij 26 Sep.)*
 
 ### M4.1 — Dump (the centre button)
-- [ ] `dump` entity: raw text, source (typed / voice / share), createdAt, immutable body; `extractions` side table (dumpId → entityId/factId, kind, undone flag).
+- [x] `dump` entity: raw text, source (typed / voice / share), createdAt, immutable body; `extractions` side table (dumpId → entityId/factId, kind, undone flag). *(Own tables `dumps` + `dump_extractions` (migration v6) rather than an entity type, so the database itself refuses edits and deletes; dumps are in search, backups and Talk's retrieval.)*
 - [ ] Dump screen replaces the Talk tab in the bottom bar: big box, mic, send; toggle *Dump / Talk* at the top; recent dumps below, each with "extracted: 1 person · 2 facts · 1 task" chips and per-item Undo.
 - [ ] Background extraction job (scheduler): parser first, then the small-model chain with a strict JSON schema: `{ people[], tasks[], facts[], events[], transactions[], cycleUpdates[], entitiesToCreate[] }`. Every created/updated record links back to the dump. Never blocks the dump; retries when online.
 - [ ] Agent "create anything": `create_entity` accepts any registered type with partial data and fills sensible defaults; new tool `create_person_from_mention` (name, company, role, where met, relationship) and `suggest_cycle` (offer keep-in-touch / warranty / renewal). Golden tests: "made a new friend today, Karan, works at Zomato, met at the gym" → Person + fact + link; "bought a Dyson for 32k on the HDFC card, warranty 2 years" → Asset + Transaction + warranty cycle; 6-line rant with one buried task → one task, nothing invented.

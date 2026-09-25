@@ -433,4 +433,70 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_ai_usage_provider ON ai_usage(provider, at)`,
     ],
   },
+  {
+    version: 6,
+    name: 'dumps',
+    up: [
+      // Brain dumps (PRODUCT v4 §1.3): the raw text exactly as typed, spoken
+      // or shared, kept forever. The body can never change and a dump can't be
+      // deleted — the triggers refuse it even if a bug tries.
+      `CREATE TABLE IF NOT EXISTS dumps (
+        id TEXT PRIMARY KEY,
+        body TEXT NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('typed', 'voice', 'share')),
+        created_at INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'failed', 'skipped')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        extracted_at INTEGER,
+        error TEXT,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_dumps_recent ON dumps(created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_dumps_status ON dumps(status, created_at)`,
+      `CREATE TRIGGER IF NOT EXISTS dumps_body_immutable BEFORE UPDATE OF body, source, created_at ON dumps
+        WHEN NEW.body IS NOT OLD.body OR NEW.source IS NOT OLD.source OR NEW.created_at IS NOT OLD.created_at
+        BEGIN SELECT RAISE(ABORT, 'dumps are immutable'); END`,
+      `CREATE TRIGGER IF NOT EXISTS dumps_never_deleted BEFORE DELETE ON dumps
+        BEGIN SELECT RAISE(ABORT, 'dumps are kept forever'); END`,
+      // What was pulled out of each dump: a record created or updated, a fact,
+      // a cycle rolled. Undo marks the row and reverses the change.
+      `CREATE TABLE IF NOT EXISTS dump_extractions (
+        id TEXT PRIMARY KEY,
+        dump_id TEXT NOT NULL REFERENCES dumps(id),
+        kind TEXT NOT NULL,
+        action TEXT NOT NULL DEFAULT 'created' CHECK (action IN ('created', 'updated', 'logged')),
+        entity_id TEXT,
+        fact_id TEXT,
+        label TEXT NOT NULL,
+        undone INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_dump_extractions_dump ON dump_extractions(dump_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_dump_extractions_entity ON dump_extractions(entity_id)`,
+      // Facts may now come from a dump: SQLite can't widen a CHECK in place,
+      // so the table is rebuilt with the same columns and indexes.
+      `CREATE TABLE facts_v6 (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        subject_id TEXT,
+        subject_key TEXT,
+        source TEXT NOT NULL CHECK (source IN ('talk', 'notification', 'note', 'correction', 'user', 'dump')),
+        source_ref TEXT,
+        stated_at INTEGER NOT NULL,
+        confidence REAL NOT NULL DEFAULT 1,
+        active INTEGER NOT NULL DEFAULT 1,
+        superseded_by TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `INSERT INTO facts_v6 SELECT id, text, subject_id, subject_key, source, source_ref, stated_at, confidence, active, superseded_by, created_at, updated_at, deleted_at, version FROM facts`,
+      `DROP TABLE facts`,
+      `ALTER TABLE facts_v6 RENAME TO facts`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_subject ON facts(subject_id, active)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_key ON facts(subject_key, active)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_recent ON facts(active, stated_at DESC)`,
+    ],
+  },
 ];

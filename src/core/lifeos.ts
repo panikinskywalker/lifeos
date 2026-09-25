@@ -10,6 +10,7 @@ import { CycleRepo } from './cycles/cycleRepo';
 import { GroupRepo } from './repo/groupRepo';
 import { AliasRepo } from './repo/aliasRepo';
 import { FactRepo } from './repo/factRepo';
+import { DumpRepo } from './repo/dumpRepo';
 import { AutomationEngine } from './automation/engine';
 import { Scheduler } from './automation/scheduler';
 import { createFormatters, DEFAULT_LOCALE, type LocaleSettings } from './format';
@@ -58,6 +59,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     groups: new GroupRepo(db, changes),
     aliases: new AliasRepo(db, changes),
     facts: new FactRepo(db, changes),
+    dumps: new DumpRepo(db, changes),
     comments: new CommentRepo(db, timeline, changes),
     reminders: new ReminderRepo(db, timeline, changes),
     customFields: new CustomFieldRepo(db),

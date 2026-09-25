@@ -41,7 +41,7 @@ export function resolveCandidates(os: LifeOSContext, text: string, types?: strin
   const phrase = words.join(' ');
   const out = new Map<string, Candidate>();
   const add = (e: { id: string; type: string; title: string; subtitle?: string | null }, score: number, why: string) => {
-    if (e.type === 'fact' || (types?.length && !types.includes(e.type))) return;
+    if (e.type === 'fact' || e.type === 'dump' || (types?.length && !types.includes(e.type))) return;
     const prev = out.get(e.id);
     if (!prev || prev.score < score) out.set(e.id, { id: e.id, type: e.type, title: e.title, subtitle: e.subtitle ?? null, score, why });
   };

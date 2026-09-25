@@ -26,7 +26,7 @@ const MAP = {
   car: 'car', gauge: 'gauge', bus: 'bus', plane: 'plane', map: 'map', location: 'map-pin',
   shoe: 'footprints', shirt: 'shirt', drop: 'droplets', wind: 'wind', leaf: 'leaf', heart: 'heart', activity: 'activity',
   flame: 'flame', bolt: 'zap', gift: 'gift', cake: 'cake', food: 'utensils', film: 'film', briefcase: 'briefcase',
-  scale: 'weight', phone: 'phone',
+  scale: 'weight', phone: 'phone', brain: 'brain', library: 'library', 'pen-line': 'pen-line', notebook: 'notebook-pen',
 };
 
 const nodes = JSON.parse(readFileSync(process.argv[2], 'utf8'));

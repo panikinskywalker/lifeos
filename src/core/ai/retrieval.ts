@@ -51,7 +51,10 @@ export function buildContext(os: LifeOSContext, userText: string, opts: Retrieva
   const detailed = about.map((c) => describeRecord(os, c.id)).filter((x): x is string => !!x);
   if (detailed.length) sections.push(['Records this message is probably about', detailed]);
   const shown = new Set(about.map((c) => c.id));
-  const hits = os.entities.search.search(userText.split(/\s+/).filter((w) => w.length > 2).slice(0, 6).join(' '), { limit: 8 }).filter((h) => h.type !== 'fact' && !shown.has(h.id));
+  const all = os.entities.search.search(userText.split(/\s+/).filter((w) => w.length > 2).slice(0, 6).join(' '), { limit: 12 });
+  const dumps = all.filter((h) => h.type === 'dump').slice(0, 4).map((h) => os.dumps.get(h.id)).filter((d): d is NonNullable<typeof d> => !!d);
+  if (dumps.length) sections.push(['From the user’s brain dumps (verbatim)', dumps.map((d) => `• ${iso(d.createdAt)}: “${d.body.replace(/\s+/g, ' ').slice(0, 400)}”`)]);
+  const hits = all.filter((h) => h.type !== 'fact' && h.type !== 'dump' && !shown.has(h.id)).slice(0, 8);
   if (hits.length) sections.push(['Other matching records', hits.map((h) => `• ${h.title} [${os.registry.entityTypes.get(h.type)?.label ?? h.type}, id ${h.id}]${h.subtitle ? ` — ${h.subtitle}` : ''}`)]);
   let out = '';
   for (const [title, lines] of sections) {

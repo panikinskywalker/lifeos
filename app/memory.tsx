@@ -8,7 +8,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { ActionSheet, Button, Chip, EmptyState, IconButton, Screen, Section, Sheet, Text, TextField, useToast } from '@ui/kit';
 import { EntityPicker } from '@ui/components/fields';
 
-const SOURCE: Record<Fact['source'], string> = { talk: 'from Talk', notification: 'from a notification', note: 'from a note', correction: 'a correction', user: 'added by you' };
+const SOURCE: Record<Fact['source'], string> = { talk: 'from Talk', notification: 'from a notification', note: 'from a note', correction: 'a correction', user: 'added by you', dump: 'from a dump' };
 
 /** Browse › Memory (M3): everything the agent remembers, by who or what it's about. Forget anything. */
 export default function MemoryScreen() {

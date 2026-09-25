@@ -24,6 +24,8 @@ export const BACKUP_TABLES = [
   'notification_rules',
   'ingest_queue',
   'aliases',
+  'dumps',
+  'dump_extractions',
 ] as const;
 
 /** Rebuilt or re-derived on this device, so not worth carrying in a backup. */
