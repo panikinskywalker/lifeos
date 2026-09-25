@@ -4,6 +4,8 @@ import type { AiToolDef } from '../registry/types';
 import { newId } from '../domain/ids';
 import type { ChatMessage, ContentBlock, LLMProvider, ToolSpec } from './provider';
 import { extrasOf, type ReplyCard } from './cards';
+import { mineFacts } from './factMiner';
+import type { Fact } from '../repo/factRepo';
 
 export interface AssistantTurn {
   id: string;
@@ -27,6 +29,10 @@ export interface AssistantOptions {
   confirm?: (tool: AiToolDef, input: unknown, summary: string) => Promise<boolean>;
   onTurn?: (turn: AssistantTurn) => void;
   maxToolRounds?: number;
+  /** Cheap model for fact mining after every user message (Haiku); off when absent. */
+  factProvider?: LLMProvider;
+  /** Facts saved from the last message (for a quiet "Remembered …" line). */
+  onFacts?: (facts: Fact[]) => void;
 }
 
 function toolSpec(t: AiToolDef): ToolSpec {
@@ -43,6 +49,8 @@ function toolSpec(t: AiToolDef): ToolSpec {
 export class Assistant {
   private history: ChatMessage[] = [];
   readonly conversationId: string;
+  /** The fact-mining run for the last message; it runs beside the reply, never blocking it. */
+  lastMining: Promise<Fact[]> = Promise.resolve([]);
 
   constructor(private os: LifeOSContext, private opts: AssistantOptions, conversationId?: string) {
     this.conversationId = conversationId ?? newId();
@@ -93,6 +101,12 @@ Guidelines:
     this.history.push(userMsg);
     this.persist(userMsg);
     emit({ id: newId(), role: 'user', text: userText, createdAt: Date.now() });
+    if (this.opts.factProvider) {
+      this.lastMining = mineFacts(this.os, this.opts.factProvider, userText, this.conversationId).then((facts) => {
+        if (facts.length) this.opts.onFacts?.(facts);
+        return facts;
+      });
+    }
 
     const tools = this.tools();
     const specs = tools.map(toolSpec);

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { shortNameForModule, tintForModule } from '@ui/theme/moduleTint';
-import { Icon, IconBox, IconButton, RowList, Screen, Section, Text } from '@ui/kit';
+import { Icon, IconBox, IconButton, RowList, Screen, Section, Text, RowItem } from '@ui/kit';
 import { EntityRow } from '@ui/components/EntityRow';
 
 /** Browse (canvas 05): search, a two-column grid of modules in their tints, then Recent. */
@@ -13,6 +13,7 @@ export default function BrowseTab() {
   const t = useTheme();
   const router = useRouter();
   const counts = useLive((o) => o.entities.countsByType(), []);
+  const facts = useLive((o) => o.facts.list({ limit: 10000 }).length, []);
   const recent = useLive((o) => o.entities.recent(6), []);
   const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core' && m.id !== 'dashboard');
   return (
@@ -47,6 +48,7 @@ export default function BrowseTab() {
         })}
         {modules.length % 2 ? <View style={{ flexBasis: '40%', flexGrow: 1 }} /> : null}
       </View>
+      <RowItem icon="sparkle" tint="memory" title="Memory" subtitle={facts ? `${facts} thing${facts === 1 ? '' : 's'} you’ve told me` : 'What Talk remembers for you'} onPress={() => router.push('/memory')} />
       {recent.length ? (
         <Section title="Recent" action="Tags" onAction={() => router.push('/tag')}>
           <RowList>

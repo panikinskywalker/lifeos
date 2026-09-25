@@ -52,8 +52,8 @@ export class SearchIndex {
     params.push(opts.limit ?? 30);
     const rows = this.db.all<{ id: string; type: string; title: string; subtitle: string | null; snippet: string; rank: number }>(
       `SELECT f.id, f.type, f.title, f.subtitle, snippet(entities_fts, 4, '[', ']', '…', 12) AS snippet, bm25(entities_fts, 0, 0, 10, 4, 1) AS rank
-       FROM entities_fts f JOIN entities e ON e.id = f.id
-       WHERE entities_fts MATCH ? AND e.deleted_at IS NULL${typeSql}
+       FROM entities_fts f LEFT JOIN entities e ON e.id = f.id LEFT JOIN facts fa ON fa.id = f.id
+       WHERE entities_fts MATCH ? AND ((e.id IS NOT NULL AND e.deleted_at IS NULL) OR (fa.id IS NOT NULL AND fa.active = 1 AND fa.deleted_at IS NULL))${typeSql}
        ORDER BY rank LIMIT ?`,
       params,
     );
@@ -78,9 +78,9 @@ export class SearchIndex {
     bound.push(`${tokens[0]}%`, opts.limit ?? 30);
     return this.db.all<SearchHit & Row>(
       `SELECT f.id, f.type, f.title, f.subtitle, substr(f.body, 1, 80) AS snippet, 0 AS rank
-       FROM entities_fts f JOIN entities e ON e.id = f.id
-       WHERE ${where.join(' AND ')} AND e.deleted_at IS NULL${typeSql}
-       ORDER BY CASE WHEN f.title LIKE ? COLLATE NOCASE THEN 0 ELSE 1 END, e.updated_at DESC LIMIT ?`,
+       FROM entities_fts f LEFT JOIN entities e ON e.id = f.id LEFT JOIN facts fa ON fa.id = f.id
+       WHERE ${where.join(' AND ')} AND ((e.id IS NOT NULL AND e.deleted_at IS NULL) OR (fa.id IS NOT NULL AND fa.active = 1 AND fa.deleted_at IS NULL))${typeSql}
+       ORDER BY CASE WHEN f.title LIKE ? COLLATE NOCASE THEN 0 ELSE 1 END, COALESCE(e.updated_at, fa.updated_at) DESC LIMIT ?`,
       bound,
     );
   }
@@ -88,7 +88,8 @@ export class SearchIndex {
   /** Full rebuild (after import / restore). */
   rebuild(entities: Entity[], defFor: (type: string) => EntityTypeDef | undefined) {
     this.db.transaction(() => {
-      this.db.run(`DELETE FROM entities_fts`);
+      // Facts live in the same index but aren't entities: keep their rows.
+      this.db.run(`DELETE FROM entities_fts WHERE type != 'fact'`);
       for (const e of entities) {
         const d = defFor(e.type);
         if (d) this.index(e, d);

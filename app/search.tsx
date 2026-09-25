@@ -43,6 +43,7 @@ export default function SearchRoute() {
             <Section title={`${hits.length} ${hits.length === 1 ? 'result' : 'results'}`}>
               <RowList>
                 {hits.map((h) => {
+                  if (h.type === 'fact') return <RowItem key={h.id} title={h.title} subtitle={`Memory${h.subtitle ? ` · about ${h.subtitle}` : ''}`} icon="sparkle" tint="memory" onPress={() => router.push({ pathname: '/memory', params: { q: h.title.split(' ').slice(0, 3).join(' ') } })} />;
                   const def = os.registry.entityTypes.get(h.type);
                   return <RowItem key={h.id} title={h.title} subtitle={`${def?.label ?? h.type}${h.subtitle ? ` · ${h.subtitle}` : ''}`} icon={def?.icon} tint={tintForModule(def?.module)} onPress={() => router.push(`/entity/${h.type}/${h.id}`)} />;
                 })}

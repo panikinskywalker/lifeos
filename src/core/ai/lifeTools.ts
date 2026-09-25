@@ -41,7 +41,7 @@ export function resolveCandidates(os: LifeOSContext, text: string, types?: strin
   const phrase = words.join(' ');
   const out = new Map<string, Candidate>();
   const add = (e: { id: string; type: string; title: string; subtitle?: string | null }, score: number, why: string) => {
-    if (types?.length && !types.includes(e.type)) return;
+    if (e.type === 'fact' || (types?.length && !types.includes(e.type))) return;
     const prev = out.get(e.id);
     if (!prev || prev.score < score) out.set(e.id, { id: e.id, type: e.type, title: e.title, subtitle: e.subtitle ?? null, score, why });
   };
@@ -127,6 +127,43 @@ export const lifeTools: AiToolDef[] = [
       const known = os.aliases.forEntity(e.id).some((a) => a.alias.toLowerCase() === i.alias.trim().toLowerCase());
       const a = os.aliases.learn(i.alias, e.id);
       return withExtras({ remembered: `"${a.alias}" means ${e.title}` }, { undo: known ? undefined : () => os.aliases.forget(a.id) });
+    },
+  },
+  {
+    name: 'remember_fact',
+    description: 'Save something the user told you that will matter later ("Dad hates surprises", "landlord is Suresh, rent due on the 5th", "I prefer aisle seats"). One short sentence per fact; subjectId when it is about a record. If it updates an older fact, pass replacesId.',
+    input: z.object({ text: z.string().min(3), subjectId: z.string().optional(), replacesId: z.string().optional() }),
+    run: async (input, os) => {
+      const i = input as { text: string; subjectId?: string; replacesId?: string };
+      const same = os.facts.findSame(i.text, i.subjectId);
+      if (same) return { alreadyKnown: same.text, factId: same.id };
+      const f = i.replacesId && os.facts.get(i.replacesId) ? os.facts.supersede(i.replacesId, i.text, { source: 'talk', subjectId: i.subjectId }) : os.facts.add({ text: i.text, subjectId: i.subjectId, source: 'talk' });
+      const replaced = i.replacesId;
+      return withExtras({ remembered: f.text, factId: f.id }, { undo: () => { os.facts.forget(f.id); if (replaced) os.facts.restore(replaced); }, card: { kind: 'list', title: 'Remembered', items: [{ title: f.text, entityId: f.subjectId ?? undefined }] } });
+    },
+  },
+  {
+    name: 'recall',
+    description: 'Look up what the user has told you before ("what does Dad like?", "when is rent due?"). Searches remembered facts (and facts about a record when subjectId is given).',
+    input: z.object({ query: z.string().optional(), subjectId: z.string().optional(), limit: z.number().optional() }),
+    run: async (input, os) => {
+      const i = input as { query?: string; subjectId?: string; limit?: number };
+      const byQuery = i.query ? os.facts.search(i.query, i.limit ?? 10) : [];
+      const bySubject = i.subjectId ? os.facts.list({ subjectId: i.subjectId, limit: i.limit ?? 10 }) : [];
+      const seen = new Set<string>();
+      const facts = [...bySubject, ...byQuery].filter((f) => (seen.has(f.id) ? false : (seen.add(f.id), true)));
+      return { facts: facts.map((f) => ({ id: f.id, text: f.text, about: f.subjectId ? os.entities.get(f.subjectId)?.title : undefined, said: new Date(f.statedAt).toISOString().slice(0, 10) })) };
+    },
+  },
+  {
+    name: 'forget_fact',
+    description: 'Forget a remembered fact the user says is wrong or no longer true. Use recall first to find its id.',
+    input: z.object({ factId: z.string() }),
+    run: async (input, os) => {
+      const f = os.facts.get((input as { factId: string }).factId);
+      if (!f) return { error: 'fact not found' };
+      os.facts.forget(f.id);
+      return withExtras({ forgot: f.text }, { undo: () => os.facts.restore(f.id) });
     },
   },
   {
