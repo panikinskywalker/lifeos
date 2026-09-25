@@ -91,7 +91,7 @@ function ToastView({ toast, dismiss, bottomOffset }: { toast: ToastOptions & { i
             style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 8, opacity: pressed ? 0.7 : 1 })}
           >
             {toast.undo ? <Icon name="undo" size={16} color={t.c.accent.mustard} /> : null}
-            <Text variant="tileTitle" color={t.c.accent.mustard} style={{ fontWeight: '800' }}>
+            <Text variant="tileTitle" color={t.c.accent.mustard} style={{ fontWeight: '700' }}>
               {toast.undo ? 'Undo' : toast.action!.label}
             </Text>
           </Pressable>

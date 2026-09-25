@@ -95,7 +95,7 @@ export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, val
         {value || meta ? (
           <View style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
             {value ? (
-              <Text variant="rowTitle" color={tone(valueTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontSize: strong ? 15 : 14, fontWeight: strong ? '800' : '700' }}>
+              <Text variant="rowTitle" color={tone(valueTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontSize: strong ? 15 : 14, fontWeight: strong ? '700' : '600' }}>
                 {value}
               </Text>
             ) : null}

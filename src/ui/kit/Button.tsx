@@ -51,7 +51,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'md', icon,
       ]}
     >
       {loading ? <ActivityIndicator color={fg} /> : icon ? <Icon name={icon} size={18} color={fg} /> : null}
-      <Text variant="body" color={fg} style={{ fontWeight: variant === 'primary' ? '800' : '700' }}>
+      <Text variant="body" color={fg} style={{ fontWeight: variant === 'primary' ? '700' : '600' }}>
         {title}
       </Text>
     </Pressable>

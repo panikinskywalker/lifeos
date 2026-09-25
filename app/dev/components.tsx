@@ -530,7 +530,7 @@ function Bar() {
 
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
   ['Colour', 'surfaces · tints · chart', Colours],
-  ['Type', 'Manrope · tabular numerals', Type],
+  ['Type', 'Plus Jakarta Sans · tabular numerals', Type],
   ['Icons · IconBox', '2px stroke · round caps · tint + ink', Icons],
   ['Tile', '1×1 · 2×1 · 2×2 · radius 20 · pad 16', Tiles],
   ['StackedBar · Ring', '14 tall · 3px gaps · stroke 9', Bars],

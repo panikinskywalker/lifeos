@@ -42,7 +42,7 @@ export function WeekStrip({ days, selected, onSelect }: { days: WeekDay[]; selec
                   {d.weekday}
                 </Text>
                 <View style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: d.today ? t.c.accent.mustard : 'transparent' }}>
-                  <Text variant="tileTitle" color={d.today ? t.c.accent.mustardInk : undefined} style={{ fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+                  <Text variant="tileTitle" color={d.today ? t.c.accent.mustardInk : undefined} style={{ fontWeight: '700', fontVariant: ['tabular-nums'] }}>
                     {d.date}
                   </Text>
                 </View>

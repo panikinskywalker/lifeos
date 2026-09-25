@@ -7,7 +7,7 @@ export type TextTone = 'primary' | 'secondary' | 'tertiary';
 
 /**
  * Text in a DESIGN.md type style. `color` takes a tone or any colour string.
- * A `fontWeight` in `style` is turned into the matching Manrope face, because
+ * A `fontWeight` in `style` is turned into the matching Plus Jakarta Sans face, because
  * Android ignores fontWeight on custom font families.
  */
 export function Text({ variant = 'body', color, style, children, ...rest }: TextProps & { variant?: TypeVariant; color?: TextTone | (string & {}) }) {

@@ -48,20 +48,23 @@ Stitch role in brackets. Dark is derived by us (Stitch is light only).
 | Travel · terracotta | `#F5DCCB` | `#7A4420` | `#5E3418` | `#F5DCCB` |
 | Documents · stone | `#E5E2DD` | `#4D4635` | `#4D4635` | `#E5E2DD` |
 
-### Type · Manrope, tabular numerals wherever numbers appear
+### Type · Plus Jakarta Sans (Stitch), tabular numerals wherever numbers appear
 | Style | Spec | Token |
 |---|---|---|
-| Stat · hero | 36 / 800 · −0.02em · tnum | `display` |
-| Stat | 26–32 / 800 · −0.02em · tnum | `stat` (28) |
-| Screen title | 30 / 800 · −0.02em | `title` |
-| Section | 17 / 800 · −0.01em | `heading` |
-| Row title | 15 / 700 | `rowTitle` |
-| Body | 15 / 600 | `body` |
-| Tile title | 14 / 700 | `tileTitle` |
-| Caption | 13 / 600 · secondary | `caption` |
-| Chip | 13 / 700 · pill | `label` |
-| Label caps | 12 / 700 · +0.08em | `labelCaps` |
-| Nav | 11 / 700 | `nav` |
+| Hero metric | 36 / 700 · −0.025em · tnum | `display` |
+| Metric | 26 / 600 · −0.015em · tnum | `stat` |
+| Screen title | 30 / 700 · −0.025em | `title` |
+| Tile / section headline | 19 / 600 · −0.015em | `heading` |
+| Row title | 15 / 600 | `rowTitle` |
+| Body | 15 / 400 · −0.005em | `body` |
+| Tile title | 14 / 600 | `tileTitle` |
+| Caption | 13 / 400 · secondary | `caption` |
+| Chip / field label | 13 / 600 | `label` |
+| Label caps | 12 / 600 · +0.06em · UPPERCASE | `labelCaps` |
+| Micro label | 10 / 700 · +0.05em · UPPERCASE | `labelMicro` |
+| Nav | 11 / 600 | `nav` |
+
+Buttons 15/700 (primary) and 15/600. Money values in rows 15/700.
 
 ### Radius
 Tile 20 · card / row / sheet body 16 · sheet top 24 · record band bottom 28 · button 14 · input 14 · icon-box 10 · checkbox 7 · bar segment 7 (14 tall) · chip / segment / toggle pill · nav bar 22.

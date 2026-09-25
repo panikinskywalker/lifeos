@@ -139,17 +139,17 @@ export const TINT_KEYS = Object.keys(lightTints) as TintKey[];
 /* Type                                                                */
 /* ------------------------------------------------------------------ */
 
-/** Manrope faces, loaded in app/_layout.tsx and embedded via the expo-font plugin. */
+/** Plus Jakarta Sans faces (Stitch), loaded in app/_layout.tsx and embedded via the expo-font plugin. */
 export const fonts = {
-  400: 'Manrope_400Regular',
-  500: 'Manrope_500Medium',
-  600: 'Manrope_600SemiBold',
-  700: 'Manrope_700Bold',
-  800: 'Manrope_800ExtraBold',
+  400: 'PlusJakartaSans_400Regular',
+  500: 'PlusJakartaSans_500Medium',
+  600: 'PlusJakartaSans_600SemiBold',
+  700: 'PlusJakartaSans_700Bold',
+  800: 'PlusJakartaSans_800ExtraBold',
 } as const;
 export type FontWeightKey = keyof typeof fonts;
 
-/** Maps a numeric/keyword fontWeight to the Manrope face that carries it (Android ignores fontWeight on custom families). */
+/** Maps a numeric/keyword fontWeight to the Plus Jakarta Sans face that carries it (Android ignores fontWeight on custom families). */
 export function fontForWeight(weight: string | number | undefined): string {
   const w = weight === 'bold' ? 700 : weight === 'normal' || weight === undefined ? 400 : Number(weight);
   if (w >= 800) return fonts[800];
@@ -175,30 +175,32 @@ const face = (w: FontWeightKey, fontSize: number, lineHeight: number, em = 0, ta
   ...(tabular ? { fontVariant: ['tabular-nums' as const] } : null),
 });
 
-/** Canvas type scale (Manrope). Line heights: 1.1 titles, 1.3 text, 1.05 stats. */
+/** Stitch type scale (Plus Jakarta Sans): 600 headings, 400 body, tabular metrics, UPPERCASE labels (applied at the call site). */
 const designType = {
-  /** Stat · hero — 36/800, −0.02em, tabular */
-  display: face(800, 36, 38, -0.02, true),
-  /** Stat — canvas 26–32/800, −0.02em, tabular (28 is the working default) */
-  stat: face(800, 28, 30, -0.02, true),
-  /** Screen title — 30/800, −0.02em */
-  title: face(800, 30, 33, -0.02),
-  /** Section — 17/800, −0.01em */
-  heading: face(800, 17, 22, -0.01),
-  /** Row title — 15/700 */
-  rowTitle: face(700, 15, 20),
-  /** Body — 15/600 */
-  body: face(600, 15, 20),
-  /** Tile title — 14/700 */
-  tileTitle: face(700, 14, 18),
-  /** Chip / field label — 13/700 */
-  label: face(700, 13, 17),
-  /** Caption — 13/600, secondary */
-  caption: face(600, 13, 17),
-  /** Label caps — 12/700, +0.08em, uppercase at the call site */
-  labelCaps: face(700, 12, 16, 0.08),
-  /** Nav — 11/700 */
-  nav: face(700, 11, 13),
+  /** Hero metric — 36/700, −0.025em, tabular (display-hero-mobile) */
+  display: face(700, 36, 42, -0.025, true),
+  /** Metric — 26/600, −0.015em, tabular (headline-metric-mobile) */
+  stat: face(600, 26, 32, -0.015, true),
+  /** Screen title — 30/700, −0.025em ("Good morning.") */
+  title: face(700, 30, 36, -0.025),
+  /** Tile / section headline — 19/600, −0.015em (headline-tile) */
+  heading: face(600, 19, 24, -0.015),
+  /** Row title — 15/600 */
+  rowTitle: face(600, 15, 20),
+  /** Body — 15/400, −0.005em (body-default) */
+  body: face(400, 15, 22, -0.005),
+  /** Tile title — 14/600 */
+  tileTitle: face(600, 14, 18),
+  /** Chip / field label — 13/600 */
+  label: face(600, 13, 17),
+  /** Caption — 13/400, secondary (body-sm) */
+  caption: face(400, 13, 18),
+  /** Label caps — 12/600, +0.06em, uppercase at the call site (label-telemetry) */
+  labelCaps: face(600, 12, 16, 0.06),
+  /** Micro label — 10/700, +0.05em, uppercase at the call site (label-micro) */
+  labelMicro: face(700, 10, 14, 0.05),
+  /** Nav — 11/600 */
+  nav: face(600, 11, 13),
 };
 
 /**
@@ -215,7 +217,7 @@ const legacyType = {
   subhead: face(600, 14, 20),
   footnote: face(600, 13, 18),
   caption2: face(600, 11, 14),
-  statSmall: face(800, 22, 26, 0, true),
+  statSmall: face(600, 22, 26, -0.015, true),
 };
 
 export const type = { ...designType, ...legacyType };

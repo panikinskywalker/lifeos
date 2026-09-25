@@ -6,12 +6,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
-import { useFonts } from '@expo-google-fonts/manrope/useFonts';
-import { Manrope_400Regular } from '@expo-google-fonts/manrope/400Regular';
-import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
-import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
-import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
-import { Manrope_800ExtraBold } from '@expo-google-fonts/manrope/800ExtraBold';
+import { useFonts } from '@expo-google-fonts/plus-jakarta-sans/useFonts';
+import { PlusJakartaSans_400Regular } from '@expo-google-fonts/plus-jakarta-sans/400Regular';
+import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/500Medium';
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
+import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
+import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { OSProvider } from '@ui/hooks/useOS';
@@ -33,7 +33,7 @@ export default function RootLayout() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   // Native builds embed these via the expo-font plugin; this also covers web and dev clients.
-  const [fontsLoaded, fontError] = useFonts({ Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold });
+  const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold });
   const fontsReady = fontsLoaded || !!fontError;
 
   useEffect(() => {
