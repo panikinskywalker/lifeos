@@ -4,13 +4,12 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { Assistant, type AssistantTurn } from '@core/ai/assistant';
-import { createClaudeProvider } from '@core/ai/provider';
 import type { Fact } from '@core/repo/factRepo';
 import { useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { ChatBubble, Chip, Composer, EmptyState, Icon, IconButton, ScreenHeader, Text, useBottomBarInset, useToast } from '@ui/kit';
+import { ChatBubble, Chip, Composer, Icon, IconButton, ScreenHeader, Text, useBottomBarInset, useToast } from '@ui/kit';
 import { ConfirmCard, ReplyCardView } from '@ui/components/ReplyCard';
-import { getApiKey } from '../../src/platform/boot';
+import { buildAgentFromSettings, type AgentProviders } from '../../src/platform/agentProvider';
 import { listen } from '../../src/platform/voice';
 
 /** PRODUCT §7 — the sentences Talk must handle, as starting points. */
@@ -45,9 +44,10 @@ export default function TalkTab() {
   const barInset = useBottomBarInset();
   const params = useLocalSearchParams<{ share?: string; file?: string; fileName?: string; mime?: string }>();
   const smartModel = useSettings((s) => s.aiModel);
-  const fastModel = useSettings((s) => s.aiFastModel);
   const routing = useSettings((s) => s.aiRouting);
-  const [key, setKey] = useState<string | null | undefined>(undefined);
+  const chain = useSettings((s) => s.aiChain);
+  const [agent, setAgent] = useState<AgentProviders | null | undefined>(undefined);
+  const [notice, setNotice] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,9 +55,18 @@ export default function TalkTab() {
   const [session, setSession] = useState(0);
   const scroll = useRef<ScrollView>(null);
 
+  // Rebuild the provider chain when settings change or Talk comes back into focus (a key may have been added).
+  const [focusTick, setFocusTick] = useState(0);
   useEffect(() => {
-    getApiKey().then(setKey);
-  }, []);
+    let alive = true;
+    buildAgentFromSettings(os, {
+      onFallback: (from, to) => alive && setNotice(`${from} unavailable — using ${to}`),
+      onCooldown: (p, until) => alive && setNotice(`${p} is rate-limited until ${new Date(until).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`),
+    }).then((a) => alive && setAgent(a));
+    return () => {
+      alive = false;
+    };
+  }, [os, chain, routing, smartModel, focusTick]);
   const [shared, setShared] = useState<{ uri: string; name: string; mime: string } | null>(null);
   useEffect(() => {
     if (params.share) setText(String(params.share));
@@ -65,14 +74,13 @@ export default function TalkTab() {
   }, [params.share, params.file]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const assistant = useMemo(() => {
-    if (!key) return null;
-    const smart = createClaudeProvider({ apiKey: key, model: smartModel });
-    const fast = createClaudeProvider({ apiKey: key, model: fastModel });
+    if (agent === undefined) return null;
     const add = (it: Item) => setItems((xs) => [...xs, it]);
     return new Assistant(os, {
-      provider: routing ? fast : smart,
-      smartProvider: routing ? smart : undefined,
-      factProvider: fast,
+      provider: agent?.main ?? null,
+      smartProvider: agent?.smart,
+      factProvider: agent?.small,
+      metered: true,
       onTurn: (turn) => add({ kind: 'turn', id: turn.id, turn }),
       onFacts: (facts) => add({ kind: 'facts', id: `f${Date.now()}`, facts }),
       onRoute: (r) => setThinking(r.tier === 'smart' ? `Thinking harder (${r.reason})…` : 'Thinking…'),
@@ -82,7 +90,7 @@ export default function TalkTab() {
           add({ kind: 'confirm', id, summary, resolve: (ok) => { setItems((xs) => xs.map((x) => (x.id === id && x.kind === 'confirm' ? { ...x, answer: ok } : x))); resolve(ok); } });
         }),
     });
-  }, [key, smartModel, fastModel, routing, os, session]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agent, os, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (msg?: string) => {
     let m = (msg ?? text).trim();
@@ -122,17 +130,14 @@ export default function TalkTab() {
     const off = navigation.addListener('tabPress' as never, () => {
       if (navigation.isFocused()) void speakRef.current();
     });
-    return off;
+    const offFocus = navigation.addListener('focus' as never, () => setFocusTick((n) => n + 1));
+    return () => {
+      off();
+      offFocus();
+    };
   }, [navigation]);
 
-  if (key === undefined) return <View style={{ flex: 1, backgroundColor: t.c.bg.ground }} />;
-  if (!key)
-    return (
-      <View style={{ flex: 1, backgroundColor: t.c.bg.ground, paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, gap: 18 }}>
-        <ScreenHeader title="Talk" subtitle="Tell me what happened" />
-        <EmptyState icon="mic" tint="memory" title="Add your Claude key" line="Say what happened in plain words and the agent files it. It runs on your own API key; only what each answer needs leaves your phone." action="Add API key" actionIcon="key" onAction={() => router.push('/settings/ai')} />
-      </View>
-    );
+  if (agent === undefined) return <View style={{ flex: 1, backgroundColor: t.c.bg.ground }} />;
 
   const open = (id: string, type?: string) => {
     const ty = type ?? os.entities.get(id)?.type;
@@ -145,7 +150,7 @@ export default function TalkTab() {
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: 8 }}>
         <ScreenHeader
           title="Talk"
-          subtitle={routing ? 'Haiku everyday · Sonnet for harder asks' : 'Tell me what happened'}
+          subtitle={agent ? `On the phone first · then ${agent.active.map((c) => c.kind === 'claude' ? 'Claude' : c.kind.charAt(0).toUpperCase() + c.kind.slice(1)).join(' → ')}` : 'On the phone · no model yet'}
           right={
             <IconButton
               icon="plus"
@@ -159,6 +164,15 @@ export default function TalkTab() {
           }
         />
       </View>
+      {!agent ? (
+        <View style={{ marginHorizontal: t.layout.gutter, marginBottom: 4 }}>
+          <Chip icon="key" tone="accent" small label="Offline for everyday things · add a free key for more" onPress={() => router.push('/settings/ai')} />
+        </View>
+      ) : notice ? (
+        <View style={{ marginHorizontal: t.layout.gutter, marginBottom: 4 }}>
+          <Chip icon="info" tone="muted" small label={notice} onPress={() => setNotice(null)} />
+        </View>
+      ) : null}
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: t.layout.gutter, paddingVertical: 12, gap: 14 }} keyboardShouldPersistTaps="handled">
         {items.length === 0 ? (
           <View style={{ gap: 12 }}>

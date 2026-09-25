@@ -263,6 +263,36 @@ function summarizeTool(name: string, input: unknown, output: unknown): string {
       return `Reminder: ${i.title}`;
     case 'create_automation':
       return `Automation: ${i.name}`;
+    case 'mark_cycle_done':
+      return `Done: ${(output as { done?: string })?.done ?? 'cycle'}`;
+    case 'log_event':
+      return (output as { logged?: string })?.logged ?? 'Logged';
+    case 'set_next_due':
+      return `Next due set`;
+    case 'log_meter':
+      return (output as { logged?: string })?.logged ?? 'Reading logged';
+    case 'split_transaction':
+      return 'Split';
+    case 'settle_debt':
+      return `Settled with ${(output as { settled?: string })?.settled ?? 'them'}`;
+    case 'remember_fact':
+      return 'Remembered';
+    case 'remember_alias':
+      return 'Learned a name';
+    case 'forget_fact':
+      return 'Forgotten';
+    case 'create_routine':
+      return `Chore added`;
+    case 'plan_trip':
+      return 'Trip planned';
+    case 'attach_file':
+      return 'Attached';
+    case 'balances':
+      return 'Balances';
+    case 'upkeep_status':
+      return 'Upkeep';
+    case 'recall':
+      return 'Memory';
     default:
       return name.replace(/_/g, ' ');
   }

@@ -5,6 +5,7 @@ import { useLive, useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Icon, IconBox, RowItem, RowList, Screen, Section, Segmented, Sheet, SwitchField, Text, useToast } from '@ui/kit';
 import { seedDemoData } from '../../src/platform/seed';
+import { PROVIDER_PRESETS } from '@core/ai/providers';
 
 const APPEARANCE = { system: 'System', light: 'Light', dark: 'Dark' } as const;
 
@@ -40,7 +41,7 @@ export default function YouTab() {
       <Section title="Setup">
         <RowList>
           <RowItem icon="grid" tint="tasks" title="Modules" subtitle={`${modules.length} on · ${modules.map((m) => os.registry.modules.get(m.id)?.name).filter(Boolean).slice(0, 3).join(', ')}…`} onPress={() => router.push('/browse')} />
-          <RowItem icon="sparkle" iconTone="accent" title="Agent & API key" subtitle={`Claude · ${s.aiModel}`} onPress={() => router.push('/settings/ai')} />
+          <RowItem icon="sparkle" iconTone="accent" title="Agent" subtitle={`On the phone · then ${s.aiChain.filter((c) => c.enabled !== false).map((c) => PROVIDER_PRESETS[c.kind].label).join(' → ') || 'no providers'}`} onPress={() => router.push('/settings/ai')} />
           <RowItem icon="cash" tint="finance" title="Currency & dates" subtitle={`${s.locale.currency} · ${s.locale.dateFormat}`} onPress={() => router.push('/settings/locale')} />
         </RowList>
       </Section>
