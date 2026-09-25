@@ -60,3 +60,20 @@ describe('upkeep', () => {
     expect(logDone(os, c.id, { cost: 399 }).transactionId).toBeNull();
   });
 });
+
+describe('week plan', () => {
+  it('puts overdue on today and repeats short cycles inside the week', async () => {
+    const { weekPlan, weekStartOf } = await import('./upkeep');
+    const now = d('2026-09-23'); // Wednesday
+    const monday = weekStartOf(now);
+    expect(new Date(monday).getDay()).toBe(1);
+    const laundry = os.entities.create({ type: 'routine', data: { name: 'Laundry' } });
+    const jio = os.entities.create({ type: 'subscription', data: { name: 'Jio' } });
+    os.cycles.create({ entityId: laundry.id, name: 'Laundry', kind: 'interval', everyN: 4, everyUnit: 'day', nextDueAt: d('2026-09-21') }); // 2 d late
+    os.cycles.create({ entityId: jio.id, name: 'Renewal', kind: 'fixed', everyN: 84, everyUnit: 'day', nextDueAt: d('2026-09-26') });
+    const days = weekPlan(os, monday, 'All', now);
+    const names = days.map((es) => es.map((e) => `${e.entity.title}${e.projected ? '*' : ''}`));
+    expect(names).toEqual([[], [], ['Laundry'], [], [], ['Jio'], ['Laundry*']]);
+    expect(weekPlan(os, monday, 'Chores', now).flat()).toHaveLength(2);
+  });
+});

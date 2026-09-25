@@ -99,3 +99,43 @@ function localDate(at: number): string {
   const d = new Date(at);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+export interface WeekEntry extends UpkeepItem {
+  /** When this occurrence falls; overdue items sit on today. */
+  at: number;
+  /** A later repeat within the week, assuming the earlier one is done on time. */
+  projected: boolean;
+}
+
+/**
+ * Seven days from `weekStart` (a Monday, 00:00 local): each day's cycles.
+ * Overdue items appear on today; interval and fixed cycles repeat inside the
+ * week (laundry every 4 days lands twice). Meter-only cycles have no day.
+ */
+export function weekPlan(os: LifeOSContext, weekStart: number, filter: UpkeepFilter = 'All', now = Date.now()): WeekEntry[][] {
+  const days: WeekEntry[][] = Array.from({ length: 7 }, () => []);
+  const start = startOfDay(weekStart);
+  const end = addPeriod(start, 7, 'day');
+  const today = startOfDay(now);
+  const dayIndex = (at: number) => Math.round((startOfDay(at) - start) / 86_400_000);
+  for (const item of upkeep(os, filter, now).items) {
+    const { cycle, status } = item;
+    if (cycle.nextDueAt == null || status.state === 'unscheduled') continue;
+    let at = status.state === 'overdue' && cycle.nextDueAt < today ? today + 9 * 3600_000 : cycle.nextDueAt;
+    let projected = false;
+    for (let guard = 0; at < end && guard < 31; guard++) {
+      if (at >= start) days[dayIndex(at)]!.push({ ...item, at, projected });
+      if (!cycle.everyN || !cycle.everyUnit) break;
+      at = addPeriod(at, cycle.everyN, cycle.everyUnit);
+      projected = true;
+    }
+  }
+  return days;
+}
+
+/** Monday 00:00 of the week containing `at`. */
+export function weekStartOf(at: number): number {
+  const d = new Date(startOfDay(at));
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getTime();
+}

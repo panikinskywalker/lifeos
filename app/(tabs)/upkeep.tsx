@@ -3,11 +3,12 @@ import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import { DAY, describeCycle } from '@core/cycles/schedule';
-import { logDone, undoLoggedDone, upkeep, UPKEEP_FILTERS, type UpkeepFilter, type UpkeepItem } from '@core/cycles/upkeep';
+import { logDone, undoLoggedDone, upkeep, UPKEEP_FILTERS, weekPlan, weekStartOf, type UpkeepFilter, type UpkeepItem, type WeekEntry } from '@core/cycles/upkeep';
+import { addPeriod, startOfDay } from '@core/cycles/schedule';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { tintForModule } from '@ui/theme/moduleTint';
-import { ActionSheet, Button, Card, Chip, EmptyState, FilterChip, IconButton, MoneyField, NumberField, ProgressBar, RowItem, RowList, Screen, Section, Sheet, StatTile, SwitchField, Text, TextField, useToast } from '@ui/kit';
+import { ActionSheet, Button, Card, Chip, EmptyState, FilterChip, IconButton, MoneyField, NumberField, ProgressBar, RowItem, RowList, Screen, Section, Segmented, Sheet, StatTile, SwitchField, Text, TextField, useToast, WeekStrip, type WeekDay } from '@ui/kit';
 
 const FILTERS: UpkeepFilter[] = ['All', ...(Object.keys(UPKEEP_FILTERS) as UpkeepFilter[])];
 const SECTIONS = [
@@ -50,6 +51,7 @@ export default function UpkeepTab() {
   const [filter, setFilter] = useState<UpkeepFilter>('All');
   const [active, setActive] = useState<UpkeepItem | null>(null);
   const [costFor, setCostFor] = useState<UpkeepItem | null>(null);
+  const [view, setView] = useState<'list' | 'week'>('list');
   const u = useLive((o) => upkeep(o, filter), [filter]);
   const all = useLive((o) => upkeep(o, 'All').items.length, []);
 
@@ -74,7 +76,11 @@ export default function UpkeepTab() {
         <View style={{ width: t.layout.gutter - 8 }} />
       </ScrollView>
 
-      {all === 0 ? (
+      {all > 0 ? <Segmented value={view} onChange={setView} options={[{ value: 'list', label: 'By due date' }, { value: 'week', label: 'This week' }]} /> : null}
+
+      {view === 'week' && all > 0 ? (
+        <WeekView filter={filter} onDone={done} onOpen={setActive} />
+      ) : all === 0 ? (
         <EmptyState icon="repeat" tint="upkeep" title="Nothing recurring yet" line="Add a vehicle, a subscription or a chore like laundry — each gets a cycle with when it was last done and when it’s due." action="Add a routine" onAction={() => router.push('/entity/routine/new')} />
       ) : u.items.length === 0 ? (
         <EmptyState icon="check" tint="upkeep" line={`No ${filter.toLowerCase()} cycles.`} bare />
@@ -193,5 +199,67 @@ function DoneWithCostSheet({ item, onClose }: { item: UpkeepItem | null; onClose
         </View>
       ) : null}
     </Sheet>
+  );
+}
+
+/** Upkeep › This week (SCOPE C2): Mon–Sun strip, the chosen day's dues below; chores check off. */
+function WeekView({ filter, onDone, onOpen }: { filter: UpkeepFilter; onDone: (i: UpkeepItem) => void; onOpen: (i: UpkeepItem) => void }) {
+  const [weekStart, setWeekStart] = useState(() => weekStartOf(Date.now()));
+  const today = startOfDay(Date.now());
+  const [selected, setSelected] = useState(() => String(Math.min(6, Math.max(0, Math.round((today - weekStartOf(Date.now())) / DAY)))));
+  const days = useLive((o) => weekPlan(o, weekStart, filter), [weekStart, filter]);
+  const strip: WeekDay[] = days.map((entries, i) => {
+    const at = addPeriod(weekStart, i, 'day');
+    return {
+      key: String(i),
+      weekday: format(at, 'EEE'),
+      date: new Date(at).getDate(),
+      today: at === today,
+      dues: entries.map((e) => ({ id: `${e.cycle.id}-${e.at}`, icon: (e.def?.icon ?? 'repeat') as never, tint: tintForModule(e.def?.module), overdue: e.status.state === 'overdue' && !e.projected, label: e.entity.title })),
+    };
+  });
+  const day = Number(selected);
+  const entries: WeekEntry[] = days[day] ?? [];
+  const dayAt = addPeriod(weekStart, day, 'day');
+  const thisWeek = weekStart === weekStartOf(Date.now());
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <IconButton icon="chevron-left" accessibilityLabel="Previous week" filled onPress={() => setWeekStart(addPeriod(weekStart, -7, 'day'))} />
+        <Text variant="heading" style={{ flex: 1, textAlign: 'center' }}>
+          {`${format(weekStart, 'd MMM')} – ${format(addPeriod(weekStart, 6, 'day'), 'd MMM')}`}
+        </Text>
+        {thisWeek ? null : <Chip label="This week" small onPress={() => setWeekStart(weekStartOf(Date.now()))} />}
+        <IconButton icon="chevron-right" accessibilityLabel="Next week" filled onPress={() => setWeekStart(addPeriod(weekStart, 7, 'day'))} />
+      </View>
+      <WeekStrip days={strip} selected={selected} onSelect={setSelected} />
+      <Section title={dayAt === today ? 'Today' : format(dayAt, 'EEEE d MMM')} meta={`${entries.length}`}>
+        {entries.length ? (
+          <RowList>
+            {entries.map((e) => {
+              const chore = e.entity.type === 'routine';
+              const actionable = !e.projected && dayAt <= today + 7 * DAY;
+              return (
+                <RowItem
+                  key={`${e.cycle.id}-${e.at}`}
+                  icon={e.def?.icon ?? 'repeat'}
+                  tint={tintForModule(e.def?.module)}
+                  title={e.entity.title}
+                  subtitle={e.projected ? 'Again, if the last one’s on time' : subtitleFor(e)}
+                  value={e.projected ? null : dueLabel(e)}
+                  valueTone={e.status.state === 'overdue' ? 'alert' : 'secondary'}
+                  checked={chore && actionable ? false : undefined}
+                  onToggle={chore && actionable ? () => onDone(e) : undefined}
+                  onDone={!chore && actionable && e.status.state !== 'unscheduled' ? () => onDone(e) : undefined}
+                  onPress={() => onOpen(e)}
+                />
+              );
+            })}
+          </RowList>
+        ) : (
+          <EmptyState icon="check" tint="upkeep" line="Nothing due this day." bare />
+        )}
+      </Section>
+    </>
   );
 }
