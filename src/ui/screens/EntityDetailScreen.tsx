@@ -16,6 +16,7 @@ import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 import { CyclesSection, MeterSheet } from '../components/cycles';
+import { backlinks } from '@core/links';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
 
@@ -104,6 +105,7 @@ export function EntityDetailScreen({ id }: { id: string }) {
           ) : null}
           <CyclesSection entity={entity} />
           <RelationsCard entity={entity} onLink={() => setPanel('link')} />
+          <BacklinksCard entity={entity} />
           <RemindersCard entity={entity} tint={tint} />
           <AttachmentsCard entity={entity} />
           <NotesCard entity={entity} />
@@ -224,11 +226,35 @@ function DetailsCard({ entity, fields }: { entity: Entity; fields: FieldDef[] })
   );
 }
 
+/** Notes that [[link]] here and facts about this record (M3 second brain). */
+function BacklinksCard({ entity }: { entity: Entity }) {
+  const os = useOS();
+  const router = useRouter();
+  const notes = useLive((o) => backlinks(o, entity.id), [entity.id]);
+  const facts = useLive((o) => o.facts.list({ subjectId: entity.id, limit: 20 }), [entity.id]);
+  if (!notes.length && !facts.length) return null;
+  return (
+    <Section title="Mentioned in" meta={String(notes.length + facts.length)} action={facts.length ? 'Memory' : undefined} onAction={facts.length ? () => router.push({ pathname: '/memory', params: { q: entity.title } }) : undefined}>
+      <RowList>
+        {notes.map((n) => {
+          const d = os.registry.entityTypes.get(n.type);
+          const body = String((n.data as Record<string, unknown>).body ?? n.subtitle ?? '').replace(/\[\[|\]\]/g, '');
+          return <RowItem key={n.id} icon={d?.icon ?? 'file'} tint={tintForModule(d?.module)} title={n.title} subtitle={body.slice(0, 90) || d?.label} onPress={() => router.push(`/entity/${n.type}/${n.id}`)} />;
+        })}
+        {facts.map((f) => (
+          <RowItem key={f.id} icon="sparkle" tint="memory" title={f.text} subtitle="Remembered" onPress={() => router.push({ pathname: '/memory', params: { q: entity.title } })} />
+        ))}
+      </RowList>
+    </Section>
+  );
+}
+
 function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void }) {
   const os = useOS();
   const router = useRouter();
   const toast = useToast();
-  const rels = useLive((o) => o.relations.forEntity(entity.id), [entity.id]);
+  // Incoming [[mentions]] have their own section (Mentioned in).
+  const rels = useLive((o) => o.relations.forEntity(entity.id).filter((r) => !(r.relation.kind === 'mention' && r.direction === 'in')), [entity.id]);
   if (!rels.length) return null;
   const def = os.registry.type(entity.type);
   const kindLabel = (k: string) => def.relations?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);

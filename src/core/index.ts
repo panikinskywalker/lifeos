@@ -20,3 +20,4 @@ export * from './cycles/nudges';
 export * from './repo/groupRepo';
 export * from './repo/aliasRepo';
 export * from './repo/factRepo';
+export * from './links';

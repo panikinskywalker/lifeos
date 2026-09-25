@@ -43,10 +43,19 @@ const toFact = (r: Row): Fact => ({
 export class FactRepo {
   constructor(private db: DatabaseAdapter, private changes: ChangeLog) {}
 
+  /** Set by the core: resolves a [[title]] in a fact to a record (links.ts). */
+  resolveLink?: (title: string) => string | null;
+
   add(f: { text: string; subjectId?: string | null; subjectKey?: string | null; source: FactSource; sourceRef?: string | null; statedAt?: number; confidence?: number }): Fact {
     const now = Date.now();
     const id = newId(now);
     const text = f.text.trim();
+    // "[[Dad]] hates surprises": the first link says who it's about.
+    if (!f.subjectId && this.resolveLink) {
+      const first = text.match(/\[\[([^[\]\n]{1,80})\]\]/)?.[1];
+      const id = first ? this.resolveLink(first.trim()) : null;
+      if (id) f = { ...f, subjectId: id };
+    }
     this.db.transaction(() => {
       this.db.run(`INSERT INTO facts(id,text,subject_id,subject_key,source,source_ref,stated_at,confidence,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`, [id, text, f.subjectId ?? null, f.subjectKey ?? null, f.source, f.sourceRef ?? null, f.statedAt ?? now, f.confidence ?? 1, now, now]);
       this.changes.record('facts', id, 'insert', 1);

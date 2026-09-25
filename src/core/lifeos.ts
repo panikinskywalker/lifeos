@@ -16,6 +16,7 @@ import { createFormatters, DEFAULT_LOCALE, type LocaleSettings } from './format'
 import { bus } from './events/bus';
 import { coreModule } from './coreModule';
 import type { Entity } from './domain/types';
+import { resolveLink, syncMentions } from './links';
 
 export interface LifeOSOptions {
   db: DatabaseAdapter;
@@ -165,6 +166,12 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
       ctx.cycles.logMeter(entity.id, v, { meter: m.meter, unit: m.unit, label: m.label }, 'user');
     }
   };
+  ctx.facts.resolveLink = (title) => resolveLink(ctx, title);
+  // [[links]] in a record's text become 'mention' relations (backlinks).
+  bus.on('entity.created', ({ entity, actor }) => syncMentions(ctx, entity, actor));
+  bus.on('entity.updated', ({ entity, changed, actor }) => {
+    if (changed.some((k) => k.startsWith('data.'))) syncMentions(ctx, entity, actor);
+  });
   bus.on('entity.created', ({ entity }) => {
     mirrorMeters(entity);
     ctx.cycles.applyTemplates(entity, registry.entityTypes.get(entity.type));
