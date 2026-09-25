@@ -21,6 +21,30 @@ Order is deliberate: the design system first (so nothing gets built twice), then
 
 **Demo:** open app → Today (placeholder tiles) → Browse → a record → edit → dark mode. Icons everywhere.
 
+## M1.5 — Design refresh (Stitch "LifeOS Android design system")
+
+**Goal:** the richer Stitch look on everything already built, without removing any existing feature. Source: `stitch_lifeos_android_design_system.zip` (screens + palette). Kept from our rules: Lucide inline SVG icons (no icon font), no shadow/blur, our dark bottom bar with the raised mic. Each module keeps its own tint, redrawn from the Stitch data palette. Dark mode is derived by us (Stitch is light only).
+
+Phase D1 ships in the next build; D2+ land alongside the milestone that brings their data.
+
+**D1 — foundation (this build)**
+- [ ] Tokens: Stitch palette (cream surface + 5 container levels, gold primary #755B00 / mustard #F3C84B, sage, steel, rose/lavender/sky/mint data colours), module tints from it, derived dark theme; DESIGN.md updated.
+- [ ] Type: Plus Jakarta Sans via expo-font, 600-weight scale, UPPERCASE micro labels, tabular metrics.
+- [ ] Components restyled: nested container levels, status pills, section labels; gallery fixed (Expo Go crash) and updated.
+- [ ] Record cover photo: pick from gallery/camera, stored on the phone, shown as a photo header on the record page (Vehicle, Place, Trip, Person, Item…); remove/replace.
+- [ ] Agent & API key screen moved onto the kit.
+
+**D2 — data components (with M2)**
+- [ ] Charts kit: sparkline, line chart (dotted grid), stacked column chart, target progress bar, day timeline; stat trio; "Attention required" card; quick-action chips.
+- [ ] Record pages (Vehicle, Subscription, Person) take the Stitch layouts using cycles, meter readings and splits.
+- [ ] Upkeep + This week in the Stitch style; Finance month view with the new charts.
+
+**D3 — Talk (with M3):** agent thread cards (nested stat slabs, source badges), prompt chips, pill composer, voice capture sheet.
+
+**D4 — Today (with M4):** Today bento as in "Today · calm bento editorial": brief, finance, cycles, habits, tasks, trip, pending SMS tiles; Health engine screens.
+
+**D5 — Ingestion (with M5):** proposed transaction card from a UPI notification; bank/SMS permission screens.
+
 ## M2 — Cycles, Upkeep, Things, chores
 
 **Goal:** the "filing cabinet with dates" works without the agent.
