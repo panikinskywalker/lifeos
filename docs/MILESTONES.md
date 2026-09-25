@@ -39,7 +39,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Record pages (Vehicle, Subscription, Person) take the Stitch layouts using cycles, meter readings and splits.
 - [x] Upkeep + This week in the Stitch style; Finance month view with the new charts.
 
-**D3 — Talk (with M3):** agent thread cards (nested stat slabs, source badges), prompt chips, pill composer, voice capture sheet.
+**D3 — Talk (with M3):** agent thread cards (nested stat slabs, source badges), prompt chips, pill composer, voice capture sheet. ✅ *(done with M3's Talk screen; voice uses the system recogniser's own sheet)*
 
 **D4 — Today (with M4):** Today bento as in "Today · calm bento editorial": brief, finance, cycles, habits, tasks, trip, pending SMS tiles; Health engine screens.
 
@@ -67,7 +67,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 
 **Goal:** the primary input works. The sample sentences in `docs/PRODUCT.md` §8 all pass.
 
-- [ ] Talk screen: thread, composer, hold-to-speak (expo-speech-recognition or Android STT intent), reply cards (record / cycle / list / number / chart) with tap-to-open and Undo.
+- [x] Talk screen: thread, composer, hold-to-speak (expo-speech-recognition or Android STT intent), reply cards (record / cycle / list / number / chart) with tap-to-open and Undo. *(Voice via the Android STT intent — tap the mic in the composer, or the raised mic while on Talk.)*
 - [x] Agent tools (extend `coreModule` aiTools): `resolve_entity` (with disambiguation), `log_event`, `mark_cycle_done`, `set_next_due`, `log_meter`, `split_transaction`, `settle_debt`, `remember_fact`, `recall`, `forget_fact`, `create_routine`, `plan_trip`. *(Fact tools ship with the Facts store below. Also added: `upkeep_status`, `balances`.)*
 - [x] Learned aliases table ("the car" → Creta) written when the user confirms a disambiguation.
 - [x] Confirmation policy: money & people tools ask (inline confirm card); others auto-run and return an Undo handle. *(The card itself is drawn by the Talk screen.)*

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ConfirmCard, ReplyCardView } from '@ui/components/ReplyCard';
 import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -552,6 +553,18 @@ function Bar() {
   );
 }
 
+function TalkCardsDemo() {
+  return (
+    <>
+      <ReplyCardView label="Service done on Creta" card={{ kind: 'cycle', entityId: 'x', cycleId: 'y', title: 'Creta · Service', due: 'next 25 Mar (in 181 d) or at 39,400 km' }} onOpen={() => {}} onUndo={() => {}} />
+      <ReplyCardView label="Balances" card={{ kind: 'list', title: 'Balances', items: [{ title: 'Priya Sharma owes you', value: '₹1,300' }, { title: 'You owe Arjun Mehta', value: '₹450' }] }} />
+      <ReplyCardView label="This month" card={{ kind: 'number', label: 'Spent on food', value: '₹12,400', caption: '30% over last month' }} />
+      <ReplyCardView label="Where it went" card={{ kind: 'chart', title: 'By category', bars: [{ label: 'Rent', value: 32000, display: '₹32,000' }, { label: 'Travel', value: 18000, display: '₹18,000' }, { label: 'Food', value: 3610, display: '₹3,610' }] }} />
+      <ConfirmCard summary="Split ₹3,600 at Dinner equally with Arjun Mehta, Priya Sharma · you paid" onAnswer={() => {}} />
+    </>
+  );
+}
+
 function InsightDemo() {
   const t = useTheme();
   return (
@@ -593,6 +606,7 @@ const SECTIONS: Array<[string, string, React.ComponentType]> = [
   ['Progress bar', '8 tall · pill · optional target tick', Progress],
   ['Charts', 'sparkline · line · columns · legend (Stitch)', ChartsDemo],
   ['Record insights', 'stat trio · attention · quick actions · day timeline (Stitch)', InsightDemo],
+  ['Talk cards', 'reply cards (cycle · list · number · chart) · confirm card', TalkCardsDemo],
   ['Colour', 'surfaces · tints · chart', Colours],
   ['Type', 'Plus Jakarta Sans · tabular numerals', Type],
   ['Icons · IconBox', '2px stroke · round caps · tint + ink', Icons],
