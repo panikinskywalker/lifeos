@@ -68,7 +68,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 **Goal:** the primary input works. The sample sentences in `docs/PRODUCT.md` §8 all pass.
 
 - [ ] Talk screen: thread, composer, hold-to-speak (expo-speech-recognition or Android STT intent), reply cards (record / cycle / list / number / chart) with tap-to-open and Undo.
-- [ ] Agent tools (extend `coreModule` aiTools): `resolve_entity` (with disambiguation), `log_event`, `mark_cycle_done`, `set_next_due`, `log_meter`, `split_transaction`, `settle_debt`, `remember_fact`, `recall`, `forget_fact`, `create_routine`, `plan_trip`.
+- [x] Agent tools (extend `coreModule` aiTools): `resolve_entity` (with disambiguation), `log_event`, `mark_cycle_done`, `set_next_due`, `log_meter`, `split_transaction`, `settle_debt`, `remember_fact`, `recall`, `forget_fact`, `create_routine`, `plan_trip`. *(Fact tools ship with the Facts store below. Also added: `upkeep_status`, `balances`.)*
 - [ ] Learned aliases table ("the car" → Creta) written when the user confirms a disambiguation.
 - [ ] Confirmation policy: money & people tools ask (inline confirm card); others auto-run and return an Undo handle.
 - [ ] **Facts** store + Browse › Memory screen; fact mining after every message (second, cheap Haiku call with a strict JSON schema); facts indexed in FTS with records and notes.

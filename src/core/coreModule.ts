@@ -3,6 +3,7 @@ import type { ModuleManifest, TriggerDef, ActionDef, AiToolDef } from './registr
 import type { CoreEvents } from './events/bus';
 import type { Entity, FilterGroup, SortSpec } from './domain/types';
 import type { LifeOSContext } from './registry/context';
+import { lifeTools } from './ai/lifeTools';
 
 /* ------------------------------------------------------------------ */
 /* Generic triggers — work for every entity type                       */
@@ -167,6 +168,7 @@ function slim(e: Entity, os: LifeOSContext) {
 }
 
 const aiTools: AiToolDef[] = [
+  ...lifeTools,
   {
     name: 'list_entity_types',
     description: 'List every record type in LifeOS with its fields, statuses and relation kinds. Call this first when unsure how data is shaped.',

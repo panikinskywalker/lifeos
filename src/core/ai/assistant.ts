@@ -3,6 +3,7 @@ import type { LifeOSContext } from '../registry/context';
 import type { AiToolDef } from '../registry/types';
 import { newId } from '../domain/ids';
 import type { ChatMessage, ContentBlock, LLMProvider, ToolSpec } from './provider';
+import { extrasOf, type ReplyCard } from './cards';
 
 export interface AssistantTurn {
   id: string;
@@ -13,6 +14,11 @@ export interface AssistantTurn {
   toolResult?: unknown;
   createdAt: number;
   pending?: boolean;
+  /** Reply card for the Talk screen (record / cycle / list / number / chart). */
+  card?: ReplyCard;
+  /** Undo for what this tool did (auto-run actions). */
+  undo?: () => void;
+  isError?: boolean;
 }
 
 export interface AssistantOptions {
@@ -116,7 +122,8 @@ Guidelines:
         } else {
           try {
             const parsed = def.input.parse(call.input);
-            if (def.confirm && this.opts.confirm && !(await this.opts.confirm(def, parsed))) {
+            const ask = typeof def.confirm === 'function' ? def.confirm(parsed, this.os) : !!def.confirm;
+            if (ask && this.opts.confirm && !(await this.opts.confirm(def, parsed))) {
               output = { error: 'User declined this action.' };
               isError = true;
             } else {
@@ -127,7 +134,8 @@ Guidelines:
             isError = true;
           }
         }
-        emit({ id: newId(), role: 'tool', text: summarizeTool(call.name, call.input, output), toolName: call.name, toolInput: call.input, toolResult: output, createdAt: Date.now() });
+        const extras = isError ? {} : extrasOf(output);
+        emit({ id: newId(), role: 'tool', text: summarizeTool(call.name, call.input, output), toolName: call.name, toolInput: call.input, toolResult: output, createdAt: Date.now(), card: extras.card, undo: extras.undo, isError });
         results.push({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(output ?? null).slice(0, 20000), is_error: isError });
       }
       const toolMsg: ChatMessage = { role: 'user', content: results };

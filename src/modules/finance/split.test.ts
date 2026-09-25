@@ -70,3 +70,24 @@ describe('splits, balances, settle up', () => {
     expect(balanceWith(os, priya)).toBe(400);
   });
 });
+
+describe('agent tools', () => {
+  it('split_transaction asks first, adds "me", and undo removes the split; settle_debt undoes', async () => {
+    const { financeAiTools } = await import('./aiTools');
+    const t = (n: string) => financeAiTools.find((x) => x.name === n)!;
+    expect(t('split_transaction').confirm).toBe(true);
+    expect(t('settle_debt').confirm).toBe(true);
+    const arjun = os.entities.create({ type: 'person', data: { name: 'Arjun' } }).id;
+    const tx = os.entities.create({ type: 'transaction', data: { amount: 1800, kind: 'expense', category: 'food', merchant: 'Dinner', date: '2026-09-20' } });
+    const { extrasOf } = await import('@core/ai/cards');
+    const out = await t('split_transaction').run({ transactionId: tx.id, payer: 'me', method: 'equal', parts: [{ party: arjun }] }, os);
+    expect(balanceWith(os, arjun)).toBe(900);
+    extrasOf(out).undo!();
+    expect(balanceWith(os, arjun)).toBe(0);
+    await t('split_transaction').run({ transactionId: tx.id, payer: 'me', method: 'equal', parts: [{ party: arjun }] }, os);
+    const s = await t('settle_debt').run({ personId: arjun }, os);
+    expect(balanceWith(os, arjun)).toBe(0);
+    extrasOf(s).undo!();
+    expect(balanceWith(os, arjun)).toBe(900);
+  });
+});

@@ -1,14 +1,12 @@
-import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES, debtType } from './types';
 import { financeWidgets } from './widgets';
 import { AccountSection, BudgetSection, FinanceHome } from './screens';
-import { budgetStatus, monthRange, netWorth, postDueSubscriptions, spendByCategory, spendInRange, incomeInRange } from './lib';
-import { monthlySubscriptionCost } from './reports';
-import type { BudgetData } from './types';
+import { postDueSubscriptions } from './lib';
 import { GroupBalanceSection, PersonBalanceSection, SplitSection } from './splitScreens';
 import { ReportsScreen } from './reportsScreen';
 import { SubscriptionHero } from './subscriptionHero';
+import { financeAiTools } from './aiTools';
 
 export const financeModule: ModuleManifest = {
   id: 'finance',
@@ -62,27 +60,7 @@ export const financeModule: ModuleManifest = {
       },
     },
   ],
-  aiTools: [
-    {
-      name: 'finance_summary',
-      description: 'Money overview: net worth with balances per account, this month\'s spend & income, spend by category, budget status, monthly subscription cost. Use for any "how am I doing financially" question.',
-      input: z.object({ monthOffset: z.number().int().max(0).optional().describe('0 = this month, -1 = last month') }),
-      run: async (input, os) => {
-        const m = monthRange((input as { monthOffset?: number }).monthOffset ?? 0);
-        const nw = netWorth(os);
-        return {
-          month: m.label,
-          netWorth: nw.total,
-          accounts: nw.accounts.map((a) => ({ id: a.account.id, name: a.account.title, kind: a.account.data.kind, balance: a.balance, currency: a.account.data.currency })),
-          spent: spendInRange(os, m.start, m.end),
-          income: incomeInRange(os, m.start, m.end),
-          byCategory: spendByCategory(os, m.start, m.end),
-          budgets: os.entities.query<BudgetData>('budget').map((b) => ({ id: b.id, category: b.data.category, period: b.data.period, ...budgetStatus(os, b) })),
-          monthlySubscriptions: monthlySubscriptionCost(os),
-        };
-      },
-    },
-  ],
+  aiTools: financeAiTools,
   onStart: async (os) => {
     // Post due subscription bills daily (and on every app start).
     os.scheduler.registerHandler('finance.subscriptions', (_j, o) => void postDueSubscriptions(o));

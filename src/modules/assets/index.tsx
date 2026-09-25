@@ -4,6 +4,7 @@ import type { EntityTypeDef } from '@core/domain/types';
 import { palette } from '@ui/theme/tokens';
 import { dateField, nextWeekday, startOfDay } from '@core/cycles/schedule';
 import { VehicleHero } from './hero';
+import { withExtras } from '@core/ai/cards';
 
 export const ASSETS_COLOR = palette.brown;
 
@@ -82,5 +83,18 @@ export const assetsModule: ModuleManifest = {
   id: 'assets', name: 'Assets', version: '1.0.0', description: 'Things you own — electronics, furniture, vehicles — with warranties, value and linked expenses.', icon: 'cube.box', color: ASSETS_COLOR,
   dependencies: ['crm'], entityTypes: [assetType, vehicleType, routineType],
   quickActions: [{ id: 'assets.add', label: 'Asset', icon: 'cube.box', route: '/entity/asset/new' }, { id: 'assets.addVehicle', label: 'Vehicle', icon: 'car', route: '/entity/vehicle/new' }],
+  aiTools: [
+    {
+      name: 'create_routine',
+      description: 'Add a chore / routine ("add a chore: vacuum every Saturday", "remind me to water the plants every 3 days"). kind chore | personal | home; weekday 0 = Sunday … 6 = Saturday.',
+      input: z.object({ name: z.string(), everyN: z.number().int().positive(), everyUnit: z.enum(['day', 'week', 'month']), kind: z.enum(['chore', 'personal', 'home']).default('chore'), minutes: z.number().optional(), weekday: z.number().int().min(0).max(6).optional(), lastDoneOn: z.string().optional() }),
+      run: async (input, os) => {
+        const i = input as { name: string; everyN: number; everyUnit: 'day' | 'week' | 'month'; kind: string; minutes?: number; weekday?: number; lastDoneOn?: string };
+        const e = os.entities.create({ type: 'routine', data: { ...i, weekday: i.weekday != null ? String(i.weekday) : undefined } }, 'assistant');
+        const c = os.cycles.forEntity(e.id)[0];
+        return withExtras({ created: e.title, schedule: e.subtitle, cycleId: c?.id }, { undo: () => os.entities.delete(e.id, 'user'), card: c ? { kind: 'cycle', entityId: e.id, cycleId: c.id, title: e.title, due: e.subtitle ?? '' } : { kind: 'record', entityId: e.id, type: 'routine', title: e.title, subtitle: e.subtitle } });
+      },
+    },
+  ],
   detailSections: [{ entityType: 'vehicle', key: 'assets.vehicle', title: 'Vehicle', component: VehicleHero, order: 10, placement: 'top' }],
 };

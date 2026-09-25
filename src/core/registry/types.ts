@@ -82,8 +82,12 @@ export interface AiToolDef {
   description: string;
   input: ZodTypeAny;
   run: (input: unknown, os: LifeOSContext) => Promise<unknown>;
-  /** Mutating tools require the user's confirmation when `confirm` is set. */
-  confirm?: boolean;
+  /**
+   * Ask the user first (HANDOFF: money and people confirm; everything else
+   * auto-runs with Undo). A function decides per input (create_entity asks
+   * only for money/people types).
+   */
+  confirm?: boolean | ((input: any, os: LifeOSContext) => boolean); // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 export interface EntityDetailSection {
