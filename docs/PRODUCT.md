@@ -1,103 +1,91 @@
-# LifeOS — product definition (v3, 23 Sep 2026)
+# LifeOS — product definition (v4, 25 Sep 2026)
+
+**Supersedes v3. What changed:** v3 was agent-first ("say it once, we file it"). v4 is **data-first**: LifeOS is a personal data dashboard and an almanac of Rutvij's life, fed automatically wherever possible, by brain-dumps otherwise, and browsed as charts and records. The agent is one of three inputs, not the product.
 
 ## 0. In one line
 
-**Jarvis with a filing cabinet.** You tell LifeOS what happened in your life, in plain words; it turns that into linked records, remembers it forever, and tells you what's due next.
+**Everything about my life, collected automatically, dumped freely, shown as data, and remembered forever.**
 
-## 1. What it is
+## 1. The five things that matter (in order)
 
-A personal life operating system on Rutvij's Android phone. Not an app with features — a memory with an agent in front of it.
+### 1.1 Today is a data dashboard
+Open the app and see numbers and charts about *me*, right now: steps today vs. yesterday, sleep last night, screen time by app, spend so far this month against the usual pace, streaks, and what's coming up. Charts are the point — sparklines, bars, rings, heat maps, comparisons — not counts and lists.
 
-- **You talk to it** ("did the car service today", "recharged Jio", "washed the white sneakers", "Priya paid me back the 2,600"). It creates or updates the right records, links them (car → service → invoice → expense), and schedules what follows (next service in 6 months / at 35,000 km).
-- **It watches what it's allowed to** (payment and bank notifications on Android) and files those the same way, asking when unsure.
-- **It remembers everything** — records, and also the things you say that aren't records ("I prefer paying rent from HDFC", "Dad hates surprises"). Every fact has a source and a date. It knows everything you have ever told it.
-- **It tells you before you ask** — what's due today, what's running out, who you owe, what's expiring.
-- **You can always browse the cabinet yourself** — every record, every link, every timeline, searchable and editable.
+Sources feeding it (all automatic, all local):
+- **Health Connect** — steps, sleep, heart rate, workouts, weight, from whatever watch/app writes to it. **P1.**
+- **Android UsageStats** — screen time per app, pickups, first unlock / last use. **P1.** (Mac screen time via a helper script once sync exists — P2. iPhone has no Screen Time API — not planned.)
+- **Bank SMS + payment-app notifications** — spend, income, balances. **P1** (see 1.5).
+- Everything the user has filed: upkeep dues, tasks, events, habits, people.
 
-## 2. Principles (priority order)
+Each tile opens a full-screen chart with a period switcher (day / week / month / year) and the underlying records.
 
-1. **Say it once.** Capture by talking (text or voice) is the primary input. Forms are the fallback and for corrections.
-2. **Everything is an object; nothing is duplicated.** One Person, one Car, one Subscription — referenced from everywhere.
-3. **Everything has a timeline.** The car's history, a friend's history, a shoe's history. Never lost.
-4. **Everything recurring has a cycle.** Subscriptions, services, renewals, washing, laundry, haircuts, filters — the system knows *last done* and *next due*.
-5. **The agent proposes; you confirm what matters.** Money and people: confirm. Everything else: auto-file, undo in one tap.
-6. **Offline-first, single device, your data.** The phone is the source of truth. Encrypted backup export. No server in phase 1.
-7. **Grows for decades.** New object types, fields and modules without changing the core.
-8. **Native quality.** Feels like a first-party Android app: real icons, big legible numbers, designed dark mode, calm pastel bento.
+### 1.2 The second brain is an almanac
+A browsable reference to everything: every person, thing, place, subscription, fact, note, number — with history. Not just "the agent remembers what I said": a surface you can open and read.
+- **Almanac tab** (replaces Browse): search on top; then *People · Things · Money · Body · Mind · Places · Time*; each opens lists → records → related records.
+- **Time view**: any day / month / year — what happened, what was spent, what was logged, what I dumped. "On this day."
+- **Facts** are first-class records (one line, subject, source, date) and show on the subject's page.
+- One full-text index across records, notes, facts and dumps. Semantic search later (P2).
 
-## 3. Cycles — the concept the whole app hangs on
+### 1.3 Brain dump is a first-class input
+One box, always one tap away: type or talk, dump anything — half thoughts, lists, rants, quotes, plans, "made a new friend today". Rules:
+- The raw dump is **stored verbatim, forever**, timestamped. Never edited, never lost.
+- Afterwards (seconds later, in the background) the agent extracts what it can — people, tasks, facts, events, spend, cycle updates — creates or updates the records, and links every one back to the dump. The dump page shows "extracted: 1 person, 2 facts, 1 task" with Undo per item.
+- Extraction never blocks the dump. Offline → extraction runs when back online.
+- The Dump box is the centre button. Talk (Q&A with the agent) is inside the same screen as a toggle, not a separate tab.
 
-A Cycle is "this thing recurs" attached to any object:
+### 1.4 Photos
+Skipped for now.
 
-| Object | Cycle | Trigger | Nudge |
-|---|---|---|---|
-| Jio recharge (Subscription) | every 84 days | time | "Jio runs out in 3 days" |
-| Creta (Vehicle) | service every 6 months **or** 10,000 km | time or odometer | "Service due in 12 days or 800 km" |
-| White sneakers (Item) | wash every 3 weeks | time since last | "Sneakers: last washed 24 days ago" |
-| Laundry (Routine) | every 4 days | time since last | "Laundry's due" |
-| Passport (Document) | expires 2031 | date | "Passport expires in 9 months" |
-| Water filter (Asset) | replace every 6 months | time | "Filter replacement due" |
-| Dad (Person) | call weekly | time since last contact | "Haven't called Dad in 9 days" |
+### 1.5 Messages and notifications feed the expense tracker
+- **SMS reader** (Android, sideloaded app so Play's READ_SMS restriction does not apply): reads bank/card/UPI alert SMS — debits, credits, balances, card spends, EMIs — and files Transactions with amount, direction, merchant/VPA, account last-4, balance-after. **P1.**
+- **First-run history import**: parse all existing bank SMS on the phone (months of history) so the expense tracker is populated on day one. Dedupe, review screen, bulk-confirm. **P1.**
+- **Notification listener** for UPI/payment apps (GPay, PhonePe, Paytm, bank apps) as the second source; dedupe against SMS by amount + time window. **P1.**
+- Sender detection is learned: the app lists SMS senders that look like banks (DLT headers like `VM-HDFCBK`, `AX-ICICIB`, `JD-SBIINB`, Amex, cards) and the user ticks which to trust. Parsers per bank with a generic fallback; every parse keeps the raw text.
+- Merchant → category learning; confirm only when the parser is unsure.
 
-"Did X today" → find the object, log a **timeline event** (cost/odometer/notes if said), **roll the cycle**. "X runs out on the 30th" → set next-due directly.
+## 2. The agent (Dump / Talk)
+The agent's job is to turn language into records — **any** record type — and to answer questions from everything it knows.
+- **Creates anything from a sentence.** "Made a new friend today, Karan, works at Zomato, met at the gym" → Person *Karan* (company Zomato), fact "met at the gym on 25 Sep", relation to Rutvij, optional keep-in-touch cycle offered. "Bought a Dyson for 32k" → Asset + Transaction. "Started reading Project Hail Mary" → Book (Mind). No form, sensible defaults, everything editable after.
+- **Updates and links.** "Did the car service, 6,400 at Hyundai" → event on Creta + transaction + cycle rolled.
+- **Answers from everything.** Records + notes + facts + dumps + health/usage/spend data. "How much did I sleep on average last week vs. the week before?" is a legitimate question.
+- **Confirmation:** money and people-related writes show a confirm card; everything else auto-files with Undo.
+- **Cost:** parser-first for common sentences; provider chain (Groq → Gemini → Claude) for the rest; usage cap. Already built.
 
-**Upkeep** is the page that shows every cycle in one list — overdue, this week, this month — filtered by type, including chores.
+## 3. Cycles and Upkeep (unchanged)
+Everything recurring is a cycle on an object (subscriptions, services, renewals, chores, keep-in-touch). Upkeep shows them all by due date. Already built; keep.
 
-## 4. Objects
+## 4. Information architecture (v4)
 
-**Life admin:** Person · Group · Account · Transaction · Debt · Subscription · Budget · Document · Asset · Vehicle · Item · Routine (chores)
-**Doing:** Project · Task · Goal · Event · Habit
-**Body:** Workout · Measurement
-**Mind:** Note · Fact
-**Places:** Trip · Location
+**Bottom bar:** **Today** · **Upkeep** · **Dump** (centre, raised) · **Almanac** · **You**
 
-Every object has: title · status · tags · custom fields · attachments · comments · reminders · **cycles** · relations · full timeline.
+- **Today** — the dashboard (1.1).
+- **Upkeep** — cycles by due date, chores, this-week strip.
+- **Dump** — the box. Toggle at the top: *Dump* (default) / *Talk*. Below: recent dumps with what was extracted.
+- **Almanac** — search; People · Things · Money · Body · Mind · Places · Time; recent.
+- **You** — settings: data sources (Health Connect, Usage access, SMS, notifications), agent providers, backups, appearance.
 
-## 5. The agent
+## 5. Flows that must be excellent (golden tests)
+1. Open app → Today shows steps, sleep, screen time, spend, upcoming — all from real device data, all as charts, within 1 s.
+2. Tap steps → full chart, week/month/year, vs. previous period.
+3. Dump: "made a new friend today, Karan, works at Zomato, met at the gym" → Person created with company + fact + link to dump; card with Undo.
+4. Dump: "bought a Dyson for 32k on the HDFC card, warranty 2 years" → Asset + Transaction + warranty cycle.
+5. Dump a 6-line rant with one task buried in it → task extracted, rant stored verbatim, nothing else invented.
+6. First run: SMS import finds N bank messages → review screen → confirm → Money shows months of history by category.
+7. New SMS "debited INR 1,240 at SWIGGY" → transaction appears within seconds, categorised Food.
+8. Talk: "how much did I spend on food this month vs. last?" / "when did I last meet Karan?" / "what did I dump about the landlord?"
+9. Almanac › Time › March 2026 → spend, dumps, events, health averages for that month.
+10. "Did the car service, 6,400 at Hyundai" → event + transaction + cycle rolled.
 
-- **Input:** typed or spoken message; Android notifications from allowed apps (GPay, PhonePe, Paytm, HDFC, Amex to start); share-sheet.
-- **Understanding:** intent (log / ask / set / remind / plan / split / remember), entities (which car, which friend, how much, when), cycle effects.
-- **Acts through the same rules as the UI.** Money and people writes ask first; the rest auto-file with Undo.
-- **Memory (second brain):** records + notes + facts in one index. Every message is mined for residual facts. The agent retrieves from all three before answering. "What did I say about the landlord?" works.
-- **Proactive:** morning brief (due, overdue, running out, spend pace, one insight) as a notification and the top of Today.
-- **Boundaries:** reads notifications; never sends messages or emails; never pays. Runs on-phone with the user's Claude key (Haiku default, Sonnet escalation); only the slice of data needed leaves the phone.
+## 6. Non-goals (phase 1)
+Photos, sending messages/emails, payments, iOS/web client, sync, Mac/iPhone screen time, bank APIs, Developer Mode.
 
-## 6. Information architecture
-
-**Bottom bar:** Today · Upkeep · **Talk** (centre, raised) · Browse · You.
-
-- **Today** — the brief, then bento tiles (overdue, due today, chores, spend this month, running out, people to call, habits). Configurable.
-- **Upkeep** — every cycle by next due; chips: Subscriptions · Vehicles · Things · Chores · People · Documents; This-week strip.
-- **Talk** — the agent thread; type or hold to speak; inline record cards with Undo.
-- **Browse** — modules → types → lists → records; global search; Memory (facts).
-- **You** — settings, modules, notification sources, agent/API key, backups.
-
-**Five screen types:** Module home · List · Record · Form · Agent thread. Nothing more than three taps deep.
-
-## 7. Flows that must be excellent (golden tests)
-
-1. "Did the car service today, 6,400 at Hyundai" → Service event on Creta, Transaction linked, cycle rolled, card with Undo. One message, zero taps.
-2. "Recharged Jio 719 for 84 days" → subscription next-due computed, transaction logged.
-3. "Washed the white sneakers" / "did laundry" → item/routine event, cycle rolled.
-4. "Priya paid me back 2,600" → debt settled, transaction in, person timeline updated (confirm card).
-5. "Dinner was 3,600, split with Arjun and Priya" → transaction + two debts (confirm card).
-6. UPI notification → proposed transaction → confirm, or "that was dinner with Arjun, split it".
-7. Morning brief → "Jio in 3 days · service in 12 days · sneakers overdue · call Dad · ₹12,400 this week, 30% over".
-8. "When did I last change tyres" / "how much on the car this year" / "who owes me money" / "what did I say about the landlord".
-9. "Remember that the landlord's name is Suresh and rent is due on the 5th" → fact + (offer) rent routine.
-10. Browse a Person → everything about them.
-
-## 8. Non-goals (phase 1)
-Sending messages/emails, payments, iOS/web clients, sync, photo scanning, bank APIs, shared accounts, Developer Mode.
-
-## 9. Decisions log
-- ✅ Android native only (Expo/RN); offline-first; no server in phase 1. Web/iPhone via Supabase sync in phase 2.
-- ✅ Ingestion: Android notification listener only; GPay, PhonePe, Paytm, HDFC, Amex first.
-- ✅ Agent never drafts/sends messages or pays. Photo tagging dropped.
-- ✅ INR default, multi-currency stored not converted.
-- ✅ Developer Mode → phase 2. Android widgets → phase 2.
-- ✅ Voice input in phase 1 (Android STT).
-- ✅ Splitwise-style splits and groups in phase 1.
-- ✅ Health: log + trend chart in phase 1; Health Connect phase 2.
-- ✅ Second brain: unified index of records + notes + facts, "knows everything", phase 1; embeddings/graph phase 2.
-- ✅ Design: Apple-Health-style bento, calmer pastels (see `docs/DESIGN.md`).
+## 7. Decisions log
+- ✅ Android native (Expo/RN), offline-first, sideloaded (not Play Store) — enables READ_SMS.
+- ✅ Data-first: Today = dashboard; Health Connect + UsageStats + SMS in P1.
+- ✅ Dump is the primary input; raw dumps immutable; extraction async and undoable.
+- ✅ Almanac replaces Browse; Time view in P1.
+- ✅ Agent can create any entity type from a sentence.
+- ✅ Parser-first + provider chain (Groq → Gemini → Claude), usage cap.
+- ✅ Splits/groups P1; chores as routines P1; finance reports: month, subscriptions, net worth.
+- ✅ Photos, Developer Mode, sync, widgets → phase 2.
+- ⬜ Which watch/app feeds Health Connect; which banks send SMS (parsers are built generic + learned; specific fixtures added when known).

@@ -16,7 +16,7 @@ Order is deliberate: the design system first (so nothing gets built twice), then
 - [x] Bottom bar: Today · Upkeep · **Talk** (centre, raised) · Browse · You.
 - [x] Dark mode tokens and a theme toggle in You.
 - [x] Storybook-style gallery screen at `/dev/components` showing every component in both themes (used to review against the Claude Design canvas).
-- [x] Core additions needed by later milestones, migrations v3: `cycles`, `meter_readings`, `facts`, `groups` + `group_members`, `notification_rules`, `ingest_queue`. *(Group is an entity type, per M2 and PRODUCT §4, so v3 adds `group_members` only — no separate `groups` table.)*
+- [x] Core additions needed by later milestones, migrations v3: `cycles`, `meter_readings`, `facts`, `groups` + `group_members`, `notification_rules`, `ingest_queue`. *(Group is an entity type, so v3 adds `group_members` only.)*
 - [x] Rebuild the generic screens on the new components: list, record, form, tag page, search.
 
 **Demo:** open app → Today (placeholder tiles) → Browse → a record → edit → dark mode. Icons everywhere.
@@ -41,16 +41,16 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 
 **D3 — Talk (with M3):** agent thread cards (nested stat slabs, source badges), prompt chips, pill composer, voice capture sheet. ✅ *(done with M3's Talk screen; voice uses the system recogniser's own sheet)*
 
-**D4 — Today (with M4):** Today bento as in "Today · calm bento editorial": brief, finance, cycles, habits, tasks, trip, pending SMS tiles; Health engine screens.
+**D4 — Today → now M4.3:** Today bento as in "Today · calm bento editorial": brief, finance, cycles, habits, tasks, trip, pending SMS tiles; Health engine screens.
 
-**D5 — Ingestion (with M5):** proposed transaction card from a UPI notification; bank/SMS permission screens.
+**D5 — Ingestion → now M4.2:** proposed transaction card from a UPI notification; bank/SMS permission screens.
 
 ## M2 — Cycles, Upkeep, Things, chores
 
 **Goal:** the "filing cabinet with dates" works without the agent.
 
 - [x] Cycle engine in `src/core/cycles/`: kinds (interval / fixed date / meter / whichever-first), `markDone`, `snooze`, `setNextDue`, `skip`, stats. Unit-tested.
-- [x] Cycle templates per entity type; Vehicle/Subscription/Document/Person/Item/Routine get defaults on create. *(Routine's template ships with the Routine type below; existing records are backfilled once on boot.)*
+- [x] Cycle templates per entity type; Vehicle/Subscription/Document/Person/Item/Routine get defaults on create.
 - [x] Meter readings (odometer) on Vehicle; cycles compute from the latest reading.
 - [x] **Routine** entity type (chores) with kind / minutes / weekday preference.
 - [x] Upkeep tab: sections Overdue / This week / This month / Later; filter chips; row actions mark done · snooze · add cost; "this month will cost" header.
@@ -65,20 +65,25 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 
 ## M3 — Talk: the agent + second brain
 
-**Goal:** the primary input works. The sample sentences in `docs/PRODUCT.md` §8 all pass.
+**Goal:** the primary input works. The sample sentences in `docs/PRODUCT.md` §7 all pass. **Cost principle: the LLM is the fallback, not the front door** — most daily sentences are handled by a deterministic parser on-device for free and offline; the model is called only when the parser isn't confident.
 
-- [x] Talk screen: thread, composer, hold-to-speak (expo-speech-recognition or Android STT intent), reply cards (record / cycle / list / number / chart) with tap-to-open and Undo. *(Voice via the Android STT intent — tap the mic in the composer, or the raised mic while on Talk.)*
-- [x] Agent tools (extend `coreModule` aiTools): `resolve_entity` (with disambiguation), `log_event`, `mark_cycle_done`, `set_next_due`, `log_meter`, `split_transaction`, `settle_debt`, `remember_fact`, `recall`, `forget_fact`, `create_routine`, `plan_trip`. *(Fact tools ship with the Facts store below. Also added: `upkeep_status`, `balances`.)*
+- [x] **Intent parser** in `src/core/agent/parser.ts` (pure, tested): pattern grammar for the top intents — `did/done <object> [today|yesterday|on <date>] [<amount>] [at <vendor>] [<n> km]` · `recharged/renewed <subscription> [<amount>] [for <n> days]` · `<person> paid me [back] <amount>` / `paid <person> <amount>` · `spent <amount> on <thing> [with <people>]` · `split <amount> with <people>` · `remind me to <x> [when]` · `add a chore/routine <x> every <n> <unit>` · `<object> runs out / due on <date>` · `remember [that] <fact>` · `what/when/how much …` (→ query path). Returns `{ intent, slots, confidence }`. *(Built as `src/core/ai/parser.ts`; returns a plan of tool calls or null — no numeric confidence yet, see Router.)*
+- [x] **Entity resolver** (shared by parser and LLM tools): fuzzy match on titles + learned aliases + type hints; returns candidates with scores; disambiguation card when top-2 are close. *(`resolveCandidates` / `clearMatch` in `lifeTools.ts`.)*
+- [ ] **Router:** parser confidence ≥ 0.85 and all slots resolved → execute directly (no network) and show the same reply card the LLM path would; otherwise → LLM with the parser's partial parse as a hint. Every direct execution is logged so misfires can be reviewed and turned into new patterns. *(Partly: parser-or-model works; not yet: numeric confidence, passing the partial parse to the model as a hint, and the misfire log.)*
+- [x] **Provider layer** (`src/core/ai/openaiCompat.ts`, `providers.ts`): one OpenAI-compatible implementation covers **Groq** (default, free tier), **Gemini** (its /openai endpoint), OpenRouter and Ollama; Claude keeps its native implementation. **Chain provider** tries them in order and falls through on 429/5xx/network, putting a rate-limited provider on cooldown. Per-provider keys in SecureStore; `withUsageMeter` counts tokens per provider per month and enforces a cap. Settings screen at You › Agent. Tests in `providers.test.ts`. *(Ported 25 Sep from `lifeos-provider-chain.patch`; since then: retired-model recovery, free-tier token budget.)*
+- [x] Fact mining and other side jobs use the `small` chain (cheap/fast models).
+- [ ] Talk screen: thread, composer, hold-to-speak (Android STT), reply cards (record / cycle / list / number / chart / confirm) with tap-to-open and Undo; a small "offline" pill on cards handled by the parser. *(All but the offline pill.)*
+- [x] Agent tools (extend `coreModule` aiTools): `resolve_entity`, `log_event`, `mark_cycle_done`, `set_next_due`, `log_meter`, `split_transaction`, `settle_debt`, `remember_fact`, `recall`, `forget_fact`, `create_routine`, `plan_trip`. Parser fast-path and LLM call the same tool functions.
 - [x] Learned aliases table ("the car" → Creta) written when the user confirms a disambiguation.
-- [x] Confirmation policy: money & people tools ask (inline confirm card); others auto-run and return an Undo handle. *(The card itself is drawn by the Talk screen.)*
-- [x] **Facts** store + Browse › Memory screen; fact mining after every message (second, cheap Haiku call with a strict JSON schema); facts indexed in FTS with records and notes.
-- [x] Retrieval step before every answer: FTS hits over records/notes/facts + resolved entity's timeline/relations + last N turns, packed into the system prompt with a token budget.
+- [x] Confirmation policy: money & people tools ask (inline confirm card); others auto-run and return an Undo handle — identical on both paths.
+- [x] **Facts** store + Browse › Memory screen. Fact mining: `remember …` sentences are filed by the parser for free; for LLM-handled messages, a second small call with a strict JSON schema extracts residual facts. Facts indexed in FTS with records and notes.
+- [x] Retrieval step before every LLM answer: FTS hits over records/notes/facts + resolved entity's timeline/relations + last N turns, packed with a token budget.
 - [x] `[[links]]` in notes/facts → relations; backlinks section on every record.
-- [x] Share-sheet intent (Android `SEND` / `SEND_MULTIPLE`) → Talk with the shared text/link/image attached. *(Native: works in the APK build, not Expo Go.)*
-- [x] Model routing: Haiku default; escalate to Sonnet when the message has ≥2 intents, a plan intent, or the first attempt returned a tool error. Usage meter in You › Agent.
-- [x] Golden tests: each sample sentence against a recorded-response fake provider asserting the exact tool calls and resulting DB state. *(PRODUCT §7 flows 1–5, 8, 9 in `src/modules/golden.test.ts`; 6 and 7 arrive with M5 and M4.)*
+- [x] Share-sheet intent (Android `SEND` / `SEND_MULTIPLE`) → Talk with the shared text/link/image attached.
+- [x] Model routing (when provider is Claude): Haiku default; escalate to Sonnet on ≥2 intents, a plan intent, or a tool error on first attempt. **Usage meter + monthly cap** in You › Agent (tokens and estimated cost per provider; the agent stops calling the model at the cap and says so).
+- [x] Golden tests: each sample sentence asserts (a) whether the parser or the LLM handled it, (b) the exact tool calls, (c) the resulting DB state — against the fake provider. *(Flows 1–5, 8, 9 in `golden.test.ts`, with and without a model.)*
 
-**Demo:** say the eight sentences in order; every one files correctly with zero taps except the two money/people confirmations.
+**Demo:** say the sample sentences in order with the phone in airplane mode — the simple ones file instantly; turn data on — the multi-step ones go through the model. Zero taps except the money/people confirmations.
 
 ## M3.5 — Free-tier agent (SCOPE v2 B5, 25 Sep)
 
@@ -89,33 +94,48 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Parser first: deterministic on-device intent parser for the common sentences; the LLM only when it isn't confident. Golden sentences 1–5, 9 pass with no provider at all.
 - [x] You › Agent: provider order, keys, models (main / small / escalation), caps, usage; Talk works (parser only) with no key.
 
-## M4 — Today + morning brief
+## M4 — Reframe: data-first (replaces the old M4)
 
-**Goal:** the app tells you before you ask.
+**Why:** after M1–M3 the app was an agent with a filing cabinet. `docs/PRODUCT.md` v4 says what it must be: a personal data dashboard + an almanac, fed automatically. This milestone turns the existing build into that. Nothing from M1–M3 is thrown away; the shell, the entity core, cycles, splits and the agent all stay.
 
-- [ ] Today bento: Brief tile (agent-written, cached daily), Overdue tile, Due-today list, Chores checklist, Spend-this-month StackedBar, Running-out (subscriptions <7 days), People-to-call, Habits ring; drag-to-reorder; sizes.
-- [ ] Brief generator job (scheduler, background task) at the chosen time → notification + tile.
-- [ ] Widget gallery (add/remove tiles from any module).
-- [ ] Quiet hours; per-module notification toggles.
-- [ ] Habits & Health: check-in, streaks, heat map, Measurement trend chart.
-- [ ] Biometric app lock; encrypted backup export/import.
+### M4.0 — Audit first (half a day, no new code)
+- [ ] Walk every screen on a real phone against PRODUCT.md v4 §5 golden flows. Write `docs/AUDIT.md`: what exists, what's missing, what's wrong. Rutvij reviews before M4.1 starts.
 
-**Demo:** wake up → brief notification → open Today → tap chores → done.
+### M4.1 — Dump (the centre button)
+- [ ] `dump` entity: raw text, source (typed / voice / share), createdAt, immutable body; `extractions` side table (dumpId → entityId/factId, kind, undone flag).
+- [ ] Dump screen replaces the Talk tab in the bottom bar: big box, mic, send; toggle *Dump / Talk* at the top; recent dumps below, each with "extracted: 1 person · 2 facts · 1 task" chips and per-item Undo.
+- [ ] Background extraction job (scheduler): parser first, then the small-model chain with a strict JSON schema: `{ people[], tasks[], facts[], events[], transactions[], cycleUpdates[], entitiesToCreate[] }`. Every created/updated record links back to the dump. Never blocks the dump; retries when online.
+- [ ] Agent "create anything": `create_entity` accepts any registered type with partial data and fills sensible defaults; new tool `create_person_from_mention` (name, company, role, where met, relationship) and `suggest_cycle` (offer keep-in-touch / warranty / renewal). Golden tests: "made a new friend today, Karan, works at Zomato, met at the gym" → Person + fact + link; "bought a Dyson for 32k on the HDFC card, warranty 2 years" → Asset + Transaction + warranty cycle; 6-line rant with one buried task → one task, nothing invented.
 
-## M5 — Notification ingestion
+### M4.2 — Data sources
+- [ ] **Health Connect** (`react-native-health-connect`): permissions screen; daily sync of steps, sleep sessions, heart rate, workouts, weight into `measurements`/`workouts` with source = health_connect; backfill 90 days on first grant; hourly refresh via background task.
+- [ ] **UsageStats** (native module + `PACKAGE_USAGE_STATS` onboarding): per-app foreground time, pickups, first unlock, last use, per day; app icons + labels cached; `usage_daily` and `usage_app_daily` tables.
+- [ ] **SMS reader** (native module, `READ_SMS` + `RECEIVE_SMS`): sender discovery (DLT-style headers, bank/card keywords) → You › Data sources › SMS with tick-boxes; parsers per bank (HDFC, ICICI, SBI, Axis, Kotak, Amex, plus generic) with fixtures in tests; every parse stores raw text + parsed fields; first-run **history import** with review screen and bulk confirm; live `RECEIVE_SMS` → transaction within seconds; dedupe with notifications by amount + 10-min window.
+- [ ] **Notification listener** (from old M5) as the second source; same ingest queue and review UI.
+- [ ] You › Data sources: one screen showing each source, its permission state, last sync, count today.
 
-**Goal:** payments file themselves.
+### M4.3 — Today as a dashboard
+- [ ] Chart components on the design tokens: Sparkline, Bars (daily/weekly), Ring, StackedBar (exists), HeatMap (habits/steps), Comparison ("vs. yesterday" delta chip). Built with react-native-svg; no chart library that pulls in web deps.
+- [ ] Today tiles, all live from real data: Steps (today vs. yesterday + 7-day bars), Sleep (last night + 7-day), Screen time (today total + top 3 apps + 7-day), Spend this month (pace line vs. usual month), Upcoming (next 5 dues/events), Streaks, People to call, Brief (one line from the agent, optional).
+- [ ] Every tile → full-screen chart: period switcher day/week/month/year, previous-period comparison, list of underlying records below.
+- [ ] Tile layout persisted; add/remove/reorder.
+- [ ] Empty states that say which permission to grant, with a button to You › Data sources.
 
-- [ ] Android `NotificationListenerService` (Expo config plugin / native module) with an allow-list of package names.
-- [ ] Parser rules for GPay, PhonePe, Paytm, HDFC Bank, Amex + generic fallback (amount, direction, merchant/VPA, last-4).
-- [ ] Ingest queue → proposed Transaction cards on Today and Talk; confirm / edit / "that was dinner with Arjun, split it".
-- [ ] Merchant learning (VPA/merchant → category) and dedupe (same amount within 10 min).
-- [ ] You › Notification sources screen; battery/permission onboarding.
-- [ ] Automation trigger `notification.matched` for user rules.
+### M4.4 — Almanac (replaces Browse)
+- [ ] Almanac tab: search field; sections *People · Things · Money · Body · Mind · Places · Time*; each a list of types with counts.
+- [ ] **Time view**: pick a day / month / year → spend by category, dumps, events, health averages, screen time, cycles done, records created. "On this day" row on Today.
+- [ ] Facts as browsable records; every record page shows Facts, Dumps that mention it, and backlinks.
+- [ ] One FTS index over records + notes + facts + dumps (extend migration; don't rebuild).
 
-**Demo:** pay by GPay → 5 s later a card appears → confirm → transaction linked to the merchant, category learned.
+**Demo:** fresh install → grant Health Connect, Usage access, SMS → Today fills with real steps/sleep/screen time and months of spend → dump "made a new friend today, Karan…" → Karan appears under Almanac › People with the fact → Almanac › Time › last month shows the whole month.
+
+## M5 — Polish + proactive
+- [ ] Morning brief notification (from real data: sleep, steps target, dues, spend pace).
+- [ ] Quiet hours; per-source notification toggles; biometric lock; encrypted backup export/import.
+- [ ] Habits: check-in, streaks, heat map.
+- [ ] Performance pass: Today < 1 s cold, lists virtualised, charts memoised.
 
 ---
 
 ## After phase 1 (backlog, in rough order)
-Supabase sync + web client (iPhone) · Android home-screen widgets · semantic search / embeddings · weekly review & nudges · Developer Mode · calendar/gallery/timeline layouts · OCR · Health Connect · CSV import · photo memory.
+Supabase sync + web client (iPhone) · Mac screen time helper · Android home-screen widgets · semantic search / embeddings · weekly review & nudges · Developer Mode · calendar/gallery/timeline layouts · OCR · CSV import · photo memory.
