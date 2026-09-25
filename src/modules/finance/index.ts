@@ -2,12 +2,13 @@ import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES, debtType } from './types';
 import { financeWidgets } from './widgets';
-import { AccountSection, BudgetSection, FinanceHome, SubscriptionSection } from './screens';
+import { AccountSection, BudgetSection, FinanceHome } from './screens';
 import { budgetStatus, monthRange, netWorth, postDueSubscriptions, spendByCategory, spendInRange, incomeInRange } from './lib';
 import { monthlySubscriptionCost } from './reports';
 import type { BudgetData } from './types';
 import { GroupBalanceSection, PersonBalanceSection, SplitSection } from './splitScreens';
 import { ReportsScreen } from './reportsScreen';
+import { SubscriptionHero } from './subscriptionHero';
 
 export const financeModule: ModuleManifest = {
   id: 'finance',
@@ -28,7 +29,7 @@ export const financeModule: ModuleManifest = {
   detailSections: [
     { entityType: 'account', key: 'finance.account', title: 'Balance', component: AccountSection, order: 10 },
     { entityType: 'budget', key: 'finance.budget', title: 'Progress', component: BudgetSection, order: 10 },
-    { entityType: 'subscription', key: 'finance.subscription', title: 'Billing', component: SubscriptionSection, order: 10 },
+    { entityType: 'subscription', key: 'finance.subscription', title: 'Billing', component: SubscriptionHero, order: 10, placement: 'top' },
     { entityType: 'transaction', key: 'finance.split', title: 'Split', component: SplitSection, order: 20 },
     { entityType: 'person', key: 'finance.balance', title: 'Money', component: PersonBalanceSection, order: 20 },
     { entityType: 'group', key: 'finance.group', title: 'Balances', component: GroupBalanceSection, order: 10 },

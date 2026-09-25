@@ -9,7 +9,7 @@ import { Card, Chip, IconButton, Row, Screen, SectionHeader, Stat, Text, Button 
 import { Bars, ProgressBar, StackedBar } from '@ui/components/charts';
 import { EntityRow } from '@ui/components/EntityRow';
 import { accountBalance, budgetStatus, dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange } from './lib';
-import { categoryOf, FINANCE_COLOR, type AccountData, type BudgetData, type SubscriptionData } from './types';
+import { categoryOf, FINANCE_COLOR, type AccountData, type BudgetData } from './types';
 
 /** Finance module home — the "Summary" page for money. */
 export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string, string> }) {
@@ -186,21 +186,3 @@ export function BudgetSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeO
   );
 }
 
-export function SubscriptionSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
-  const s = entity as Entity<SubscriptionData>;
-  const posted = useLive((os) => os.relations.forEntity(entity.id, 'subscription').map((r) => os.entities.get(r.other.id)).filter((x): x is Entity => !!x), [entity.id]);
-  const days = Math.ceil((new Date(s.data.nextBillingAt).getTime() - Date.now()) / 86400000);
-  return (
-    <View style={{ gap: 16 }}>
-      <Card>
-        <Stat value={days <= 0 ? 'Due' : `${days}`} unit={days <= 0 ? '' : days === 1 ? 'day' : 'days'} label={`Next bill ${ctx.format.date(s.data.nextBillingAt, 'medium')}`} />
-      </Card>
-      {posted.length ? (
-        <View>
-          <SectionHeader title="Billing history" icon="clock" color={FINANCE_COLOR} />
-          <Card padded={false}>{posted.map((e, i) => <EntityRow key={e.id} entity={e} last={i === posted.length - 1} />)}</Card>
-        </View>
-      ) : null}
-    </View>
-  );
-}

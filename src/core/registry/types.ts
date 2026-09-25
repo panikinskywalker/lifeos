@@ -92,6 +92,8 @@ export interface EntityDetailSection {
   title: string;
   component: ComponentType<{ entity: Entity<any>; ctx: LifeOSContext }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   order?: number;
+  /** 'top': above the details card (Stitch stat trio, attention, quick actions). Default: below it. */
+  placement?: 'top' | 'body';
 }
 
 export interface ModuleManifest {

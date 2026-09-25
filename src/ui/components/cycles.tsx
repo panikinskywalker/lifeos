@@ -244,3 +244,22 @@ function CycleCard({ item, onDone, onMore }: { item: UpkeepItem; onDone: () => v
     </View>
   );
 }
+
+/** Log a meter reading (odometer); cycles on the record recompute from it. */
+export function MeterSheet({ visible, onClose, entity, meter }: { visible: boolean; onClose: () => void; entity: Entity; meter: { meter: string; label: string; unit: string } }) {
+  const os = useOS();
+  const toast = useToast();
+  const latest = useLive((o) => o.cycles.latestMeter(entity.id, meter.meter), [entity.id, meter.meter]);
+  const [value, setValue] = useState<number | undefined>(undefined);
+  const save = () => {
+    const id = os.cycles.logMeter(entity.id, value!, { meter: meter.meter, unit: meter.unit, label: meter.label });
+    onClose();
+    setValue(undefined);
+    toast.show({ message: `${meter.label} ${value!.toLocaleString('en-IN')} ${meter.unit}`, icon: 'gauge', undo: () => os.cycles.removeReading(id) });
+  };
+  return (
+    <Sheet visible={visible} onClose={onClose} title={`Log ${meter.label.toLowerCase()}`} footer={<Button title="Save reading" icon="check" block disabled={value == null || value < 0} onPress={save} />}>
+      <NumberField label={meter.label} value={value} onChange={setValue} unit={meter.unit} hint={latest != null ? `Last reading ${latest.toLocaleString('en-IN')} ${meter.unit}` : undefined} autoFocus />
+    </Sheet>
+  );
+}

@@ -1,13 +1,9 @@
-import React from 'react';
-import { View } from 'react-native';
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
-import type { Entity, EntityTypeDef } from '@core/domain/types';
-import type { LifeOSContext } from '@core/registry/context';
+import type { EntityTypeDef } from '@core/domain/types';
 import { palette } from '@ui/theme/tokens';
-import { useLive } from '@ui/hooks';
-import { Card, Stat } from '@ui/components/primitives';
 import { dateField, nextWeekday, startOfDay } from '@core/cycles/schedule';
+import { VehicleHero } from './hero';
 
 export const ASSETS_COLOR = palette.brown;
 
@@ -81,23 +77,10 @@ export const vehicleType: EntityTypeDef<VehicleData> = {
   relations: [{ kind: 'vehicle', label: 'Expenses & services', to: ['transaction', 'document'], cardinality: 'many' }],
 };
 
-function VehicleSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
-  const spend = useLive((os) => os.entities.aggregate('transaction', { filter: { and: [{ field: 'relation.vehicle', op: 'relatedTo', value: entity.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'], count: true }), [entity.id]);
-  const v = entity as Entity<VehicleData>;
-  const days = (d?: string) => (d ? Math.ceil((new Date(d).getTime() - Date.now()) / 86400000) : null);
-  const ins = days(v.data.insuranceUntil);
-  return (
-    <Card style={{ flexDirection: 'row', gap: 16 }}>
-      <View style={{ flex: 1 }}><Stat value={ctx.format.currency(spend['sum_data.amount'])} label={`${spend.count} expenses`} small /></View>
-      {ins != null ? <View style={{ flex: 1 }}><Stat value={`${ins}`} unit="days" label="Insurance left" small color={ins < 30 ? palette.red : undefined} /></View> : null}
-      {v.data.odometerKm ? <View style={{ flex: 1 }}><Stat value={ctx.format.number(v.data.odometerKm)} unit="km" label="Odometer" small /></View> : null}
-    </Card>
-  );
-}
 
 export const assetsModule: ModuleManifest = {
   id: 'assets', name: 'Assets', version: '1.0.0', description: 'Things you own — electronics, furniture, vehicles — with warranties, value and linked expenses.', icon: 'cube.box', color: ASSETS_COLOR,
   dependencies: ['crm'], entityTypes: [assetType, vehicleType, routineType],
   quickActions: [{ id: 'assets.add', label: 'Asset', icon: 'cube.box', route: '/entity/asset/new' }, { id: 'assets.addVehicle', label: 'Vehicle', icon: 'car', route: '/entity/vehicle/new' }],
-  detailSections: [{ entityType: 'vehicle', key: 'assets.vehicle', title: 'Vehicle', component: VehicleSection, order: 10 }],
+  detailSections: [{ entityType: 'vehicle', key: 'assets.vehicle', title: 'Vehicle', component: VehicleHero, order: 10, placement: 'top' }],
 };

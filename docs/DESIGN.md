@@ -81,5 +81,7 @@ All text pairs meet AA 4.5 in both themes (secondary on tile 7.7 / 9.1, every ti
 ## Components (M1 builds these)
 Tile (1×1, 2×1, 2×2; header row = icon-box + label + meta; body = stat or list; optional footer StackedBar) · StatTile · StackedBar (rounded segments, 3 px gaps, legend row) · Ring · RowItem (icon-box · title/sub · trailing value or checkbox) · Chip / FilterChip · Sheet (bottom) · Toast with Undo · EmptyState (illustration-free: icon-box + one line + one button) · Segmented · Form fields (text, number, money, date, select, relation picker, tags) · RecordHeader (module tint band, title, status chip, key stats) · SectionCard · WeekStrip (Upkeep) · AgentCard (record / cycle / list / number / chart) · Composer (text, mic, send).
 
+**Added in M1.5 / M2 (Stitch):** ProgressBar (8 tall, optional target tick) · Sparkline · LineChart and ColumnChart (dotted gridlines, y labels right, friendly steps) · ChartLegend · StatTrio (three metrics in one tile) · AttentionCard (coral eyebrow, URGENT pill, estimate, two actions) · QuickActions (horizontal "+ action" pills) · DayTimeline (lanes of segments over a span) · status pills (`Chip caps`) · RecordHeader cover photo. Record pages put a type's trio / attention / quick actions above the details (`placement: 'top'`).
+
 ## Screens to match the canvas
 Today · Upkeep (list + This week) · Talk thread · Browse · Record (Vehicle, Person, Subscription) · List · Form · You. Light and dark for each.

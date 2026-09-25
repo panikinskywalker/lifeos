@@ -35,9 +35,9 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Agent & API key screen moved onto the kit.
 
 **D2 — data components (with M2)**
-- [ ] Charts kit: sparkline, line chart (dotted grid), stacked column chart, target progress bar, day timeline; stat trio; "Attention required" card; quick-action chips. *(Done so far: sparkline, line, column, progress bar, legend.)*
-- [ ] Record pages (Vehicle, Subscription, Person) take the Stitch layouts using cycles, meter readings and splits.
-- [ ] Upkeep + This week in the Stitch style; Finance month view with the new charts.
+- [x] Charts kit: sparkline, line chart (dotted grid), stacked column chart, target progress bar, day timeline; stat trio; "Attention required" card; quick-action chips.
+- [x] Record pages (Vehicle, Subscription, Person) take the Stitch layouts using cycles, meter readings and splits.
+- [x] Upkeep + This week in the Stitch style; Finance month view with the new charts.
 
 **D3 — Talk (with M3):** agent thread cards (nested stat slabs, source badges), prompt chips, pill composer, voice capture sheet.
 

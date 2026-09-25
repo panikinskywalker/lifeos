@@ -29,6 +29,10 @@ import {
   MoneyField,
   NumberField,
   ProgressBar,
+  StatTrio,
+  AttentionCard,
+  QuickActions,
+  DayTimeline,
   LineChart,
   ColumnChart,
   ChartLegend,
@@ -548,6 +552,18 @@ function Bar() {
   );
 }
 
+function InsightDemo() {
+  const t = useTheme();
+  return (
+    <>
+      <StatTrio stats={[{ label: 'Odometer', value: '29,840', unit: 'km', caption: '+840 this month', tone: 'ok' }, { label: 'Insurance', value: '7', unit: 'days', caption: 'Exp 12 Sep', tone: 'alert' }, { label: '2026 spend', value: '₹34,800', caption: 'YTD' }]} />
+      <AttentionCard urgent title="Comprehensive insurance" meta="Expires in 7 days · Tue 2 Oct" estimate="₹14,200" primary={{ label: 'Mark renewed', icon: 'check', onPress: () => {} }} secondary={{ label: 'Remind me', icon: 'bell', onPress: () => {} }} />
+      <QuickActions actions={[{ label: 'Log odometer', icon: 'gauge', onPress: () => {} }, { label: 'Record service', icon: 'wrench', onPress: () => {} }, { label: 'Add expense', icon: 'receipt', onPress: () => {} }]} />
+      <DayTimeline ticks={['Mon', 'Wed', 'Fri', 'Sun']} lanes={[{ label: 'Laundry', color: t.c.chart[0], segments: [[0.02, 0.08], [0.6, 0.66]] }, { label: 'Plants', color: t.c.chart[1], segments: [[0.3, 0.35], [0.75, 0.8]] }, { label: 'Service', color: t.c.chart[3], segments: [[0.45, 0.55]] }]} accessibilityLabel="This week at a glance" />
+    </>
+  );
+}
+
 function ChartsDemo() {
   const t = useTheme();
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -576,6 +592,7 @@ function Progress() {
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
   ['Progress bar', '8 tall · pill · optional target tick', Progress],
   ['Charts', 'sparkline · line · columns · legend (Stitch)', ChartsDemo],
+  ['Record insights', 'stat trio · attention · quick actions · day timeline (Stitch)', InsightDemo],
   ['Colour', 'surfaces · tints · chart', Colours],
   ['Type', 'Plus Jakarta Sans · tabular numerals', Type],
   ['Icons · IconBox', '2px stroke · round caps · tint + ink', Icons],
