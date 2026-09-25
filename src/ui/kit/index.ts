@@ -13,7 +13,7 @@ export { EmptyState } from './EmptyState';
 export { Segmented } from './Segmented';
 export { Field, TextField, NumberField, MoneyField, DateField, SelectField, RelationField, TagsField, SwitchField, Toggle, Stepper, DayChips, PickerSheet, type Option, type PickerItem } from './fields';
 export { RecordHeader, type HeaderStat } from './RecordHeader';
-export { Section, ListGroup, Card, SectionCard } from './SectionCard';
+export { Section, ListGroup, Card } from './SectionCard';
 export { Icon, icons, type IconName } from '../icons';
 export { BottomBar, useBottomBarInset, type BottomBarItem } from './BottomBar';
 export { Screen, ScreenHeader } from './Screen';

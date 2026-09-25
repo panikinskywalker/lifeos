@@ -10,19 +10,23 @@ import { tintForModule } from '../theme/moduleTint';
  * from summary fields, amount on the right when the type has a currency
  * field, and a status chip when the record is past its first status.
  */
-export function EntityRow({ entity, last, onPress, showType, value, subtitle }: { entity: Entity; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null }) {
+export function EntityRow({ entity, onPress, showType, value, subtitle }: { entity: Entity; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null }) {
   const os = useOS();
   const router = useRouter();
   const def = os.registry.entityTypes.get(entity.type);
+  const tint = tintForModule(def?.module);
   const currencyField = def?.fields.find((f) => f.type === 'currency');
   const amount = currencyField ? (entity.data[currencyField.key] as number | undefined) : undefined;
+  // Canvas: a list row shows the record's category as a small tag in its module tint.
+  const tagField = def?.fields.find((f) => f.type === 'select' && f.summary && entity.data[f.key] != null && entity.data[f.key] !== '');
+  const tagLabel = tagField ? tagField.options?.find((o) => o.value === entity.data[tagField.key])?.label ?? String(entity.data[tagField.key]) : null;
   const statusDef = def?.statuses?.find((s) => s.value === entity.status);
   const sub =
     subtitle !== undefined
       ? subtitle
-      : entity.subtitle ||
+      : (entity.subtitle && entity.subtitle !== tagLabel ? entity.subtitle : null) ||
         def?.fields
-          .filter((f) => f.summary && f.key !== currencyField?.key)
+          .filter((f) => f.summary && f.key !== currencyField?.key && f.key !== tagField?.key)
           .map((f) => {
             const v = entity.data[f.key];
             if (v == null || v === '') return null;
@@ -42,11 +46,13 @@ export function EntityRow({ entity, last, onPress, showType, value, subtitle }: 
     <RowItem
       title={entity.title}
       subtitle={[showType ? def?.label : null, status, sub].filter(Boolean).join(' · ') || null}
+      tag={tagLabel ? { label: tagLabel, tint } : undefined}
       icon={def?.icon}
-      tint={tintForModule(def?.module)}
+      tint={tint}
       value={shownValue}
+      strong={amount != null && value === undefined}
       valueTone={kind === 'income' ? 'ok' : 'default'}
-      divider={!last}
+      chevron={shownValue ? false : undefined}
       onPress={onPress ?? (() => router.push(`/entity/${entity.type}/${entity.id}`))}
     />
   );

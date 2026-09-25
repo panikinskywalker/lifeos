@@ -16,7 +16,7 @@ export function ScreenHeader({ title, subtitle, eyebrow, onBack, right, compact 
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       {onBack ? <IconButton icon="chevron-left" accessibilityLabel="Back" filled onPress={onBack} /> : null}
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        <Text variant="title" numberOfLines={2} accessibilityRole="header" style={compact ? { fontSize: 26, lineHeight: 29 } : undefined}>
+        <Text variant="title" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header" style={compact ? { fontSize: 26, lineHeight: 29 } : undefined}>
           {title}
         </Text>
         {sub ? (

@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Entity } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { EntityRow } from '@ui/components/EntityRow';
-import { EmptyState, Screen, SectionCard } from '@ui/kit';
+import { EmptyState, ListGroup, Screen } from '@ui/kit';
 
 /** Everything with one tag, grouped by record type. */
 export default function TagRoute() {
@@ -15,14 +15,14 @@ export default function TagRoute() {
   const byType = new Map<string, Entity[]>();
   for (const e of items) byType.set(e.type, [...(byType.get(e.type) ?? []), e]);
   return (
-    <Screen title={`#${tag}`} eyebrow={`${items.length} ${items.length === 1 ? 'record' : 'records'}`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/tag'))}>
+    <Screen title={`#${tag}`} subtitle={`${items.length} ${items.length === 1 ? 'record' : 'records'}`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/tag'))}>
       {items.length === 0 ? <EmptyState icon="tag" line="Nothing has this tag any more." /> : null}
       {[...byType.entries()].map(([type, list]) => (
-        <SectionCard key={type} title={os.registry.entityTypes.get(type)?.labelPlural ?? type} flush>
-          {list.map((e, i) => (
-            <EntityRow key={e.id} entity={e} last={i === list.length - 1} />
+        <ListGroup key={type} title={os.registry.entityTypes.get(type)?.labelPlural ?? type} meta={String(list.length)}>
+          {list.map((e) => (
+            <EntityRow key={e.id} entity={e} />
           ))}
-        </SectionCard>
+        </ListGroup>
       ))}
     </Screen>
   );

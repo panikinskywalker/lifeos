@@ -14,7 +14,7 @@ export function DetailRow({ label, value, stacked, onPress, divider, valueColor 
   const long = stacked ?? value.length > 28;
   return (
     <Pressable accessibilityRole={onPress ? 'link' : undefined} accessibilityLabel={`${label}: ${value}`} disabled={!onPress} onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-      <View style={{ paddingVertical: 10, minHeight: 44, flexDirection: long ? 'column' : 'row', alignItems: long ? 'stretch' : 'center', gap: long ? 4 : 12 }}>
+      <View style={{ paddingVertical: 8, minHeight: 40, flexDirection: long ? 'column' : 'row', alignItems: long ? 'stretch' : 'center', gap: long ? 4 : 12 }}>
         <Text variant="label" color="secondary">
           {label}
         </Text>

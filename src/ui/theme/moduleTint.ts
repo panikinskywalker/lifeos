@@ -18,3 +18,18 @@ const MODULE_TINT: Record<string, TintKey> = {
 export function tintForModule(moduleId: string | undefined): TintKey {
   return (moduleId && MODULE_TINT[moduleId]) || 'documents';
 }
+
+/** Short names for Browse tiles (canvas: Finance, People, Tasks, Health, Notes…). Falls back to the module's name. */
+const MODULE_SHORT: Record<string, string> = {
+  crm: 'People',
+  projects: 'Tasks',
+  health: 'Health',
+  habits: 'Habits',
+  knowledge: 'Notes',
+  assets: 'Things',
+  inventory: 'Inventory',
+};
+
+export function shortNameForModule(moduleId: string, fallback: string): string {
+  return MODULE_SHORT[moduleId] ?? fallback;
+}

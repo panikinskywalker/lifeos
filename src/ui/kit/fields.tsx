@@ -61,12 +61,12 @@ function useInputBox(_focused: boolean, error?: string) {
 
 type BaseInput = Omit<TextInputProps, 'value' | 'onChange' | 'onChangeText' | 'style'> & { label?: string; required?: boolean; hint?: string; error?: string };
 
-export function TextField({ label, required, hint, error, value, onChange, multiline, leading, ...rest }: BaseInput & { value: string; onChange: (v: string) => void; leading?: IconName }) {
+export function TextField({ label, required, hint, error, value, onChange, multiline, leading, compact, ...rest }: BaseInput & { value: string; onChange: (v: string) => void; leading?: IconName; /** Multiline that starts one line tall and grows (a note composer). */ compact?: boolean }) {
   const t = useTheme();
   const [focused, setFocused] = useState(false);
   return (
     <Field label={label} required={required} hint={hint} error={error}>
-      <View style={[useInputBox(focused, error), multiline && { alignItems: 'flex-start', paddingVertical: 12 }]}>
+      <View style={[useInputBox(focused, error), multiline && { alignItems: compact ? 'center' : 'flex-start', paddingVertical: compact ? 14 : 12 }]}>
         {leading ? <Icon name={leading} size={18} color={t.c.fg.secondary} /> : null}
         <TextInput
           accessibilityLabel={label}
@@ -85,7 +85,7 @@ export function TextField({ label, required, hint, error, value, onChange, multi
             setFocused(false);
             rest.onBlur?.(e);
           }}
-          style={[t.type.body as TextStyle, { flex: 1, color: t.c.fg.primary, paddingVertical: multiline ? 0 : 12, minHeight: multiline ? 96 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]}
+          style={[t.type.body as TextStyle, { flex: 1, color: t.c.fg.primary, paddingVertical: multiline ? 0 : 12, minHeight: multiline ? (compact ? 22 : 96) : undefined, maxHeight: compact ? 140 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]}
         />
       </View>
     </Field>

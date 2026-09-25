@@ -1,43 +1,61 @@
 import React from 'react';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLive, useOS } from '@ui/hooks';
-import { tintForModule } from '@ui/theme/moduleTint';
-import { IconButton, RowItem, Screen, SectionCard } from '@ui/kit';
+import { useTheme } from '@ui/theme/ThemeProvider';
+import { shortNameForModule, tintForModule } from '@ui/theme/moduleTint';
+import { Icon, IconBox, IconButton, RowList, Screen, Section, Text } from '@ui/kit';
+import { EntityRow } from '@ui/components/EntityRow';
 
-/** Browse — modules → types → lists → records, with counts. Search is one tap away. */
+/** Browse (canvas 05): search, a two-column grid of modules in their tints, then Recent. */
 export default function BrowseTab() {
   const os = useOS();
+  const t = useTheme();
   const router = useRouter();
   const counts = useLive((o) => o.entities.countsByType(), []);
-  const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core');
+  const recent = useLive((o) => o.entities.recent(6), []);
+  const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core' && m.id !== 'dashboard');
   return (
-    <Screen tab title="Browse" right={<IconButton icon="search" accessibilityLabel="Search" filled onPress={() => router.push('/search')} />}>
-      {modules.map((m) => {
-        const tint = tintForModule(m.id);
-        const types = os.registry.typesForModule(m.id).filter((x) => !x.hidden);
-        const hasHome = m.screens?.some((s) => s.key === 'index');
-        const rows = [
-          ...(hasHome ? [{ key: 'home', title: `${m.name} overview`, subtitle: m.description, icon: m.icon, go: () => router.push(`/module/${m.id}`) }] : []),
-          ...(m.id === 'automation'
-            ? [
-                { key: 'rules', title: 'Rules', subtitle: 'Triggers, conditions, actions', icon: 'bolt', go: () => router.push('/automation') },
-                { key: 'reminders', title: 'Reminders', subtitle: 'Everything scheduled', icon: 'bell', go: () => router.push('/reminders') },
-              ]
-            : []),
-          ...types.map((ty) => ({ key: ty.type, title: ty.labelPlural, subtitle: undefined, icon: ty.icon, value: counts[ty.type] ? String(counts[ty.type]) : undefined, go: () => router.push(`/entity/${ty.type}`) })),
-        ];
-        if (!rows.length) return null;
-        return (
-          <SectionCard key={m.id} title={m.name} flush>
-            {rows.map((r, i) => (
-              <RowItem key={r.key} title={r.title} subtitle={r.subtitle} icon={r.icon} tint={tint} value={'value' in r ? r.value : undefined} valueTone="secondary" divider={i < rows.length - 1} onPress={r.go} />
+    <Screen tab title="Browse" right={<IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} />}>
+      <Pressable accessibilityRole="search" accessibilityLabel="Search everything" onPress={() => router.push('/search')} style={{ height: 50, borderRadius: t.radius.card, backgroundColor: t.c.bg.tile, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 }}>
+        <Icon name="search" size={18} color={t.c.fg.secondary} />
+        <Text variant="body" color="tertiary">
+          Search records, people, things…
+        </Text>
+      </Pressable>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        {modules.map((m) => {
+          const tint = tintForModule(m.id);
+          const types = os.registry.typesForModule(m.id).filter((x) => !x.hidden);
+          const n = types.reduce((sum, ty) => sum + (counts[ty.type] ?? 0), 0);
+          const unit = types.length === 1 ? types[0]!.labelPlural.toLowerCase() : 'records';
+          const name = shortNameForModule(m.id, m.name);
+          const line = types.length ? `${n.toLocaleString('en-IN')} ${unit}` : 'rules & reminders';
+          return (
+            <Pressable key={m.id} accessibilityRole="button" accessibilityLabel={`${name}, ${line}`} onPress={() => router.push(`/module/${m.id}`)} style={({ pressed }) => ({ flexBasis: '40%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: t.radius.tile, backgroundColor: t.tints[tint].fill, opacity: pressed ? 0.85 : 1 })}>
+              <IconBox icon={m.icon} tint={tint} tone="overlay" size={36} color={t.c.fg.primary} />
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text variant="rowTitle" numberOfLines={1}>
+                  {name}
+                </Text>
+                <Text variant="labelCaps" color={t.tints[tint].ink} numberOfLines={1} style={{ letterSpacing: 0 }}>
+                  {line}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+        {modules.length % 2 ? <View style={{ flexBasis: '40%', flexGrow: 1 }} /> : null}
+      </View>
+      {recent.length ? (
+        <Section title="Recent" action="Tags" onAction={() => router.push('/tag')}>
+          <RowList>
+            {recent.map((e) => (
+              <EntityRow key={e.id} entity={e} showType />
             ))}
-          </SectionCard>
-        );
-      })}
-      <SectionCard title="System" flush>
-        <RowItem title="Tags" icon="tag" onPress={() => router.push('/tag')} />
-      </SectionCard>
+          </RowList>
+        </Section>
+      ) : null}
     </Screen>
   );
 }

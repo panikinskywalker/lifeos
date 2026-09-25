@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useLive, useOS } from '@ui/hooks';
 import { tintForModule } from '@ui/theme/moduleTint';
 import { EntityRow } from '@ui/components/EntityRow';
-import { Chip, ChipRow, EmptyState, FilterChip, RowItem, Screen, SectionCard, TextField } from '@ui/kit';
+import { Chip, ChipRow, EmptyState, FilterChip, RowItem, RowList, Screen, Section, TextField } from '@ui/kit';
 
 /** Global search across every record, plus quick-add actions and recent records. */
 export default function SearchRoute() {
@@ -21,7 +21,7 @@ export default function SearchRoute() {
   const run = (a: (typeof commands)[number]) => (a.route ? router.push(a.route as never) : a.run?.(os));
   return (
     <Screen title="Search" onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
-      <TextField value={q} onChange={setQ} leading="search" placeholder="Search everything" autoFocus autoCorrect={false} returnKeyType="search" />
+      <TextField value={q} onChange={setQ} leading="search" placeholder="Search records, people, things…" autoFocus autoCorrect={false} returnKeyType="search" />
       {query ? (
         <>
           {typesInHits.length > 1 || type ? (
@@ -40,12 +40,14 @@ export default function SearchRoute() {
             </View>
           ) : null}
           {hits.length ? (
-            <SectionCard title={`${hits.length} ${hits.length === 1 ? 'result' : 'results'}`} flush>
-              {hits.map((h, i) => {
-                const def = os.registry.entityTypes.get(h.type);
-                return <RowItem key={h.id} title={h.title} subtitle={`${def?.label ?? h.type}${h.subtitle ? ` · ${h.subtitle}` : ''}`} icon={def?.icon} tint={tintForModule(def?.module)} divider={i < hits.length - 1} onPress={() => router.push(`/entity/${h.type}/${h.id}`)} />;
-              })}
-            </SectionCard>
+            <Section title={`${hits.length} ${hits.length === 1 ? 'result' : 'results'}`}>
+              <RowList>
+                {hits.map((h) => {
+                  const def = os.registry.entityTypes.get(h.type);
+                  return <RowItem key={h.id} title={h.title} subtitle={`${def?.label ?? h.type}${h.subtitle ? ` · ${h.subtitle}` : ''}`} icon={def?.icon} tint={tintForModule(def?.module)} onPress={() => router.push(`/entity/${h.type}/${h.id}`)} />;
+                })}
+              </RowList>
+            </Section>
           ) : (
             <EmptyState icon="search" line={`Nothing matches “${query}”.`} />
           )}
@@ -53,29 +55,31 @@ export default function SearchRoute() {
       ) : (
         <>
           {os.registry.quickActions.length ? (
-            <SectionCard title="Quick add">
+            <Section title="Quick add">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {os.registry.quickActions.map((a) => (
                   <Chip key={a.id} label={a.label} icon={a.icon} onPress={() => run(a)} />
                 ))}
               </View>
-            </SectionCard>
+            </Section>
           ) : null}
           {tags.length ? (
-            <SectionCard title="Tags" action="All" onAction={() => router.push('/tag')}>
+            <Section title="Tags" action="All" onAction={() => router.push('/tag')}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {tags.map((tag) => (
                   <Chip key={tag.id} label={`#${tag.name} · ${tag.count}`} onPress={() => router.push(`/tag/${encodeURIComponent(tag.name)}`)} />
                 ))}
               </View>
-            </SectionCard>
+            </Section>
           ) : null}
           {recent.length ? (
-            <SectionCard title="Recent" flush>
-              {recent.map((e, i) => (
-                <EntityRow key={e.id} entity={e} showType last={i === recent.length - 1} />
-              ))}
-            </SectionCard>
+            <Section title="Recent">
+              <RowList>
+                {recent.map((e) => (
+                  <EntityRow key={e.id} entity={e} showType />
+                ))}
+              </RowList>
+            </Section>
           ) : (
             <EmptyState icon="clock" line="Records you open or change show up here." />
           )}

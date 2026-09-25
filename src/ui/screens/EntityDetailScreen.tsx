@@ -11,7 +11,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
 import type { TintKey } from '../theme/tokens';
-import { ActionSheet, Button, Chip, DateField, DetailRow, EmptyState, Field, FilterChip, IconButton, RecordHeader, RowItem, SectionCard, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
+import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, Field, FilterChip, IconButton, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
 import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
@@ -65,21 +65,15 @@ export function EntityDetailScreen({ id }: { id: string }) {
           onBack={back}
           actions={
             <>
-              <IconButton icon="star" accessibilityLabel={entity.starred ? 'Unstar' : 'Star'} filled={entity.starred ? t.c.accent.mustard : undefined} color={entity.starred ? t.c.accent.mustardInk : t.tints[tint].ink} onPress={() => os.entities.update(entity.id, { starred: !entity.starred })} />
-              <IconButton icon="edit" accessibilityLabel="Edit" color={t.tints[tint].ink} onPress={() => router.push(`/entity/${entity.type}/${entity.id}/edit`)} />
-              <IconButton icon="more" accessibilityLabel="More" color={t.tints[tint].ink} onPress={() => setPanel('menu')} />
+              <IconButton icon="star" accessibilityLabel={entity.starred ? 'Unstar' : 'Star'} filled={entity.starred ? t.c.accent.mustard : 'overlay'} onPress={() => os.entities.update(entity.id, { starred: !entity.starred })} />
+              <IconButton icon="edit" accessibilityLabel="Edit record" filled="overlay" onPress={() => router.push(`/entity/${entity.type}/${entity.id}/edit`)} />
+              <IconButton icon="more" accessibilityLabel="More" filled="overlay" onPress={() => setPanel('menu')} />
             </>
           }
         />
 
-        <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 16, gap: 20 }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <Chip label="Remind" icon="bell" onPress={() => setPanel('remind')} />
-            <Chip label="Attach" icon="paperclip" onPress={() => setPanel('attach')} />
-            <Chip label="Link" icon="link" onPress={() => setPanel('link')} />
-            <Chip label={tags.length ? 'Tags' : 'Tag'} icon="tag" onPress={() => setPanel('tags')} />
-            {entity.archived ? <Chip label="Archived" icon="archive" tone="accent" /> : null}
-          </View>
+        <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 20, gap: 20 }}>
+          {entity.archived ? <Chip label="Archived" icon="archive" tone="muted" /> : null}
 
           <DetailsCard entity={entity} fields={def.fields} />
           {sections.map((s) => {
@@ -91,15 +85,15 @@ export function EntityDetailScreen({ id }: { id: string }) {
             );
           })}
           {tags.length ? (
-            <SectionCard title="Tags" action="Edit" onAction={() => setPanel('tags')}>
+            <Section title="Tags" action="Edit" onAction={() => setPanel('tags')}>
               <TagChips tags={tags.map((x) => x.name)} module={def.module} onPress={(name) => router.push(`/tag/${encodeURIComponent(name)}`)} />
-            </SectionCard>
+            </Section>
           ) : null}
           <RelationsCard entity={entity} onLink={() => setPanel('link')} />
           <RemindersCard entity={entity} tint={tint} />
           <AttachmentsCard entity={entity} />
           <NotesCard entity={entity} />
-          <TimelineCard entity={entity} />
+          <TimelineCard entity={entity} tint={tint} />
           <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>
             Created {os.format.dateTime(entity.createdAt)} · updated {os.format.dateTime(entity.updatedAt)}
           </Text>
@@ -111,7 +105,10 @@ export function EntityDetailScreen({ id }: { id: string }) {
         onClose={close}
         title={entity.title}
         actions={[
-          { label: 'Edit', icon: 'edit', onPress: () => router.push(`/entity/${entity.type}/${entity.id}/edit`) },
+          { label: 'Remind me', icon: 'bell', onPress: () => setPanel('remind') },
+          { label: 'Attach a photo or file', icon: 'paperclip', onPress: () => setPanel('attach') },
+          { label: 'Link to…', icon: 'link', onPress: () => setPanel('link') },
+          { label: tags.length ? 'Edit tags' : 'Add tags', icon: 'tag', onPress: () => setPanel('tags') },
           {
             label: 'Duplicate',
             icon: 'file',
@@ -185,8 +182,8 @@ const hasValue = (v: unknown) => v !== undefined && v !== null && v !== '' && !(
 /** Up to three header stats: money first, then summary fields, then the record's date. */
 function headerStats(os: LifeOSContext, entity: Entity, fields: FieldDef[]): HeaderStat[] {
   const picked = [...fields.filter((f) => f.type === 'currency'), ...fields.filter((f) => f.summary && f.type !== 'currency' && f.type !== 'longtext' && f.type !== 'relation')].filter((f) => hasValue(entity.data[f.key]));
-  const stats = picked.slice(0, 3).map((f) => ({ label: f.label, value: renderValue(os, entity, f, entity.data[f.key]).text }));
-  if (stats.length < 3 && entity.occurredAt) stats.push({ label: 'Date', value: os.format.date(entity.occurredAt, 'medium') });
+  const stats = picked.slice(0, 3).map((f) => ({ label: f.label.toLowerCase(), value: renderValue(os, entity, f, entity.data[f.key]).text }));
+  if (stats.length < 3 && entity.occurredAt) stats.push({ label: 'date', value: os.format.date(entity.occurredAt, 'medium') });
   return stats.filter((s) => s.value.length <= 16);
 }
 
@@ -198,12 +195,14 @@ function DetailsCard({ entity, fields }: { entity: Entity; fields: FieldDef[] })
   const rows = all.filter((f) => hasValue(entity.data[f.key]));
   if (!rows.length) return null;
   return (
-    <SectionCard title="Details" flush>
-      {rows.map((f, i) => {
-        const r = renderValue(os, entity, f, entity.data[f.key]);
-        return <DetailRow key={f.key} label={f.label} value={r.text} stacked={f.type === 'longtext' ? true : undefined} divider={i < rows.length - 1} onPress={r.target ? () => router.push(`/entity/${r.target!.type}/${r.target!.id}`) : undefined} />;
-      })}
-    </SectionCard>
+    <Section title="Details">
+      <Card>
+        {rows.map((f, i) => {
+          const r = renderValue(os, entity, f, entity.data[f.key]);
+          return <DetailRow key={f.key} label={f.label} value={r.text} stacked={f.type === 'longtext' ? true : undefined} divider={i < rows.length - 1} onPress={r.target ? () => router.push(`/entity/${r.target!.type}/${r.target!.id}`) : undefined} />;
+        })}
+      </Card>
+    </Section>
   );
 }
 
@@ -216,27 +215,26 @@ function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void 
   const def = os.registry.type(entity.type);
   const kindLabel = (k: string) => def.relations?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
   return (
-    <SectionCard title="Related" action="Link" onAction={onLink} flush>
-      {rels.map((r, i) => {
-        const d = os.registry.entityTypes.get(r.other.type);
-        return (
-          <RowItem
-            key={r.relation.id}
-            title={r.other.title}
-            subtitle={`${kindLabel(r.relation.kind)} · ${d?.label ?? r.other.type}`}
-            icon={d?.icon}
-            tint={tintForModule(d?.module)}
-            divider={i < rels.length - 1}
-            onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)}
-            onLongPress={() => {
-              const { kind } = r.relation;
-              os.relations.unlink(entity.id, r.other.id, kind);
-              toast.show({ message: `Unlinked ${r.other.title}`, icon: 'link', undo: () => void os.relations.link(entity.id, r.other.id, kind) });
-            }}
-          />
-        );
-      })}
-    </SectionCard>
+    <Section title="Related" action="Link" onAction={onLink}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {rels.map((r) => {
+          const d = os.registry.entityTypes.get(r.other.type);
+          const kind = r.relation.kind;
+          return (
+            <Chip
+              key={r.relation.id}
+              label={kind === 'related' ? r.other.title : `${r.other.title} · ${kindLabel(kind).toLowerCase()}`}
+              icon={d?.icon}
+              onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)}
+              onLongPress={() => {
+                os.relations.unlink(entity.id, r.other.id, kind);
+                toast.show({ message: `Unlinked ${r.other.title}`, icon: 'link', undo: () => void os.relations.link(entity.id, r.other.id, kind) });
+              }}
+            />
+          );
+        })}
+      </View>
+    </Section>
   );
 }
 
@@ -283,8 +281,9 @@ function RemindersCard({ entity, tint }: { entity: Entity; tint: TintKey }) {
   const active = useLive((o) => o.reminders.forEntity(entity.id), [entity.id]).filter((r) => !r.doneAt);
   if (!active.length) return null;
   return (
-    <SectionCard title="Reminders" flush>
-      {active.map((r, i) => {
+    <Section title="Reminders">
+      <RowList>
+      {active.map((r) => {
         const at = r.snoozedUntil ?? r.nextAt ?? r.dueAt;
         return (
           <RowItem
@@ -293,25 +292,20 @@ function RemindersCard({ entity, tint }: { entity: Entity; tint: TintKey }) {
             tint={tint}
             title={r.title}
             subtitle={`${os.format.dateTime(at)} · ${describeRRule(r.rrule)}`}
-            value={at < Date.now() ? 'Overdue' : undefined}
-            valueTone="alert"
-            divider={i < active.length - 1}
-            trailing={
-              <IconButton
-                icon="check-circle"
-                accessibilityLabel={`Done: ${r.title}`}
-                color={t.c.ok.sageText}
-                onPress={() => {
-                  os.reminders.complete(r.id);
-                  toast.show({ message: r.rrule ? 'Done · rolled to the next one' : 'Reminder done', icon: 'check' });
-                }}
-              />
-            }
+            meta={at < Date.now() ? 'overdue' : undefined}
+            metaTone="alert"
+            iconTone={at < Date.now() ? 'alert' : 'accent'}
+            onDone={() => {
+              os.reminders.complete(r.id);
+              toast.show({ message: r.rrule ? 'Done · rolled to the next one' : 'Reminder done', icon: 'check' });
+            }}
+            doneLabel={at < Date.now() ? 'Done' : undefined}
             onLongPress={() => os.reminders.remove(r.id)}
           />
         );
       })}
-    </SectionCard>
+      </RowList>
+    </Section>
   );
 }
 
@@ -357,20 +351,22 @@ function AttachmentsCard({ entity }: { entity: Entity }) {
   const images = items.filter((a) => a.kind === 'image' || a.kind === 'receipt' || a.mime?.startsWith('image/'));
   const files = items.filter((a) => !images.includes(a));
   return (
-    <SectionCard title="Attachments" flush>
+    <Section title="Attachments" meta={String(items.length)}>
       {images.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12, gap: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -t.layout.gutter }} contentContainerStyle={{ paddingHorizontal: t.layout.gutter, gap: 8 }}>
           {images.map((a) => (
             <Pressable key={a.id} accessibilityRole="imagebutton" accessibilityLabel={a.name} onLongPress={() => os.attachments.remove(a.id)} onPress={() => Linking.openURL(a.uri).catch(() => {})}>
-              <Image source={{ uri: a.uri }} style={{ width: 96, height: 96, borderRadius: t.radius.iconBox, backgroundColor: t.c.bg.pressed }} contentFit="cover" />
+              <Image source={{ uri: a.uri }} style={{ width: 104, height: 104, borderRadius: t.radius.card, backgroundColor: t.c.bg.tile }} contentFit="cover" />
             </Pressable>
           ))}
         </ScrollView>
       ) : null}
-      {files.map((a, i) => (
-        <RowItem key={a.id} icon="file" title={a.name} subtitle={[a.mime, a.size ? `${Math.round(a.size / 1024)} KB` : null].filter(Boolean).join(' · ')} divider={i < files.length - 1} onPress={() => Linking.openURL(a.uri).catch(() => {})} onLongPress={() => os.attachments.remove(a.id)} />
-      ))}
-    </SectionCard>
+      <RowList>
+        {files.map((a) => (
+          <RowItem key={a.id} icon="file" tint="documents" title={a.name} subtitle={[a.mime, a.size ? `${Math.round(a.size / 1024)} KB` : null].filter(Boolean).join(' · ')} onPress={() => Linking.openURL(a.uri).catch(() => {})} onLongPress={() => os.attachments.remove(a.id)} />
+        ))}
+      </RowList>
+    </Section>
   );
 }
 
@@ -416,11 +412,11 @@ function NotesCard({ entity }: { entity: Entity }) {
     setText('');
   };
   return (
-    <SectionCard title="Notes">
+    <Card icon="book" tint="memory" title="Notes" meta={comments.length ? `${comments.length}` : undefined}>
       <View style={{ gap: 12 }}>
         {comments.map((c) => (
           <Pressable key={c.id} accessibilityHint="Long-press to delete" onLongPress={() => os.comments.remove(c.id)} style={{ gap: 2 }}>
-            <Text variant="body" selectable>
+            <Text variant="body" selectable style={{ lineHeight: 21 }}>
               {c.body}
             </Text>
             <Text variant="caption" color="tertiary">
@@ -430,35 +426,37 @@ function NotesCard({ entity }: { entity: Entity }) {
         ))}
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
           <View style={{ flex: 1 }}>
-            <TextField value={text} onChange={setText} placeholder="Add a note…" multiline />
+            <TextField value={text} onChange={setText} placeholder="Add a note…" multiline compact />
           </View>
-          <IconButton icon="send" accessibilityLabel="Add note" filled={text.trim() ? t.c.accent.mustard : true} color={text.trim() ? t.c.accent.mustardInk : t.c.fg.tertiary} disabled={!text.trim()} onPress={send} size={44} style={{ marginBottom: 4 }} />
+          <IconButton icon="arrow-up" accessibilityLabel="Add note" filled={text.trim() ? t.c.accent.mustard : true} color={text.trim() ? t.c.accent.mustardInk : t.c.fg.tertiary} disabled={!text.trim()} onPress={send} size={44} style={{ marginBottom: 4 }} />
         </View>
       </View>
-    </SectionCard>
+    </Card>
   );
 }
 
-const TIMELINE_ICON: Record<string, string> = { created: 'plus-circle', updated: 'edit', status: 'check-circle', comment: 'comment', attachment: 'paperclip', relation: 'link', reminder: 'bell', tag: 'tag', 'cycle.done': 'repeat' };
-
-function TimelineCard({ entity }: { entity: Entity }) {
+function TimelineCard({ entity, tint }: { entity: Entity; tint: TintKey }) {
   const os = useOS();
+  const t = useTheme();
   const events = useLive((o) => o.entities.timeline.forEntity(entity.id, 60), [entity.id]);
   const [all, setAll] = useState(false);
   if (!events.length) return null;
   const shown = all ? events : events.slice(0, 6);
+  const dot = (actor: string) => (actor === 'assistant' ? t.tints.memory.ink : actor === 'automation' ? t.tints.tasks.ink : t.tints[tint].ink);
   return (
-    <SectionCard title="Timeline" action={events.length > 6 ? (all ? 'Less' : `All ${events.length}`) : undefined} onAction={() => setAll((a) => !a)} flush>
-      <Timeline
-        entries={shown.map((e) => ({
-          id: e.id,
-          icon: TIMELINE_ICON[e.kind] ?? 'circle',
-          title: e.title,
-          body: e.body,
-          actor: e.actor,
-          meta: `${os.format.dateTime(e.occurredAt)}${e.actor === 'assistant' ? ' · agent' : e.actor === 'automation' ? ' · automation' : ''}`,
-        }))}
-      />
-    </SectionCard>
+    <Section title="Recent" meta="timeline" action={events.length > 6 ? (all ? 'Less' : `All ${events.length}`) : undefined} onAction={() => setAll((a) => !a)}>
+      <Card>
+        <Timeline
+          entries={shown.map((e) => ({
+            id: e.id,
+            title: e.title,
+            body: [os.format.dateTime(e.occurredAt), e.body].filter(Boolean).join(' · '),
+            meta: e.actor === 'assistant' ? 'agent' : e.actor === 'automation' ? 'automation' : undefined,
+            value: typeof (e.meta as { cost?: number })?.cost === 'number' ? os.format.currency((e.meta as { cost: number }).cost) : undefined,
+            color: dot(e.actor),
+          }))}
+        />
+      </Card>
+    </Section>
   );
 }

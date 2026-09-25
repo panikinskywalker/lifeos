@@ -17,7 +17,7 @@ export type ChipTone = 'neutral' | 'muted' | 'alert' | 'alertText' | 'accent' | 
  * Static chip. md (7/12, 13/700) for checklists and related records; sm
  * (3/8, 11/700) for category tags and status. `overlay` puts it on a tinted band.
  */
-export function Chip({ label, tint, tone = 'neutral', icon, onPress, small, overlay }: { label: string; tint?: TintKey; tone?: ChipTone; icon?: IconName | (string & {}); onPress?: () => void; small?: boolean; overlay?: boolean }) {
+export function Chip({ label, tint, tone = 'neutral', icon, onPress, onLongPress, small, overlay }: { label: string; tint?: TintKey; tone?: ChipTone; icon?: IconName | (string & {}); onPress?: () => void; onLongPress?: () => void; small?: boolean; overlay?: boolean }) {
   const t = useTheme();
   const control = useControlFill();
   const [bg, fg] = tint
@@ -38,9 +38,9 @@ export function Chip({ label, tint, tone = 'neutral', icon, onPress, small, over
       </Text>
     </View>
   );
-  if (!onPress) return body;
+  if (!onPress && !onLongPress) return body;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={10} onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={10} onPress={onPress} onLongPress={onLongPress} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
       {body}
     </Pressable>
   );

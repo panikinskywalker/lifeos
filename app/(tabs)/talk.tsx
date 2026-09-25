@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Assistant, type AssistantTurn } from '@core/ai/assistant';
@@ -7,8 +7,7 @@ import { createClaudeProvider } from '@core/ai/provider';
 import type { AiToolDef } from '@core/registry/types';
 import { useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, Card, Chip, Icon, IconButton, Input, Text } from '@ui/components/primitives';
-import { useBottomBarInset } from '@ui/kit';
+import { AgentCard, ChatBubble, Chip, Composer, EmptyState, Icon, IconButton, Screen, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
 import { getApiKey } from '../../src/platform/boot';
 
 const SUGGESTIONS = ['How much did I spend this month?', 'Spent 450 on lunch at Blue Tokai', 'What\'s due today?', 'Add a task: renew car insurance, due next Friday', 'Which subscriptions renew this week?', 'Remind me every Monday at 9am to review budgets', 'Who haven\'t I talked to in a while?'];
@@ -66,41 +65,41 @@ export default function TalkTab() {
     setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);
   }, [turns.length, busy]);
 
-  if (key === undefined) return <View style={{ flex: 1, backgroundColor: t.colors.background }} />;
+  if (key === undefined) return <View style={{ flex: 1, backgroundColor: t.c.bg.ground }} />;
   if (!key)
     return (
-      <View style={{ flex: 1, backgroundColor: t.colors.background, paddingTop: insets.top + 8, paddingHorizontal: 16 }}>
-        <Text variant="largeTitle" style={{ marginBottom: 12 }}>
-          Talk
-        </Text>
-        <Card style={{ gap: 12 }}>
-          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: t.colors.accents.indigo + '1A', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="sparkles" size={28} color={t.colors.accents.indigo} />
-          </View>
-          <Text variant="title3">Your data, in conversation</Text>
-          <Text color="secondary">
-            Ask questions ("how much did I spend on food in August?"), log things in plain language ("paid 1200 for petrol"), and set up automations. It runs on Claude with your own API key; only the data needed for each answer leaves your phone.
-          </Text>
-          <Button title="Add API key" icon="key" onPress={() => router.push('/settings/ai')} color={t.colors.accents.indigo} />
-        </Card>
-      </View>
+      <Screen tab title="Talk" subtitle="Tell me what happened">
+        <EmptyState icon="mic" tint="memory" title="Add your Claude key" line="Say what happened in plain words and the agent files it. It runs on your own API key; only what each answer needs leaves your phone." action="Add API key" actionIcon="key" onAction={() => router.push('/settings/ai')} />
+      </Screen>
     );
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.colors.background }} keyboardVerticalOffset={0}>
-      <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }}>
-        <Text variant="largeTitle" style={{ flex: 1 }}>
-          Talk
-        </Text>
-        <IconButton icon="square.and.pencil" bg onPress={() => { setTurns([]); assistant.current?.reset(); assistant.current = new Assistant(os, { provider: createClaudeProvider({ apiKey: key, model }), onTurn: (turn) => setTurns((ts) => [...ts, turn]) }); }} />
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
+      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: 8 }}>
+        <ScreenHeader
+          title="Talk"
+          subtitle="Tell me what happened"
+          right={
+            <IconButton
+              icon="history"
+              accessibilityLabel="New conversation"
+              filled
+              onPress={() => {
+                setTurns([]);
+                assistant.current?.reset();
+                assistant.current = new Assistant(os, { provider: createClaudeProvider({ apiKey: key, model }), onTurn: (turn) => setTurns((ts) => [...ts, turn]) });
+              }}
+            />
+          }
+        />
       </View>
-      <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: t.layout.gutter, paddingVertical: 12, gap: 12 }} keyboardShouldPersistTaps="handled">
         {turns.length === 0 ? (
-          <View style={{ gap: 8 }}>
-            <Text color="secondary" variant="subhead">
-              Try asking
+          <View style={{ gap: 10 }}>
+            <Text variant="label" color="secondary">
+              Try saying
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {SUGGESTIONS.map((s) => (
                 <Chip key={s} label={s} onPress={() => void send(s)} />
               ))}
@@ -108,44 +107,37 @@ export default function TalkTab() {
           </View>
         ) : null}
         {turns.map((turn) => (
-          <Bubble key={turn.id} turn={turn} />
+          <Turn key={turn.id} turn={turn} />
         ))}
         {busy ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 4 }}>
-            <Icon name="sparkles" size={14} color={t.colors.accents.indigo} />
-            <Text variant="footnote" color="secondary">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Icon name="sparkle" size={14} color={t.tints.memory.ink} />
+            <Text variant="caption" color="secondary">
               Thinking…
             </Text>
           </View>
         ) : null}
       </ScrollView>
-      <View style={{ paddingHorizontal: 16, paddingBottom: barInset + 24, paddingTop: 8, backgroundColor: t.colors.background }}>
-        <Input value={text} onChangeText={setText} placeholder="Ask or tell LifeOS anything…" onSubmitEditing={() => void send()} returnKeyType="send" blurOnSubmit={false} multiline right={<IconButton icon="arrow.up.circle.fill" size={28} color={text.trim() ? t.colors.accents.indigo : t.colors.textTertiary} onPress={() => void send()} />} style={{ maxHeight: 120 }} />
+      <View style={{ paddingHorizontal: t.layout.gutter, paddingBottom: barInset + 32, paddingTop: 8 }}>
+        <Composer value={text} onChange={setText} onSend={() => void send()} disabled={busy} />
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-function Bubble({ turn }: { turn: AssistantTurn }) {
+/** A turn in the thread: your words as a bubble; the agent's as a card; what it filed as a record card. */
+function Turn({ turn }: { turn: AssistantTurn }) {
   const t = useTheme();
   const router = useRouter();
+  if (turn.role === 'user') return <ChatBubble text={turn.text} />;
   if (turn.role === 'tool') {
     const res = turn.toolResult as { id?: string; type?: string; title?: string } | undefined;
-    const clickable = res && typeof res === 'object' && res.id && res.type;
-    return (
-      <Pressable onPress={clickable ? () => router.push(`/entity/${res!.type}/${res!.id}`) : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 4 }}>
-        <Icon name="checkmark.circle" size={14} color={t.colors.accents.indigo} />
-        <Text variant="footnote" color="secondary">
-          {turn.text}
-          {clickable ? ' →' : ''}
-        </Text>
-      </Pressable>
-    );
+    const target = res && typeof res === 'object' && res.id && res.type ? res : null;
+    return <AgentCard kind="record" icon="check" tint="upkeep" title={turn.text} filedUnder={target?.title ?? undefined} onPress={target ? () => router.push(`/entity/${target.type}/${target.id}`) : undefined} />;
   }
-  const user = turn.role === 'user';
   return (
-    <View style={{ alignSelf: user ? 'flex-end' : 'flex-start', maxWidth: '88%', backgroundColor: user ? t.colors.tint : t.colors.card, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, borderBottomRightRadius: user ? 4 : 18, borderBottomLeftRadius: user ? 18 : 4 }}>
-      <Text color={user ? '#fff' : undefined} selectable>
+    <View style={{ backgroundColor: t.c.bg.tile, borderRadius: t.radius.card, padding: 14, marginRight: 28 }}>
+      <Text variant="body" selectable style={{ lineHeight: 21 }}>
         {turn.text}
       </Text>
     </View>

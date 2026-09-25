@@ -83,17 +83,3 @@ export function Card({ icon, tint, iconTone, title, meta, children, flush, style
     </View>
   );
 }
-
-/**
- * @deprecated Compose Section / Card instead. `flush` content is rows (a
- * Section); otherwise the content sits in a Card under the heading.
- */
-export function SectionCard({ title, meta, action, onAction, children, flush, style }: { title?: string; meta?: string; action?: string; onAction?: () => void; children: React.ReactNode; flush?: boolean; style?: StyleProp<ViewStyle> }) {
-  const body = flush ? <View style={{ gap: 8 }}>{children}</View> : <Card>{children}</Card>;
-  if (!title && !action && !meta) return <View style={style}>{body}</View>;
-  return (
-    <Section title={title ?? ''} meta={meta} action={action} onAction={onAction} style={style}>
-      {body}
-    </Section>
-  );
-}

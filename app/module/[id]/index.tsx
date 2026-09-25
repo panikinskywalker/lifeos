@@ -1,22 +1,42 @@
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useOS } from '@ui/hooks';
-import { EmptyState } from '@ui/components/primitives';
-import { EntityListScreen } from '@ui/screens/EntityListScreen';
+import { useLive, useOS } from '@ui/hooks';
+import { tintForModule } from '@ui/theme/moduleTint';
+import { EmptyState, RowItem, RowList, Screen } from '@ui/kit';
 
-/** Module home: the module's own "index" screen, or its first entity list. */
-export default function ModuleHomeRoute() {
+/** A module's page: its overview (when it has one) and every record type with a count. */
+export default function ModuleRoute() {
   const os = useOS();
   const router = useRouter();
-  const { id, ...params } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const counts = useLive((o) => o.entities.countsByType(), []);
   const m = os.registry.modules.get(id ?? '');
-  if (!m) return <EmptyState icon="cube" title="Module not installed" action="Back" onAction={() => router.back()} />;
-  const home = m.screens?.find((s) => s.key === 'index');
-  if (home) {
-    const C = home.component;
-    return <C ctx={os} params={params as Record<string, string>} />;
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/browse'));
+  if (!m) {
+    return (
+      <Screen title="Not found" onBack={back}>
+        <EmptyState icon="box" line="That module isn’t installed." />
+      </Screen>
+    );
   }
-  const first = os.registry.typesForModule(m.id).find((x) => !x.hidden);
-  if (first) return <EntityListScreen type={first.type} />;
-  return <EmptyState icon={m.icon} title={m.name} body={m.description} />;
+  const tint = tintForModule(m.id);
+  const types = os.registry.typesForModule(m.id).filter((x) => !x.hidden);
+  const hasHome = m.screens?.some((s) => s.key === 'index');
+  const total = types.reduce((n, ty) => n + (counts[ty.type] ?? 0), 0);
+  return (
+    <Screen title={m.name} subtitle={`${total} ${total === 1 ? 'record' : 'records'}`} onBack={back}>
+      <RowList>
+        {hasHome ? <RowItem icon={m.icon} tint={tint} title="Overview" subtitle={m.description} onPress={() => router.push(`/module/${m.id}/index`)} /> : null}
+        {m.id === 'automation' ? (
+          <>
+            <RowItem icon="bolt" tint={tint} title="Rules" subtitle="Triggers, conditions, actions" onPress={() => router.push('/automation')} />
+            <RowItem icon="bell" tint={tint} title="Reminders" subtitle="Everything scheduled" onPress={() => router.push('/reminders')} />
+          </>
+        ) : null}
+        {types.map((ty) => (
+          <RowItem key={ty.type} icon={ty.icon} tint={tint} title={ty.labelPlural} value={String(counts[ty.type] ?? 0)} valueTone="secondary" onPress={() => router.push(`/entity/${ty.type}`)} chevron />
+        ))}
+      </RowList>
+    </Screen>
+  );
 }

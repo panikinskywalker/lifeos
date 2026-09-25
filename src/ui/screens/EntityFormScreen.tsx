@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import type { Entity, EntityTypeDef, FieldDef } from '@core/domain/types';
 import { ZodError } from 'zod';
 import { useTheme } from '../theme/ThemeProvider';
-import { Button, Field, FilterChip, IconButton, Screen, SectionCard, Text, TextField } from '../kit';
+import { Button, Field, FilterChip, Screen, Section, Text, TextField } from '../kit';
 import { FieldInput, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 
@@ -73,7 +73,7 @@ export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type:
 
   const errorCount = Object.keys(errors).length;
   return (
-    <Screen title={id ? `Edit ${def.label.toLowerCase()}` : `New ${def.label.toLowerCase()}`} eyebrow={id ? existing?.title : os.registry.modules.get(def.module)?.name} right={<IconButton icon="x" accessibilityLabel="Close" filled onPress={close} />}>
+    <Screen title={id ? `Edit ${def.label.toLowerCase()}` : `New ${def.label.toLowerCase()}`} subtitle={id ? existing?.title : os.registry.modules.get(def.module)?.description ?? os.registry.modules.get(def.module)?.name} onBack={close}>
       {hasTitleField ? <TextField label="Name" required value={title} onChange={setTitle} placeholder={`${def.label} name`} autoFocus={!id} error={errors.title} /> : null}
       {def.statuses?.length ? (
         <Field label="Status">
@@ -86,13 +86,13 @@ export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type:
       ) : null}
       {sections.map(([section, fields], si) =>
         section ? (
-          <SectionCard key={section} title={section}>
+          <Section key={section} title={section}>
             <View style={{ gap: 16 }}>
               {fields.map((f) => (
                 <FieldInput key={f.key} field={f} value={data[f.key]} onChange={(v) => setData((d) => ({ ...d, [f.key]: v }))} error={errors[f.key]} />
               ))}
             </View>
-          </SectionCard>
+          </Section>
         ) : (
           <View key="_" style={{ gap: 16 }}>
             {fields.map((f, i) => (
@@ -107,7 +107,7 @@ export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type:
           {errors._ ?? `Check ${errorCount === 1 ? 'the highlighted field' : `${errorCount} highlighted fields`}.`}
         </Text>
       ) : null}
-      <Button title={id ? 'Save changes' : `Add ${def.label.toLowerCase()}`} icon="check" block onPress={save} loading={saving} />
+      <Button title={id ? 'Save changes' : `Save ${def.label.toLowerCase()}`} icon="check" size="lg" block onPress={save} loading={saving} style={{ marginTop: 4 }} />
     </Screen>
   );
 }
