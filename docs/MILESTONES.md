@@ -55,7 +55,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] **Routine** entity type (chores) with kind / minutes / weekday preference.
 - [x] Upkeep tab: sections Overdue / This week / This month / Later; filter chips; row actions mark done · snooze · add cost; "this month will cost" header.
 - [x] Upkeep › **This week** strip view.
-- [ ] Record page "Cycles" section with history and stats.
+- [x] Record page "Cycles" section with history and stats.
 - [ ] Cycle-driven reminders through the existing scheduler → local notifications.
 - [ ] Subscription auto-post transaction on due (automation template, on by default).
 - [ ] Finance: Debt entity, **Group** entity, split sheet on a transaction (equal/exact/percent/shares), balances per person and per group, settle-up.

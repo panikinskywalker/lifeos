@@ -145,6 +145,16 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     const meters = registry.entityTypes.get(entity.type)?.meters ?? [];
     if (meters.some((m) => changed.includes(m.field) || changed.includes(`data.${m.field}`))) mirrorMeters(entity);
   });
+  // Records that predate meter readings: their typed value becomes the first reading, once.
+  if (!settings.get('meters.backfilled', false)) {
+    db.transaction(() => {
+      for (const def of registry.entityTypes.values()) {
+        if (!def.meters?.length) continue;
+        for (const e of entities.query(def.type, {}, { limit: 100000 })) mirrorMeters(e);
+      }
+    });
+    settings.set('meters.backfilled', true);
+  }
   if (!settings.get('cycles.templatesBackfilled', false)) {
     db.transaction(() => {
       for (const def of registry.entityTypes.values()) {

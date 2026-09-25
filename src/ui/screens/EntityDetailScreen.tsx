@@ -15,6 +15,7 @@ import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, Fiel
 import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
+import { CyclesSection } from '../components/cycles';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
 
@@ -92,6 +93,7 @@ export function EntityDetailScreen({ id }: { id: string }) {
               <TagChips tags={tags.map((x) => x.name)} module={def.module} onPress={(name) => router.push(`/tag/${encodeURIComponent(name)}`)} />
             </Section>
           ) : null}
+          <CyclesSection entity={entity} />
           <RelationsCard entity={entity} onLink={() => setPanel('link')} />
           <RemindersCard entity={entity} tint={tint} />
           <AttachmentsCard entity={entity} />

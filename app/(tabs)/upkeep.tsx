@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { format, formatDistanceToNowStrict } from 'date-fns';
-import { DAY, describeCycle } from '@core/cycles/schedule';
+import { format } from 'date-fns';
+import { DAY } from '@core/cycles/schedule';
 import { logDone, undoLoggedDone, upkeep, UPKEEP_FILTERS, weekPlan, weekStartOf, type UpkeepFilter, type UpkeepItem, type WeekEntry } from '@core/cycles/upkeep';
 import { addPeriod, startOfDay } from '@core/cycles/schedule';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { tintForModule } from '@ui/theme/moduleTint';
-import { ActionSheet, Button, Card, Chip, EmptyState, FilterChip, IconButton, MoneyField, NumberField, ProgressBar, RowItem, RowList, Screen, Section, Segmented, Sheet, StatTile, SwitchField, Text, TextField, useToast, WeekStrip, type WeekDay } from '@ui/kit';
+import { DoneWithCostSheet, dueLabel, subtitleFor, titleFor } from '@ui/components/cycles';
+import { ActionSheet, Button, Card, Chip, EmptyState, FilterChip, IconButton, ProgressBar, RowItem, RowList, Screen, Section, Segmented, StatTile, Text, useToast, WeekStrip, type WeekDay } from '@ui/kit';
 
 const FILTERS: UpkeepFilter[] = ['All', ...(Object.keys(UPKEEP_FILTERS) as UpkeepFilter[])];
 const SECTIONS = [
@@ -17,30 +18,6 @@ const SECTIONS = [
   ['month', 'This month'],
   ['later', 'Later'],
 ] as const;
-
-/** "4 d late", "Today", "in 3 d", "800 km left", "Snoozed". */
-function dueLabel(i: UpkeepItem): string {
-  const { state, daysLeft, meterLeft } = i.status;
-  const km = (n: number) => `${Math.abs(Math.round(n)).toLocaleString('en-IN')} km`;
-  if (state === 'unscheduled') return 'Set date';
-  if (state === 'snoozed') return 'Snoozed';
-  if (meterLeft != null && meterLeft <= 0) return `${km(meterLeft)} over`;
-  if (daysLeft != null && daysLeft < 0) return `${-daysLeft} d late`;
-  if (daysLeft === 0) return 'Today';
-  if (daysLeft != null && meterLeft != null) return daysLeft <= 60 ? `in ${daysLeft} d` : `${km(meterLeft)} left`;
-  if (daysLeft != null) return daysLeft > 60 ? `in ${Math.round(daysLeft / 30)} mo` : `in ${daysLeft} d`;
-  return meterLeft != null ? `${km(meterLeft)} left` : '';
-}
-
-const ownName = (i: UpkeepItem) => i.cycle.name === i.entity.title || i.entity.type === 'routine';
-
-/** "Keep in touch · every 14 days · last 22 days ago" — the record is the title, the cycle leads the subtitle. */
-function subtitleFor(i: UpkeepItem): string {
-  const last = i.cycle.lastDoneAt ? `last ${formatDistanceToNowStrict(i.cycle.lastDoneAt, { roundingMethod: 'floor' })} ago` : null;
-  return [ownName(i) ? null : i.cycle.name, describeCycle(i.cycle), last].filter(Boolean).join(' · ');
-}
-
-const titleFor = (i: UpkeepItem) => (ownName(i) ? i.entity.title : `${i.entity.title} · ${i.cycle.name}`);
 
 /** Upkeep (canvas 02, Stitch "Upkeep cycles") — every cycle by next due. */
 export default function UpkeepTab() {
@@ -162,43 +139,6 @@ export default function UpkeepTab() {
       />
       <DoneWithCostSheet item={costFor} onClose={() => setCostFor(null)} />
     </Screen>
-  );
-}
-
-/** Done with a cost (and odometer for meter cycles); the cost can be filed as an expense. */
-function DoneWithCostSheet({ item, onClose }: { item: UpkeepItem | null; onClose: () => void }) {
-  const os = useOS();
-  const toast = useToast();
-  const [cost, setCost] = useState<number | undefined>(undefined);
-  const [note, setNote] = useState('');
-  const [meter, setMeter] = useState<number | undefined>(undefined);
-  const [asExpense, setAsExpense] = useState(true);
-  const key = item?.cycle.id;
-  React.useEffect(() => {
-    setCost(item?.cycle.costEstimate ?? undefined);
-    setNote('');
-    setMeter(undefined);
-    setAsExpense(true);
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!item) return null;
-  const hasFinance = os.registry.entityTypes.has('transaction');
-  const save = () => {
-    const d = logDone(os, item.cycle.id, { cost: cost ?? null, note: note.trim() || null, meter: meter ?? null, asExpense: hasFinance && asExpense });
-    onClose();
-    toast.show({ message: cost ? `${titleFor(item)} done · ${os.format.currency(cost)}` : `${titleFor(item)} done`, icon: 'check', undo: () => undoLoggedDone(os, d) });
-  };
-  return (
-    <Sheet visible onClose={onClose} title={`${titleFor(item)} done`} footer={<Button title="Save" icon="check" block onPress={save} />}>
-      <MoneyField label="Cost" value={cost} onChange={setCost} />
-      {item.cycle.meter ? <NumberField label="Odometer" unit="km" value={meter} onChange={setMeter} hint="Optional — rolls the km side of the cycle" /> : null}
-      <TextField label="Note" value={note} onChange={setNote} placeholder="Where, who, anything to remember" />
-      {hasFinance && cost ? <SwitchField icon="receipt" label="Also add as an expense" hint="Filed under Finance, linked to this record" value={asExpense} onChange={setAsExpense} /> : null}
-      {item.cycle.costEstimate ? (
-        <View style={{ flexDirection: 'row' }}>
-          <Chip label={`Usually ${os.format.currency(item.cycle.costEstimate)}`} small tone="muted" />
-        </View>
-      ) : null}
-    </Sheet>
   );
 }
 

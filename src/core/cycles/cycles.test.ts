@@ -192,6 +192,20 @@ describe('backfill', () => {
     expect(third.cycles.forEntity(s.id)).toHaveLength(1);
     db.close();
   });
+
+  it('an odometer typed before readings existed becomes the first reading', async () => {
+    const db = createBetterSqliteAdapter(':memory:');
+    const plain: ModuleManifest = { ...things, entityTypes: things.entityTypes!.map((t) => ({ ...t, meters: undefined })) };
+    bus.clear();
+    const first = await createLifeOS({ db, modules: [plain], registry: new Registry() });
+    first.settings.set('meters.backfilled', false);
+    const van = first.entities.create({ type: 'van', data: { name: 'Creta', odometerKm: 28500 } });
+    expect(first.cycles.latestMeter(van.id)).toBeNull();
+    bus.clear();
+    const second = await createLifeOS({ db, modules: [things], registry: new Registry() });
+    expect(second.cycles.latestMeter(van.id)).toBe(28500);
+    db.close();
+  });
 });
 
 describe('meter readings', () => {
