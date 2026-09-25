@@ -142,3 +142,26 @@ describe('confirmation policy', () => {
     expect(os.tags.forEntity(e.id).map((t) => t.name)).toEqual(['rain']);
   });
 });
+
+describe('learned aliases', () => {
+  it('after the user picks one, the alias resolves straight to it; forgetting undoes it', async () => {
+    const city = os.entities.create({ type: 'vehicle', data: { name: 'Honda City' } });
+    os.entities.create({ type: 'vehicle', data: { name: 'Hyundai Creta' } });
+    expect(clearMatch(resolveCandidates(os, 'the car'))).toBeNull(); // two vehicles: ambiguous
+    const out = await tool('remember_alias').run({ alias: 'the car', entityId: city.id }, os);
+    const r = (await tool('resolve_entity').run({ text: 'serviced the car today' }, os)) as { match?: { id: string; why: string } };
+    expect(r.match).toMatchObject({ id: city.id, why: 'you call it "the car"' });
+    expect(os.aliases.lookup('cartoon')).toEqual([]); // word boundaries
+    extrasOf(out).undo!();
+    expect(clearMatch(resolveCandidates(os, 'the car'))).toBeNull();
+  });
+
+  it('learning the same alias again counts uses instead of duplicating', () => {
+    const dad = os.entities.create({ type: 'person', data: { name: 'Ramesh Rao' } });
+    os.aliases.learn('Dad', dad.id);
+    os.aliases.learn('dad!', dad.id);
+    expect(os.aliases.forEntity(dad.id)).toEqual([expect.objectContaining({ uses: 2 })]);
+    os.entities.delete(dad.id);
+    expect(os.aliases.lookup('call dad')).toEqual([]);
+  });
+});

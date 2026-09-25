@@ -18,3 +18,4 @@ export * from './cycles/cycleRepo';
 export * from './cycles/upkeep';
 export * from './cycles/nudges';
 export * from './repo/groupRepo';
+export * from './repo/aliasRepo';

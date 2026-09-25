@@ -29,7 +29,7 @@ export interface Candidate {
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 
 /**
- * Which record does a phrase mean? Scores: exact title
+ * Which record does a phrase mean? Scores: learned alias 1.0, exact title
  * 0.95, title starts with / contains the phrase 0.85 / 0.8, the only record of
  * a named type ("the car") 0.9, full-text hits 0.4–0.6. Returns candidates,
  * best first.
@@ -45,6 +45,10 @@ export function resolveCandidates(os: LifeOSContext, text: string, types?: strin
     const prev = out.get(e.id);
     if (!prev || prev.score < score) out.set(e.id, { id: e.id, type: e.type, title: e.title, subtitle: e.subtitle ?? null, score, why });
   };
+  for (const a of os.aliases.lookup(q)) {
+    const e = os.entities.get(a.entityId);
+    if (e) add(e, 1, `you call it "${a.alias}"`);
+  }
   if (phrase) {
     const hits = os.entities.search.search(phrase, { types, limit: 20 });
     for (const h of hits) {
@@ -110,6 +114,19 @@ export const lifeTools: AiToolDef[] = [
       const c = resolveCandidates(os, i.text, i.types);
       const m = clearMatch(c);
       return m ? { match: m } : { candidates: c, ask: c.length > 1 ? 'Which one did they mean?' : c.length === 0 ? 'Nothing matches — ask or offer to create it.' : undefined };
+    },
+  },
+  {
+    name: 'remember_alias',
+    description: 'After the user picks which record they meant ("the Creta, not the City"), remember what they called it so next time it resolves straight away. alias is their words ("the car", "Dad", "the gym").',
+    input: z.object({ alias: z.string().min(1), entityId: z.string() }),
+    run: async (input, os) => {
+      const i = input as { alias: string; entityId: string };
+      const e = os.entities.get(i.entityId);
+      if (!e) return { error: 'record not found' };
+      const known = os.aliases.forEntity(e.id).some((a) => a.alias.toLowerCase() === i.alias.trim().toLowerCase());
+      const a = os.aliases.learn(i.alias, e.id);
+      return withExtras({ remembered: `"${a.alias}" means ${e.title}` }, { undo: known ? undefined : () => os.aliases.forget(a.id) });
     },
   },
   {

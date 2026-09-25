@@ -390,4 +390,37 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_ingest_dedupe ON ingest_queue(dedupe_key)`,
     ],
   },
+  {
+    version: 4,
+    name: 'agent-aliases-usage',
+    up: [
+      // Learned names for records: "the car" → Creta, "Dad" → a person. Written
+      // when the user picks one of several matches in Talk. alias_norm is the
+      // lower-cased, punctuation-free form used for lookup.
+      `CREATE TABLE IF NOT EXISTS aliases (
+        id TEXT PRIMARY KEY,
+        alias TEXT NOT NULL,
+        alias_norm TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        uses INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE(alias_norm, entity_id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_aliases_norm ON aliases(alias_norm, deleted_at)`,
+      // Token use per model call, for You › Agent's usage meter. Device-local.
+      `CREATE TABLE IF NOT EXISTS ai_usage (
+        id TEXT PRIMARY KEY,
+        at INTEGER NOT NULL,
+        model TEXT NOT NULL,
+        purpose TEXT NOT NULL DEFAULT 'chat',
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        conversation_id TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_usage_at ON ai_usage(at)`,
+    ],
+  },
 ];

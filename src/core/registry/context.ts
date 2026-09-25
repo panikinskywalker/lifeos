@@ -5,6 +5,7 @@ import type { AttachmentRepo, CommentRepo, CustomFieldRepo, DashboardRepo, Modul
 import type { AutomationEngine } from '../automation/engine';
 import type { CycleRepo } from '../cycles/cycleRepo';
 import type { GroupRepo } from '../repo/groupRepo';
+import type { AliasRepo } from '../repo/aliasRepo';
 import type { Scheduler } from '../automation/scheduler';
 
 /**
@@ -20,6 +21,7 @@ export interface LifeOSContext {
   attachments: AttachmentRepo;
   cycles: CycleRepo;
   groups: GroupRepo;
+  aliases: AliasRepo;
   comments: CommentRepo;
   reminders: ReminderRepo;
   customFields: CustomFieldRepo;

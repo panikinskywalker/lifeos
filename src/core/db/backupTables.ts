@@ -23,7 +23,8 @@ export const BACKUP_TABLES = [
   'group_members',
   'notification_rules',
   'ingest_queue',
+  'aliases',
 ] as const;
 
 /** Rebuilt or re-derived on this device, so not worth carrying in a backup. */
-export const BACKUP_EXCLUDED = ['_migrations', 'modules', 'automation_runs', 'ai_messages', 'changes', 'entities_fts'] as const;
+export const BACKUP_EXCLUDED = ['_migrations', 'modules', 'automation_runs', 'ai_messages', 'changes', 'entities_fts', 'ai_usage'] as const;
