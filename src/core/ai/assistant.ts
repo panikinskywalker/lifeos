@@ -23,8 +23,8 @@ export interface AssistantTurn {
 
 export interface AssistantOptions {
   provider: LLMProvider;
-  /** Called before a mutating tool runs; return false to refuse. */
-  confirm?: (tool: AiToolDef, input: unknown) => Promise<boolean>;
+  /** Money & people: shown as an inline confirm card with `summary`; resolve false to refuse. */
+  confirm?: (tool: AiToolDef, input: unknown, summary: string) => Promise<boolean>;
   onTurn?: (turn: AssistantTurn) => void;
   maxToolRounds?: number;
 }
@@ -123,7 +123,7 @@ Guidelines:
           try {
             const parsed = def.input.parse(call.input);
             const ask = typeof def.confirm === 'function' ? def.confirm(parsed, this.os) : !!def.confirm;
-            if (ask && this.opts.confirm && !(await this.opts.confirm(def, parsed))) {
+            if (ask && this.opts.confirm && !(await this.opts.confirm(def, parsed, confirmSummary(def, parsed, this.os)))) {
               output = { error: 'User declined this action.' };
               isError = true;
             } else {
@@ -148,6 +148,19 @@ Guidelines:
   reset() {
     this.history = [];
   }
+}
+
+/** The confirm card's line: the tool's own describe(), else its name and the key inputs. */
+export function confirmSummary(def: AiToolDef, input: unknown, os: LifeOSContext): string {
+  try {
+    if (def.describe) return def.describe(input, os);
+  } catch {
+    /* fall through */
+  }
+  const i = (input ?? {}) as Record<string, unknown>;
+  const title = (i.title as string) ?? (i.id ? os.entities.get(String(i.id))?.title : undefined);
+  const type = i.type ? os.registry.entityTypes.get(String(i.type))?.label : undefined;
+  return [def.name.replace(/_/g, ' '), type, title].filter(Boolean).join(' · ');
 }
 
 function summarizeTool(name: string, input: unknown, output: unknown): string {

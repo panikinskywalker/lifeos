@@ -3,7 +3,8 @@ import type { ModuleManifest, TriggerDef, ActionDef, AiToolDef } from './registr
 import type { CoreEvents } from './events/bus';
 import type { Entity, FilterGroup, SortSpec } from './domain/types';
 import type { LifeOSContext } from './registry/context';
-import { lifeTools } from './ai/lifeTools';
+import { lifeTools, recordCard, touchesMoneyOrPeople } from './ai/lifeTools';
+import { withExtras } from './ai/cards';
 
 /* ------------------------------------------------------------------ */
 /* Generic triggers — work for every entity type                       */
@@ -223,45 +224,63 @@ const aiTools: AiToolDef[] = [
     name: 'create_entity',
     description: 'Create a record. `data` must match the type\'s fields (see list_entity_types). Optionally tag and link it to other records in the same call.',
     input: z.object({ type: z.string(), title: z.string().optional(), data: z.record(z.string(), z.unknown()), status: z.string().optional(), tags: z.array(z.string()).optional(), links: z.array(z.object({ toId: z.string(), kind: z.string() })).optional() }),
-    confirm: true,
+    confirm: (i: { type: string }, os) => touchesMoneyOrPeople(os, i.type),
+    describe: (i: { type: string; title?: string; data: Record<string, unknown> }, os) => {
+      const label = os.registry.entityTypes.get(i.type)?.label ?? i.type;
+      const amt = typeof i.data?.amount === 'number' ? ` · ${os.format.currency(i.data.amount as number)}` : '';
+      return `Add ${label.toLowerCase()}: ${i.title ?? (i.data?.merchant as string) ?? (i.data?.name as string) ?? ''}${amt}`.trim();
+    },
     run: async (input, os) => {
       const i = input as { type: string; title?: string; data: Record<string, unknown>; status?: string; tags?: string[]; links?: Array<{ toId: string; kind: string }> };
       const e = os.entities.create({ type: i.type, title: i.title, data: i.data, status: i.status }, 'assistant');
       for (const t of i.tags ?? []) os.tags.apply(e.id, t, 'assistant');
       for (const l of i.links ?? []) os.relations.link(e.id, l.toId, l.kind, {}, 'assistant');
-      return slim(os.entities.get(e.id)!, os);
+      const saved = os.entities.get(e.id)!;
+      return withExtras(slim(saved, os), { undo: () => os.entities.delete(e.id, 'user'), card: recordCard(os, saved) });
     },
   },
   {
     name: 'update_entity',
     description: 'Update fields, title, status, star or archive on an existing record. Only send the fields that change.',
     input: z.object({ id: z.string(), title: z.string().optional(), data: z.record(z.string(), z.unknown()).optional(), status: z.string().nullable().optional(), starred: z.boolean().optional(), archived: z.boolean().optional(), addTags: z.array(z.string()).optional() }),
-    confirm: true,
+    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.entities.get(i.id)?.type),
+    describe: (i: { id: string; data?: Record<string, unknown> }, os) => `Change ${os.entities.get(i.id)?.title ?? 'record'}${i.data ? `: ${Object.entries(i.data).map(([k, v]) => `${k} → ${String(v)}`).join(', ')}` : ''}`,
     run: async (input, os) => {
       const i = input as { id: string; title?: string; data?: Record<string, unknown>; status?: string | null; starred?: boolean; archived?: boolean; addTags?: string[] };
+      const before = os.entities.get(i.id);
+      if (!before) return { error: 'not found' };
+      const hadTags = new Set(os.tags.forEntity(i.id).map((t) => t.name));
       const e = os.entities.update(i.id, { title: i.title, data: i.data, status: i.status, starred: i.starred, archived: i.archived }, 'assistant');
       for (const t of i.addTags ?? []) os.tags.apply(e.id, t, 'assistant');
-      return slim(os.entities.get(e.id)!, os);
+      const saved = os.entities.get(e.id)!;
+      const undo = () => {
+        os.entities.update(before.id, { title: before.title, data: before.data as Record<string, unknown>, status: before.status, starred: before.starred, archived: before.archived }, 'user');
+        for (const t of os.tags.forEntity(before.id)) if (!hadTags.has(t.name)) os.tags.remove(before.id, t.id);
+      };
+      return withExtras(slim(saved, os), { undo, card: recordCard(os, saved) });
     },
   },
   {
     name: 'delete_entity',
     description: 'Soft-delete a record (recoverable).',
     input: z.object({ id: z.string() }),
-    confirm: true,
+    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.entities.get(i.id)?.type),
+    describe: (i: { id: string }, os) => `Delete ${os.entities.get(i.id)?.title ?? 'record'} (you can restore it)`,
     run: async (input, os) => {
-      os.entities.delete((input as { id: string }).id, 'assistant');
-      return { ok: true };
+      const id = (input as { id: string }).id;
+      const title = os.entities.get(id)?.title;
+      os.entities.delete(id, 'assistant');
+      return withExtras({ ok: true, deleted: title }, { undo: () => os.entities.restore(id) });
     },
   },
   {
     name: 'link_entities',
     description: 'Create a typed relationship between two records (e.g. transaction → trip with kind "trip").',
     input: z.object({ fromId: z.string(), toId: z.string(), kind: z.string() }),
-    confirm: true,
     run: async (input, os) => {
       const i = input as { fromId: string; toId: string; kind: string };
-      return os.relations.link(i.fromId, i.toId, i.kind, {}, 'assistant');
+      const rel = os.relations.link(i.fromId, i.toId, i.kind, {}, 'assistant');
+      return withExtras({ ...rel }, { undo: () => os.relations.unlink(i.fromId, i.toId, i.kind, 'user') });
     },
   },
   {
@@ -277,10 +296,10 @@ const aiTools: AiToolDef[] = [
     name: 'create_reminder',
     description: 'Create a reminder, optionally attached to a record and recurring (RRULE like FREQ=WEEKLY;INTERVAL=1;BYDAY=MO).',
     input: z.object({ title: z.string(), dueAt: z.string().describe('ISO datetime'), entityId: z.string().optional(), rrule: z.string().optional(), body: z.string().optional() }),
-    confirm: true,
     run: async (input, os) => {
       const i = input as { title: string; dueAt: string; entityId?: string; rrule?: string; body?: string };
-      return os.reminders.create({ title: i.title, dueAt: new Date(i.dueAt).getTime(), entityId: i.entityId, rrule: i.rrule, body: i.body }, 'assistant');
+      const r = os.reminders.create({ title: i.title, dueAt: new Date(i.dueAt).getTime(), entityId: i.entityId, rrule: i.rrule, body: i.body }, 'assistant');
+      return withExtras({ ...r }, { undo: () => os.reminders.remove(r.id) });
     },
   },
   {

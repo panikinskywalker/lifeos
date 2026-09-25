@@ -13,6 +13,11 @@ export const financeAiTools: AiToolDef[] = [
       description: 'Split an expense with people ("that was dinner with Arjun, split it", "split the cab 3 ways, Priya paid"). parts: everyone sharing it, "me" for the user; method equal | exact (₹) | percent | shares with a value each. payer "me" or a personId. Asks the user before saving.',
       input: z.object({ transactionId: z.string(), payer: z.string().default('me'), method: z.enum(['equal', 'exact', 'percent', 'shares']).default('equal'), parts: z.array(z.object({ party: z.string().describe('"me" or a person id'), value: z.number().optional() })).min(1), groupId: z.string().optional() }),
       confirm: true,
+      describe: (i: { transactionId: string; payer: string; method: string; parts: Array<{ party: string }> }, os) => {
+        const tx = os.entities.get<{ amount: number }>(i.transactionId);
+        const names = i.parts.map((p) => (p.party === 'me' ? 'you' : (os.entities.get(p.party)?.title ?? '?'))).filter((n) => n !== 'you');
+        return `Split ${tx ? os.format.currency(tx.data.amount) : ''} at ${tx?.title ?? 'this'} ${i.method === 'equal' ? 'equally' : `by ${i.method}`} with ${names.join(', ')} · ${i.payer === 'me' ? 'you paid' : `${os.entities.get(i.payer)?.title ?? 'they'} paid`}`;
+      },
       run: async (input, os) => {
         const i = input as { transactionId: string; payer: string; method: 'equal' | 'exact' | 'percent' | 'shares'; parts: Array<{ party: string; value?: number }>; groupId?: string };
         const tx = os.entities.get<{ split?: unknown }>(i.transactionId);
@@ -44,6 +49,11 @@ export const financeAiTools: AiToolDef[] = [
       description: 'Settle up with a person ("Priya paid me back", "I paid Arjun"): files a payment for the whole balance and marks everything between you settled. Asks the user first.',
       input: z.object({ personId: z.string(), groupId: z.string().optional() }),
       confirm: true,
+      describe: (i: { personId: string; groupId?: string }, os) => {
+        const b = balanceWith(os, i.personId, i.groupId);
+        const who = os.entities.get(i.personId)?.title ?? 'them';
+        return b > 0 ? `${who} paid you ${os.format.currency(b)} — settle everything` : b < 0 ? `You paid ${who} ${os.format.currency(-b)} — settle everything` : `Nothing owed with ${who}`;
+      },
       run: async (input, os) => {
         const i = input as { personId: string; groupId?: string };
         const before = balanceWith(os, i.personId, i.groupId);

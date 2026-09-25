@@ -105,3 +105,40 @@ describe('assistant loop', () => {
     expect(sent[1]).not.toContain('undo');
   });
 });
+
+describe('confirmation policy', () => {
+  it('money & people ask; everything else runs with Undo; a declined confirm changes nothing', async () => {
+    const create = os.registry.aiTools.get('create_entity')!;
+    const ask = create.confirm as (i: unknown, o: LifeOSContext) => boolean;
+    expect(ask({ type: 'item' }, os)).toBe(false);
+    expect(ask({ type: 'person' }, os)).toBe(true);
+    expect(ask({ type: 'transaction' }, os)).toBe(true);
+
+    const summaries: string[] = [];
+    const script: CompletionResult[] = [
+      { content: [{ type: 'tool_use', id: 'a', name: 'create_entity', input: { type: 'person', data: { name: 'Suresh' } } }, { type: 'tool_use', id: 'b', name: 'create_entity', input: { type: 'item', data: { name: 'Umbrella' } } }], stopReason: 'tool_use' },
+      { content: [{ type: 'text', text: 'ok' }], stopReason: 'end_turn' },
+    ];
+    const provider: LLMProvider = { id: 's', complete: async () => script.shift()! };
+    const turns: AssistantTurn[] = [];
+    await new Assistant(os, { provider, onTurn: (t) => turns.push(t), confirm: async (_d, _i, summary) => { summaries.push(summary); return false; } }).send('add Suresh and my umbrella');
+    expect(summaries).toEqual(['Add person: Suresh']);
+    expect(os.entities.query('person')).toHaveLength(0);
+    const tools = turns.filter((t) => t.role === 'tool');
+    expect(tools[0]).toMatchObject({ isError: true });
+    expect(tools[1]!.undo).toBeTypeOf('function');
+    expect(os.entities.query('item')).toHaveLength(1);
+    tools[1]!.undo!();
+    expect(os.entities.query('item')).toHaveLength(0);
+  });
+
+  it('update undo restores the previous values and only the tags it added', async () => {
+    const e = os.entities.create({ type: 'item', data: { name: 'Umbrella' } });
+    os.tags.apply(e.id, 'rain');
+    const out = await os.registry.aiTools.get('update_entity')!.run({ id: e.id, data: { name: 'Big umbrella' }, addTags: ['car'] }, os);
+    expect(os.entities.get(e.id)!.title).toBe('Big umbrella');
+    extrasOf(out).undo!();
+    expect(os.entities.get(e.id)!.title).toBe('Umbrella');
+    expect(os.tags.forEntity(e.id).map((t) => t.name)).toEqual(['rain']);
+  });
+});

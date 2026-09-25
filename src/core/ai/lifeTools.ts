@@ -117,6 +117,7 @@ export const lifeTools: AiToolDef[] = [
     description: 'Log that something happened to a record ("did the car service today, 6,400 at Hyundai", "washed the white sneakers"). Adds a timeline entry; when it matches one of the record\'s cycles it also rolls that cycle (and files the cost as an expense). Use resolve_entity first to get entityId.',
     input: z.object({ entityId: z.string(), what: z.string().describe('Short event, e.g. "Service", "Wash"'), date: z.string().optional().describe('ISO date; default today'), cost: z.number().optional(), meter: z.number().optional().describe('Odometer reading if said'), note: z.string().optional() }),
     confirm: (i: { cost?: number }) => !!i.cost,
+    describe: (i: { entityId: string; what: string; cost?: number }, os) => `${i.what} on ${os.entities.get(i.entityId)?.title ?? 'record'} · file ${os.format.currency(i.cost ?? 0)} as an expense`,
     run: async (input, os) => {
       const i = input as { entityId: string; what: string; date?: string; cost?: number; meter?: number; note?: string };
       const e = os.entities.get(i.entityId);
@@ -138,6 +139,7 @@ export const lifeTools: AiToolDef[] = [
     description: 'Mark a recurring thing done ("did laundry", "paid the Jio recharge"): rolls the cycle to its next due. Give cycleId, or entityId (+ cycle name when the record has several). Optional cost files an expense.',
     input: z.object({ cycleId: z.string().optional(), entityId: z.string().optional(), cycle: z.string().optional(), date: z.string().optional(), cost: z.number().optional(), meter: z.number().optional(), note: z.string().optional() }),
     confirm: (i: { cost?: number }) => !!i.cost,
+    describe: (i: { cycleId?: string; entityId?: string; cost?: number }, os) => `Mark ${(i.cycleId ? os.cycles.get(i.cycleId)?.name : i.entityId ? os.entities.get(i.entityId)?.title : '') ?? ''} done · file ${os.format.currency(i.cost ?? 0)} as an expense`,
     run: async (input, os) => {
       const i = input as { cycleId?: string; entityId?: string; cycle?: string; date?: string; cost?: number; meter?: number; note?: string };
       const c = i.cycleId ? os.cycles.get(i.cycleId) : i.entityId ? pickCycle(os, i.entityId, i.cycle) : null;
