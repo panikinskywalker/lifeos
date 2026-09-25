@@ -1,10 +1,11 @@
 /**
- * Design tokens — source of truth is docs/DESIGN.md (and, once shared, the
- * Claude Design canvas). Warm bone ground, tiles one shade off, mustard
- * accent, muted pastel module tints, Manrope with tabular numerals.
+ * Design tokens — source of truth is the LifeOS Claude Design canvas
+ * ("Components & tokens" sheet), recorded in docs/DESIGN.md. Near-white
+ * ground, tiles one shade off, mustard accent, muted module tints with a
+ * matching ink, Manrope with tabular numerals.
  *
- * No shadows, no gradients. If a value is not in DESIGN.md it is marked
- * "working value" and must be replaced from the canvas.
+ * No shadows, no gradients. A value the canvas does not specify is marked
+ * "working value".
  */
 
 /* ------------------------------------------------------------------ */
@@ -12,57 +13,65 @@
 /* ------------------------------------------------------------------ */
 
 export interface Colors {
+  /** tileRaised = the canvas's "nested / control" surface: controls sitting on a tile. */
   bg: { ground: string; tile: string; tileRaised: string; bar: string; pressed: string; scrim: string };
+  /** onBar / onBarActive: nav bar icon+label, inactive and active (active is mustard for the icon). */
   fg: { primary: string; secondary: string; tertiary: string; onBar: string; onBarActive: string };
+  /** Track: segmented, toggle and chip tracks, hairlines. */
   line: string;
-  accent: { mustard: string; mustardInk: string };
-  /** coral/sage are for fills, rings and dots; *Text variants are the AA-contrast versions for text. */
+  /** Unfilled part of a Ring. */
+  ringTrack: string;
+  /** mustardSoft: the reminder / highlight icon-box behind a bell. */
+  accent: { mustard: string; mustardInk: string; mustardSoft: string };
+  /** coral / sage are fills, rings and dots; *Text variants are for text and icons. */
   alert: { coral: string; coralText: string; coralInk: string; coralFill: string };
   ok: { sage: string; sageText: string; sageInk: string };
 }
 
 export const lightTokens: Colors = {
   bg: {
-    ground: '#F4F3EE',
-    tile: '#ECEBE5',
-    tileRaised: '#FFFFFF',
+    ground: '#FAFAF7',
+    tile: '#F1F1EC',
+    tileRaised: '#FAFAF7',
     bar: '#17201C',
-    pressed: '#E2E0D8', // working value: tile pressed state = line colour
-    scrim: '#17201C66', // working value: sheet backdrop
+    pressed: '#E4E4DD', // working value: pressed = track
+    scrim: '#17201C47', // canvas: scrim 28%
   },
   fg: {
     primary: '#1B1F1D',
     secondary: '#6F7773',
-    tertiary: '#A2A8A4',
-    onBar: '#9AA19C', // working value: inactive icon on the bar
-    onBarActive: '#F4F3EE', // working value: active label on the bar
+    tertiary: '#A3A9A5',
+    onBar: '#AEB5B0',
+    onBarActive: '#F3C84B',
   },
-  line: '#E2E0D8',
-  accent: { mustard: '#F3C84B', mustardInk: '#5A4300' },
-  alert: { coral: '#E9635A', coralText: '#A8362E', coralInk: '#FFFFFF', coralFill: '#F7D5D1' }, // coralText: working value, 4.8:1 on coralFill
-  ok: { sage: '#8FB59B', sageText: '#2E5A3C', sageInk: '#1B1F1D' },
+  line: '#E4E4DD',
+  ringTrack: '#E3E3DB',
+  accent: { mustard: '#F3C84B', mustardInk: '#1B1F1D', mustardSoft: '#FBEFC6' },
+  alert: { coral: '#E9635A', coralText: '#B8382F', coralInk: '#FFFFFF', coralFill: '#F8D9D5' },
+  ok: { sage: '#8FB596', sageText: '#2F6142', sageInk: '#1B1F1D' },
 };
 
 export const darkTokens: Colors = {
   bg: {
     ground: '#141614',
     tile: '#1E211E',
-    tileRaised: '#262A27',
-    bar: '#262A27', // working value: the light bar colour is too close to the dark ground
-    pressed: '#2C302D',
-    scrim: '#00000099',
+    tileRaised: '#272B27',
+    bar: '#242A26',
+    pressed: '#333833', // working value: pressed = track
+    scrim: '#00000070', // working value
   },
   fg: {
-    primary: '#F1F0EA',
+    primary: '#EDEEEA',
     secondary: '#9AA19C',
-    tertiary: '#6B726D', // working value
-    onBar: '#9AA19C',
-    onBarActive: '#F1F0EA',
+    tertiary: '#6C736E',
+    onBar: '#8F978F',
+    onBarActive: '#F3C84B',
   },
-  line: '#2C302D',
-  accent: { mustard: '#F3C84B', mustardInk: '#5A4300' },
-  alert: { coral: '#E9635A', coralText: '#F08A82', coralInk: '#FFFFFF', coralFill: '#4A2825' },
-  ok: { sage: '#8FB59B', sageText: '#8FB59B', sageInk: '#141614' },
+  line: '#333833',
+  ringTrack: '#343934',
+  accent: { mustard: '#F3C84B', mustardInk: '#1B1F1D', mustardSoft: '#5D533C' },
+  alert: { coral: '#F07A71', coralText: '#F5A29B', coralInk: '#1B1F1D', coralFill: '#4A2724' },
+  ok: { sage: '#5F7F65', sageText: '#BCDCC0', sageInk: '#EDEEEA' },
 };
 
 export type TintKey = 'finance' | 'upkeep' | 'people' | 'tasks' | 'health' | 'memory' | 'travel' | 'documents';
@@ -71,27 +80,27 @@ export interface Tint {
   ink: string;
 }
 
+/** Canvas module tints. Things share sage with Upkeep. */
 export const lightTints: Record<TintKey, Tint> = {
-  finance: { fill: '#F1DFB8', ink: '#6B4F12' },
-  upkeep: { fill: '#CFE0D1', ink: '#2E5A3C' },
-  people: { fill: '#EFCDC8', ink: '#7A3A34' },
-  tasks: { fill: '#CFDDEB', ink: '#2B4A66' },
-  health: { fill: '#CDE6DD', ink: '#215546' },
-  memory: { fill: '#DDD5EA', ink: '#4B3D6B' },
-  travel: { fill: '#F4D9C4', ink: '#7A4520' },
-  documents: { fill: '#DEDCD3', ink: '#4C4B44' },
+  finance: { fill: '#F4E8CC', ink: '#6E5010' },
+  upkeep: { fill: '#CFE0D1', ink: '#2F6142' },
+  people: { fill: '#EFCDC8', ink: '#94423C' },
+  tasks: { fill: '#CFDDEB', ink: '#2E5A84' },
+  health: { fill: '#CDE6DD', ink: '#24654B' },
+  memory: { fill: '#DDD5EA', ink: '#544483' },
+  travel: { fill: '#F4D9C4', ink: '#8E4F22' },
+  documents: { fill: '#DEDCD3', ink: '#54544A' },
 };
 
-/** Same hue, fill at ~28% lightness, ink at ~80% (DESIGN.md › Dark). */
 export const darkTints: Record<TintKey, Tint> = {
-  finance: { fill: '#594E36', ink: '#E8D6B0' },
-  upkeep: { fill: '#38573C', ink: '#BDDBC7' },
-  people: { fill: '#593A36', ink: '#DEBDBA' },
-  tasks: { fill: '#364759', ink: '#B9CDDF' },
-  health: { fill: '#36594C', ink: '#B8E0D5' },
-  memory: { fill: '#433659', ink: '#C7BFD9' },
-  travel: { fill: '#594536', ink: '#E7C7B1' },
-  documents: { fill: '#524E3D', ink: '#CFCEC9' },
+  finance: { fill: '#5D533C', ink: '#E8D7B0' },
+  upkeep: { fill: '#3C5D40', ink: '#BCDCC0' },
+  people: { fill: '#5D403C', ink: '#E8B7B0' },
+  tasks: { fill: '#3C4D5D', ink: '#B2CCE6' },
+  health: { fill: '#3C5D51', ink: '#B6E2D2' },
+  memory: { fill: '#483C5D', ink: '#C7B6E2' },
+  travel: { fill: '#5D4A3C', ink: '#E8C8B0' },
+  documents: { fill: '#575342', ink: '#DBD6BD' },
 };
 
 export const TINT_KEYS = Object.keys(lightTints) as TintKey[];
@@ -136,15 +145,30 @@ const face = (w: FontWeightKey, fontSize: number, lineHeight: number, em = 0, ta
   ...(tabular ? { fontVariant: ['tabular-nums' as const] } : null),
 });
 
+/** Canvas type scale (Manrope). Line heights: 1.1 titles, 1.3 text, 1.05 stats. */
 const designType = {
-  display: face(800, 40, 44, -0.03, true),
-  title: face(800, 28, 32, -0.02),
-  heading: face(700, 20, 26),
-  body: face(600, 15, 22),
-  caption: face(600, 12, 16),
-  stat: face(800, 26, 28, 0, true),
-  /** working value: tile/row labels a step above caption */
-  label: face(700, 13, 18),
+  /** Stat · hero — 36/800, −0.02em, tabular */
+  display: face(800, 36, 38, -0.02, true),
+  /** Stat — canvas 26–32/800, −0.02em, tabular (28 is the working default) */
+  stat: face(800, 28, 30, -0.02, true),
+  /** Screen title — 30/800, −0.02em */
+  title: face(800, 30, 33, -0.02),
+  /** Section — 17/800, −0.01em */
+  heading: face(800, 17, 22, -0.01),
+  /** Row title — 15/700 */
+  rowTitle: face(700, 15, 20),
+  /** Body — 15/600 */
+  body: face(600, 15, 20),
+  /** Tile title — 14/700 */
+  tileTitle: face(700, 14, 18),
+  /** Chip / field label — 13/700 */
+  label: face(700, 13, 17),
+  /** Caption — 13/600, secondary */
+  caption: face(600, 13, 17),
+  /** Label caps — 12/700, +0.08em, uppercase at the call site */
+  labelCaps: face(700, 12, 16, 0.08),
+  /** Nav — 11/700 */
+  nav: face(700, 11, 13),
 };
 
 /**
@@ -173,12 +197,20 @@ export type TypeVariant = keyof typeof type;
 
 export const radius = {
   tile: 20,
+  /** card, row, sheet body */
   card: 16,
-  chip: 999,
-  input: 12,
+  sheet: 24,
+  /** bottom corners of the record header band */
+  band: 28,
+  button: 14,
+  input: 14,
   iconBox: 10,
+  checkbox: 7,
+  /** stacked-bar segment (14 tall) */
+  bar: 7,
+  chip: 999,
   /** @deprecated */ sm: 10,
-  /** @deprecated */ md: 12,
+  /** @deprecated */ md: 14,
   /** @deprecated */ lg: 16,
   /** @deprecated */ xl: 20,
   /** @deprecated */ pill: 999,
@@ -189,12 +221,13 @@ export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32
 export const layout = {
   gutter: 20,
   gridGap: 12,
-  bar: { height: 62, radius: 22, inset: 20 },
+  bar: { height: 66, radius: 22, inset: 20 },
   iconBox: 32,
   touch: 48,
 } as const;
 
-export const icon = { stroke: 2, strokeInBox: 2.2, size: 24 } as const;
+/** Canvas: 2px stroke everywhere; sizes 22 nav · 18 row · 16 tile · 14 chip. */
+export const icon = { stroke: 2, strokeInBox: 2, size: 24, nav: 22, row: 18, tile: 16, chip: 14 } as const;
 
 /* ------------------------------------------------------------------ */
 /* Legacy colour aliases                                               */
