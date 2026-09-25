@@ -17,7 +17,7 @@ export type ChipTone = 'neutral' | 'muted' | 'alert' | 'alertText' | 'accent' | 
  * Static chip. md (7/12, 13/700) for checklists and related records; sm
  * (3/8, 11/700) for category tags and status. `overlay` puts it on a tinted band.
  */
-export function Chip({ label, tint, tone = 'neutral', icon, onPress, onLongPress, small, overlay }: { label: string; tint?: TintKey; tone?: ChipTone; icon?: IconName | (string & {}); onPress?: () => void; onLongPress?: () => void; small?: boolean; overlay?: boolean }) {
+export function Chip({ label, tint, tone = 'neutral', icon, onPress, onLongPress, small, overlay, caps }: { label: string; tint?: TintKey; tone?: ChipTone; icon?: IconName | (string & {}); onPress?: () => void; onLongPress?: () => void; small?: boolean; overlay?: boolean; /** Stitch status pill: UPPERCASE micro label ('ACTIVE', 'URGENT', 'OPTIMAL'). */ caps?: boolean }) {
   const t = useTheme();
   const control = useControlFill();
   const [bg, fg] = tint
@@ -28,12 +28,12 @@ export function Chip({ label, tint, tone = 'neutral', icon, onPress, onLongPress
         alert: [t.c.alert.coralFill, t.c.alert.coralText],
         alertText: [control, t.c.alert.coralText],
         accent: [t.c.accent.mustard, t.c.accent.mustardInk],
-        ok: [t.tints.upkeep.fill, t.tints.upkeep.ink],
+        ok: [t.c.ok.sageFill, t.c.ok.sageText],
       }[tone];
   const body = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: small ? 3 : 7, paddingHorizontal: small ? 8 : 12, borderRadius: t.radius.chip, backgroundColor: overlay ? t.c.bg.overlay : bg, alignSelf: 'flex-start' }}>
       {icon ? <Icon name={icon} size={small ? 12 : 14} color={fg} /> : null}
-      <Text variant={small ? 'nav' : 'label'} color={fg} numberOfLines={1}>
+      <Text variant={caps ? 'labelMicro' : small ? 'nav' : 'label'} color={fg} numberOfLines={1} style={caps ? { textTransform: 'uppercase' } : undefined}>
         {label}
       </Text>
     </View>

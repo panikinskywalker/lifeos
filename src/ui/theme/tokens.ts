@@ -228,7 +228,7 @@ export type TypeVariant = keyof typeof type;
 /* ------------------------------------------------------------------ */
 
 export const radius = {
-  tile: 20,
+  tile: 24,
   /** card, row, sheet body */
   card: 16,
   sheet: 24,

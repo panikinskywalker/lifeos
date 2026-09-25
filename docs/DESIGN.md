@@ -67,7 +67,7 @@ Stitch role in brackets. Dark is derived by us (Stitch is light only).
 Buttons 15/700 (primary) and 15/600. Money values in rows 15/700.
 
 ### Radius
-Tile 20 · card / row / sheet body 16 · sheet top 24 · record band bottom 28 · button 14 · input 14 · icon-box 10 · checkbox 7 · bar segment 7 (14 tall) · chip / segment / toggle pill · nav bar 22.
+Tile 24 · card / row / nested slab / sheet body 16 · icon button 30% of its size (40 → 12) · sheet top 24 · record band bottom 28 · button 14 · input 14 · icon-box 10 · checkbox 7 · bar segment 7 (14 tall) · chip / segment / toggle pill · nav bar 22.
 
 ### Strokes & spacing
 Icons 2px, round caps and joins, 24 grid; sizes 22 nav · 18 row · 16 tile · 14 chip. Stacked-bar gap 3px. Page gutter 20, tile gap 12. Tile padding 16, row padding 12. Frames 390 wide. Nav bar 66 high, radius 22, inset 20, centre Talk raised (58 mustard disc, mic).

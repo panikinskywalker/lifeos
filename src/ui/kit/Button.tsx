@@ -74,7 +74,7 @@ export function IconButton({ icon, onPress, accessibilityLabel, color, filled, s
       disabled={disabled}
       hitSlop={pad}
       onPress={onPress}
-      style={({ pressed }) => [{ width: size, height: size, borderRadius: size / 2, backgroundColor: pressed && !filled ? t.c.bg.pressed : bg, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : pressed ? 0.75 : 1 }, style]}
+      style={({ pressed }) => [{ width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: pressed && !filled ? t.c.bg.pressed : bg, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : pressed ? 0.75 : 1 }, style]}
     >
       <View>
         <Icon name={icon} size={size >= 40 ? 20 : 18} color={color ?? t.c.fg.primary} />

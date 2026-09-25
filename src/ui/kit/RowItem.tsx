@@ -5,7 +5,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import type { TintKey } from '../theme/tokens';
 import { Chip, type ChipTone } from './Chip';
 import { IconBox, type IconBoxTone } from './IconBox';
-import { Surface } from './Surface';
+import { Surface, useSurface } from './Surface';
 import { Text } from './Text';
 
 /** Canvas checkbox: 24, radius 7, 2px tertiary border; ticked = sage with an ink check. */
@@ -62,6 +62,8 @@ export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, val
   const t = useTheme();
   const tone = (v: ValueTone) => ({ default: t.c.fg.primary, secondary: t.c.fg.secondary, alert: t.c.alert.coralText, ok: t.tints.health.ink })[v];
   const done = checked === true;
+  // On the ground a row is a tile; inside a tile it is a nested slab one level lighter (Stitch).
+  const fill = useSurface() === 'tile' ? t.c.bg.tileRaised : t.c.bg.tile;
   const showChevron = chevron ?? (!!onPress && checked === undefined && !onDone && !trailing);
   return (
     <Pressable
@@ -69,7 +71,7 @@ export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, val
       disabled={!onPress && !onLongPress}
       onPress={onPress}
       onLongPress={onLongPress}
-      style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, minHeight: 60, borderRadius: t.radius.card, backgroundColor: pressed ? t.c.bg.pressed : t.c.bg.tile }, style]}
+      style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, minHeight: 60, borderRadius: t.radius.card, backgroundColor: pressed ? t.c.bg.pressed : fill }, style]}
     >
       <Surface kind="tile">
         {icon ? <IconBox icon={icon} tint={tint} tone={iconTone} size={36} /> : null}

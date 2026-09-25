@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from '@ui/theme/ThemeProvider';
@@ -63,18 +63,26 @@ export default function ComponentGallery() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const outer = useTheme();
-  const [mode, setMode] = useState<'both' | 'light' | 'dark'>('both');
+  // One theme by default: every Svg is its own bitmap on Android, and both themes at once ran Expo Go out of memory.
+  const [mode, setMode] = useState<'both' | 'light' | 'dark'>(outer.dark ? 'dark' : 'light');
   const modes: Array<'light' | 'dark'> = mode === 'both' ? ['light', 'dark'] : [mode];
   return (
     <ToastProvider>
       <View style={{ flex: 1, backgroundColor: outer.c.bg.ground }}>
         <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: 12, gap: 16 }}>
           <ScreenHeader title="Components" subtitle="Canvas: Components & tokens" onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
-          <Segmented value={mode} onChange={setMode} options={[{ value: 'both', label: 'Both' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} />
+          <Segmented value={mode} onChange={setMode} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'both', label: 'Both' }]} />
         </View>
-        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-          {SECTIONS.map(([title, spec, Demo]) => (
-            <View key={title}>
+        <FlatList
+          data={SECTIONS}
+          keyExtractor={([title]) => title}
+          extraData={mode}
+          initialNumToRender={3}
+          windowSize={5}
+          removeClippedSubviews
+          contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+          renderItem={({ item: [title, spec, Demo] }) => (
+            <View>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 10 }}>
                 <Text variant="labelCaps" color="secondary" style={{ textTransform: 'uppercase' }}>
                   {title}
@@ -91,8 +99,8 @@ export default function ComponentGallery() {
                 </ThemeProvider>
               ))}
             </View>
-          ))}
-        </ScrollView>
+          )}
+        />
       </View>
     </ToastProvider>
   );
@@ -286,6 +294,13 @@ function Chips() {
         <Chip label="Settlement" tint="people" small />
         <Chip label="Uncategorised" tone="alert" small />
         <Chip label="in 3 d" tone="muted" small />
+      </Row>
+      <Row>
+        <Chip label="Active" tone="ok" caps />
+        <Chip label="Optimal" tone="ok" caps small />
+        <Chip label="Urgent" tone="alert" caps small />
+        <Chip label="Live sync" tone="neutral" caps small />
+        <Chip label="Agent briefing" tone="accent" caps small />
       </Row>
     </>
   );

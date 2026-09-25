@@ -22,7 +22,7 @@ export function Section({ title, meta, action, onAction, children, style }: { ti
   return (
     <View style={[{ gap: 8 }, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 4, paddingHorizontal: 4 }}>
-        <Text variant="heading" style={{ flex: 1 }} accessibilityRole="header" numberOfLines={1}>
+        <Text variant="labelCaps" color="secondary" style={{ flex: 1, textTransform: 'uppercase' }} accessibilityRole="header" numberOfLines={1}>
           {title}
         </Text>
         {meta ? (
