@@ -93,7 +93,7 @@ export interface ProviderConfig {
   enabled?: boolean; // default true
 }
 
-export function createProvider(cfg: ProviderConfig, role: 'main' | 'small' = 'main'): LLMProvider {
+export function createProvider(cfg: ProviderConfig, role: 'main' | 'small' = 'main', onModelChanged?: (model: string) => void): LLMProvider {
   const preset = PROVIDER_PRESETS[cfg.kind];
   const model = cfg.model || (role === 'small' ? preset.smallModel : preset.defaultModel);
   const baseUrl = cfg.baseUrl || preset.baseUrl;
@@ -102,7 +102,7 @@ export function createProvider(cfg: ProviderConfig, role: 'main' | 'small' = 'ma
     return createClaudeProvider({ apiKey: cfg.apiKey, model, baseUrl });
   }
   if (preset.needsKey && !cfg.apiKey) throw new ProviderError(`${cfg.kind}: no API key`, cfg.kind, 401);
-  return createOpenAICompatProvider({ id: cfg.kind, baseUrl, apiKey: cfg.apiKey, model });
+  return createOpenAICompatProvider({ id: cfg.kind, baseUrl, apiKey: cfg.apiKey, model, onModelChanged });
 }
 
 /* ------------------------------------------------------------------ */
@@ -113,6 +113,8 @@ export interface ChainEvents {
   onFallback?: (from: string, to: string, err: Error) => void;
   /** Called when a provider is rate-limited; lets the UI show "Groq is cooling down until 14:05". */
   onCooldown?: (provider: string, untilMs: number) => void;
+  /** A provider moved to another model because its own is gone. */
+  onModelChanged?: (provider: string, model: string) => void;
 }
 
 export function createChainProvider(providers: LLMProvider[], events: ChainEvents = {}): LLMProvider {
@@ -156,6 +158,8 @@ export function createChainProvider(providers: LLMProvider[], events: ChainEvent
 export interface AgentProviderSettings {
   /** Ordered chain, first is preferred. */
   chain: ProviderConfig[];
+  /** A provider switched model because its configured one is gone (so settings can keep it). */
+  onModelChanged?: (kind: ProviderKind, role: 'main' | 'small', model: string) => void;
   /** Wrap each provider (usage meter + cap, see routing.ts meterProvider). */
   wrap?: (p: LLMProvider, role: 'main' | 'small') => LLMProvider;
   events?: ChainEvents;
@@ -166,7 +170,10 @@ export function buildAgentProviders(s: AgentProviderSettings): { main: LLMProvid
   const active = s.chain.filter((c) => c.enabled !== false);
   const build = (role: 'main' | 'small') =>
     createChainProvider(
-      active.map((c) => (s.wrap ? s.wrap(createProvider(c, role), role) : createProvider(c, role))),
+      active.map((c) => {
+        const p = createProvider(c, role, s.onModelChanged ? (m) => s.onModelChanged!(c.kind, role, m) : undefined);
+        return s.wrap ? s.wrap(p, role) : p;
+      }),
       s.events,
     );
   return { main: build('main'), small: build('small') };

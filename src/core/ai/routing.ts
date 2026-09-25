@@ -54,7 +54,9 @@ export class UsageCapError extends Error {
 export function meterProvider(os: LifeOSContext, provider: LLMProvider, opts: { purpose: UsagePurpose; cap?: (providerId: string) => number | undefined; conversationId?: () => string | null }): LLMProvider {
   return {
     id: provider.id,
-    model: provider.model,
+    get model() {
+      return provider.model;
+    },
     async complete(args) {
       const cap = opts.cap?.(provider.id);
       if (cap && providerTokensThisMonth(os, provider.id) >= cap) throw new UsageCapError(provider.id, cap);

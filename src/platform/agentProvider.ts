@@ -38,6 +38,12 @@ export async function buildAgentFromSettings(os: LifeOSContext, events?: ChainEv
   const { main, small } = buildAgentProviders({
     chain: withKeys,
     events,
+    onModelChanged: (kind, role, model) => {
+      if (role !== 'main') return;
+      const st = useSettings.getState();
+      st.set('aiChain', st.aiChain.map((c) => (c.kind === kind ? { ...c, model } : c)));
+      events?.onModelChanged?.(kind, model);
+    },
     wrap: (p, role) => meterProvider(os, p, { purpose: role === 'small' ? 'facts' : 'chat', cap }),
   });
   let smart: LLMProvider | undefined;

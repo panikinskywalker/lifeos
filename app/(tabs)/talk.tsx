@@ -61,6 +61,7 @@ export default function TalkTab() {
     let alive = true;
     buildAgentFromSettings(os, {
       onFallback: (from, to) => alive && setNotice(`${from} unavailable — using ${to}`),
+      onModelChanged: (p, model) => alive && setNotice(`${p}: its model was retired — now using ${model}`),
       onCooldown: (p, until) => alive && setNotice(`${p} is rate-limited until ${new Date(until).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`),
     }).then((a) => alive && setAgent(a));
     return () => {

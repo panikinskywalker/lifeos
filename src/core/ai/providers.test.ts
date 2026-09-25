@@ -7,7 +7,7 @@ const tools: ToolSpec[] = [{ name: 'mark_cycle_done', description: 'Mark a cycle
 
 function mockFetch(handler: (url: string, body: any) => { status?: number; json?: unknown; text?: string; headers?: Record<string, string> }) {
   const fn = vi.fn(async (url: string, init: RequestInit) => {
-    const body = JSON.parse(String(init.body));
+    const body = init?.body ? JSON.parse(String(init.body)) : null;
     const r = handler(url, body);
     const status = r.status ?? 200;
     return {
@@ -135,5 +135,34 @@ describe('Claude in the chain', () => {
     const r = await createChainProvider([claude, groq]).complete({ system: '', messages: [{ role: 'user', content: 'hi' }], tools: [] });
     expect(r.content[0]).toEqual({ type: 'text', text: 'from groq' });
     expect(groq.model).toBe('m');
+  });
+});
+
+describe('retired models', () => {
+  it('asks the host for its models, switches to a good one, retries and reports it', async () => {
+    const { pickModel } = await import('./openaiCompat');
+    const seen: string[] = [];
+    mockFetch((url, body) => {
+      if (url.endsWith('/models')) return { json: { data: [{ id: 'whisper-large-v3' }, { id: 'llama-3.1-8b-instant' }, { id: 'openai/gpt-oss-120b' }, { id: 'llama-guard-4-12b' }] } };
+      seen.push(body.model);
+      if (body.model === 'llama-3.3-70b-versatile') return { status: 404, text: '{"error":{"message":"The model `llama-3.3-70b-versatile` has been decommissioned","code":"model_not_found"}}' };
+      return { json: { choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] } };
+    });
+    const changed: string[] = [];
+    const p = createOpenAICompatProvider({ id: 'groq', baseUrl: 'https://api.groq.com/openai/v1', apiKey: 'k', model: 'llama-3.3-70b-versatile', onModelChanged: (m) => changed.push(m) });
+    const r = await p.complete({ system: '', messages: [{ role: 'user', content: 'hi' }], tools: [] });
+    expect(r.content[0]).toEqual({ type: 'text', text: 'ok' });
+    expect(seen).toEqual(['llama-3.3-70b-versatile', 'openai/gpt-oss-120b']);
+    expect(changed).toEqual(['openai/gpt-oss-120b']);
+    expect(p.model).toBe('openai/gpt-oss-120b');
+    expect(pickModel(['llama-3.1-8b-instant', 'openai/gpt-oss-120b'], true)).toBe('llama-3.1-8b-instant');
+  });
+
+  it('a model error with nothing to switch to falls through the chain', async () => {
+    mockFetch((url) => (url.includes('groq') ? (url.endsWith('/models') ? { status: 500, text: 'down' } : { status: 404, text: 'model_not_found: The model does not exist' }) : { json: { choices: [{ message: { content: 'from gemini' }, finish_reason: 'stop' }] } }));
+    const groq = createOpenAICompatProvider({ id: 'groq', baseUrl: 'https://api.groq.com/openai/v1', apiKey: 'k', model: 'gone' });
+    const gemini = createOpenAICompatProvider({ id: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: 'k', model: 'm' });
+    const r = await createChainProvider([groq, gemini]).complete({ system: '', messages: [{ role: 'user', content: 'hi' }], tools: [] });
+    expect(r.content[0]).toEqual({ type: 'text', text: 'from gemini' });
   });
 });

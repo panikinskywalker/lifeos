@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Linking, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { PROVIDER_PRESETS, type ProviderConfig, type ProviderKind } from '@core/ai/providers';
+import { listModels, pickModel } from '@core/ai/openaiCompat';
 import { providerTokensThisMonth, usageSummary } from '@core/ai/routing';
 import { useLive, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -96,6 +97,20 @@ function ProviderCard({ cfg, first, last, onChange, onMove, cap, onCap }: { cfg:
   const [key, setKey] = useState('');
   const [stored, setStored] = useState<string | null>(null);
   const used = useLive((o) => providerTokensThisMonth(o, cfg.kind), [cfg.kind]);
+  const [models, setModels] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const loadModels = async () => {
+    setLoading(true);
+    try {
+      const list = await listModels(cfg.baseUrl || preset.baseUrl, stored ?? undefined);
+      setModels(list);
+      if (!list.length) toast.show({ message: `${preset.label} returned no chat models`, icon: 'info' });
+    } catch (e) {
+      toast.show({ message: `Couldn’t load models: ${(e as Error).message.slice(0, 80)}`, icon: 'alert' });
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => {
     if (preset.needsKey) getProviderKey(cfg.kind).then((v) => { setKey(v ?? ''); setStored(v ?? null); });
   }, [cfg.kind, preset.needsKey]);
@@ -131,7 +146,18 @@ function ProviderCard({ cfg, first, last, onChange, onMove, cap, onCap }: { cfg:
               </View>
             </View>
           ) : null}
-          <TextField label="Model" value={cfg.model ?? ''} onChange={(v) => onChange({ model: v.trim() || undefined })} placeholder={preset.defaultModel || 'model id'} autoCapitalize="none" autoCorrect={false} />
+          <TextField label="Model" value={cfg.model ?? ''} onChange={(v) => onChange({ model: v.trim() || undefined })} placeholder={preset.defaultModel || 'model id'} autoCapitalize="none" autoCorrect={false} hint="If this model is retired, the agent switches to one the provider still offers" />
+          {cfg.kind !== 'claude' && ready ? (
+            models ? (
+              <ChipRow>
+                {[...models].sort((a, b) => (a === pickModel(models) ? -1 : b === pickModel(models) ? 1 : a.localeCompare(b))).slice(0, 14).map((m) => (
+                  <FilterChip key={m} label={m === pickModel(models) ? `${m} · suggested` : m} selected={(cfg.model || preset.defaultModel) === m} onPress={() => onChange({ model: m })} />
+                ))}
+              </ChipRow>
+            ) : (
+              <Button title={loading ? 'Loading…' : 'Show available models'} icon="search" size="sm" variant="secondary" disabled={loading} onPress={() => void loadModels()} />
+            )
+          ) : null}
           {cfg.kind === 'ollama' || cfg.kind === 'custom' ? <TextField label="Address" value={cfg.baseUrl ?? ''} onChange={(v) => onChange({ baseUrl: v.trim() || undefined })} placeholder={preset.baseUrl || 'http://…/v1'} autoCapitalize="none" autoCorrect={false} hint={cfg.kind === 'ollama' ? 'Your Mac’s Tailscale address, port 11434, ending in /v1' : undefined} /> : null}
           <NumberField label="Monthly token cap" value={cap || undefined} onChange={(v) => onCap(v)} placeholder="No cap" hint="Stops using this provider for the month once reached" />
           {cap ? <ProgressBar value={used / cap} color={used >= cap ? t.c.alert.coral : t.c.accent.gold} accessibilityLabel={`${k(used)} of ${k(cap)} tokens used`} /> : null}
