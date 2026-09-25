@@ -1,8 +1,8 @@
 /**
- * Design tokens — source of truth is the LifeOS Claude Design canvas
- * ("Components & tokens" sheet), recorded in docs/DESIGN.md. Near-white
- * ground, tiles one shade off, mustard accent, muted module tints with a
- * matching ink, Manrope with tabular numerals.
+ * Design tokens — colours from the Stitch "LifeOS Android design system"
+ * (M1.5), layout and components from the LifeOS Claude Design canvas; both
+ * recorded in docs/DESIGN.md. Warm cream ground, tiles in surface levels,
+ * gold/mustard accent, module tints from the Stitch data palette.
  *
  * No shadows, no gradients. A value the canvas does not specify is marked
  * "working value".
@@ -13,9 +13,14 @@
 /* ------------------------------------------------------------------ */
 
 export interface Colors {
-  /** tileRaised = the canvas's "nested / control" surface: controls sitting on a tile. */
-  /** overlay: controls on a tinted record band; pill: the Done pill and an off toggle's thumb. */
-  bg: { ground: string; tile: string; tileRaised: string; bar: string; pressed: string; scrim: string; overlay: string; pill: string };
+  /**
+   * Stitch surface levels: ground = surface, tile = container-high (bento
+   * tiles), tileRaised = container-low (a slab nested in a tile), lowest =
+   * white (segmented track, composer), container = the level between, dim =
+   * tracks and pressed controls.
+   */
+  /** overlay: controls on a photo or tinted record band; pill: the Done pill and an off toggle's thumb. */
+  bg: { ground: string; tile: string; tileRaised: string; lowest: string; container: string; dim: string; bar: string; pressed: string; scrim: string; overlay: string; pill: string };
   /** onBar / onBarActive: nav bar icon+label, inactive and active (active is mustard for the icon). */
   /** onBarText: text on the bar colour (toast). */
   fg: { primary: string; secondary: string; tertiary: string; onBar: string; onBarActive: string; onBarText: string };
@@ -23,71 +28,80 @@ export interface Colors {
   line: string;
   /** Unfilled part of a Ring. */
   ringTrack: string;
-  /** Timeline rail. */
+  /** Timeline rail, chart gridlines. */
   rail: string;
-  /** Spending chart series, in order: sage · peach · rose · sky · stone (canvas). */
+  /** Data series, in order: mint · sky · lavender · rose · olive (Stitch). */
   chart: readonly [string, string, string, string, string];
-  /** mustardSoft: the reminder / highlight icon-box behind a bell. */
-  accent: { mustard: string; mustardInk: string; mustardSoft: string };
+  /** mustard: primary-container (actions, selected). gold: primary (links, accent text/icons). mustardSoft: primary-fixed. */
+  accent: { mustard: string; mustardInk: string; mustardSoft: string; gold: string };
   /** coral / sage are fills, rings and dots; *Text variants are for text and icons. */
   alert: { coral: string; coralText: string; coralInk: string; coralFill: string };
-  ok: { sage: string; sageText: string; sageInk: string };
+  /** sageFill: the "done / optimal" pill (secondary-container). */
+  ok: { sage: string; sageText: string; sageInk: string; sageFill: string };
 }
 
+/** Stitch "LifeOS Android design system" palette (Material 3 roles, warm cream + gold + sage + steel). */
 export const lightTokens: Colors = {
   bg: {
-    ground: '#FAFAF7',
-    tile: '#F1F1EC',
-    tileRaised: '#FAFAF7',
-    bar: '#17201C',
-    pressed: '#E4E4DD', // working value: pressed = track
-    scrim: '#17201C47', // canvas: scrim 28%
-    overlay: '#FFFFFF8C', // canvas: white 55%
+    ground: '#FCF9F4', // surface
+    tile: '#EBE8E3', // surface-container-high
+    tileRaised: '#F6F3EE', // surface-container-low
+    lowest: '#FFFFFF', // surface-container-lowest
+    container: '#F0EDE8', // surface-container
+    dim: '#DCDAD5', // surface-dim
+    bar: '#1C1C19', // our dark bar, on-surface ink
+    pressed: '#E5E2DD', // surface-container-highest
+    scrim: '#1C1C1947',
+    overlay: '#FFFFFFB3',
     pill: '#FFFFFF',
   },
   fg: {
-    primary: '#1B1F1D',
-    secondary: '#6F7773',
-    tertiary: '#A3A9A5',
-    onBar: '#AEB5B0',
+    primary: '#1C1C19', // on-surface
+    secondary: '#4D4635', // on-surface-variant
+    tertiary: '#7F7663', // outline
+    onBar: '#B5B0A6',
     onBarActive: '#F3C84B',
-    onBarText: '#EDEEEA',
+    onBarText: '#F3F0EB', // inverse-on-surface
   },
-  line: '#E4E4DD',
-  ringTrack: '#E3E3DB',
-  rail: '#D3D3CB',
-  chart: ['#5F7F65', '#C9825A', '#B96E6A', '#6C8DB0', '#B5B2A6'],
-  accent: { mustard: '#F3C84B', mustardInk: '#1B1F1D', mustardSoft: '#FBEFC6' },
-  alert: { coral: '#E9635A', coralText: '#B8382F', coralInk: '#FFFFFF', coralFill: '#F8D9D5' },
-  ok: { sage: '#8FB596', sageText: '#2F6142', sageInk: '#1B1F1D' },
+  line: '#DCDAD5', // surface-dim
+  ringTrack: '#DCDAD5',
+  rail: '#D1C5AF', // outline-variant
+  chart: ['#6F9E88', '#7F9BB0', '#8C7FB0', '#C89AA6', '#8E9B70'],
+  accent: { mustard: '#F3C84B', mustardInk: '#241A00', mustardSoft: '#FFE08F', gold: '#755B00' },
+  alert: { coral: '#E9635A', coralText: '#BA1A1A', coralInk: '#FFFFFF', coralFill: '#FFDAD6' },
+  ok: { sage: '#BFCC9E', sageText: '#57633D', sageInk: '#151F02', sageFill: '#D8E5B5' },
 };
 
+/** Derived by us — Stitch ships light only. Material-style dark roles of the same hues. */
 export const darkTokens: Colors = {
   bg: {
-    ground: '#141614',
-    tile: '#1E211E',
-    tileRaised: '#272B27',
-    bar: '#242A26',
-    pressed: '#333833', // working value: pressed = track
-    scrim: '#00000073', // canvas: black 45%
-    overlay: '#FFFFFF1A', // canvas: white 10%
-    pill: '#2E332E',
+    ground: '#141311',
+    tile: '#252420',
+    tileRaised: '#1D1C19',
+    lowest: '#0F0E0C',
+    container: '#211F1C',
+    dim: '#3A3833',
+    bar: '#2B2A26',
+    pressed: '#33312C',
+    scrim: '#00000073',
+    overlay: '#0000004D',
+    pill: '#33312C',
   },
   fg: {
-    primary: '#EDEEEA',
-    secondary: '#9AA19C',
-    tertiary: '#6C736E',
-    onBar: '#8F978F',
+    primary: '#E6E2DC',
+    secondary: '#D1C5AF',
+    tertiary: '#9A9079',
+    onBar: '#9A9079',
     onBarActive: '#F3C84B',
-    onBarText: '#EDEEEA',
+    onBarText: '#E6E2DC',
   },
-  line: '#333833',
-  ringTrack: '#343934',
-  rail: '#2E332E',
-  chart: ['#8FB596', '#E0A27E', '#D9908B', '#93B1D1', '#7F7E76'],
-  accent: { mustard: '#F3C84B', mustardInk: '#1B1F1D', mustardSoft: '#5D533C' },
-  alert: { coral: '#F07A71', coralText: '#F5A29B', coralInk: '#1B1F1D', coralFill: '#4A2724' },
-  ok: { sage: '#5F7F65', sageText: '#BCDCC0', sageInk: '#EDEEEA' },
+  line: '#3A3833',
+  ringTrack: '#3A3833',
+  rail: '#4D4635',
+  chart: ['#8FC0A8', '#9FBBD0', '#AEA2D0', '#E0B6C0', '#AEBB8E'],
+  accent: { mustard: '#F3C84B', mustardInk: '#241A00', mustardSoft: '#584400', gold: '#ECC245' },
+  alert: { coral: '#F07A71', coralText: '#FFB4AB', coralInk: '#1C1C19', coralFill: '#5C1F1A' },
+  ok: { sage: '#5B6741', sageText: '#BFCC9E', sageInk: '#E6E2DC', sageFill: '#404B27' },
 };
 
 export type TintKey = 'finance' | 'upkeep' | 'people' | 'tasks' | 'health' | 'memory' | 'travel' | 'documents';
@@ -96,27 +110,27 @@ export interface Tint {
   ink: string;
 }
 
-/** Canvas module tints. Things share sage with Upkeep. */
+/** Module tints redrawn from the Stitch data palette. Things share mint with Upkeep. */
 export const lightTints: Record<TintKey, Tint> = {
-  finance: { fill: '#F4E8CC', ink: '#6E5010' },
-  upkeep: { fill: '#CFE0D1', ink: '#2F6142' },
-  people: { fill: '#EFCDC8', ink: '#94423C' },
-  tasks: { fill: '#CFDDEB', ink: '#2E5A84' },
-  health: { fill: '#CDE6DD', ink: '#24654B' },
-  memory: { fill: '#DDD5EA', ink: '#544483' },
-  travel: { fill: '#F4D9C4', ink: '#8E4F22' },
-  documents: { fill: '#DEDCD3', ink: '#54544A' },
+  finance: { fill: '#F7E7B4', ink: '#584400' }, // gold
+  upkeep: { fill: '#CFE2D8', ink: '#284938' }, // mint
+  people: { fill: '#F0DCE1', ink: '#7A3E4E' }, // rose
+  tasks: { fill: '#D3E3EF', ink: '#2E4A5C' }, // steel
+  health: { fill: '#D8E5B5', ink: '#404B27' }, // sage
+  memory: { fill: '#E1DCEF', ink: '#4B3F75' }, // lavender
+  travel: { fill: '#F5DCCB', ink: '#7A4420' }, // terracotta
+  documents: { fill: '#E5E2DD', ink: '#4D4635' }, // stone
 };
 
 export const darkTints: Record<TintKey, Tint> = {
-  finance: { fill: '#5D533C', ink: '#E8D7B0' },
-  upkeep: { fill: '#3C5D40', ink: '#BCDCC0' },
-  people: { fill: '#5D403C', ink: '#E8B7B0' },
-  tasks: { fill: '#3C4D5D', ink: '#B2CCE6' },
-  health: { fill: '#3C5D51', ink: '#B6E2D2' },
-  memory: { fill: '#483C5D', ink: '#C7B6E2' },
-  travel: { fill: '#5D4A3C', ink: '#E8C8B0' },
-  documents: { fill: '#575342', ink: '#DBD6BD' },
+  finance: { fill: '#584400', ink: '#FFE08F' },
+  upkeep: { fill: '#284938', ink: '#CFE2D8' },
+  people: { fill: '#5A2E3A', ink: '#F0DCE1' },
+  tasks: { fill: '#2E4A5C', ink: '#C9E6FD' },
+  health: { fill: '#404B27', ink: '#DAE8B8' },
+  memory: { fill: '#3D3361', ink: '#E1DCEF' },
+  travel: { fill: '#5E3418', ink: '#F5DCCB' },
+  documents: { fill: '#4D4635', ink: '#E5E2DD' },
 };
 
 export const TINT_KEYS = Object.keys(lightTints) as TintKey[];

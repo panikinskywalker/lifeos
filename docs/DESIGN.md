@@ -1,47 +1,52 @@
-# LifeOS — design system (v1.0, 25 Sep 2026)
+# LifeOS — design system (v1.1, 25 Sep 2026)
 
-Source of truth: the **LifeOS** Claude Design canvas (https://claude.ai/artifact/RVT9hLfcQ7tvgXvZN1x6cF), its "Components & tokens" sheet and 16 screens (Today, Upkeep, This week, Talk — light and dark — Browse, Transactions, Vehicle / Person / Subscription records, New routine, You). Values below are copied from it; code lives in `src/ui/theme/tokens.ts`.
+Sources of truth: **colours** from the Stitch "LifeOS Android design system" (M1.5, `stitch_lifeos_android_design_system.zip`, Material 3 roles); **layout and components** from the **LifeOS** Claude Design canvas (https://claude.ai/artifact/RVT9hLfcQ7tvgXvZN1x6cF) and, phase by phase (MILESTONES M1.5), the Stitch screens. Code lives in `src/ui/theme/tokens.ts`.
 
 ## Direction
 
-Apple-Health-style bento, calmer: near-white ground, tiles one shade off, muted module tints each with an ink of the same hue, big tabular numbers, thin 2px stroke icons (Lucide geometry). No shadows, no gradients, no emoji, no glassmorphism.
+Calm bento, editorial: warm cream ground, tiles in stepped surface levels (a slab nested in a tile is one level lighter), gold/mustard accent, sage for "done / optimal", steel and soft data colours for charts, big tabular numbers, small UPPERCASE labels, thin 2px stroke icons (Lucide geometry). No shadows, no gradients, no emoji, no glassmorphism. Our dark bottom bar with the raised mic stays.
 
 ## Tokens
 
 ### Colour · surfaces & text
+Stitch role in brackets. Dark is derived by us (Stitch is light only).
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `bg.ground` | `#FAFAF7` | `#141614` | screen background, sheet body |
-| `bg.tile` | `#F1F1EC` | `#1E211E` | tiles, cards, rows, inputs on the ground |
-| `bg.tileRaised` (nested / control) | `#FAFAF7` | `#272B27` | controls sitting on a tile |
-| `bg.bar` (nav bar, toast) | `#17201C` | `#242A26` | bottom bar, toast |
-| `fg.primary` (ink) | `#1B1F1D` | `#EDEEEA` | headings, numbers, body |
-| `fg.secondary` | `#6F7773` | `#9AA19C` | captions, meta |
-| `fg.tertiary` | `#A3A9A5` | `#6C736E` | chevrons, faint icons |
-| `fg.onBar` | `#AEB5B0` | `#8F978F` | inactive nav |
-| `line` (track) | `#E4E4DD` | `#333833` | segmented / toggle / chip tracks |
-| `ringTrack` | `#E3E3DB` | `#343934` | unfilled ring |
-| `accent.mustard` | `#F3C84B` | `#F3C84B` | primary action, Talk, selected, today |
-| `accent.mustardInk` | `#1B1F1D` | `#1B1F1D` | text/icons on mustard |
-| `accent.mustardSoft` | `#FBEFC6` | `#5D533C`* | reminder icon-box |
-| `alert.coral` | `#E9635A` | `#F07A71` | overdue fills, dots |
-| `alert.coralText` | `#B8382F` | `#F5A29B` | overdue text and icons |
-| `alert.coralFill` | `#F8D9D5` | `#4A2724` | overdue chip / icon-box |
-| `ok.sage` | `#8FB596` | `#5F7F65` | done fill |
+| `bg.ground` (surface) | `#FCF9F4` | `#141311` | screen background, sheet body |
+| `bg.tile` (container-high) | `#EBE8E3` | `#252420` | bento tiles, cards, rows |
+| `bg.tileRaised` (container-low) | `#F6F3EE` | `#1D1C19` | slab / control nested in a tile |
+| `bg.container` (container) | `#F0EDE8` | `#211F1C` | secondary tiles, chat bubbles |
+| `bg.lowest` (container-lowest) | `#FFFFFF` | `#0F0E0C` | segmented track, composer |
+| `bg.dim` (surface-dim) | `#DCDAD5` | `#3A3833` | tracks, quiet buttons |
+| `bg.bar` | `#1C1C19` | `#2B2A26` | bottom bar, toast (ours) |
+| `fg.primary` (on-surface) | `#1C1C19` | `#E6E2DC` | headings, numbers, body |
+| `fg.secondary` (on-surface-variant) | `#4D4635` | `#D1C5AF` | captions, meta |
+| `fg.tertiary` (outline) | `#7F7663` | `#9A9079` | chevrons, faint icons, axis labels |
+| `line` / `ringTrack` | `#DCDAD5` | `#3A3833` | tracks, hairlines |
+| `rail` (outline-variant) | `#D1C5AF` | `#4D4635` | timeline rail, chart gridlines |
+| `accent.mustard` (primary-container) | `#F3C84B` | `#F3C84B` | primary action, Talk, selected |
+| `accent.mustardInk` (on-primary-fixed) | `#241A00` | `#241A00` | text/icons on mustard |
+| `accent.gold` (primary) | `#755B00` | `#ECC245` | accent text, links, icons |
+| `accent.mustardSoft` (primary-fixed) | `#FFE08F` | `#584400` | reminder icon-box, highlight |
+| `alert.coral` | `#E9635A` | `#F07A71` | overdue / flag dots and fills |
+| `alert.coralText` (error) | `#BA1A1A` | `#FFB4AB` | overdue text and icons |
+| `alert.coralFill` (error-container) | `#FFDAD6` | `#5C1F1A` | overdue chip / icon-box |
+| `ok.sage` (secondary-fixed-dim) | `#BFCC9E` | `#5B6741` | done fill, checkbox |
+| `ok.sageText` (secondary) | `#57633D` | `#BFCC9E` | "Done", positive deltas |
+| `ok.sageFill` (secondary-container) | `#D8E5B5` | `#404B27` | "Optimal / done" pill |
+| `chart[0..4]` | `#6F9E88` `#7F9BB0` `#8C7FB0` `#C89AA6` `#8E9B70` | lighter of each | mint · sky · lavender · rose · olive |
 
-\* working value (the canvas shows it in light only).
-
-### Module tints (tile fill / ink of the same hue)
+### Module tints (tile fill / ink of the same hue, from the Stitch data palette)
 | Module | Light fill | Light ink | Dark fill | Dark ink |
 |---|---|---|---|---|
-| Finance · sand | `#F4E8CC` | `#6E5010` | `#5D533C` | `#E8D7B0` |
-| Upkeep · sage (Things share it) | `#CFE0D1` | `#2F6142` | `#3C5D40` | `#BCDCC0` |
-| People · rose | `#EFCDC8` | `#94423C` | `#5D403C` | `#E8B7B0` |
-| Tasks · sky | `#CFDDEB` | `#2E5A84` | `#3C4D5D` | `#B2CCE6` |
-| Health · mint | `#CDE6DD` | `#24654B` | `#3C5D51` | `#B6E2D2` |
-| Notes / Memory · lavender | `#DDD5EA` | `#544483` | `#483C5D` | `#C7B6E2` |
-| Travel · peach | `#F4D9C4` | `#8E4F22` | `#5D4A3C` | `#E8C8B0` |
-| Documents · stone | `#DEDCD3` | `#54544A` | `#575342` | `#DBD6BD` |
+| Finance · gold | `#F7E7B4` | `#584400` | `#584400` | `#FFE08F` |
+| Upkeep · mint (Things share it) | `#CFE2D8` | `#284938` | `#284938` | `#CFE2D8` |
+| People · rose | `#F0DCE1` | `#7A3E4E` | `#5A2E3A` | `#F0DCE1` |
+| Tasks · steel | `#D3E3EF` | `#2E4A5C` | `#2E4A5C` | `#C9E6FD` |
+| Health · sage | `#D8E5B5` | `#404B27` | `#404B27` | `#DAE8B8` |
+| Notes / Memory · lavender | `#E1DCEF` | `#4B3F75` | `#3D3361` | `#E1DCEF` |
+| Travel · terracotta | `#F5DCCB` | `#7A4420` | `#5E3418` | `#F5DCCB` |
+| Documents · stone | `#E5E2DD` | `#4D4635` | `#4D4635` | `#E5E2DD` |
 
 ### Type · Manrope, tabular numerals wherever numbers appear
 | Style | Spec | Token |
@@ -67,8 +72,8 @@ Icons 2px, round caps and joins, 24 grid; sizes 22 nav · 18 row · 16 tile · 1
 ### Icons
 Inline SVG, 24 viewBox, stroke 2, round caps/joins, `currentColor`. Never an icon font. Required set: home, wrench, sparkle (Talk), grid, user, search, plus, check, bell, calendar, car, card, receipt, repeat, tag, link, paperclip, comment, clock, alert, chevron-right, chevron-left, more, trash, undo, edit, filter, sort, star, pin, mic, send, share, lock, moon, sun, settings, shoe, shirt, drop, leaf, heart, activity, book, plane, file, folder, people, wallet, chart, trend.
 
-### Open contrast items
-`fg.secondary` on tile is 4.06:1 and on ground 4.40:1, `alert.coralText` on `alert.coralFill` 4.36:1 — just under AA 4.5 for 13px text. Kept as designed; raise with the canvas if it matters on device.
+### Contrast
+All text pairs meet AA 4.5 in both themes (secondary on tile 7.7 / 9.1, every tint ink on its fill ≥ 6.0, coral text on coral fill 5.0 / 7.4). `fg.tertiary` on tile is 3.7:1 in light — used for icons and axis labels only, never body text.
 
 ## Components (M1 builds these)
 Tile (1×1, 2×1, 2×2; header row = icon-box + label + meta; body = stat or list; optional footer StackedBar) · StatTile · StackedBar (rounded segments, 3 px gaps, legend row) · Ring · RowItem (icon-box · title/sub · trailing value or checkbox) · Chip / FilterChip · Sheet (bottom) · Toast with Undo · EmptyState (illustration-free: icon-box + one line + one button) · Segmented · Form fields (text, number, money, date, select, relation picker, tags) · RecordHeader (module tint band, title, status chip, key stats) · SectionCard · WeekStrip (Upkeep) · AgentCard (record / cycle / list / number / chart) · Composer (text, mic, send).
