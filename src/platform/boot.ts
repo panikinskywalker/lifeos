@@ -9,6 +9,7 @@ import { registerBackgroundTick } from './background';
 import { notifications } from './notifications';
 import { openDatabase } from './openDatabase';
 import { cycleNudges } from '@core/cycles/nudges';
+import { runDumpExtraction } from './dumpExtraction';
 
 let instance: LifeOSContext | null = null;
 let navigateRef: (path: string) => void = () => {};
@@ -84,10 +85,13 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   bus.on('entity.updated', resync);
   bus.on('entity.deleted', resync);
   bus.on('app.foreground', resync);
+  // Dumps saved offline or before a key was added get extracted now.
+  bus.on('app.foreground', () => void runDumpExtraction(os));
 
   // Run any due scheduled jobs now, then hand off to the background task.
   await os.scheduler.tick();
   registerBackgroundTick(os);
+  void runDumpExtraction(os);
 
   instance = os;
   return os;

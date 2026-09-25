@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundTask from 'expo-background-task';
 import type { LifeOSContext } from '@core/registry/context';
+import { runDumpExtraction } from './dumpExtraction';
 
 const TASK = 'lifeos-scheduler-tick';
 let osRef: LifeOSContext | null = null;
@@ -9,7 +10,10 @@ let osRef: LifeOSContext | null = null;
 // Task bodies must be defined at module scope.
 TaskManager.defineTask(TASK, async () => {
   try {
-    if (osRef) await osRef.scheduler.tick();
+    if (osRef) {
+      await osRef.scheduler.tick();
+      await runDumpExtraction(osRef);
+    }
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch {
     return BackgroundTask.BackgroundTaskResult.Failed;
