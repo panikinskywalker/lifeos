@@ -49,7 +49,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 
 **Goal:** the "filing cabinet with dates" works without the agent.
 
-- [ ] Cycle engine in `src/core/cycles/`: kinds (interval / fixed date / meter / whichever-first), `markDone`, `snooze`, `setNextDue`, `skip`, stats. Unit-tested.
+- [x] Cycle engine in `src/core/cycles/`: kinds (interval / fixed date / meter / whichever-first), `markDone`, `snooze`, `setNextDue`, `skip`, stats. Unit-tested.
 - [ ] Cycle templates per entity type; Vehicle/Subscription/Document/Person/Item/Routine get defaults on create.
 - [ ] Meter readings (odometer) on Vehicle; cycles compute from the latest reading.
 - [ ] **Routine** entity type (chores) with kind / minutes / weekday preference.

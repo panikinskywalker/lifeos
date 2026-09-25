@@ -15,6 +15,11 @@ export class TimelineRepo {
     return { ...ev, id, createdAt: now, meta: ev.meta ?? {} };
   }
 
+  /** Drop an event — only for Undo of the action that just wrote it. */
+  remove(id: string): void {
+    this.db.run(`DELETE FROM timeline_events WHERE id=?`, [id]);
+  }
+
   forEntity(entityId: string, limit = 100): TimelineEvent[] {
     return this.db.all(`SELECT * FROM timeline_events WHERE entity_id = ? ORDER BY occurred_at DESC LIMIT ?`, [entityId, limit]).map(toEvent);
   }

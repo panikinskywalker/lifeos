@@ -3,6 +3,7 @@ import type { Registry } from './registry';
 import type { EntityRepo } from '../repo/entityRepo';
 import type { AttachmentRepo, CommentRepo, CustomFieldRepo, DashboardRepo, ModuleRepo, RelationRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from '../repo/sideRepos';
 import type { AutomationEngine } from '../automation/engine';
+import type { CycleRepo } from '../cycles/cycleRepo';
 import type { Scheduler } from '../automation/scheduler';
 
 /**
@@ -16,6 +17,7 @@ export interface LifeOSContext {
   relations: RelationRepo;
   tags: TagRepo;
   attachments: AttachmentRepo;
+  cycles: CycleRepo;
   comments: CommentRepo;
   reminders: ReminderRepo;
   customFields: CustomFieldRepo;
