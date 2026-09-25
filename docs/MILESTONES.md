@@ -31,7 +31,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Tokens: Stitch palette (cream surface + 5 container levels, gold primary #755B00 / mustard #F3C84B, sage, steel, rose/lavender/sky/mint data colours), module tints from it, derived dark theme; DESIGN.md updated.
 - [x] Type: Plus Jakarta Sans via expo-font, 600-weight scale, UPPERCASE micro labels, tabular metrics.
 - [x] Components restyled: nested container levels, status pills, section labels; gallery fixed (Expo Go crash) and updated.
-- [ ] Record cover photo: pick from gallery/camera, stored on the phone, shown as a photo header on the record page (Vehicle, Place, Trip, Person, Item…); remove/replace.
+- [x] Record cover photo: pick from gallery/camera, stored on the phone, shown as a photo header on the record page (Vehicle, Place, Trip, Person, Item…); remove/replace.
 - [ ] Agent & API key screen moved onto the kit.
 
 **D2 — data components (with M2)**

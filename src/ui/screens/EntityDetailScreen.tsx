@@ -16,7 +16,7 @@ import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 
-type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags';
+type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover';
 
 /**
  * Universal record page: tinted header with key stats, fields, module
@@ -31,6 +31,7 @@ export function EntityDetailScreen({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
   const entity = useLive((o) => o.entities.get(id), [id]);
   const tags = useLive((o) => o.tags.forEntity(id), [id]);
+  const cover = useLive((o) => o.attachments.cover(id), [id]);
   const [panel, setPanel] = useState<Panel>(null);
   const back = () => (router.canGoBack() ? router.back() : router.replace('/browse'));
   if (!entity) {
@@ -58,6 +59,8 @@ export function EntityDetailScreen({ id }: { id: string }) {
         <RecordHeader
           tint={tint}
           icon={def.icon}
+          cover={cover?.uri}
+          onCoverPress={() => setPanel('cover')}
           title={entity.title}
           subtitle={[def.label, entity.subtitle].filter(Boolean).join(' · ')}
           status={def.statuses?.length ? { label: statusDef?.label ?? 'No status', onPress: () => setPanel('status') } : undefined}
@@ -106,6 +109,7 @@ export function EntityDetailScreen({ id }: { id: string }) {
         title={entity.title}
         actions={[
           { label: 'Remind me', icon: 'bell', onPress: () => setPanel('remind') },
+          { label: cover ? 'Change cover photo' : 'Add cover photo', icon: 'image', onPress: () => setPanel('cover') },
           { label: 'Attach a photo or file', icon: 'paperclip', onPress: () => setPanel('attach') },
           { label: 'Link to…', icon: 'link', onPress: () => setPanel('link') },
           { label: tags.length ? 'Edit tags' : 'Add tags', icon: 'tag', onPress: () => setPanel('tags') },
@@ -143,6 +147,7 @@ export function EntityDetailScreen({ id }: { id: string }) {
       </Sheet>
       <ReminderSheet visible={panel === 'remind'} onClose={close} entity={entity} />
       <AttachSheet visible={panel === 'attach'} onClose={close} entity={entity} />
+      <CoverSheet visible={panel === 'cover'} onClose={close} entity={entity} hasCover={!!cover} />
       <LinkSheet visible={panel === 'link'} onClose={close} entity={entity} />
     </View>
   );
@@ -347,11 +352,12 @@ function AttachmentsCard({ entity }: { entity: Entity }) {
   const os = useOS();
   const t = useTheme();
   const items = useLive((o) => o.attachments.forEntity(entity.id), [entity.id]);
-  if (!items.length) return null;
-  const images = items.filter((a) => a.kind === 'image' || a.kind === 'receipt' || a.mime?.startsWith('image/'));
-  const files = items.filter((a) => !images.includes(a));
+  const shown = items.filter((a) => a.kind !== 'cover');
+  if (!shown.length) return null;
+  const images = shown.filter((a) => a.kind === 'image' || a.kind === 'receipt' || a.mime?.startsWith('image/'));
+  const files = shown.filter((a) => !images.includes(a));
   return (
-    <Section title="Attachments" meta={String(items.length)}>
+    <Section title="Attachments" meta={String(shown.length)}>
       {images.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -t.layout.gutter }} contentContainerStyle={{ paddingHorizontal: t.layout.gutter, gap: 8 }}>
           {images.map((a) => (
@@ -396,6 +402,39 @@ function AttachSheet({ visible, onClose, entity }: { visible: boolean; onClose: 
         { label: 'Take photo', icon: 'camera', onPress: () => void pickImage(true) },
         { label: 'Choose photo', icon: 'image', onPress: () => void pickImage(false) },
         { label: 'Choose file', icon: 'file', onPress: () => void pickDoc() },
+      ]}
+    />
+  );
+}
+
+/** Cover photo (Stitch photo header): take, choose, or remove with Undo. Cropped to the header's 16:10. */
+function CoverSheet({ visible, onClose, entity, hasCover }: { visible: boolean; onClose: () => void; entity: Entity; hasCover: boolean }) {
+  const os = useOS();
+  const toast = useToast();
+  const pick = async (camera: boolean) => {
+    const opts: ImagePicker.ImagePickerOptions = { quality: 0.8, mediaTypes: ['images'], allowsEditing: true, aspect: [16, 10] };
+    const r = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
+    if (r.canceled || !r.assets?.[0]) return;
+    const a = r.assets[0];
+    const name = a.fileName ?? `cover-${Date.now()}.jpg`;
+    const uri = await persistAttachment(a.uri, name);
+    os.attachments.setCover({ entityId: entity.id, name, mime: a.mimeType ?? 'image/jpeg', size: a.fileSize ?? null, uri });
+  };
+  const remove = () => {
+    const c = os.attachments.cover(entity.id);
+    if (!c) return;
+    os.attachments.remove(c.id);
+    toast.show({ message: 'Cover photo removed', icon: 'trash', undo: () => void os.attachments.setCover({ entityId: c.entityId, name: c.name, mime: c.mime, size: c.size, uri: c.uri }) });
+  };
+  return (
+    <ActionSheet
+      visible={visible}
+      onClose={onClose}
+      title="Cover photo"
+      actions={[
+        { label: 'Take photo', icon: 'camera', onPress: () => void pick(true) },
+        { label: 'Choose photo', icon: 'image', onPress: () => void pick(false) },
+        ...(hasCover ? [{ label: 'Remove cover photo', icon: 'trash' as const, destructive: true, onPress: remove }] : []),
       ]}
     />
   );

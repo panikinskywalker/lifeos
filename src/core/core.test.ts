@@ -213,6 +213,18 @@ describe('relations, tags, comments, attachments', () => {
     const kinds = os.entities.timeline.forEntity(t.id).map((e) => e.kind);
     expect(kinds).toEqual(expect.arrayContaining(['comment', 'attachment', 'created']));
   });
+
+  it('a record has at most one cover photo; replacing keeps the old one recoverable', () => {
+    const t = os.entities.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
+    expect(os.attachments.cover(t.id)).toBeNull();
+    const first = os.attachments.setCover({ entityId: t.id, name: 'a.jpg', mime: 'image/jpeg', uri: 'file:///a' });
+    const second = os.attachments.setCover({ entityId: t.id, name: 'b.jpg', mime: 'image/jpeg', uri: 'file:///b' });
+    expect(os.attachments.cover(t.id)?.id).toBe(second.id);
+    expect(os.attachments.forEntity(t.id).filter((a) => a.kind === 'cover').map((a) => a.id)).toEqual([second.id]);
+    expect(os.db.get<{ n: number }>('SELECT COUNT(*) n FROM attachments WHERE id=? AND deleted_at IS NOT NULL', [first.id])?.n).toBe(1);
+    os.attachments.remove(second.id);
+    expect(os.attachments.cover(t.id)).toBeNull();
+  });
 });
 
 describe('reminders + recurrence', () => {

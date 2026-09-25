@@ -135,6 +135,17 @@ export class AttachmentRepo {
   forEntity(entityId: string): Attachment[] {
     return this.db.all<Row>(`SELECT * FROM attachments WHERE entity_id=? AND deleted_at IS NULL ORDER BY created_at DESC`, [entityId]).map(toAttachment);
   }
+  /** The record's cover photo (photo header), if any. */
+  cover(entityId: string): Attachment | null {
+    const r = this.db.get<Row>(`SELECT * FROM attachments WHERE entity_id=? AND kind='cover' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`, [entityId]);
+    return r ? toAttachment(r) : null;
+  }
+  /** Replace the cover photo; the previous one is soft-deleted. */
+  setCover(a: Omit<Attachment, 'id' | 'createdAt' | 'kind'>, actor: Actor = 'user'): Attachment {
+    const prev = this.cover(a.entityId);
+    if (prev) this.remove(prev.id);
+    return this.add({ ...a, kind: 'cover' }, actor);
+  }
   remove(id: string) {
     this.db.run(`UPDATE attachments SET deleted_at=? WHERE id=?`, [Date.now(), id]);
     this.changes.record('attachments', id, 'delete', 1);

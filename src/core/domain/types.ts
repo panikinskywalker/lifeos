@@ -193,7 +193,8 @@ export interface Attachment {
   mime?: string | null;
   size?: number | null;
   uri: string;
-  kind: 'file' | 'image' | 'receipt' | 'link';
+  /** 'cover': the record's photo header — at most one live per record. */
+  kind: 'file' | 'image' | 'receipt' | 'link' | 'cover';
   createdAt: number;
 }
 
