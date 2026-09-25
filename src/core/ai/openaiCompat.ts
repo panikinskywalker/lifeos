@@ -28,10 +28,13 @@ export class ProviderError extends Error {
   }
   /** The configured model doesn't exist (renamed or retired). */
   get isModelMissing() {
+    const m = this.message;
+    if (this.status === 404 && /model/i.test(m)) return true;
     return (
-      (this.status === 404 || this.status === 400) &&
-      /model[_ ]?(not[_ ]?found|does not exist|decommissioned|is not (supported|available)|not supported)|unknown model|no such model|invalid model/i.test(
-        this.message,
+      [400, 403, 404, 410].includes(this.status) &&
+      /model/i.test(m) &&
+      /not[_ ]?found|does not exist|no longer (available|supported)|decommissioned|deprecated|retired|discontinued|shut ?down|is not (supported|available)|not supported|unknown model|no such model|invalid model/i.test(
+        m,
       )
     );
   }
@@ -64,6 +67,9 @@ export interface OpenAICompatOptions {
   onModelChanged?: (model: string) => void;
 }
 
+/** Cheap fast tier names — whole words, so "gemini" isn't "mini". */
+const SMALL_MODEL = /(?:^|[-_/.:])(?:lite|mini|nano|instant|small|[1-9]b|[1-4]\.\d?b)(?=$|[-_/.:])/i;
+
 /** GET {baseUrl}/models — the chat models a host currently offers. */
 export async function listModels(
   baseUrl: string,
@@ -84,14 +90,14 @@ export async function listModels(
   };
   const ids = (json.data ?? [])
     .filter((m) => m.active !== false)
-    .map((m) => m.id);
+    .map((m) => m.id.replace(/^models\//, ""));
   const extra = (json.models ?? [])
     .map((m) => (m.id ?? m.name ?? "").replace(/^models\//, ""))
     .filter(Boolean);
   // Chat models only: drop speech, embeddings, moderation, image models.
   return [...new Set([...ids, ...extra])].filter(
     (id) =>
-      !/whisper|tts|embed|guard|moderation|playai|vision-preview|imagen|veo|aqa|distil|orpheus|prompt-guard/i.test(
+      !/whisper|tts|embed|guard|moderation|playai|vision-preview|imagen|veo|aqa|distil|orpheus|prompt-guard|image|audio|live|computer-use|robotics|learnlm|gemma|nano-banana/i.test(
         id,
       ),
   );
@@ -114,12 +120,17 @@ export function pickModel(models: string[], small = false): string | null {
     )
       s += small ? 10 : 50;
     if (/instruct|versatile|flash|tool/.test(m)) s += 15;
+    // Gemini's moving aliases never retire; otherwise newer versions win.
+    if (/^gemini-(flash|pro)(-lite)?-latest$/.test(m))
+      s += /lite/.test(m) === small ? 80 : 0;
+    const ver = Number(/gemini-(\d+(?:\.\d+)?)/.exec(m)?.[1] ?? 0);
+    s += ver * 5;
     if (/preview|exp|experimental|beta/.test(m)) s -= 10;
     const size = Number(/(\d+)b\b/.exec(m)?.[1] ?? 0);
-    if (small) s += /lite|mini|instant|8b|4b|small|flash/.test(m) ? 30 : 0;
+    if (small) s += SMALL_MODEL.test(m) || /flash/.test(m) ? 30 : 0;
     else
       s +=
-        Math.min(size, 120) / 4 + (/lite|mini|instant|small/.test(m) ? -20 : 0);
+        Math.min(size, 120) / 4 + (SMALL_MODEL.test(m) ? -20 : 0);
     return s;
   };
   return [...models].sort(
@@ -250,7 +261,7 @@ export function createOpenAICompatProvider(
         )
           throw e;
         // The model was renamed or retired: switch to what the host offers now, once.
-        const small = /lite|mini|instant|8b|4b|small/i.test(model);
+        const small = SMALL_MODEL.test(model);
         const next = pickModel(
           (await listModels(baseUrl, opts.apiKey).catch(() => [])).filter(
             (m) => m !== model,

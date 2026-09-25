@@ -134,7 +134,7 @@ describe('buildAgentProviders', () => {
     });
     expect(main.id).toBe('chain(groq>gemini)');
     expect(small.id).toBe('chain(groq>gemini)');
-    expect(roles).toEqual(['groq:main:llama-3.3-70b-versatile', 'gemini:main:gemini-2.5-flash', 'groq:small:llama-3.1-8b-instant', 'gemini:small:gemini-2.5-flash-lite']);
+    expect(roles).toEqual(['groq:main:llama-3.3-70b-versatile', 'gemini:main:gemini-flash-latest', 'groq:small:llama-3.1-8b-instant', 'gemini:small:gemini-flash-lite-latest']);
   });
 
   it('refuses a keyed provider without a key', () => {
@@ -172,6 +172,24 @@ describe('retired models', () => {
     expect(changed).toEqual(['openai/gpt-oss-120b']);
     expect(p.model).toBe('openai/gpt-oss-120b');
     expect(pickModel(['llama-3.1-8b-instant', 'openai/gpt-oss-120b'], true)).toBe('llama-3.1-8b-instant');
+  });
+
+  it('Gemini: "no longer available" switches to a current model from its models/ list', async () => {
+    const { pickModel } = await import('./openaiCompat');
+    const seen: string[] = [];
+    mockFetch((url, body) => {
+      if (url.endsWith('/models')) return { json: { object: 'list', data: ['models/gemini-2.5-flash', 'models/gemini-2.0-flash', 'models/gemini-3-flash', 'models/gemini-flash-latest', 'models/gemini-flash-lite-latest', 'models/gemini-2.5-flash-preview-tts', 'models/text-embedding-004', 'models/gemma-3-27b-it', 'models/gemini-2.5-flash-image'].map((id) => ({ id })) } };
+      seen.push(body.model);
+      if (body.model === 'gemini-2.5-flash') return { status: 404, text: '[{"error":{"code":404,"message":"This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use a newer model.","status":"NOT_FOUND"}}]' };
+      return { json: { choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] } };
+    });
+    const p = createOpenAICompatProvider({ id: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: 'k', model: 'gemini-2.5-flash' });
+    await p.complete({ system: '', messages: [{ role: 'user', content: 'hi' }], tools: [] });
+    expect(seen).toEqual(['gemini-2.5-flash', 'gemini-flash-latest']);
+    expect(pickModel(['gemini-2.0-flash', 'gemini-3-flash', 'gemini-2.5-pro'])).toBe('gemini-3-flash');
+    expect(pickModel(['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3-flash'], true)).toBe('gemini-flash-lite-latest');
+    expect(new ProviderError('gemini 400: This model is no longer available', 'gemini', 400).isModelMissing).toBe(true);
+    expect(new ProviderError('gemini 400: bad tool schema', 'gemini', 400).isModelMissing).toBe(false);
   });
 
   it('a model error with nothing to switch to falls through the chain', async () => {
