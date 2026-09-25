@@ -58,7 +58,7 @@ const daysFrom = (n: number) => {
 async function say(text: string, steps: Step[]) {
   const turns: AssistantTurn[] = [];
   const asked: string[] = [];
-  await new Assistant(os, { provider: recorded(steps), onTurn: (t) => turns.push(t), confirm: async (d) => (asked.push(d.name), true) }).send(text);
+  await new Assistant(os, { provider: recorded(steps), parser: false, onTurn: (t) => turns.push(t), confirm: async (d) => (asked.push(d.name), true) }).send(text);
   const tools = turns.filter((t) => t.role === 'tool');
   for (const t of tools) expect({ tool: t.toolName, error: t.isError ? t.toolResult : null }).toEqual({ tool: t.toolName, error: null });
   return { calls: tools.map((t) => t.toolName), asked, tools };
@@ -172,5 +172,84 @@ describe('golden flows (PRODUCT §7)', () => {
     expect(r).toMatchObject({ calls: ['remember_fact'], asked: [] });
     expect(os.facts.list().map((f) => f.text)).toEqual(['The landlord is Suresh; rent is due on the 5th']);
     expect(os.entities.query('routine')).toHaveLength(0);
+  });
+});
+
+/** SCOPE v2 B5: the same sentences with no model at all — the on-device parser does them. */
+async function offline(text: string) {
+  const turns: AssistantTurn[] = [];
+  const asked: string[] = [];
+  await new Assistant(os, { provider: null, onTurn: (t) => turns.push(t), confirm: async (d) => (asked.push(d.name), true) }).send(text);
+  const tools = turns.filter((t) => t.role === 'tool');
+  for (const t of tools) expect({ tool: t.toolName, error: t.isError ? t.toolResult : null }).toEqual({ tool: t.toolName, error: null });
+  return { calls: tools.map((t) => t.toolName), asked, reply: turns.filter((t) => t.role === 'assistant').map((t) => t.text).join(' '), tools };
+}
+
+describe('golden flows with no model (parser first)', () => {
+  it('1 · car service with cost, vendor and the money confirm', async () => {
+    const car = os.entities.create({ type: 'vehicle', data: { make: 'Hyundai', model: 'Creta', odometerKm: 29400, nextServiceKm: 30000 } });
+    const service = os.cycles.forEntity(car.id).find((c) => c.template === 'vehicle.service')!;
+    const r = await offline('Did the car service today, 6,400 at Hyundai');
+    expect(r).toMatchObject({ calls: ['log_event'], asked: ['log_event'] });
+    expect(os.cycles.get(service.id)!.nextDueMeter).toBe(39400);
+    expect(os.entities.query<{ amount: number }>('transaction').map((t) => t.data.amount)).toEqual([6400]);
+    expect(r.reply).toMatch(/Hyundai Creta service done · ₹6,400 filed/);
+    expect(r.tools[0]!.undo).toBeTypeOf('function');
+  });
+
+  it('2 · Jio recharge', async () => {
+    const jio = os.entities.create({ type: 'subscription', status: 'active', data: { name: 'Jio', amount: 599, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: today(), autoPost: false } });
+    const r = await offline('Recharged Jio 719 for 84 days');
+    expect(r).toMatchObject({ calls: ['update_entity', 'mark_cycle_done'], asked: ['update_entity', 'mark_cycle_done'] });
+    expect(os.entities.get<{ nextBillingAt: string; amount: number }>(jio.id)!.data).toMatchObject({ amount: 719, nextBillingAt: daysFrom(84) });
+  });
+
+  it('3 · did laundry / washed the white sneakers — no confirms', async () => {
+    const laundry = os.entities.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', lastDoneOn: daysFrom(-5) } });
+    const sneakers = os.entities.create({ type: 'item', title: 'White sneakers', data: { quantity: 1 } });
+    const wash = os.cycles.create({ entityId: sneakers.id, name: 'Wash', kind: 'interval', everyN: 3, everyUnit: 'week', lastDoneAt: Date.now() - 25 * 864e5 });
+    expect(await offline('did laundry')).toMatchObject({ calls: ['mark_cycle_done'], asked: [] });
+    expect(os.entities.get<{ lastDoneOn: string }>(laundry.id)!.data.lastDoneOn).toBe(today());
+    expect(await offline('Washed the white sneakers')).toMatchObject({ calls: ['log_event'], asked: [] });
+    expect(os.cycles.stats(wash.id).count).toBe(1);
+  });
+
+  it('4 · Priya paid me back', async () => {
+    const priya = os.entities.create({ type: 'person', data: {}, title: 'Priya Sharma' });
+    os.entities.create({ type: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 2600, date: today(), kind: 'split' } });
+    const r = await offline('Priya paid me back 2,600');
+    expect(r).toMatchObject({ calls: ['settle_debt', 'create_entity'], asked: ['settle_debt', 'create_entity'] });
+    expect(balanceWith(os, priya.id)).toBe(0);
+  });
+
+  it('5 · dinner split three ways', async () => {
+    const arjun = os.entities.create({ type: 'person', data: {}, title: 'Arjun Mehta' });
+    const priya = os.entities.create({ type: 'person', data: {}, title: 'Priya Sharma' });
+    const r = await offline('Dinner was 3,600, split with Arjun and Priya');
+    expect(r).toMatchObject({ calls: ['create_entity', 'split_transaction'], asked: ['create_entity', 'split_transaction'] });
+    expect([balanceWith(os, arjun.id), balanceWith(os, priya.id)]).toEqual([1200, 1200]);
+    expect(r.reply).toBe('Split ₹3,600 3 ways — Arjun and Priya owe you ₹1,200 each.');
+  });
+
+  it('8 · who owes me money / what did I say about the landlord — read only', async () => {
+    const priya = os.entities.create({ type: 'person', data: {}, title: 'Priya Sharma' });
+    os.entities.create({ type: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 900, date: today(), kind: 'loan' } });
+    os.facts.add({ text: 'The landlord is Suresh; rent is due on the 5th', source: 'talk' });
+    expect((await offline('who owes me money')).reply).toBe('Priya Sharma owes you ₹900.');
+    expect((await offline('what did I say about the landlord')).reply).toBe('The landlord is Suresh; rent is due on the 5th.');
+  });
+
+  it('9 · remember that …', async () => {
+    const r = await offline("Remember that the landlord's name is Suresh and rent is due on the 5th");
+    expect(r).toMatchObject({ calls: ['remember_fact'], asked: [] });
+    expect(os.facts.list().map((f) => f.text)).toEqual(["The landlord's name is Suresh and rent is due on the 5th"]);
+  });
+
+  it('ambiguous or unknown sentences fall through (no model: a helpful note)', async () => {
+    os.entities.create({ type: 'person', data: {}, title: 'Priya Sharma' });
+    os.entities.create({ type: 'person', data: {}, title: 'Priya Menon' });
+    const r = await offline('Priya paid me back 500');
+    expect(r.calls).toEqual([]);
+    expect(r.reply).toMatch(/add a free Groq or Gemini key/);
   });
 });

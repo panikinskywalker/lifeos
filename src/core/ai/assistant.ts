@@ -7,6 +7,7 @@ import { extrasOf, type ReplyCard } from './cards';
 import { mineFacts } from './factMiner';
 import { buildContext, historyWindow } from './retrieval';
 import { recordUsage, routeMessage, type Tier } from './routing';
+import { parseMessage } from './parser';
 import type { Fact } from '../repo/factRepo';
 
 export interface AssistantTurn {
@@ -26,8 +27,10 @@ export interface AssistantTurn {
 }
 
 export interface AssistantOptions {
-  /** Used for every call unless `smartProvider` is given (then this is the fast tier). */
-  provider: LLMProvider;
+  /** Used for every call unless `smartProvider` is given (then this is the fast tier). Without one, only the parser answers. */
+  provider?: LLMProvider | null;
+  /** Parser first (SCOPE B5): understand common sentences on the phone before any model call. Default on. */
+  parser?: boolean;
   /** Sonnet: plans, multi-request messages, and turns where a tool failed. Routing is off without it. */
   smartProvider?: LLMProvider;
   /** Which tier answered (for a small "Sonnet" hint in Talk). */
@@ -114,6 +117,38 @@ Guidelines:
     this.history.push(userMsg);
     this.persist(userMsg);
     emit({ id: newId(), role: 'user', text: userText, createdAt: Date.now() });
+    const tools = this.tools();
+    const byName = new Map(tools.map((t) => [t.name, t]));
+    const plan = this.opts.parser === false ? null : parseMessage(this.os, userText);
+    if (plan || !this.opts.provider) {
+      const results: unknown[] = [];
+      let declined = false;
+      if (plan) {
+        this.opts.onRoute?.({ tier: 'fast', reason: 'understood on the phone', model: 'parser' });
+        for (const step of plan.steps) {
+          const call = step(results);
+          if (!call) break;
+          const r = await this.runTool(byName, call.name, call.input, emit);
+          results.push(r.output);
+          if (r.declined) {
+            declined = true;
+            break;
+          }
+          if (r.isError) break;
+        }
+      }
+      const failed = !declined && results.some((r) => !!(r as { error?: unknown })?.error);
+      const text = !plan
+        ? 'I can handle everyday things on the phone — “did laundry”, “spent 450 on lunch”, “Priya paid me back 2,600”, “remind me to …”. For anything else, add a free Groq or Gemini key in You › Agent.'
+        : failed
+          ? `I couldn’t do that: ${String((results.find((r) => (r as { error?: unknown })?.error) as { error: string }).error)}`
+          : plan.reply(results, declined);
+      const reply: ChatMessage = { role: 'assistant', content: text };
+      this.history.push(reply);
+      this.persist(reply);
+      emit({ id: newId(), role: 'assistant', text, createdAt: Date.now() });
+      return turns;
+    }
     if (this.opts.factProvider) {
       const fp = this.opts.factProvider;
       this.lastMining = mineFacts(this.os, fp, userText, this.conversationId, { onUsage: (u) => (this.opts.metered ? undefined : recordUsage(this.os, { provider: fp.id, model: fp.model ?? fp.id, purpose: 'facts', ...u, conversationId: this.conversationId })) }).then((facts) => {
@@ -122,15 +157,13 @@ Guidelines:
       });
     }
 
-    const tools = this.tools();
     const specs = tools.map(toolSpec);
-    const byName = new Map(tools.map((t) => [t.name, t]));
     const maxRounds = this.opts.maxToolRounds ?? 8;
     const context = buildContext(this.os, userText, { budget: this.opts.contextBudget });
     const system = context ? `${this.systemPrompt()}\n\n${context}` : this.systemPrompt();
 
     let route = this.opts.smartProvider ? routeMessage(userText) : { tier: 'fast' as Tier, reason: 'routing off' };
-    const pick = () => (route.tier === 'smart' && this.opts.smartProvider ? this.opts.smartProvider : this.opts.provider);
+    const pick = () => (route.tier === 'smart' && this.opts.smartProvider ? this.opts.smartProvider : this.opts.provider!);
     this.opts.onRoute?.({ ...route, model: pick().model });
     for (let round = 0; round <= maxRounds; round++) {
       const provider = pick();
@@ -148,29 +181,7 @@ Guidelines:
 
       const results: ContentBlock[] = [];
       for (const call of calls) {
-        const def = byName.get(call.name);
-        let output: unknown;
-        let isError = false;
-        if (!def) {
-          output = { error: `unknown tool ${call.name}` };
-          isError = true;
-        } else {
-          try {
-            const parsed = def.input.parse(call.input);
-            const ask = typeof def.confirm === 'function' ? def.confirm(parsed, this.os) : !!def.confirm;
-            if (ask && this.opts.confirm && !(await this.opts.confirm(def, parsed, confirmSummary(def, parsed, this.os)))) {
-              output = { error: 'User declined this action.' };
-              isError = true;
-            } else {
-              output = await def.run(parsed, this.os);
-            }
-          } catch (e) {
-            output = { error: (e as Error).message };
-            isError = true;
-          }
-        }
-        const extras = isError ? {} : extrasOf(output);
-        emit({ id: newId(), role: 'tool', text: summarizeTool(call.name, call.input, output), toolName: call.name, toolInput: call.input, toolResult: output, createdAt: Date.now(), card: extras.card, undo: extras.undo, isError });
+        const { output, isError } = await this.runTool(byName, call.name, call.input, emit);
         results.push({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(output ?? null).slice(0, 20000), is_error: isError });
       }
       // A tool failed: hand the rest of this turn to the smart model.
@@ -183,6 +194,36 @@ Guidelines:
       this.persist(toolMsg);
     }
     return turns;
+  }
+
+  /** One tool call, the same way for the model and the parser: validate, confirm (money & people), run, emit the turn. */
+  private async runTool(byName: Map<string, AiToolDef>, name: string, input: unknown, emit: (t: AssistantTurn) => void): Promise<{ output: unknown; isError: boolean; declined: boolean }> {
+    const def = byName.get(name);
+    let output: unknown;
+    let isError = false;
+    let declined = false;
+    if (!def) {
+      output = { error: `unknown tool ${name}` };
+      isError = true;
+    } else {
+      try {
+        const parsed = def.input.parse(input);
+        const ask = typeof def.confirm === 'function' ? def.confirm(parsed, this.os) : !!def.confirm;
+        if (ask && this.opts.confirm && !(await this.opts.confirm(def, parsed, confirmSummary(def, parsed, this.os)))) {
+          output = { error: 'User declined this action.' };
+          isError = true;
+          declined = true;
+        } else {
+          output = await def.run(parsed, this.os);
+        }
+      } catch (e) {
+        output = { error: (e as Error).message };
+        isError = true;
+      }
+    }
+    const extras = isError ? {} : extrasOf(output);
+    emit({ id: newId(), role: 'tool', text: summarizeTool(name, input, output), toolName: name, toolInput: input, toolResult: output, createdAt: Date.now(), card: extras.card, undo: extras.undo, isError });
+    return { output, isError, declined };
   }
 
   reset() {
