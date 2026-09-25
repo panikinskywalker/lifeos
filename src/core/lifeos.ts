@@ -12,6 +12,7 @@ import { Scheduler } from './automation/scheduler';
 import { createFormatters, DEFAULT_LOCALE, type LocaleSettings } from './format';
 import { bus } from './events/bus';
 import { coreModule } from './coreModule';
+import type { Entity } from './domain/types';
 
 export interface LifeOSOptions {
   db: DatabaseAdapter;
@@ -119,8 +120,29 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   if (!ctx.scheduler.get('core.reminder-scan')) ctx.scheduler.schedule({ id: 'core.reminder-scan', kind: 'reminder-scan', at: Date.now(), rrule: 'FREQ=DAILY;INTERVAL=1' });
 
   // Default cycles: new records get their type's templates; existing records get them once.
+  ctx.cycles.onReading = (entityId, meter, actor) => {
+    const e = entities.get(entityId);
+    const m = e && registry.entityTypes.get(e.type)?.meters?.find((x) => x.meter === meter);
+    if (!e || !m) return;
+    const latest = ctx.cycles.latestMeter(entityId, meter);
+    if ((e.data as Record<string, unknown>)[m.field] !== latest) entities.update(entityId, { data: { [m.field]: latest ?? undefined } }, actor);
+  };
+  // Meters: a value typed into the mirrored field (odometerKm) becomes a reading.
+  const mirrorMeters = (entity: Entity) => {
+    for (const m of registry.entityTypes.get(entity.type)?.meters ?? []) {
+      const v = Number((entity.data as Record<string, unknown>)[m.field]);
+      if (!Number.isFinite(v) || (entity.data as Record<string, unknown>)[m.field] == null) continue;
+      if (ctx.cycles.latestMeter(entity.id, m.meter) === v) continue;
+      ctx.cycles.logMeter(entity.id, v, { meter: m.meter, unit: m.unit, label: m.label }, 'user');
+    }
+  };
   bus.on('entity.created', ({ entity }) => {
+    mirrorMeters(entity);
     ctx.cycles.applyTemplates(entity, registry.entityTypes.get(entity.type));
+  });
+  bus.on('entity.updated', ({ entity, changed }) => {
+    const meters = registry.entityTypes.get(entity.type)?.meters ?? [];
+    if (meters.some((m) => changed.includes(m.field) || changed.includes(`data.${m.field}`))) mirrorMeters(entity);
   });
   if (!settings.get('cycles.templatesBackfilled', false)) {
     db.transaction(() => {

@@ -44,6 +44,7 @@ export const vehicleType: EntityTypeDef<VehicleData> = {
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   computeTitle: (d) => [d.year, d.make, d.model].filter(Boolean).join(' '),
+  meters: [{ meter: 'odometer', field: 'odometerKm', label: 'Odometer', unit: 'km' }],
   cycleTemplates: (d) => [
     { template: 'vehicle.service', name: 'Service', kind: 'either', everyN: 6, everyUnit: 'month', meterEvery: 10000, nextDueAt: dateField(d.nextServiceDate), nextDueMeter: d.nextServiceKm ?? null, leadDays: 14 }, // unscheduled until a next service or a done is logged
     ...(dateField(d.insuranceUntil) ? [{ template: 'vehicle.insurance', name: 'Insurance renewal', kind: 'fixed' as const, everyN: 1, everyUnit: 'year' as const, nextDueAt: dateField(d.insuranceUntil), leadDays: 30 }] : []),

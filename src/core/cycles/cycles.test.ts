@@ -65,6 +65,13 @@ const things: ModuleManifest = {
   entityTypes: [
     { type: 'car', module: 'test-things', label: 'Car', labelPlural: 'Cars', icon: 'x', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
     {
+      type: 'van', module: 'test-things', label: 'Van', labelPlural: 'Vans', icon: 'x',
+      schema: z.object({ name: z.string(), odometerKm: z.number().optional() }),
+      fields: [{ key: 'name', label: 'Name', type: 'text' }, { key: 'odometerKm', label: 'Odometer (km)', type: 'number' }],
+      computeTitle: (x) => String(x.name),
+      meters: [{ meter: 'odometer', field: 'odometerKm', label: 'Odometer', unit: 'km' }],
+    },
+    {
       type: 'sub', module: 'test-things', label: 'Sub', labelPlural: 'Subs', icon: 'x',
       schema: z.object({ name: z.string(), rrule: z.string(), next: z.string().optional() }),
       fields: [{ key: 'name', label: 'Name', type: 'text' }],
@@ -184,5 +191,30 @@ describe('backfill', () => {
     const third = await createLifeOS({ db, modules: [things], registry: new Registry() });
     expect(third.cycles.forEntity(s.id)).toHaveLength(1);
     db.close();
+  });
+});
+
+describe('meter readings', () => {
+  it('the odometer field and readings stay in step; cycles use the latest; undo reverts', () => {
+    const van = os.entities.create({ type: 'van', data: { name: 'Creta', odometerKm: 30000 } });
+    expect(os.cycles.latestMeter(van.id)).toBe(30000);
+    const svc = os.cycles.create({ entityId: van.id, name: 'Service', kind: 'either', everyN: 6, everyUnit: 'month', meterEvery: 10000, nextDueMeter: 34000 });
+
+    const r = os.cycles.logMeter(van.id, 34200, { unit: 'km' });
+    expect(os.entities.get(van.id)!.data).toMatchObject({ odometerKm: 34200 });
+    expect(os.cycles.status(svc).state).toBe('overdue');
+    expect(os.entities.timeline.forEntity(van.id).some((e) => e.kind === 'meter.reading' && e.title === 'Odometer 34,200 km')).toBe(true);
+    expect(os.cycles.readings(van.id).map((x) => x.value)).toEqual([34200, 30000]);
+
+    os.cycles.removeReading(r);
+    expect(os.cycles.latestMeter(van.id)).toBe(30000);
+    expect(os.entities.get(van.id)!.data).toMatchObject({ odometerKm: 30000 });
+    expect(os.entities.timeline.forEntity(van.id).some((e) => e.title === 'Odometer 34,200 km')).toBe(false);
+
+    // Typing a new value in the form records a reading, once.
+    os.entities.update(van.id, { data: { odometerKm: 31000 } });
+    expect(os.cycles.readings(van.id).map((x) => x.value)).toEqual([31000, 30000]);
+    // Timeline says the field's label, not its key.
+    expect(os.entities.timeline.forEntity(van.id).some((e) => e.title === 'Updated Odometer (km)')).toBe(true);
   });
 });

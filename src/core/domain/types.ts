@@ -105,6 +105,8 @@ export interface EntityTypeDef<TData = Record<string, unknown>> {
   defaultViews?: SavedViewDef[];
   /** Hide from generic "browse all" screens. */
   hidden?: boolean;
+  /** Meters the record tracks (a vehicle's odometer), mirrored into a data field; cycles read the latest reading. */
+  meters?: Array<{ meter: string; field: string; label: string; unit: string }>;
   /** Default cycles a new record of this type gets (Upkeep), derived from its data. */
   cycleTemplates?: (data: TData) => CycleSeed[];
 }

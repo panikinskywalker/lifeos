@@ -11,12 +11,12 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
 import type { TintKey } from '../theme/tokens';
-import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, Field, FilterChip, IconButton, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
+import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, Field, FilterChip, IconButton, NumberField, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
 import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 
-type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover';
+type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
 
 /**
  * Universal record page: tinted header with key stats, fields, module
@@ -108,6 +108,7 @@ export function EntityDetailScreen({ id }: { id: string }) {
         onClose={close}
         title={entity.title}
         actions={[
+          ...(def.meters?.length ? [{ label: `Log ${def.meters[0]!.label.toLowerCase()}`, icon: 'gauge' as const, onPress: () => setPanel('meter') }] : []),
           { label: 'Remind me', icon: 'bell', onPress: () => setPanel('remind') },
           { label: cover ? 'Change cover photo' : 'Add cover photo', icon: 'image', onPress: () => setPanel('cover') },
           { label: 'Attach a photo or file', icon: 'paperclip', onPress: () => setPanel('attach') },
@@ -146,6 +147,7 @@ export function EntityDetailScreen({ id }: { id: string }) {
         <TagEditor tags={tags.map((x) => x.name)} onChange={(names) => os.tags.set(entity.id, names)} />
       </Sheet>
       <ReminderSheet visible={panel === 'remind'} onClose={close} entity={entity} />
+      {def.meters?.[0] ? <MeterSheet visible={panel === 'meter'} onClose={close} entity={entity} meter={def.meters[0]} /> : null}
       <AttachSheet visible={panel === 'attach'} onClose={close} entity={entity} />
       <CoverSheet visible={panel === 'cover'} onClose={close} entity={entity} hasCover={!!cover} />
       <LinkSheet visible={panel === 'link'} onClose={close} entity={entity} />
@@ -321,6 +323,25 @@ const REPEATS: Array<[string | null, string]> = [
   ['FREQ=MONTHLY;INTERVAL=1', 'Monthly'],
   ['FREQ=YEARLY;INTERVAL=1', 'Yearly'],
 ];
+
+/** Log a meter reading (odometer); cycles on the record recompute from it. */
+function MeterSheet({ visible, onClose, entity, meter }: { visible: boolean; onClose: () => void; entity: Entity; meter: { meter: string; label: string; unit: string } }) {
+  const os = useOS();
+  const toast = useToast();
+  const latest = useLive((o) => o.cycles.latestMeter(entity.id, meter.meter), [entity.id, meter.meter]);
+  const [value, setValue] = useState<number | undefined>(undefined);
+  const save = () => {
+    const id = os.cycles.logMeter(entity.id, value!, { meter: meter.meter, unit: meter.unit, label: meter.label });
+    onClose();
+    setValue(undefined);
+    toast.show({ message: `${meter.label} ${value!.toLocaleString('en-IN')} ${meter.unit}`, icon: 'gauge', undo: () => os.cycles.removeReading(id) });
+  };
+  return (
+    <Sheet visible={visible} onClose={onClose} title={`Log ${meter.label.toLowerCase()}`} footer={<Button title="Save reading" icon="check" block disabled={value == null || value < 0} onPress={save} />}>
+      <NumberField label={meter.label} value={value} onChange={setValue} unit={meter.unit} hint={latest != null ? `Last reading ${latest.toLocaleString('en-IN')} ${meter.unit}` : undefined} autoFocus />
+    </Sheet>
+  );
+}
 
 function ReminderSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: Entity }) {
   const os = useOS();

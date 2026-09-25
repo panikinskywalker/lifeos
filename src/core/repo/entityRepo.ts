@@ -197,7 +197,7 @@ export class EntityRepo {
       if (previous.status !== next.status) {
         this.timeline.add({ entityId: id, kind: 'status', title: `Status → ${labelFor(def, next.status)}`, actor, occurredAt: now, meta: { from: previous.status, to: next.status } });
       } else {
-        const human = changed.filter((k) => !['updatedAt', 'version', 'subtitle'].includes(k)).map((k) => k.replace(/^data\./, ''));
+        const human = changed.filter((k) => !['updatedAt', 'version', 'subtitle'].includes(k)).map((k) => k.replace(/^data\./, '')).map((k) => def.fields.find((f) => f.key === k)?.label ?? k);
         if (human.length) this.timeline.add({ entityId: id, kind: 'updated', title: `Updated ${human.slice(0, 4).join(', ')}${human.length > 4 ? '…' : ''}`, actor, occurredAt: now, meta: { changed: human } });
       }
       this.search.index(next as Entity, def);

@@ -34,6 +34,17 @@ export interface Cycle {
 
 export type CycleInput = Pick<Cycle, 'entityId' | 'name' | 'kind'> & Partial<Omit<Cycle, 'id' | 'entityId' | 'name' | 'kind' | 'createdAt' | 'updatedAt'>>;
 
+export interface MeterReading {
+  id: string;
+  entityId: string;
+  meter: string;
+  value: number;
+  unit: string | null;
+  readAt: number;
+  source: string;
+  note: string | null;
+}
+
 export interface DoneInput {
   at?: number;
   meter?: number | null;
@@ -65,9 +76,50 @@ const COLS: Array<[keyof Cycle, string]> = [
 export class CycleRepo {
   constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
 
+  /** Set by the core: mirrors the latest reading into the record's meter field (odometerKm). */
+  onReading?: (entityId: string, meter: string, actor: Actor) => void;
+
   /** Latest reading of a meter on a record (odometer by default). */
   latestMeter(entityId: string, meter = 'odometer'): number | null {
-    return this.db.get<{ value: number }>(`SELECT value FROM meter_readings WHERE entity_id=? AND meter=? AND deleted_at IS NULL ORDER BY read_at DESC, created_at DESC LIMIT 1`, [entityId, meter])?.value ?? null;
+    return this.db.get<{ value: number }>(`SELECT value FROM meter_readings WHERE entity_id=? AND meter=? AND deleted_at IS NULL ORDER BY read_at DESC, rowid DESC LIMIT 1`, [entityId, meter])?.value ?? null;
+  }
+
+  /** Readings of a meter, newest first. */
+  readings(entityId: string, meter = 'odometer', limit = 50): MeterReading[] {
+    return this.db
+      .all<Row>(`SELECT * FROM meter_readings WHERE entity_id=? AND meter=? AND deleted_at IS NULL ORDER BY read_at DESC, rowid DESC LIMIT ?`, [entityId, meter, limit])
+      .map((r) => ({ id: r.id as string, entityId: r.entity_id as string, meter: r.meter as string, value: r.value as number, unit: (r.unit as string | null) ?? null, readAt: r.read_at as number, source: r.source as string, note: (r.note as string | null) ?? null }));
+  }
+
+  /**
+   * Log a meter reading ("Creta at 34,200 km"). Lands on the timeline; cycles
+   * on the record compute from the latest reading. Returns the reading id for Undo.
+   */
+  logMeter(entityId: string, value: number, opts: { meter?: string; unit?: string | null; at?: number; note?: string | null; label?: string } = {}, actor: Actor = 'user'): string {
+    const meter = opts.meter ?? 'odometer';
+    const at = opts.at ?? Date.now();
+    const now = Date.now();
+    const id = newId(now);
+    this.db.transaction(() => {
+      this.db.run(`INSERT INTO meter_readings(id,entity_id,meter,value,unit,read_at,source,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`, [id, entityId, meter, value, opts.unit ?? null, at, actor, opts.note ?? null, now, now]);
+      this.changes.record('meter_readings', id, 'insert', 1);
+      this.timeline.add({ entityId, kind: 'meter.reading', title: `${opts.label ?? 'Odometer'} ${value.toLocaleString('en-IN')}${opts.unit ? ` ${opts.unit}` : ''}`, body: opts.note ?? null, actor, occurredAt: at, meta: { readingId: id, meter, value } });
+    });
+    this.onReading?.(entityId, meter, actor);
+    bus.emit('data.changed', { table: 'meter_readings', id });
+    return id;
+  }
+
+  /** Remove a reading (Undo). Its timeline entry goes with it. */
+  removeReading(id: string): void {
+    this.db.transaction(() => {
+      this.db.run(`UPDATE meter_readings SET deleted_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
+      this.changes.record('meter_readings', id, 'delete', 1);
+      this.db.run(`DELETE FROM timeline_events WHERE kind='meter.reading' AND json_extract(meta,'$.readingId')=?`, [id]);
+    });
+    const r = this.db.get<{ entity_id: string; meter: string }>(`SELECT entity_id, meter FROM meter_readings WHERE id=?`, [id]);
+    if (r) this.onReading?.(r.entity_id, r.meter, 'user');
+    bus.emit('data.changed', { table: 'meter_readings', id });
   }
 
   create(input: CycleInput, actor: Actor = 'user'): Cycle {
@@ -86,7 +138,8 @@ export class CycleRepo {
       const meter = c.lastMeter ?? (c.meter ? this.latestMeter(c.entityId, c.meter) : null);
       Object.assign(c, nextAfterDone(c, c.lastDoneAt ?? now, meter, null));
     }
-    if (c.nextDueMeter == null && c.meterEvery && c.meter && c.lastMeter == null) {
+    // A pure meter cycle (tyre rotation every 8,000 km) starts counting from the latest reading.
+    if (c.kind === 'meter' && c.nextDueMeter == null && c.meterEvery && c.meter && c.lastMeter == null) {
       const m = this.latestMeter(c.entityId, c.meter);
       if (m != null) c.nextDueMeter = m + c.meterEvery;
     }
