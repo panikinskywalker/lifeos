@@ -27,7 +27,7 @@ export const useSettings = create<AppSettings>((set) => ({
   appearance: 'system',
   locale: DEFAULT_LOCALE,
   homeDashboardId: null,
-  aiModel: 'claude-sonnet-4-5',
+  aiModel: 'claude-sonnet-5',
   aiEnabled: true,
   hapticsEnabled: true,
   onboarded: false,

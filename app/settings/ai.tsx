@@ -6,7 +6,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Card, Chip, IconButton, Input, Screen, Text } from '@ui/components/primitives';
 import { getApiKey, setApiKey } from '../../src/platform/boot';
 
-const MODELS = ['claude-sonnet-4-5', 'claude-opus-4-1', 'claude-haiku-4-5'];
+const MODELS = ['claude-sonnet-5', 'claude-opus-5-5', 'claude-haiku-4-5'];
 
 export default function AiSettingsRoute() {
   const router = useRouter();

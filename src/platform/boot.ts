@@ -55,7 +55,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     appearance: (stored.appearance as never) ?? 'system',
     locale: { ...useSettings.getState().locale, ...((stored.locale as object) ?? {}) },
     homeDashboardId: (stored.homeDashboardId as string) ?? null,
-    aiModel: (stored.aiModel as string) ?? 'claude-sonnet-4-5',
+    aiModel: (stored.aiModel as string) ?? 'claude-sonnet-5',
     aiEnabled: stored.aiEnabled !== false,
     hapticsEnabled: stored.hapticsEnabled !== false,
     onboarded: !!stored.onboarded,
