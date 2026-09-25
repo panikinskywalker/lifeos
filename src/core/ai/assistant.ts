@@ -249,6 +249,8 @@ const TOOL_GROUPS: Array<[RegExp, string[]]> = [
   [/\b(comment|note on)\b/i, ['add_comment']],
   [/\b(recent|lately|activity|what did i|history)\b/i, ['recent_activity']],
   [/\b(trip|travel|holiday|vacation|flight|itinerary)\b/i, ['plan_trip']],
+  [/\b(friend|met|meet|colleague|works? (at|for)|boss|neighbou?r|cousin|introduced)\b/i, ['create_person_from_mention', 'suggest_cycle']],
+  [/\b(warranty|guarantee|keep in touch|renew\w*|expires?|every)\b/i, ['suggest_cycle']],
 ];
 const CORE_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'create_entity', 'update_entity', 'link_entities', 'list_entity_types']);
 

@@ -5,6 +5,7 @@ import type { Entity, FilterGroup, SortSpec } from './domain/types';
 import type { LifeOSContext } from './registry/context';
 import { lifeTools, recordCard, touchesMoneyOrPeople } from './ai/lifeTools';
 import { withExtras } from './ai/cards';
+import { createAnythingTools, fillDefaults } from './ai/createAnything';
 
 /* ------------------------------------------------------------------ */
 /* Generic triggers — work for every entity type                       */
@@ -170,6 +171,7 @@ function slim(e: Entity, os: LifeOSContext) {
 
 const aiTools: AiToolDef[] = [
   ...lifeTools,
+  ...createAnythingTools,
   {
     name: 'list_entity_types',
     description: 'List every record type in LifeOS with its fields, statuses and relation kinds. Call this first when unsure how data is shaped.',
@@ -222,7 +224,7 @@ const aiTools: AiToolDef[] = [
   },
   {
     name: 'create_entity',
-    description: 'Create a record. `data` must match the type\'s fields (see list_entity_types). Optionally tag and link it to other records in the same call.',
+    description: 'Create a record of any type. Send what you know in `data` (field keys from the type list); missing required fields get sensible defaults and "32k" / "2 years" / "today" are understood. Optionally tag and link it to other records in the same call.',
     input: z.object({ type: z.string(), title: z.string().optional(), data: z.record(z.string(), z.unknown()), status: z.string().optional(), tags: z.array(z.string()).optional(), links: z.array(z.object({ toId: z.string(), kind: z.string() })).optional() }),
     confirm: (i: { type: string }, os) => touchesMoneyOrPeople(os, i.type),
     describe: (i: { type: string; title?: string; data: Record<string, unknown> }, os) => {
@@ -232,7 +234,9 @@ const aiTools: AiToolDef[] = [
     },
     run: async (input, os) => {
       const i = input as { type: string; title?: string; data: Record<string, unknown>; status?: string; tags?: string[]; links?: Array<{ toId: string; kind: string }> };
-      const e = os.entities.create({ type: i.type, title: i.title, data: i.data, status: i.status }, 'assistant');
+      const def = os.registry.entityTypes.get(i.type);
+      if (!def) return { error: `unknown record type ${i.type}` };
+      const e = os.entities.create({ type: i.type, title: i.title, data: fillDefaults(def, i.data ?? {}, i.title), status: i.status }, 'assistant');
       for (const t of i.tags ?? []) os.tags.apply(e.id, t, 'assistant');
       for (const l of i.links ?? []) os.relations.link(e.id, l.toId, l.kind, {}, 'assistant');
       const saved = os.entities.get(e.id)!;
