@@ -218,3 +218,21 @@ describe('meter readings', () => {
     expect(os.entities.timeline.forEntity(van.id).some((e) => e.title === 'Updated Odometer (km)')).toBe(true);
   });
 });
+
+describe('template sync', () => {
+  it('edits follow into the cycle; a rolled due date survives unrelated edits', () => {
+    const sub = os.entities.create({ type: 'sub', data: { name: 'Jio', rrule: 'FREQ=DAILY;INTERVAL=84', next: '2026-10-01' } });
+    const id = os.cycles.forEntity(sub.id)[0]!.id;
+    os.entities.update(sub.id, { data: { rrule: 'FREQ=DAILY;INTERVAL=28' } });
+    expect(os.cycles.get(id)).toMatchObject({ everyN: 28, everyUnit: 'day' });
+    expect(day(os.cycles.get(id)!.nextDueAt)).toBe('2026-10-01');
+
+    os.entities.update(sub.id, { data: { next: '2026-10-09' } });
+    expect(day(os.cycles.get(id)!.nextDueAt)).toBe('2026-10-09');
+
+    os.cycles.markDone(id, { at: d('2026-10-09') });
+    expect(day(os.cycles.get(id)!.nextDueAt)).toBe('2026-11-06');
+    os.entities.update(sub.id, { data: { name: 'Jio Fiber' } });
+    expect(day(os.cycles.get(id)!.nextDueAt)).toBe('2026-11-06');
+  });
+});

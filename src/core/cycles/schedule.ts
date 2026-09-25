@@ -173,3 +173,11 @@ export function periodFromRRule(rrule: unknown): { everyN: number; everyUnit: Cy
   const n = Number(/INTERVAL=(\d+)/.exec(rrule)?.[1] ?? 1) || 1;
   return { everyN: n, everyUnit: ({ DAILY: 'day', WEEKLY: 'week', MONTHLY: 'month', YEARLY: 'year' } as const)[freq as 'DAILY'] };
 }
+
+/** Next occurrence (today included) of a weekday, 0 = Sunday … 6 = Saturday, at 09:00. */
+export function nextWeekday(weekday: number, now: number): number {
+  const d = new Date(startOfDay(now));
+  d.setDate(d.getDate() + ((weekday - d.getDay() + 7) % 7));
+  d.setHours(9);
+  return d.getTime();
+}

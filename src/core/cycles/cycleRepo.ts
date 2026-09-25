@@ -168,6 +168,30 @@ export class CycleRepo {
     return made;
   }
 
+  /**
+   * Keep template cycles in step with an edited record: the rule (every N,
+   * meter, lead, cost) always follows; a due date moves only when the field it
+   * comes from changed, so a rolled cycle is not reset by an unrelated edit.
+   */
+  syncTemplates(entity: Entity, previous: Entity, def: EntityTypeDef | undefined): void {
+    if (!def?.cycleTemplates) return;
+    const before = new Map(def.cycleTemplates(previous.data as never).map((s) => [s.template, s]));
+    const live = new Map(this.forEntity(entity.id).filter((c) => c.template).map((c) => [c.template!, c]));
+    for (const seed of def.cycleTemplates(entity.data as never)) {
+      const c = live.get(seed.template);
+      if (!c) continue;
+      const old = before.get(seed.template);
+      const patch: Partial<Cycle> = { name: seed.name, kind: seed.kind, everyN: seed.everyN ?? null, everyUnit: seed.everyUnit ?? null, meterEvery: seed.meterEvery ?? null, leadDays: seed.leadDays ?? 0, costEstimate: seed.costEstimate ?? null, currency: seed.currency ?? null };
+      if (seed.nextDueAt != null && seed.nextDueAt !== old?.nextDueAt) patch.nextDueAt = seed.nextDueAt;
+      if (seed.nextDueMeter != null && seed.nextDueMeter !== old?.nextDueMeter) patch.nextDueMeter = seed.nextDueMeter;
+      const changed = (Object.keys(patch) as Array<keyof Cycle>).some((k) => JSON.stringify(patch[k]) !== JSON.stringify(c[k]));
+      if (changed) {
+        this.update(c.id, patch);
+        bus.emit('data.changed', { table: 'cycles', id: c.id });
+      }
+    }
+  }
+
   get(id: string): Cycle | null {
     const r = this.db.get<Row>(`SELECT * FROM cycles WHERE id=? AND deleted_at IS NULL`, [id]);
     return r ? toCycle(r) : null;

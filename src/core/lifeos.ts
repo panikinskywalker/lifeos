@@ -140,7 +140,8 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     mirrorMeters(entity);
     ctx.cycles.applyTemplates(entity, registry.entityTypes.get(entity.type));
   });
-  bus.on('entity.updated', ({ entity, changed }) => {
+  bus.on('entity.updated', ({ entity, previous, changed }) => {
+    if (changed.some((k) => k.startsWith('data.'))) ctx.cycles.syncTemplates(entity, previous, registry.entityTypes.get(entity.type));
     const meters = registry.entityTypes.get(entity.type)?.meters ?? [];
     if (meters.some((m) => changed.includes(m.field) || changed.includes(`data.${m.field}`))) mirrorMeters(entity);
   });

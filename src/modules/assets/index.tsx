@@ -7,7 +7,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
 import { useLive } from '@ui/hooks';
 import { Card, Stat } from '@ui/components/primitives';
-import { dateField, nextAnnual, periodFromRRule } from '@core/cycles/schedule';
+import { dateField, nextWeekday, startOfDay } from '@core/cycles/schedule';
 
 export const ASSETS_COLOR = palette.brown;
 
@@ -33,6 +33,32 @@ export const assetType: EntityTypeDef<AssetData> = {
 };
 
 export interface VehicleData { make: string; model?: string; year?: number; plate?: string; odometerKm?: number; fuel?: string; insuranceUntil?: string; pucUntil?: string; nextServiceKm?: number; nextServiceDate?: string; notes?: string }
+type RoutineData = { name: string; kind: string; everyN: number; everyUnit: 'day' | 'week' | 'month'; minutes?: number; weekday?: string; lastDoneOn?: string; notes?: string };
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Routine (chores): a cycle with no physical object — laundry, water plants, haircut. SCOPE C3. */
+export const routineType: EntityTypeDef<RoutineData> = {
+  type: 'routine', module: 'assets', label: 'Routine', labelPlural: 'Routines', icon: 'repeat',
+  schema: z.object({ name: z.string().min(1), kind: z.string().default('chore'), everyN: z.coerce.number().int().positive().default(7), everyUnit: z.enum(['day', 'week', 'month']).default('day'), minutes: z.coerce.number().optional(), weekday: z.string().optional(), lastDoneOn: z.string().optional(), notes: z.string().optional() }),
+  fields: [
+    { key: 'name', label: 'Routine', type: 'text', required: true, placeholder: 'Laundry, water plants, haircut…' },
+    { key: 'kind', label: 'Kind', type: 'select', defaultValue: 'chore', summary: true, options: [{ value: 'chore', label: 'Chore' }, { value: 'personal', label: 'Personal' }, { value: 'home', label: 'Home' }] },
+    { key: 'everyN', label: 'Every', type: 'number', required: true, defaultValue: 7 },
+    { key: 'everyUnit', label: 'Unit', type: 'select', required: true, defaultValue: 'day', options: [{ value: 'day', label: 'Days' }, { value: 'week', label: 'Weeks' }, { value: 'month', label: 'Months' }] },
+    { key: 'minutes', label: 'Takes about (minutes)', type: 'number' },
+    { key: 'weekday', label: 'Preferred day', type: 'select', options: WEEKDAYS.map((l, i) => ({ value: String(i), label: l })) },
+    { key: 'lastDoneOn', label: 'Last done', type: 'date' },
+    { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
+  ],
+  computeTitle: (d) => d.name,
+  computeSubtitle: (d) => [`every ${d.everyN === 1 ? '' : `${d.everyN} `}${d.everyUnit}${d.everyN === 1 ? '' : 's'}`, d.minutes ? `${d.minutes} min` : null, d.weekday ? `${WEEKDAYS[Number(d.weekday)]}s` : null].filter(Boolean).join(' · '),
+  cycleTemplates: (d) => {
+    const last = dateField(d.lastDoneOn);
+    const first = d.weekday ? nextWeekday(Number(d.weekday), Date.now()) : startOfDay(Date.now()) + 9 * 3600_000;
+    return [{ template: 'routine.cycle', name: d.name, kind: 'interval', everyN: d.everyN, everyUnit: d.everyUnit, lastDoneAt: last, nextDueAt: last == null ? first : null }];
+  },
+};
+
 export const vehicleType: EntityTypeDef<VehicleData> = {
   type: 'vehicle', module: 'assets', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car',
   schema: z.object({ make: z.string(), model: z.string().optional(), year: z.coerce.number().optional(), plate: z.string().optional(), odometerKm: z.coerce.number().optional(), fuel: z.string().optional(), insuranceUntil: z.string().optional(), pucUntil: z.string().optional(), nextServiceKm: z.coerce.number().optional(), nextServiceDate: z.string().optional(), notes: z.string().optional() }),
@@ -69,7 +95,7 @@ function VehicleSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSConte
 
 export const assetsModule: ModuleManifest = {
   id: 'assets', name: 'Assets', version: '1.0.0', description: 'Things you own — electronics, furniture, vehicles — with warranties, value and linked expenses.', icon: 'cube.box', color: ASSETS_COLOR,
-  dependencies: ['crm'], entityTypes: [assetType, vehicleType],
+  dependencies: ['crm'], entityTypes: [assetType, vehicleType, routineType],
   quickActions: [{ id: 'assets.add', label: 'Asset', icon: 'cube.box', route: '/entity/asset/new' }, { id: 'assets.addVehicle', label: 'Vehicle', icon: 'car', route: '/entity/vehicle/new' }],
   detailSections: [{ entityType: 'vehicle', key: 'assets.vehicle', title: 'Vehicle', component: VehicleSection, order: 10 }],
 };
