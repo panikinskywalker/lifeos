@@ -9,6 +9,7 @@ import { palette } from '@ui/theme/tokens';
 import { useLive } from '@ui/hooks';
 import { Card, Row, SectionHeader, Stat, Text } from '@ui/components/primitives';
 import { EntityRow } from '@ui/components/EntityRow';
+import { dateField, nextAnnual } from '@core/cycles/schedule';
 
 export const CRM_COLOR = palette.pink;
 
@@ -32,6 +33,10 @@ export const personType: EntityTypeDef<PersonData> = {
   labelPlural: 'People',
   icon: 'person',
   schema: z.object({ relationship: z.string().optional(), phone: z.string().optional(), email: z.string().optional(), birthday: z.string().optional(), company: z.string().optional(), role: z.string().optional(), city: z.string().optional(), notes: z.string().optional(), contactEvery: z.coerce.number().optional(), lastContactAt: z.string().optional() }),
+  cycleTemplates: (d) => [
+    ...(d.contactEvery ? [{ template: 'person.contact', name: 'Keep in touch', kind: 'interval' as const, everyN: d.contactEvery, everyUnit: 'day' as const, lastDoneAt: dateField(d.lastContactAt) ?? Date.now() }] : []),
+    ...(d.birthday ? [{ template: 'person.birthday', name: 'Birthday', kind: 'fixed' as const, everyN: 1, everyUnit: 'year' as const, nextDueAt: nextAnnual(d.birthday, Date.now()), leadDays: 7 }] : []),
+  ],
   fields: [
     { key: 'relationship', label: 'Relationship', type: 'select', summary: true, options: [{ value: 'family', label: 'Family', color: palette.red }, { value: 'friend', label: 'Friend', color: palette.orange }, { value: 'partner', label: 'Partner', color: palette.pink }, { value: 'colleague', label: 'Colleague', color: palette.blue }, { value: 'client', label: 'Client', color: palette.indigo }, { value: 'vendor', label: 'Vendor / Service', color: palette.teal }, { value: 'acquaintance', label: 'Acquaintance', color: palette.gray }] },
     { key: 'phone', label: 'Phone', type: 'text', section: 'Contact' },

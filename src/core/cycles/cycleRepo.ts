@@ -1,4 +1,5 @@
 import type { DatabaseAdapter, Row, SqlParam } from '../db/adapter';
+import type { Entity, EntityTypeDef } from '../domain/types';
 import { newId } from '../domain/ids';
 import { bus, type Actor } from '../events/bus';
 import type { TimelineRepo } from '../repo/timelineRepo';
@@ -97,6 +98,21 @@ export class CycleRepo {
     bus.emit('data.changed', { table: 'cycles', id });
     void actor;
     return c;
+  }
+
+  /**
+   * Give a record its type's default cycles. A template already applied —
+   * even if the user later deleted that cycle — is not added again.
+   */
+  applyTemplates(entity: Entity, def: EntityTypeDef | undefined, actor: Actor = 'system'): Cycle[] {
+    if (!def?.cycleTemplates) return [];
+    const seen = new Set(this.db.all<{ template: string }>(`SELECT template FROM cycles WHERE entity_id=? AND template IS NOT NULL`, [entity.id]).map((r) => r.template));
+    const made: Cycle[] = [];
+    for (const seed of def.cycleTemplates(entity.data as never)) {
+      if (seen.has(seed.template)) continue;
+      made.push(this.create({ ...seed, entityId: entity.id }, actor));
+    }
+    return made;
   }
 
   get(id: string): Cycle | null {

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import type { EntityTypeDef } from '@core/domain/types';
 import { palette } from '@ui/theme/tokens';
+import { dateField } from '@core/cycles/schedule';
 
 export const DOCUMENTS_COLOR = palette.indigo;
 
@@ -9,6 +10,7 @@ export interface DocumentData { kind: string; number?: string; issuedOn?: string
 export const documentType: EntityTypeDef<DocumentData> = {
   type: 'document', module: 'documents', label: 'Document', labelPlural: 'Documents', icon: 'doc.text',
   schema: z.object({ kind: z.string().default('other'), number: z.string().optional(), issuedOn: z.string().optional(), expiresOn: z.string().optional(), issuer: z.string().optional(), notes: z.string().optional(), personId: z.string().optional(), tripId: z.string().optional(), assetId: z.string().optional() }),
+  cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'document.expiry', name: 'Renew', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: d.kind === 'id' ? 180 : 30 }] : []),
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [{ value: 'id', label: 'ID / Passport' }, { value: 'insurance', label: 'Insurance' }, { value: 'contract', label: 'Contract / Lease' }, { value: 'receipt', label: 'Receipt / Invoice' }, { value: 'ticket', label: 'Ticket / Booking' }, { value: 'medical', label: 'Medical' }, { value: 'tax', label: 'Tax' }, { value: 'certificate', label: 'Certificate' }, { value: 'other', label: 'Other' }] },
     { key: 'number', label: 'Reference number', type: 'text' },

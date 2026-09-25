@@ -7,6 +7,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
 import { useLive } from '@ui/hooks';
 import { Card, Stat } from '@ui/components/primitives';
+import { dateField, nextAnnual, periodFromRRule } from '@core/cycles/schedule';
 
 export const ASSETS_COLOR = palette.brown;
 
@@ -14,6 +15,7 @@ export interface AssetData { category: string; purchaseDate?: string; purchasePr
 export const assetType: EntityTypeDef<AssetData> = {
   type: 'asset', module: 'assets', label: 'Asset', labelPlural: 'Assets', icon: 'cube.box',
   schema: z.object({ category: z.string().default('electronics'), purchaseDate: z.string().optional(), purchasePrice: z.coerce.number().optional(), currentValue: z.coerce.number().optional(), serial: z.string().optional(), warrantyUntil: z.string().optional(), location: z.string().optional(), notes: z.string().optional(), vendorId: z.string().optional() }),
+  cycleTemplates: (d) => (dateField(d.warrantyUntil) ? [{ template: 'asset.warranty', name: 'Warranty ends', kind: 'fixed', nextDueAt: dateField(d.warrantyUntil), leadDays: 30 }] : []),
   fields: [
     { key: 'category', label: 'Category', type: 'select', required: true, summary: true, options: [{ value: 'electronics', label: 'Electronics' }, { value: 'furniture', label: 'Furniture' }, { value: 'appliance', label: 'Appliance' }, { value: 'jewellery', label: 'Jewellery' }, { value: 'property', label: 'Property' }, { value: 'other', label: 'Other' }] },
     { key: 'purchasePrice', label: 'Purchase price', type: 'currency' },
@@ -42,6 +44,11 @@ export const vehicleType: EntityTypeDef<VehicleData> = {
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   computeTitle: (d) => [d.year, d.make, d.model].filter(Boolean).join(' '),
+  cycleTemplates: (d) => [
+    { template: 'vehicle.service', name: 'Service', kind: 'either', everyN: 6, everyUnit: 'month', meterEvery: 10000, nextDueAt: dateField(d.nextServiceDate), nextDueMeter: d.nextServiceKm ?? null, leadDays: 14 }, // unscheduled until a next service or a done is logged
+    ...(dateField(d.insuranceUntil) ? [{ template: 'vehicle.insurance', name: 'Insurance renewal', kind: 'fixed' as const, everyN: 1, everyUnit: 'year' as const, nextDueAt: dateField(d.insuranceUntil), leadDays: 30 }] : []),
+    ...(dateField(d.pucUntil) ? [{ template: 'vehicle.puc', name: 'PUC renewal', kind: 'fixed' as const, everyN: 6, everyUnit: 'month' as const, nextDueAt: dateField(d.pucUntil), leadDays: 7 }] : []),
+  ],
   relations: [{ kind: 'vehicle', label: 'Expenses & services', to: ['transaction', 'document'], cardinality: 'many' }],
 };
 

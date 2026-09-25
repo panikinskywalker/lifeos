@@ -146,3 +146,30 @@ export function describeCycle(r: CycleRule, meterUnit = 'km'): string {
   if (r.kind === 'fixed') return period ? `${period} (fixed date)` : 'on a fixed date';
   return period ?? 'no schedule';
 }
+
+/** "2026-03-14" (a date field) → that day at 09:00 local; null for empty/invalid. */
+export function dateField(v: unknown): number | null {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(v)) return null;
+  const t = new Date(`${v.slice(0, 10)}T09:00:00`).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+/** The next yearly occurrence of a date on or after today (birthdays). */
+export function nextAnnual(v: unknown, now: number): number | null {
+  const t = dateField(v);
+  if (t == null) return null;
+  const d = new Date(t);
+  const n = new Date(now);
+  d.setFullYear(n.getFullYear());
+  if (startOfDay(d.getTime()) < startOfDay(now)) d.setFullYear(n.getFullYear() + 1);
+  return d.getTime();
+}
+
+/** FREQ=MONTHLY;INTERVAL=3 → every 3 months. Unknown frequencies → null. */
+export function periodFromRRule(rrule: unknown): { everyN: number; everyUnit: CycleUnit } | null {
+  if (typeof rrule !== 'string') return null;
+  const freq = /FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/.exec(rrule)?.[1];
+  if (!freq) return null;
+  const n = Number(/INTERVAL=(\d+)/.exec(rrule)?.[1] ?? 1) || 1;
+  return { everyN: n, everyUnit: ({ DAILY: 'day', WEEKLY: 'week', MONTHLY: 'month', YEARLY: 'year' } as const)[freq as 'DAILY'] };
+}

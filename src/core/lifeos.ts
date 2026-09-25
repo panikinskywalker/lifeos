@@ -118,6 +118,20 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   });
   if (!ctx.scheduler.get('core.reminder-scan')) ctx.scheduler.schedule({ id: 'core.reminder-scan', kind: 'reminder-scan', at: Date.now(), rrule: 'FREQ=DAILY;INTERVAL=1' });
 
+  // Default cycles: new records get their type's templates; existing records get them once.
+  bus.on('entity.created', ({ entity }) => {
+    ctx.cycles.applyTemplates(entity, registry.entityTypes.get(entity.type));
+  });
+  if (!settings.get('cycles.templatesBackfilled', false)) {
+    db.transaction(() => {
+      for (const def of registry.entityTypes.values()) {
+        if (!def.cycleTemplates) continue;
+        for (const e of entities.query(def.type, {}, { limit: 100000 })) ctx.cycles.applyTemplates(e, def);
+      }
+    });
+    settings.set('cycles.templatesBackfilled', true);
+  }
+
   ctx.automation.start();
   for (const m of all) await m.onStart?.(ctx);
   return ctx;

@@ -6,7 +6,7 @@ import { Registry } from '../registry/registry';
 import type { LifeOSContext } from '../registry/context';
 import type { ModuleManifest } from '../registry/types';
 import { bus } from '../events/bus';
-import { addPeriod, cycleStatus, describeCycle, nextAfterDone, nextAfterSkip } from './schedule';
+import { addPeriod, cycleStatus, dateField, describeCycle, nextAfterDone, nextAfterSkip, nextAnnual, periodFromRRule } from './schedule';
 
 const d = (s: string) => new Date(`${s}T10:00:00`).getTime();
 const day = (at: number | null) => (at == null ? null : new Date(at).toISOString().slice(0, 10));
@@ -62,7 +62,16 @@ describe('schedule (pure)', () => {
 
 const things: ModuleManifest = {
   id: 'test-things', name: 'Things', version: '1.0.0', description: 't', icon: 'x', color: '#000',
-  entityTypes: [{ type: 'car', module: 'test-things', label: 'Car', labelPlural: 'Cars', icon: 'x', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) }],
+  entityTypes: [
+    { type: 'car', module: 'test-things', label: 'Car', labelPlural: 'Cars', icon: 'x', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
+    {
+      type: 'sub', module: 'test-things', label: 'Sub', labelPlural: 'Subs', icon: 'x',
+      schema: z.object({ name: z.string(), rrule: z.string(), next: z.string().optional() }),
+      fields: [{ key: 'name', label: 'Name', type: 'text' }],
+      computeTitle: (x) => String(x.name),
+      cycleTemplates: (x) => [{ template: 'sub.renewal', name: 'Renewal', kind: 'fixed', ...periodFromRRule(x.rrule), nextDueAt: dateField(x.next) }],
+    },
+  ],
 };
 
 let os: LifeOSContext;
@@ -135,5 +144,45 @@ describe('CycleRepo', () => {
     expect(os.cycles.all()).toHaveLength(1);
     os.entities.delete(car.id);
     expect(os.cycles.all()).toHaveLength(0);
+  });
+
+  it('new records get their type\'s default cycles once; a deleted default is not re-added', () => {
+    const jio = os.entities.create({ type: 'sub', data: { name: 'Jio', rrule: 'FREQ=DAILY;INTERVAL=84', next: '2026-10-01' } });
+    const [c] = os.cycles.forEntity(jio.id);
+    expect(c).toMatchObject({ name: 'Renewal', kind: 'fixed', everyN: 84, everyUnit: 'day', template: 'sub.renewal' });
+    expect(day(c!.nextDueAt)).toBe('2026-10-01');
+    os.cycles.remove(c!.id);
+    os.cycles.applyTemplates(jio, os.registry.entityTypes.get('sub'));
+    expect(os.cycles.forEntity(jio.id)).toHaveLength(0);
+  });
+});
+
+describe('template helpers', () => {
+  it('parses rrules, date fields and the next birthday', () => {
+    expect(periodFromRRule('FREQ=MONTHLY;INTERVAL=3')).toEqual({ everyN: 3, everyUnit: 'month' });
+    expect(periodFromRRule('FREQ=YEARLY')).toEqual({ everyN: 1, everyUnit: 'year' });
+    expect(periodFromRRule('nope')).toBeNull();
+    expect(dateField('')).toBeNull();
+    expect(day(nextAnnual('1990-03-20', d('2026-05-01')))).toBe('2027-03-20');
+    expect(day(nextAnnual('1990-06-20', d('2026-05-01')))).toBe('2026-06-20');
+  });
+});
+
+describe('backfill', () => {
+  it('records created before templates existed get them on the next boot, once', async () => {
+    const db = createBetterSqliteAdapter(':memory:');
+    const plain: ModuleManifest = { ...things, entityTypes: things.entityTypes!.map((t) => ({ ...t, cycleTemplates: undefined })) };
+    bus.clear();
+    const first = await createLifeOS({ db, modules: [plain], registry: new Registry() });
+    first.settings.set('cycles.templatesBackfilled', false);
+    const s = first.entities.create({ type: 'sub', data: { name: 'Netflix', rrule: 'FREQ=MONTHLY;INTERVAL=1', next: '2026-10-05' } });
+    expect(first.cycles.forEntity(s.id)).toHaveLength(0);
+    bus.clear();
+    const second = await createLifeOS({ db, modules: [things], registry: new Registry() });
+    expect(second.cycles.forEntity(s.id)).toHaveLength(1);
+    bus.clear();
+    const third = await createLifeOS({ db, modules: [things], registry: new Registry() });
+    expect(third.cycles.forEntity(s.id)).toHaveLength(1);
+    db.close();
   });
 });

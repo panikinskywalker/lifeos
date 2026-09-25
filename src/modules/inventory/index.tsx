@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import type { EntityTypeDef } from '@core/domain/types';
 import { palette } from '@ui/theme/tokens';
+import { dateField } from '@core/cycles/schedule';
 
 export const INVENTORY_COLOR = palette.teal;
 
@@ -9,6 +10,7 @@ export interface ItemData { quantity: number; unit?: string; location?: string; 
 export const itemType: EntityTypeDef<ItemData> = {
   type: 'item', module: 'inventory', label: 'Item', labelPlural: 'Inventory', icon: 'shippingbox',
   schema: z.object({ quantity: z.coerce.number().default(1), unit: z.string().optional(), location: z.string().optional(), minQuantity: z.coerce.number().optional(), expiresOn: z.string().optional(), category: z.string().optional(), notes: z.string().optional() }),
+  cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'item.expiry', name: 'Use or replace', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: 7 }] : []),
   fields: [
     { key: 'quantity', label: 'Quantity', type: 'number', required: true, defaultValue: 1, summary: true },
     { key: 'unit', label: 'Unit', type: 'text', placeholder: 'pcs, kg, L' },

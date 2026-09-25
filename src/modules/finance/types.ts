@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { EntityTypeDef, FieldOption } from '@core/domain/types';
 import { palette } from '@ui/theme/tokens';
+import { dateField, nextAnnual, periodFromRRule } from '@core/cycles/schedule';
 
 export const FINANCE_COLOR = palette.green;
 
@@ -207,6 +208,10 @@ export const subscriptionType: EntityTypeDef<SubscriptionData> = {
   occurredAtField: 'nextBillingAt',
   statuses: [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused' }, { value: 'cancelled', label: 'Cancelled', color: palette.gray }],
   computeTitle: (d) => d.name,
+  cycleTemplates: (d) => {
+    const p = periodFromRRule(d.rrule) ?? { everyN: 1, everyUnit: 'month' as const };
+    return [{ template: 'subscription.renewal', name: 'Renewal', kind: 'fixed', ...p, nextDueAt: dateField(d.nextBillingAt), leadDays: 3, costEstimate: d.amount ?? null, currency: d.currency ?? null }];
+  },
   computeSubtitle: (d, { formatCurrency }) => `${formatCurrency(d.amount)} · next ${d.nextBillingAt}`,
   relations: [{ kind: 'account', label: 'Account', to: 'account', cardinality: 'one' }],
 };

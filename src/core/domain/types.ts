@@ -105,6 +105,25 @@ export interface EntityTypeDef<TData = Record<string, unknown>> {
   defaultViews?: SavedViewDef[];
   /** Hide from generic "browse all" screens. */
   hidden?: boolean;
+  /** Default cycles a new record of this type gets (Upkeep), derived from its data. */
+  cycleTemplates?: (data: TData) => CycleSeed[];
+}
+
+/** A default cycle from a type's template; `template` keeps it from being added twice. */
+export interface CycleSeed {
+  template: string;
+  name: string;
+  kind: 'interval' | 'fixed' | 'meter' | 'either';
+  everyN?: number | null;
+  everyUnit?: 'day' | 'week' | 'month' | 'year' | null;
+  meterEvery?: number | null;
+  lastDoneAt?: number | null;
+  lastMeter?: number | null;
+  nextDueAt?: number | null;
+  nextDueMeter?: number | null;
+  leadDays?: number;
+  costEstimate?: number | null;
+  currency?: string | null;
 }
 
 export interface RelationKindDef {
