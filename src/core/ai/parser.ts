@@ -1,5 +1,6 @@
 import type { LifeOSContext } from '../registry/context';
 import { clearMatch, pickCycle, resolveCandidates } from './lifeTools';
+import type { ReplyCard } from './cards';
 
 /**
  * Parser first (SCOPE v2 B5): the everyday sentences are understood on the
@@ -20,6 +21,8 @@ export interface ParsedPlan {
   steps: Array<(results: unknown[]) => PlannedCall | null>;
   /** The reply once the steps ran (declined = a confirm was refused). */
   reply: (results: unknown[], declined: boolean) => string;
+  /** A card to show without running a tool (e.g. "add a vehicle" → the new-vehicle form). */
+  card?: ReplyCard;
 }
 
 const today = (offset = 0) => {
@@ -92,6 +95,18 @@ function namesAfterWith(text: string): string[] {
   return m[1]!.split(/\s*(?:,|\band\b|&)\s*/i).map((s) => s.trim()).filter((s) => s && !/^(me|us)$/i.test(s));
 }
 
+const TYPE_SYNONYMS: Record<string, string> = { car: 'vehicle', bike: 'vehicle', scooter: 'vehicle', motorcycle: 'vehicle', motorbike: 'vehicle', contact: 'person', friend: 'person', expense: 'transaction', chore: 'routine' };
+
+/** "vehicle" / "vehicles" / "car" → 'vehicle', only for a record type that is installed. */
+function typeFromWord(os: LifeOSContext, word: string): string | null {
+  const w = word.trim().toLowerCase().replace(/^(?:my|the)\s+/, '');
+  for (const def of os.registry.entityTypes.values()) {
+    if ([def.type, def.label, def.labelPlural].some((x) => x?.toLowerCase() === w)) return def.type;
+  }
+  const syn = TYPE_SYNONYMS[w.replace(/s$/, '')] ?? TYPE_SYNONYMS[w];
+  return syn && os.registry.entityTypes.has(syn) ? syn : null;
+}
+
 const r0 = <T>(results: unknown[], i = 0) => results[i] as T;
 
 export function parseMessage(os: LifeOSContext, raw: string): ParsedPlan | null {
@@ -104,6 +119,14 @@ export function parseMessage(os: LifeOSContext, raw: string): ParsedPlan | null 
   if (m) {
     const fact = cap(m[1]!.replace(/[.!]+$/, ''));
     return { intent: 'remember', steps: [() => ({ name: 'remember_fact', input: { text: fact } })], reply: (r) => ((r[0] as { alreadyKnown?: string })?.alreadyKnown ? 'I already knew that.' : `Noted — I’ll remember that ${fact.charAt(0).toLowerCase()}${fact.slice(1)}.`) };
+  }
+
+  // — "Add a new vehicle" / "new person" / "create a trip": nothing to fill in yet, so open the form
+  m = /^(?:please\s+)?(?:add|create|make|start|new)\s+(?:a|an|another|one)?\s*(?:new\s+)?([a-z][a-z ]{1,30}?)(?:\s+(?:record|entry|form))?[.!]?$/i.exec(text);
+  const newType = m && typeFromWord(os, m[1]!);
+  if (newType) {
+    const def = os.registry.entityTypes.get(newType)!;
+    return { intent: 'new_record', steps: [], card: { kind: 'new', type: def.type, label: def.label, icon: def.icon }, reply: () => `Here’s a new ${def.label.toLowerCase()} — fill in what you know.` };
   }
 
   // — Questions answered from data

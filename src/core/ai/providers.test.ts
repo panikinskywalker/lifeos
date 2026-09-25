@@ -98,6 +98,22 @@ describe('chain provider', () => {
     expect(groqCalls).toBe(1);
   });
 
+  it('the last provider, briefly limited, waits once and retries; a long limit fails fast', async () => {
+    let n = 0;
+    const groq: LLMProvider = { id: 'groq', complete: async () => { if (n++ === 0) throw new ProviderError('groq 429: tpm', 'groq', 429, 5); return { content: [{ type: 'text', text: 'ok' }], stopReason: 'end_turn' }; } };
+    const r = await createChainProvider([groq]).complete({ system: '', messages: [], tools: [] });
+    expect(r.content[0]).toEqual({ type: 'text', text: 'ok' });
+    expect(n).toBe(2);
+    const slow: LLMProvider = { id: 'slow', complete: async () => { throw new ProviderError('slow 429', 'slow', 429, 60_000); } };
+    await expect(createChainProvider([slow]).complete({ system: '', messages: [], tools: [] })).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('falls through when a request is too large for a free tier (413)', async () => {
+    const big: LLMProvider = { id: 'groq', complete: async () => { throw new ProviderError('groq 413: Request too large', 'groq', 413); } };
+    const r = await createChainProvider([big, fake('gemini', async () => ({ text: 'g' }))]).complete({ system: '', messages: [], tools: [] });
+    expect(r.content[0]).toEqual({ type: 'text', text: 'g' });
+  });
+
   it('does not fall through on a non-retryable 400', async () => {
     const bad: LLMProvider = { id: 'a', complete: async () => { throw new ProviderError('bad request', 'a', 400); } };
     const ok = fake('b', async () => ({ text: 'b' }));

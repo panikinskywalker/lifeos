@@ -9,7 +9,8 @@ export type ReplyCard =
   | { kind: 'cycle'; entityId: string; cycleId: string; title: string; due: string; subtitle?: string | null }
   | { kind: 'list'; title: string; items: Array<{ entityId?: string; type?: string; title: string; value?: string | null }> }
   | { kind: 'number'; label: string; value: string; caption?: string | null }
-  | { kind: 'chart'; title: string; bars: Array<{ label: string; value: number; display?: string }> };
+  | { kind: 'chart'; title: string; bars: Array<{ label: string; value: number; display?: string }> }
+  | { kind: 'new'; type: string; label: string; icon?: string };
 
 export const UNDO: unique symbol = Symbol('lifeos.undo');
 export const CARD: unique symbol = Symbol('lifeos.card');

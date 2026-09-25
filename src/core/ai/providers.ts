@@ -117,13 +117,20 @@ export interface ChainEvents {
   onModelChanged?: (provider: string, model: string) => void;
 }
 
-export function createChainProvider(providers: LLMProvider[], events: ChainEvents = {}): LLMProvider {
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => (clearTimeout(t), reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
+  });
+
+export function createChainProvider(providers: LLMProvider[], events: ChainEvents = {}, maxWaitMs = 20_000): LLMProvider {
   if (!providers.length) throw new Error('chain: no providers configured');
   const cooldownUntil = new Map<string, number>();
   return {
     id: `chain(${providers.map((p) => p.id).join('>')})`,
     async complete(args) {
       let lastErr: Error | undefined;
+      let retried = false;
       const now = Date.now();
       const order = [...providers].sort((a, b) => Number((cooldownUntil.get(a.id) ?? 0) > now) - Number((cooldownUntil.get(b.id) ?? 0) > now));
       for (let i = 0; i < order.length; i++) {
@@ -142,6 +149,13 @@ export function createChainProvider(providers: LLMProvider[], events: ChainEvent
           }
           const retryable = pe ? pe.isRetryable : true;
           const next = order[i + 1];
+          // Last one standing and only briefly limited (free tiers count per minute): wait it out once.
+          if (!next && pe?.isRateLimit && !retried && (pe.retryAfterMs ?? Infinity) <= maxWaitMs) {
+            retried = true;
+            await sleep(pe.retryAfterMs!, args.signal);
+            i--;
+            continue;
+          }
           if (!retryable || !next) throw err;
           events.onFallback?.(p.id, next.id, err);
         }

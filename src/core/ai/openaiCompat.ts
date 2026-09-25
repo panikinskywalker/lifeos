@@ -42,6 +42,7 @@ export class ProviderError extends Error {
       this.status === 401 ||
       this.status === 403 ||
       this.status === 408 ||
+      this.status === 413 ||
       this.status === 429 ||
       this.status >= 500 ||
       this.isModelMissing

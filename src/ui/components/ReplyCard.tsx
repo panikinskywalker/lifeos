@@ -10,7 +10,7 @@ import { Button, Chip, IconBox, ProgressBar, Text } from '../kit';
  * nested slab in a tile — record, cycle, list, number or chart — tappable to
  * open, with Undo for anything it changed.
  */
-export function ReplyCardView({ card, label, onOpen, onUndo }: { card?: Card; label: string; onOpen?: (entityId: string, type?: string) => void; onUndo?: () => void }) {
+export function ReplyCardView({ card, label, onOpen, onNew, onUndo }: { card?: Card; label: string; onOpen?: (entityId: string, type?: string) => void; onNew?: (type: string) => void; onUndo?: () => void }) {
   const t = useTheme();
   const [undone, setUndone] = useState(false);
   const undo = onUndo && !undone ? () => { onUndo(); setUndone(true); } : undefined;
@@ -22,7 +22,7 @@ export function ReplyCardView({ card, label, onOpen, onUndo }: { card?: Card; la
           {undone ? `Undone · ${label}` : label}
         </Text>
       </View>
-      {card ? <CardBody card={card} onOpen={undone ? undefined : onOpen} /> : null}
+      {card ? <CardBody card={card} onOpen={undone ? undefined : onOpen} onNew={onNew} /> : null}
       {undo ? (
         <View style={{ flexDirection: 'row' }}>
           <Chip label="Undo" icon="undo" small onPress={undo} />
@@ -44,7 +44,7 @@ function Slab({ children, onPress, label }: { children: React.ReactNode; onPress
   );
 }
 
-function CardBody({ card, onOpen }: { card: Card; onOpen?: (entityId: string, type?: string) => void }) {
+function CardBody({ card, onOpen, onNew }: { card: Card; onOpen?: (entityId: string, type?: string) => void; onNew?: (type: string) => void }) {
   const t = useTheme();
   switch (card.kind) {
     case 'record':
@@ -92,6 +92,19 @@ function CardBody({ card, onOpen }: { card: Card; onOpen?: (entityId: string, ty
           <Text variant="labelMicro" color="secondary" style={{ textTransform: 'uppercase' }}>{card.label}</Text>
           <Text variant="stat">{card.value}</Text>
           {card.caption ? <Text variant="caption" color="secondary">{card.caption}</Text> : null}
+        </Slab>
+      );
+    case 'new':
+      return (
+        <Slab onPress={onNew ? () => onNew(card.type) : undefined} label={`New ${card.label}`}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <IconBox icon={(card.icon as IconName) ?? 'plus'} tone="plain" size={32} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="rowTitle" numberOfLines={1}>New {card.label.toLowerCase()}</Text>
+              <Text variant="caption" color="secondary" numberOfLines={1}>Tap to fill in the details</Text>
+            </View>
+            {onNew ? <Icon name="chevron-right" size={16} color={t.c.fg.tertiary} /> : null}
+          </View>
         </Slab>
       );
     case 'chart': {

@@ -17,12 +17,16 @@ const PROMPTS = ['Did the car service today, 6,400 at Hyundai', 'Recharged Jio 7
 
 /** Claude API failures in plain words. */
 function friendlyError(msg: string): string {
-  if (/\b401\b|authentication|invalid x-api-key|API key is invalid/i.test(msg)) return 'Your API key was rejected. Check it in You › Agent & API key.';
-  if (/\b429\b|rate.?limit/i.test(msg)) return 'Too many requests just now — wait a minute and try again.';
-  if (/\b529\b|overloaded/i.test(msg)) return 'Claude is busy right now. Try again in a moment.';
+  const who = /^(\w+)[ :]/.exec(msg)?.[1];
+  const name = who && !/^(chain|network|request)$/i.test(who) ? who.charAt(0).toUpperCase() + who.slice(1) : 'The model';
+  if (/\b401\b|authentication|invalid x-api-key|API key is invalid|no API key/i.test(msg)) return `${name} rejected the API key. Check it in You › Agent.`;
+  if (/\b413\b|request too large|tokens per minute|\bTPM\b/i.test(msg)) return `That was more than ${name}’s free tier takes in a minute. Try again shortly, or add a Gemini key in You › Agent so Talk can switch.`;
+  if (/\b429\b|rate.?limit|too many requests/i.test(msg)) return `${name}’s free tier is busy for the next minute. Try again shortly, or add a second provider in You › Agent so Talk can switch.`;
+  if (/\bcap\b|monthly/i.test(msg) && /usage|cap/i.test(msg)) return `${name} hit the monthly cap you set in You › Agent.`;
+  if (/\b529\b|overloaded/i.test(msg)) return `${name} is busy right now. Try again in a moment.`;
   if (/credit|billing|\b402\b/i.test(msg)) return 'Your Anthropic account is out of credit. Top up at console.anthropic.com › Billing.';
-  if (/network|fetch|Failed to fetch|timed? ?out/i.test(msg)) return 'Couldn’t reach Claude — are you online?';
-  return `Something went wrong talking to Claude: ${msg.slice(0, 160)}`;
+  if (/network|fetch|Failed to fetch|timed? ?out/i.test(msg)) return `Couldn’t reach ${name} — are you online?`;
+  return `Something went wrong: ${msg.slice(0, 160)}`;
 }
 
 type Item =
@@ -82,7 +86,10 @@ export default function TalkTab() {
       smartProvider: agent?.smart,
       factProvider: agent?.small,
       metered: true,
-      onTurn: (turn) => add({ kind: 'turn', id: turn.id, turn }),
+      onTurn: (turn) => {
+        add({ kind: 'turn', id: turn.id, turn });
+        if (turn.card?.kind === 'new') router.push(`/entity/${turn.card.type}/new` as never);
+      },
       onFacts: (facts) => add({ kind: 'facts', id: `f${Date.now()}`, facts }),
       onRoute: (r) => setThinking(r.tier === 'smart' ? `Thinking harder (${r.reason})…` : 'Thinking…'),
       confirm: (_tool, _input, summary) =>
@@ -217,7 +224,7 @@ export default function TalkTab() {
               </Text>
             );
             if (!turn.card && !turn.undo) return null; // lookups: the answer says what they found
-            return <ReplyCardView key={it.id} label={turn.text} card={turn.card} onOpen={open} onUndo={turn.undo} />;
+            return <ReplyCardView key={it.id} label={turn.text} card={turn.card} onOpen={open} onNew={(ty) => router.push(`/entity/${ty}/new` as never)} onUndo={turn.undo} />;
           }
           return (
             <View key={it.id} style={{ gap: 6, marginRight: 24 }}>

@@ -34,6 +34,13 @@ describe('parser', () => {
     expect(first('remember that Dad hates surprises')).toEqual({ name: 'remember_fact', input: { text: 'Dad hates surprises' } });
   });
 
+  it('"add a new vehicle" opens the form, no model call', async () => {
+    const { vehicleType } = await import('../../modules/assets/types');
+    os.registry.entityTypes.set('vehicle', vehicleType as never);
+    for (const t of ['add a new vehicle', 'Add vehicle', 'new car', 'create a vehicle.']) expect(parseMessage(os, t)).toMatchObject({ intent: 'new_record', steps: [], card: { kind: 'new', type: 'vehicle' } });
+    expect(parseMessage(os, 'add a new spaceship')).toBeNull();
+  });
+
   it('hands anything unsure to the model', () => {
     expect(parseMessage(os, 'how should I plan my finances for next year?')).toBeNull();
     expect(parseMessage(os, 'did the thing')).toBeNull(); // nothing called "thing"

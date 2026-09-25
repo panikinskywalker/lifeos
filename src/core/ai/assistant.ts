@@ -125,6 +125,7 @@ Guidelines:
       let declined = false;
       if (plan) {
         this.opts.onRoute?.({ tier: 'fast', reason: 'understood on the phone', model: 'parser' });
+        if (plan.card) emit({ id: newId(), role: 'tool', text: plan.card.kind === 'new' ? `New ${plan.card.label.toLowerCase()}` : plan.intent, toolName: plan.intent, card: plan.card, createdAt: Date.now() });
         for (const step of plan.steps) {
           const call = step(results);
           if (!call) break;
@@ -149,15 +150,7 @@ Guidelines:
       emit({ id: newId(), role: 'assistant', text, createdAt: Date.now() });
       return turns;
     }
-    if (this.opts.factProvider) {
-      const fp = this.opts.factProvider;
-      this.lastMining = mineFacts(this.os, fp, userText, this.conversationId, { onUsage: (u) => (this.opts.metered ? undefined : recordUsage(this.os, { provider: fp.id, model: fp.model ?? fp.id, purpose: 'facts', ...u, conversationId: this.conversationId })) }).then((facts) => {
-        if (facts.length) this.opts.onFacts?.(facts);
-        return facts;
-      });
-    }
-
-    const specs = tools.map(toolSpec);
+    const specs = selectTools(userText, tools, this.history).map(toolSpec);
     const maxRounds = this.opts.maxToolRounds ?? 8;
     const context = buildContext(this.os, userText, { budget: this.opts.contextBudget });
     const system = context ? `${this.systemPrompt()}\n\n${context}` : this.systemPrompt();
@@ -182,7 +175,7 @@ Guidelines:
       const results: ContentBlock[] = [];
       for (const call of calls) {
         const { output, isError } = await this.runTool(byName, call.name, call.input, emit);
-        results.push({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(output ?? null).slice(0, 20000), is_error: isError });
+        results.push({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(output ?? null).slice(0, 6000), is_error: isError });
       }
       // A tool failed: hand the rest of this turn to the smart model.
       if (route.tier === 'fast' && this.opts.smartProvider && results.some((r) => r.type === 'tool_result' && r.is_error && !String(r.content).includes('declined'))) {
@@ -192,6 +185,14 @@ Guidelines:
       const toolMsg: ChatMessage = { role: 'user', content: results };
       this.history.push(toolMsg);
       this.persist(toolMsg);
+    }
+    // Fact mining after the reply, not beside it: free tiers count tokens per minute.
+    if (this.opts.factProvider) {
+      const fp = this.opts.factProvider;
+      this.lastMining = mineFacts(this.os, fp, userText, this.conversationId, { onUsage: (u) => (this.opts.metered ? undefined : recordUsage(this.os, { provider: fp.id, model: fp.model ?? fp.id, purpose: 'facts', ...u, conversationId: this.conversationId })) }).then((facts) => {
+        if (facts.length) this.opts.onFacts?.(facts);
+        return facts;
+      });
     }
     return turns;
   }
@@ -229,6 +230,35 @@ Guidelines:
   reset() {
     this.history = [];
   }
+}
+
+/**
+ * Only the tools a message plausibly needs (plus any already used in the
+ * conversation): the full set is ~5k tokens a call, which alone trips
+ * free-tier per-minute limits (Groq). Lookup and record tools always go.
+ */
+const TOOL_GROUPS: Array<[RegExp, string[]]> = [
+  [/\b(how (much|many)|total|sum|average|spent|spend|most|least|per month|this (week|month|year)|last (week|month|year))\b/i, ['aggregate', 'finance_summary']],
+  [/\b(split|owe|owes|owed|paid|pay|settle|balance|back|lent|borrowed|debt)\b|₹|\brs\.?\s?\d/i, ['split_transaction', 'balances', 'settle_debt']],
+  [/\b(remember|forget|recall|know|call(ed)?|means?|alias|nickname)\b/i, ['remember_fact', 'recall', 'forget_fact', 'remember_alias']],
+  [/\b(done|did|finished|serviced|washed|cleaned|changed|renewed|replaced|due|overdue|next|km|reading|odometer|meter|every|chore|routine|upkeep|service|log(ged)?)\b/i, ['mark_cycle_done', 'log_event', 'set_next_due', 'log_meter', 'upkeep_status', 'create_routine']],
+  [/\b(automat\w*|whenever|every time|rule|trigger)\b/i, ['create_automation']],
+  [/\b(remind|reminder|alarm)\b/i, ['create_reminder', 'list_reminders']],
+  [/\b(delete|remove)\b/i, ['delete_entity']],
+  [/\b(attach|photo|file|document|receipt|pdf|scan)\b/i, ['attach_file']],
+  [/\b(comment|note on)\b/i, ['add_comment']],
+  [/\b(recent|lately|activity|what did i|history)\b/i, ['recent_activity']],
+  [/\b(trip|travel|holiday|vacation|flight|itinerary)\b/i, ['plan_trip']],
+];
+const CORE_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'create_entity', 'update_entity', 'link_entities', 'list_entity_types']);
+
+export function selectTools(text: string, tools: AiToolDef[], history: ChatMessage[] = []): AiToolDef[] {
+  const want = new Set(CORE_TOOLS);
+  for (const [re, names] of TOOL_GROUPS) if (re.test(text)) names.forEach((n) => want.add(n));
+  for (const m of history) if (Array.isArray(m.content)) for (const b of m.content) if (b.type === 'tool_use') want.add(b.name);
+  const known = new Set(TOOL_GROUPS.flatMap(([, n]) => n));
+  // Tools we don't classify (a new module's) always go, so nothing silently disappears.
+  return tools.filter((t) => want.has(t.name) || !known.has(t.name));
 }
 
 /** The confirm card's line: the tool's own describe(), else its name and the key inputs. */
