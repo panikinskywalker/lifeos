@@ -57,7 +57,11 @@ export function resolveCandidates(os: LifeOSContext, text: string, types?: strin
     }
     for (const w of words) {
       if (w.length < 3) continue;
-      for (const h of os.entities.search.search(w, { types, limit: 10 })) add(h, norm(h.title).split(' ').includes(w) ? 0.55 : 0.4, `matches "${w}"`);
+      for (const h of os.entities.search.search(w, { types, limit: 10 })) {
+        const t = norm(h.title);
+        // The record's whole title said inside the message ("did the creta service") names it.
+        add(h, ` ${q} `.includes(` ${t} `) ? 0.85 : t.split(' ').includes(w) ? 0.55 : 0.4, ` ${q} `.includes(` ${t} `) ? 'named' : `matches "${w}"`);
+      }
     }
   }
   for (const [type, ws] of Object.entries(TYPE_WORDS)) {

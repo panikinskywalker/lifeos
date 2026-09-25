@@ -72,7 +72,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Learned aliases table ("the car" → Creta) written when the user confirms a disambiguation.
 - [x] Confirmation policy: money & people tools ask (inline confirm card); others auto-run and return an Undo handle. *(The card itself is drawn by the Talk screen.)*
 - [x] **Facts** store + Browse › Memory screen; fact mining after every message (second, cheap Haiku call with a strict JSON schema); facts indexed in FTS with records and notes.
-- [ ] Retrieval step before every answer: FTS hits over records/notes/facts + resolved entity's timeline/relations + last N turns, packed into the system prompt with a token budget.
+- [x] Retrieval step before every answer: FTS hits over records/notes/facts + resolved entity's timeline/relations + last N turns, packed into the system prompt with a token budget.
 - [ ] `[[links]]` in notes/facts → relations; backlinks section on every record.
 - [ ] Share-sheet intent (Android `SEND` / `SEND_MULTIPLE`) → Talk with the shared text/link/image attached.
 - [ ] Model routing: Haiku default; escalate to Sonnet when the message has ≥2 intents, a plan intent, or the first attempt returned a tool error. Usage meter in You › Agent.

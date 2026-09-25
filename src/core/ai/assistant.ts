@@ -5,6 +5,7 @@ import { newId } from '../domain/ids';
 import type { ChatMessage, ContentBlock, LLMProvider, ToolSpec } from './provider';
 import { extrasOf, type ReplyCard } from './cards';
 import { mineFacts } from './factMiner';
+import { buildContext, historyWindow } from './retrieval';
 import type { Fact } from '../repo/factRepo';
 
 export interface AssistantTurn {
@@ -33,6 +34,10 @@ export interface AssistantOptions {
   factProvider?: LLMProvider;
   /** Facts saved from the last message (for a quiet "Remembered …" line). */
   onFacts?: (facts: Fact[]) => void;
+  /** User turns of history sent with each call (default 12). */
+  historyTurns?: number;
+  /** Character budget for retrieved context (default 6000). */
+  contextBudget?: number;
 }
 
 function toolSpec(t: AiToolDef): ToolSpec {
@@ -112,9 +117,11 @@ Guidelines:
     const specs = tools.map(toolSpec);
     const byName = new Map(tools.map((t) => [t.name, t]));
     const maxRounds = this.opts.maxToolRounds ?? 8;
+    const context = buildContext(this.os, userText, { budget: this.opts.contextBudget });
+    const system = context ? `${this.systemPrompt()}\n\n${context}` : this.systemPrompt();
 
     for (let round = 0; round <= maxRounds; round++) {
-      const result = await this.opts.provider.complete({ system: this.systemPrompt(), messages: this.history, tools: specs, signal });
+      const result = await this.opts.provider.complete({ system, messages: historyWindow(this.history, this.opts.historyTurns ?? 12), tools: specs, signal });
       const assistantMsg: ChatMessage = { role: 'assistant', content: result.content };
       this.history.push(assistantMsg);
       this.persist(assistantMsg);
