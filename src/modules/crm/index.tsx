@@ -10,6 +10,7 @@ import { useLive } from '@ui/hooks';
 import { Card, Row, SectionHeader, Stat, Text } from '@ui/components/primitives';
 import { EntityRow } from '@ui/components/EntityRow';
 import { dateField, nextAnnual } from '@core/cycles/schedule';
+import { bus } from '@core/events/bus';
 
 export const CRM_COLOR = palette.pink;
 
@@ -119,6 +120,20 @@ function nextBirthday(iso: string): { days: number; age: number | null } | null 
   return { days, age: d.getFullYear() > 1900 ? next.getFullYear() - d.getFullYear() : null };
 }
 
+/** Group (PRODUCT §4): flatmates, a trip crew, family — splits and balances run per group. Members also live in group_members. */
+export const groupType: EntityTypeDef<{ name: string; kind?: string; memberIds: string[]; notes?: string }> = {
+  type: 'group', module: 'crm', label: 'Group', labelPlural: 'Groups', icon: 'people',
+  schema: z.object({ name: z.string().min(1), kind: z.string().optional(), memberIds: z.array(z.string()).default([]), notes: z.string().optional() }),
+  fields: [
+    { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Flat 4B, Goa trip, Family' },
+    { key: 'kind', label: 'Kind', type: 'select', summary: true, options: [{ value: 'home', label: 'Home' }, { value: 'trip', label: 'Trip' }, { value: 'friends', label: 'Friends' }, { value: 'family', label: 'Family' }, { value: 'work', label: 'Work' }] },
+    { key: 'memberIds', label: 'Members', type: 'relation', relationTo: 'person', relationKind: 'member', defaultValue: [] },
+    { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
+  ],
+  computeTitle: (d) => d.name,
+  computeSubtitle: (d) => `${d.memberIds.length} member${d.memberIds.length === 1 ? '' : 's'} + you`,
+};
+
 export const crmModule: ModuleManifest = {
   id: 'crm',
   name: 'People',
@@ -126,7 +141,15 @@ export const crmModule: ModuleManifest = {
   description: 'Personal CRM: everyone in your life, with everything linked to them.',
   icon: 'person.2',
   color: CRM_COLOR,
-  entityTypes: [personType],
+  entityTypes: [personType, groupType],
+  onStart: (os) => {
+    // A group's member field is mirrored into group_members (default shares for splits, "groups Priya is in").
+    const sync = (e: Entity) => {
+      if (e.type === 'group') os.groups.setMembers(e.id, ((e.data as { memberIds?: string[] }).memberIds ?? []).filter(Boolean));
+    };
+    bus.on('entity.created', ({ entity }) => sync(entity));
+    bus.on('entity.updated', ({ entity }) => sync(entity));
+  },
   quickActions: [{ id: 'crm.addPerson', label: 'Person', icon: 'person', route: '/entity/person/new' }],
   detailSections: [{ entityType: 'person', key: 'crm.person', title: 'Relationship', component: PersonSection, order: 10 }],
   aiTools: [

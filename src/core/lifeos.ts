@@ -7,6 +7,7 @@ import { EntityRepo } from './repo/entityRepo';
 import { AttachmentRepo, CommentRepo, CustomFieldRepo, DashboardRepo, ModuleRepo, RelationRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from './repo/sideRepos';
 import { ChangeLog } from './sync/changeLog';
 import { CycleRepo } from './cycles/cycleRepo';
+import { GroupRepo } from './repo/groupRepo';
 import { AutomationEngine } from './automation/engine';
 import { Scheduler } from './automation/scheduler';
 import { createFormatters, DEFAULT_LOCALE, type LocaleSettings } from './format';
@@ -51,6 +52,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     tags: new TagRepo(db, timeline),
     attachments: new AttachmentRepo(db, timeline, changes),
     cycles: new CycleRepo(db, timeline, changes),
+    groups: new GroupRepo(db, changes),
     comments: new CommentRepo(db, timeline, changes),
     reminders: new ReminderRepo(db, timeline, changes),
     customFields: new CustomFieldRepo(db),

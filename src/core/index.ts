@@ -17,3 +17,4 @@ export * from './cycles/schedule';
 export * from './cycles/cycleRepo';
 export * from './cycles/upkeep';
 export * from './cycles/nudges';
+export * from './repo/groupRepo';

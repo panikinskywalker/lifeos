@@ -311,3 +311,17 @@ describe('nested transactions', () => {
     expect(os.entities.count('trip')).toBe(1);
   });
 });
+
+describe('groups', () => {
+  it('members follow setMembers; leavers can rejoin; shares persist', () => {
+    const g = 'group-1';
+    os.groups.setMembers(g, ['priya', 'arjun'], { arjun: 2 });
+    expect(os.groups.members(g)).toEqual([{ memberId: 'priya', defaultShare: 1 }, { memberId: 'arjun', defaultShare: 2 }]);
+    os.groups.setMembers(g, ['arjun']);
+    expect(os.groups.members(g).map((m) => m.memberId)).toEqual(['arjun']);
+    expect(os.groups.groupsOf('priya')).toEqual([]);
+    os.groups.setMembers(g, ['arjun', 'priya']);
+    expect(os.groups.groupsOf('priya')).toEqual([g]);
+    expect(os.groups.members(g).find((m) => m.memberId === 'arjun')!.defaultShare).toBe(2);
+  });
+});

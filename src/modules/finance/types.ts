@@ -105,6 +105,8 @@ export const transactionType: EntityTypeDef<TransactionData> = {
     tripId: z.string().optional(),
     personIds: z.array(z.string()).optional(),
     projectId: z.string().optional(),
+    /** Split details (split.ts SplitRecord); debts are filed separately. */
+    split: z.any().optional(),
   }),
   fields: [
     { key: 'amount', label: 'Amount', type: 'currency', required: true },
@@ -216,4 +218,38 @@ export const subscriptionType: EntityTypeDef<SubscriptionData> = {
   },
   computeSubtitle: (d, { formatCurrency }) => `${formatCurrency(d.amount)} · next ${d.nextBillingAt}`,
   relations: [{ kind: 'account', label: 'Account', to: 'account', cardinality: 'one' }],
+};
+
+/** Debt (PRODUCT §4): money between me and a person — from a split, a loan, or a payment that settles. */
+export const debtType: EntityTypeDef<{ personId: string; direction: 'they_owe' | 'i_owe'; amount: number; reason?: string; date: string; kind: 'split' | 'loan' | 'payment'; transactionId?: string; groupId?: string; currency?: string }> = {
+  type: 'debt',
+  module: 'finance',
+  label: 'Debt',
+  labelPlural: 'Debts',
+  icon: 'people',
+  schema: z.object({
+    personId: z.string().min(1),
+    direction: z.enum(['they_owe', 'i_owe']).default('they_owe'),
+    amount: z.coerce.number().positive(),
+    reason: z.string().optional(),
+    date: z.string(),
+    kind: z.enum(['split', 'loan', 'payment']).default('loan'),
+    transactionId: z.string().optional(),
+    groupId: z.string().optional(),
+    currency: z.string().optional(),
+  }),
+  fields: [
+    { key: 'personId', label: 'Person', type: 'relation', relationTo: 'person', relationKind: 'person', required: true },
+    { key: 'direction', label: 'Who owes', type: 'select', required: true, defaultValue: 'they_owe', summary: true, options: [{ value: 'they_owe', label: 'They owe me' }, { value: 'i_owe', label: 'I owe them' }] },
+    { key: 'amount', label: 'Amount', type: 'currency', required: true },
+    { key: 'reason', label: 'For', type: 'text', placeholder: 'Dinner, cab, concert tickets…' },
+    { key: 'date', label: 'Date', type: 'date', required: true, defaultValue: () => new Date().toISOString().slice(0, 10) },
+    { key: 'kind', label: 'Kind', type: 'select', defaultValue: 'loan', section: 'Details', options: [{ value: 'loan', label: 'Loan / IOU' }, { value: 'split', label: 'Split' }, { value: 'payment', label: 'Payment' }] },
+    { key: 'transactionId', label: 'Transaction', type: 'relation', relationTo: 'transaction', relationKind: 'transaction', section: 'Details' },
+    { key: 'groupId', label: 'Group', type: 'relation', relationTo: 'group', relationKind: 'group', section: 'Details' },
+  ],
+  occurredAtField: 'date',
+  computeTitle: (d) => d.reason || (d.kind === 'payment' ? 'Payment' : 'Debt'),
+  computeSubtitle: (d, { formatCurrency }) => `${d.direction === 'they_owe' ? 'Owes you' : 'You owe'} ${formatCurrency(d.amount, d.currency)}`,
+  statuses: [{ value: 'open', label: 'Open' }, { value: 'settled', label: 'Settled', color: palette.gray }],
 };

@@ -5,7 +5,7 @@ import { bus, type Actor } from '../events/bus';
 import type { TimelineRepo } from '../repo/timelineRepo';
 import type { ChangeLog } from '../sync/changeLog';
 import { safeJson } from '../repo/entityRepo';
-import { cycleStatus, DAY, nextAfterDone, nextAfterSkip, type CycleDue, type CycleKind, type CycleStatus, type CycleUnit } from './schedule';
+import { cycleStatus, DAY, nextAfterDone, nextAfterSkip, startOfDay, type CycleDue, type CycleKind, type CycleStatus, type CycleUnit } from './schedule';
 
 export interface Cycle {
   id: string;
@@ -191,6 +191,10 @@ export class CycleRepo {
       if (changed) {
         this.update(c.id, patch);
         bus.emit('data.changed', { table: 'cycles', id: c.id });
+      }
+      // "Last done" moved forward on the record (Log contact today, a date typed in the form): that's a done.
+      if (seed.lastDoneAt != null && seed.lastDoneAt !== old?.lastDoneAt && (c.lastDoneAt == null || startOfDay(seed.lastDoneAt) > startOfDay(c.lastDoneAt))) {
+        this.markDone(c.id, { at: seed.lastDoneAt }, 'user');
       }
     }
   }

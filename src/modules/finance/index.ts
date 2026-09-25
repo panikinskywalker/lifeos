@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
-import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES } from './types';
+import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES, debtType } from './types';
 import { financeWidgets } from './widgets';
 import { AccountSection, BudgetSection, FinanceHome, SubscriptionSection } from './screens';
 import { budgetStatus, monthRange, netWorth, postDueSubscriptions, spendByCategory, spendInRange, incomeInRange, monthlySubscriptionCost } from './lib';
 import type { BudgetData } from './types';
+import { GroupBalanceSection, PersonBalanceSection, SplitSection } from './splitScreens';
 
 export const financeModule: ModuleManifest = {
   id: 'finance',
@@ -13,7 +14,7 @@ export const financeModule: ModuleManifest = {
   description: 'Accounts, transactions, budgets and subscriptions — with receipts, trips and people all linked.',
   icon: 'banknote',
   color: FINANCE_COLOR,
-  entityTypes: [accountType, transactionType, budgetType, subscriptionType],
+  entityTypes: [accountType, transactionType, budgetType, subscriptionType, debtType],
   screens: [{ key: 'index', title: 'Finance', component: FinanceHome }],
   widgets: financeWidgets,
   defaultWidgets: [{ type: 'finance.spend', size: 'medium' }, { type: 'finance.networth', size: 'small' }, { type: 'finance.budgets', size: 'small' }],
@@ -26,6 +27,9 @@ export const financeModule: ModuleManifest = {
     { entityType: 'account', key: 'finance.account', title: 'Balance', component: AccountSection, order: 10 },
     { entityType: 'budget', key: 'finance.budget', title: 'Progress', component: BudgetSection, order: 10 },
     { entityType: 'subscription', key: 'finance.subscription', title: 'Billing', component: SubscriptionSection, order: 10 },
+    { entityType: 'transaction', key: 'finance.split', title: 'Split', component: SplitSection, order: 20 },
+    { entityType: 'person', key: 'finance.balance', title: 'Money', component: PersonBalanceSection, order: 20 },
+    { entityType: 'group', key: 'finance.group', title: 'Balances', component: GroupBalanceSection, order: 10 },
   ],
   triggers: [
     {

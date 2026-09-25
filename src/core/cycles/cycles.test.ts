@@ -72,6 +72,14 @@ const things: ModuleManifest = {
       meters: [{ meter: 'odometer', field: 'odometerKm', label: 'Odometer', unit: 'km' }],
     },
     {
+      type: 'chore', module: 'test-things', label: 'Chore', labelPlural: 'Chores', icon: 'x',
+      schema: z.object({ name: z.string(), last: z.string().optional() }),
+      fields: [],
+      computeTitle: (x) => String(x.name),
+      cycleFields: { 'chore.cycle': { lastDoneAt: 'last' } },
+      cycleTemplates: (x) => [{ template: 'chore.cycle', name: String(x.name), kind: 'interval', everyN: 4, everyUnit: 'day', lastDoneAt: dateField(x.last) }],
+    },
+    {
       type: 'sub', module: 'test-things', label: 'Sub', labelPlural: 'Subs', icon: 'x',
       schema: z.object({ name: z.string(), rrule: z.string(), next: z.string().optional() }),
       fields: [{ key: 'name', label: 'Name', type: 'text' }],
@@ -248,5 +256,19 @@ describe('template sync', () => {
     expect(day(os.cycles.get(id)!.nextDueAt)).toBe('2026-11-06');
     os.entities.update(sub.id, { data: { name: 'Jio Fiber' } });
     expect(day(os.cycles.get(id)!.nextDueAt)).toBe('2026-11-06');
+  });
+});
+
+describe('last done on the record', () => {
+  it('moving the record’s last-done date forward logs a done; done in Upkeep writes the date back', () => {
+    const c = os.entities.create({ type: 'chore', data: { name: 'Laundry', last: '2026-09-01' } });
+    const cyc = os.cycles.forEntity(c.id)[0]!;
+    expect(day(cyc.nextDueAt)).toBe('2026-09-05');
+    os.entities.update(c.id, { data: { last: '2026-09-10' } });
+    expect(os.cycles.stats(cyc.id).count).toBe(1);
+    expect(day(os.cycles.get(cyc.id)!.nextDueAt)).toBe('2026-09-14');
+    os.cycles.markDone(cyc.id, { at: d('2026-09-15') });
+    expect(os.entities.get<{ last: string }>(c.id)!.data.last).toBe('2026-09-15');
+    expect(os.cycles.stats(cyc.id).count).toBe(2);
   });
 });

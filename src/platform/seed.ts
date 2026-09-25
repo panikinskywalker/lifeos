@@ -96,6 +96,10 @@ export function seedDemoData(os: LifeOSContext) {
     os.entities.create({ type: 'item', title: 'Paracetamol', data: { quantity: 4, unit: 'strips', location: 'Medicine box', category: 'medicine', minQuantity: 2 } });
     os.entities.create({ type: 'item', title: 'Coffee beans', data: { quantity: 1, unit: 'kg', location: 'Kitchen', category: 'pantry', minQuantity: 1 } });
 
+    // Money between people (M2): a household group and an IOU.
+    os.entities.create({ type: 'group', data: { name: 'Flat 4B', kind: 'home', memberIds: [priya.id, arjun.id] } });
+    os.entities.create({ type: 'debt', status: 'open', data: { personId: arjun.id, direction: 'i_owe', amount: 450, reason: 'Movie tickets', date: daysAgo(4), kind: 'loan' } });
+
     // Chores (M2): routines get their cycle from their own schedule.
     os.entities.create({ type: 'routine', data: { name: 'Laundry', kind: 'chore', everyN: 4, everyUnit: 'day', minutes: 20, lastDoneOn: daysAgo(5) } });
     os.entities.create({ type: 'routine', data: { name: 'Water the plants', kind: 'home', everyN: 3, everyUnit: 'day', minutes: 10, lastDoneOn: daysAgo(1) } });
