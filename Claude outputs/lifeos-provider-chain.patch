@@ -1,0 +1,909 @@
+From d4f7aab2ba56af4ca90c938471624c4238d4e230 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 20:49:19 +0000
+Subject: [PATCH] Agent: provider chain (Groq/Gemini/OpenRouter/Ollama/Claude)
+ with fallback on rate limits, per-provider keys, usage meter + monthly cap
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0114LtTu9MVwB8WM36bNDTjU
+---
+ app/(tabs)/assistant.tsx      |  39 +++---
+ app/settings/ai.tsx           | 105 +++++++++++++----
+ src/core/ai/openaiCompat.ts   | 137 +++++++++++++++++++++
+ src/core/ai/providers.test.ts | 139 ++++++++++++++++++++++
+ src/core/ai/providers.ts      | 216 ++++++++++++++++++++++++++++++++++
+ src/platform/agentProvider.ts |  35 ++++++
+ src/platform/boot.ts          |  32 +++--
+ src/ui/hooks/useSettings.ts   |  12 +-
+ 8 files changed, 669 insertions(+), 46 deletions(-)
+ create mode 100644 src/core/ai/openaiCompat.ts
+ create mode 100644 src/core/ai/providers.test.ts
+ create mode 100644 src/core/ai/providers.ts
+ create mode 100644 src/platform/agentProvider.ts
+
+diff --git a/app/(tabs)/assistant.tsx b/app/(tabs)/assistant.tsx
+index 330d4a5..4f10ae6 100644
+--- a/app/(tabs)/assistant.tsx
++++ b/app/(tabs)/assistant.tsx
+@@ -3,12 +3,12 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } fr
+ import { useRouter } from 'expo-router';
+ import { useSafeAreaInsets } from 'react-native-safe-area-context';
+ import { Assistant, type AssistantTurn } from '@core/ai/assistant';
+-import { createClaudeProvider } from '@core/ai/provider';
++import type { LLMProvider } from '@core/ai/provider';
+ import type { AiToolDef } from '@core/registry/types';
+ import { useOS, useSettings } from '@ui/hooks';
+ import { useTheme } from '@ui/theme/ThemeProvider';
+ import { Button, Card, Chip, Icon, IconButton, Input, Text } from '@ui/components/primitives';
+-import { getApiKey } from '../../src/platform/boot';
++import { buildProvidersFromSettings } from '../../src/platform/agentProvider';
+ 
+ const SUGGESTIONS = ['How much did I spend this month?', 'Spent 450 on lunch at Blue Tokai', 'What\'s due today?', 'Add a task: renew car insurance, due next Friday', 'Which subscriptions renew this week?', 'Remind me every Monday at 9am to review budgets', 'Who haven\'t I talked to in a while?'];
+ 
+@@ -17,8 +17,9 @@ export default function AssistantTab() {
+   const t = useTheme();
+   const router = useRouter();
+   const insets = useSafeAreaInsets();
+-  const model = useSettings((s) => s.aiModel);
+-  const [key, setKey] = useState<string | null | undefined>(undefined);
++  const chain = useSettings((s) => s.aiChain);
++  const [provider, setProvider] = useState<LLMProvider | null | undefined>(undefined);
++  const [notice, setNotice] = useState<string | null>(null);
+   const [turns, setTurns] = useState<AssistantTurn[]>([]);
+   const [text, setText] = useState('');
+   const [busy, setBusy] = useState(false);
+@@ -26,13 +27,18 @@ export default function AssistantTab() {
+   const assistant = useRef<Assistant | null>(null);
+ 
+   useEffect(() => {
+-    getApiKey().then(setKey);
+-  }, []);
++    let alive = true;
++    buildProvidersFromSettings({
++      onFallback: (from, to) => alive && setNotice(`${from} unavailable — using ${to}`),
++      onCooldown: (p, until) => alive && setNotice(`${p} rate-limited until ${new Date(until).toLocaleTimeString()}`),
++    }).then((r) => alive && setProvider(r?.main ?? null));
++    return () => { alive = false; };
++  }, [chain]);
+ 
+   useEffect(() => {
+-    if (!key) return;
++    if (!provider) return;
+     assistant.current = new Assistant(os, {
+-      provider: createClaudeProvider({ apiKey: key, model }),
++      provider,
+       onTurn: (turn) => setTurns((ts) => [...ts, turn]),
+       confirm: (tool: AiToolDef, input) =>
+         new Promise((resolve) => {
+@@ -44,7 +50,7 @@ export default function AssistantTab() {
+           ]);
+         }),
+     });
+-  }, [key, model, os]);
++  }, [provider, os]);
+ 
+   const send = async (msg?: string) => {
+     const m = (msg ?? text).trim();
+@@ -64,8 +70,8 @@ export default function AssistantTab() {
+     setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);
+   }, [turns.length, busy]);
+ 
+-  if (key === undefined) return <View style={{ flex: 1, backgroundColor: t.colors.background }} />;
+-  if (!key)
++  if (provider === undefined) return <View style={{ flex: 1, backgroundColor: t.colors.background }} />;
++  if (!provider)
+     return (
+       <View style={{ flex: 1, backgroundColor: t.colors.background, paddingTop: insets.top + 8, paddingHorizontal: 16 }}>
+         <Text variant="largeTitle" style={{ marginBottom: 12 }}>
+@@ -77,9 +83,9 @@ export default function AssistantTab() {
+           </View>
+           <Text variant="title3">Your data, in conversation</Text>
+           <Text color="secondary">
+-            Ask questions ("how much did I spend on food in August?"), log things in plain language ("paid 1200 for petrol"), and set up automations. It runs on Claude with your own API key; only the data needed for each answer leaves your phone.
++            Ask questions ("how much did I spend on food in August?"), log things in plain language ("paid 1200 for petrol"), and set up automations. It runs on a model of your choice (Groq and Gemini have free tiers) with your own key; only the data needed for each answer leaves your phone.
+           </Text>
+-          <Button title="Add API key" icon="key" onPress={() => router.push('/settings/ai')} color={t.colors.accents.indigo} />
++          <Button title="Choose a provider" icon="key" onPress={() => router.push('/settings/ai')} color={t.colors.accents.indigo} />
+         </Card>
+       </View>
+     );
+@@ -90,8 +96,13 @@ export default function AssistantTab() {
+         <Text variant="largeTitle" style={{ flex: 1 }}>
+           Assistant
+         </Text>
+-        <IconButton icon="square.and.pencil" bg onPress={() => { setTurns([]); assistant.current?.reset(); assistant.current = new Assistant(os, { provider: createClaudeProvider({ apiKey: key, model }), onTurn: (turn) => setTurns((ts) => [...ts, turn]) }); }} />
++        <IconButton icon="square.and.pencil" bg onPress={() => { setTurns([]); assistant.current?.reset(); assistant.current = new Assistant(os, { provider: provider!, onTurn: (turn) => setTurns((ts) => [...ts, turn]) }); }} />
+       </View>
++      {notice ? (
++        <Pressable onPress={() => setNotice(null)} style={{ marginHorizontal: 16, marginTop: 6 }}>
++          <Text variant="footnote" color="secondary">{notice}</Text>
++        </Pressable>
++      ) : null}
+       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+         {turns.length === 0 ? (
+           <View style={{ gap: 8 }}>
+diff --git a/app/settings/ai.tsx b/app/settings/ai.tsx
+index e900ea2..eac6041 100644
+--- a/app/settings/ai.tsx
++++ b/app/settings/ai.tsx
+@@ -1,41 +1,104 @@
+ import React, { useEffect, useState } from 'react';
+-import { View } from 'react-native';
++import { Linking, View } from 'react-native';
+ import { useRouter } from 'expo-router';
++import { PROVIDER_PRESETS, type ProviderConfig, type ProviderKind } from '@core/ai/providers';
+ import { useSettings } from '@ui/hooks';
+ import { useTheme } from '@ui/theme/ThemeProvider';
+ import { Button, Card, Chip, IconButton, Input, Screen, Text } from '@ui/components/primitives';
+-import { getApiKey, setApiKey } from '../../src/platform/boot';
++import { getProviderKey, setProviderKey } from '../../src/platform/boot';
+ 
+-const MODELS = ['claude-sonnet-4-5', 'claude-opus-4-1', 'claude-haiku-4-5'];
++const ORDER: ProviderKind[] = ['groq', 'gemini', 'openrouter', 'ollama', 'claude'];
+ 
+ export default function AiSettingsRoute() {
+   const router = useRouter();
+   const t = useTheme();
+   const s = useSettings();
+-  const [key, setKey] = useState('');
+-  const [saved, setSaved] = useState(false);
+-  useEffect(() => { getApiKey().then((k) => setKey(k ?? '')); }, []);
++  const chain = s.aiChain;
++  const usage = s.aiUsage;
++
++  const cfgOf = (kind: ProviderKind): ProviderConfig => chain.find((c) => c.kind === kind) ?? { kind, enabled: false };
++  const update = (kind: ProviderKind, patch: Partial<ProviderConfig>) => {
++    const exists = chain.some((c) => c.kind === kind);
++    const next = exists ? chain.map((c) => (c.kind === kind ? { ...c, ...patch } : c)) : [...chain, { kind, ...patch }];
++    s.set('aiChain', next);
++  };
++  const move = (kind: ProviderKind, dir: -1 | 1) => {
++    const i = chain.findIndex((c) => c.kind === kind);
++    const j = i + dir;
++    if (i < 0 || j < 0 || j >= chain.length) return;
++    const next = [...chain];
++    [next[i], next[j]] = [next[j], next[i]];
++    s.set('aiChain', next);
++  };
++  const activeOrder = chain.filter((c) => c.enabled !== false).map((c) => c.kind);
++
+   return (
+-    <Screen title="Assistant" right={<IconButton icon="xmark" bg onPress={() => router.back()} />}>
++    <Screen title="Agent" right={<IconButton icon="xmark" bg onPress={() => router.back()} />}>
+       <View style={{ gap: 14 }}>
+-        <Card style={{ gap: 10 }}>
+-          <Text variant="headline">Anthropic API key</Text>
+-          <Text variant="footnote" color="secondary">Stored in the device keychain (SecureStore). Calls go straight from your phone to api.anthropic.com — there is no LifeOS server.</Text>
+-          <Input value={key} onChangeText={(v) => { setKey(v); setSaved(false); }} placeholder="sk-ant-…" autoCapitalize="none" autoCorrect={false} secureTextEntry />
+-          <Button title={saved ? 'Saved' : 'Save key'} onPress={async () => { await setApiKey(key.trim() || null); setSaved(true); }} color={t.colors.accents.indigo} />
+-        </Card>
+-        <Card style={{ gap: 10 }}>
+-          <Text variant="headline">Model</Text>
+-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+-            {MODELS.map((m) => <Chip key={m} label={m} selected={s.aiModel === m} color={t.colors.accents.indigo} onPress={() => s.set('aiModel', m)} />)}
+-          </View>
+-          <Input value={s.aiModel} onChangeText={(v) => s.set('aiModel', v)} placeholder="Custom model id" autoCapitalize="none" />
++        <Card style={{ gap: 6 }}>
++          <Text variant="headline">How it picks a model</Text>
++          <Text variant="footnote" color="secondary">
++            Simple sentences are handled on the phone with no model at all. Anything else goes to the first enabled provider below; if it is rate-limited or down, the next one is tried.
++            {activeOrder.length ? ` Current order: ${activeOrder.map((k) => PROVIDER_PRESETS[k].label).join(' → ')}.` : ' No provider is enabled yet.'}
++          </Text>
+         </Card>
++
++        {ORDER.map((kind) => (
++          <ProviderCard key={kind} kind={kind} cfg={cfgOf(kind)} onChange={(p) => update(kind, p)} onMove={(d) => move(kind, d)} usage={usage.byProvider[kind]} cap={s.aiMonthlyCaps[kind]} onCap={(v) => s.set('aiMonthlyCaps', { ...s.aiMonthlyCaps, [kind]: v })} />
++        ))}
++
+         <Card style={{ gap: 6 }}>
+-          <Text variant="headline">What it can do</Text>
+-          <Text variant="footnote" color="secondary">Search and query any record · aggregate spend, tasks, habits · create, update, link and tag records (asks first) · set reminders · build automation rules. Every change goes through the same validation, timeline and automation as the UI.</Text>
++          <Text variant="headline">Usage this month{usage.month ? ` (${usage.month})` : ''}</Text>
++          {Object.values(usage.byProvider).length ? (
++            Object.values(usage.byProvider).map((u) => (
++              <Text key={u.provider} variant="footnote" color="secondary">
++                {PROVIDER_PRESETS[u.provider as ProviderKind]?.label ?? u.provider}: {u.calls} calls · {(u.input + u.output).toLocaleString()} tokens
++              </Text>
++            ))
++          ) : (
++            <Text variant="footnote" color="secondary">Nothing yet.</Text>
++          )}
+         </Card>
+       </View>
+     </Screen>
+   );
+ }
++
++function ProviderCard({ kind, cfg, onChange, onMove, usage, cap, onCap }: { kind: ProviderKind; cfg: ProviderConfig; onChange: (p: Partial<ProviderConfig>) => void; onMove: (d: -1 | 1) => void; usage?: { input: number; output: number; calls: number }; cap?: number; onCap: (v: number) => void }) {
++  const t = useTheme();
++  const preset = PROVIDER_PRESETS[kind];
++  const [key, setKey] = useState('');
++  const [saved, setSaved] = useState(false);
++  useEffect(() => {
++    if (preset.needsKey) getProviderKey(kind).then((k) => setKey(k ?? ''));
++  }, [kind, preset.needsKey]);
++  const enabled = cfg.enabled !== false && (!preset.needsKey || !!key);
++
++  return (
++    <Card style={{ gap: 10, opacity: cfg.enabled === false ? 0.7 : 1 }}>
++      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
++        <Text variant="headline" style={{ flex: 1 }}>{preset.label}</Text>
++        <IconButton icon="chevron.up" bg onPress={() => onMove(-1)} />
++        <IconButton icon="chevron.down" bg onPress={() => onMove(1)} />
++        <Chip label={cfg.enabled === false ? 'Off' : 'On'} selected={cfg.enabled !== false} color={t.colors.accents.green} onPress={() => onChange({ enabled: cfg.enabled === false })} />
++      </View>
++      <Text variant="footnote" color="secondary">{preset.note}</Text>
++      {preset.needsKey ? (
++        <>
++          <Input value={key} onChangeText={(v) => { setKey(v); setSaved(false); }} placeholder="API key" autoCapitalize="none" autoCorrect={false} secureTextEntry />
++          <View style={{ flexDirection: 'row', gap: 8 }}>
++            <Button title={saved ? 'Saved' : 'Save key'} onPress={async () => { await setProviderKey(kind, key.trim() || null); setSaved(true); }} color={t.colors.accents.indigo} />
++            {preset.keyUrl ? <Button title="Get a key" onPress={() => void Linking.openURL(preset.keyUrl!)} color={t.colors.gray} /> : null}
++          </View>
++        </>
++      ) : null}
++      <Input value={cfg.model ?? ''} onChangeText={(v) => onChange({ model: v || undefined })} placeholder={`Model (default ${preset.defaultModel || '—'})`} autoCapitalize="none" autoCorrect={false} />
++      {kind === 'ollama' || kind === 'custom' ? <Input value={cfg.baseUrl ?? ''} onChangeText={(v) => onChange({ baseUrl: v || undefined })} placeholder={`Base URL (default ${preset.baseUrl || '—'})`} autoCapitalize="none" autoCorrect={false} /> : null}
++      <Input value={cap ? String(cap) : ''} onChangeText={(v) => onCap(Number(v.replace(/\D/g, '')) || 0)} placeholder="Monthly token cap (blank = none)" keyboardType="numeric" />
++      <Text variant="footnote" color="secondary">
++        {enabled ? 'Ready' : preset.needsKey && !key ? 'Needs a key' : 'Disabled'}
++        {usage ? ` · ${usage.calls} calls · ${(usage.input + usage.output).toLocaleString()} tokens this month` : ''}
++      </Text>
++    </Card>
++  );
++}
+diff --git a/src/core/ai/openaiCompat.ts b/src/core/ai/openaiCompat.ts
+new file mode 100644
+index 0000000..5641c83
+--- /dev/null
++++ b/src/core/ai/openaiCompat.ts
+@@ -0,0 +1,137 @@
++import type { ChatMessage, CompletionResult, ContentBlock, LLMProvider, ToolSpec } from './provider';
++
++/**
++ * OpenAI-compatible chat-completions provider. One implementation covers
++ * Groq, Gemini (its /openai endpoint), OpenRouter, Ollama, LM Studio, etc.
++ * The assistant speaks the Claude-shaped message format in provider.ts; this
++ * file translates both ways.
++ */
++
++export class ProviderError extends Error {
++  constructor(
++    message: string,
++    public readonly provider: string,
++    public readonly status: number,
++    public readonly retryAfterMs?: number,
++  ) {
++    super(message);
++    this.name = 'ProviderError';
++  }
++  get isRateLimit() {
++    return this.status === 429;
++  }
++  /** Errors another provider could plausibly succeed on. */
++  get isRetryable() {
++    return this.status === 0 || this.status === 401 || this.status === 403 || this.status === 408 || this.status === 429 || this.status >= 500;
++  }
++}
++
++export interface OpenAICompatOptions {
++  id: string; // 'groq' | 'gemini' | 'openrouter' | 'ollama' | ...
++  baseUrl: string; // e.g. https://api.groq.com/openai/v1
++  apiKey?: string; // Ollama needs none
++  model: string;
++  extraHeaders?: Record<string, string>;
++  /** Some hosts reject `tool_choice`/`parallel_tool_calls`; keep the body minimal by default. */
++  temperature?: number;
++}
++
++type OAIMessage =
++  | { role: 'system'; content: string }
++  | { role: 'user'; content: string }
++  | { role: 'assistant'; content: string | null; tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[] }
++  | { role: 'tool'; tool_call_id: string; content: string };
++
++function toOpenAIMessages(system: string, messages: ChatMessage[]): OAIMessage[] {
++  const out: OAIMessage[] = [{ role: 'system', content: system }];
++  for (const m of messages) {
++    if (typeof m.content === 'string') {
++      out.push({ role: m.role, content: m.content });
++      continue;
++    }
++    if (m.role === 'assistant') {
++      const text = m.content.filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n');
++      const calls = m.content.filter((b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use');
++      out.push({
++        role: 'assistant',
++        content: text || null,
++        tool_calls: calls.length ? calls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.input ?? {}) } })) : undefined,
++      });
++    } else {
++      // user turn: tool results become `tool` messages, text stays a user message
++      const results = m.content.filter((b): b is Extract<ContentBlock, { type: 'tool_result' }> => b.type === 'tool_result');
++      for (const r of results) out.push({ role: 'tool', tool_call_id: r.tool_use_id, content: r.content });
++      const text = m.content.filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('\n');
++      if (text) out.push({ role: 'user', content: text });
++    }
++  }
++  return out;
++}
++
++function toOpenAITools(tools: ToolSpec[]) {
++  return tools.map((t) => ({ type: 'function' as const, function: { name: t.name, description: t.description, parameters: t.input_schema } }));
++}
++
++function parseArgs(raw: string): unknown {
++  if (!raw) return {};
++  try {
++    return JSON.parse(raw);
++  } catch {
++    // Some open models emit trailing commentary after the JSON; salvage the first object.
++    const m = raw.match(/\{[\s\S]*\}/);
++    if (m) {
++      try {
++        return JSON.parse(m[0]);
++      } catch {
++        /* fall through */
++      }
++    }
++    return { _raw: raw };
++  }
++}
++
++export function createOpenAICompatProvider(opts: OpenAICompatOptions): LLMProvider {
++  const baseUrl = opts.baseUrl.replace(/\/$/, '');
++  return {
++    id: opts.id,
++    async complete({ system, messages, tools, maxTokens = 2048, signal }): Promise<CompletionResult> {
++      const body: Record<string, unknown> = {
++        model: opts.model,
++        messages: toOpenAIMessages(system, messages),
++        max_tokens: maxTokens,
++        temperature: opts.temperature ?? 0.2,
++      };
++      if (tools.length) body.tools = toOpenAITools(tools);
++
++      let res: Response;
++      try {
++        res = await fetch(`${baseUrl}/chat/completions`, {
++          method: 'POST',
++          signal,
++          headers: { 'content-type': 'application/json', ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}), ...(opts.extraHeaders ?? {}) },
++          body: JSON.stringify(body),
++        });
++      } catch (e) {
++        if ((e as Error).name === 'AbortError') throw e;
++        throw new ProviderError(`${opts.id}: network error (${(e as Error).message})`, opts.id, 0);
++      }
++      if (!res.ok) {
++        const text = await res.text();
++        const ra = res.headers.get('retry-after');
++        const retryAfterMs = ra ? (Number.isFinite(Number(ra)) ? Number(ra) * 1000 : Math.max(0, Date.parse(ra) - Date.now())) : undefined;
++        throw new ProviderError(`${opts.id} ${res.status}: ${text.slice(0, 300)}`, opts.id, res.status, retryAfterMs);
++      }
++      const json = (await res.json()) as {
++        choices: { message: { content: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] }; finish_reason: string }[];
++        usage?: { prompt_tokens: number; completion_tokens: number };
++      };
++      const choice = json.choices?.[0];
++      const content: ContentBlock[] = [];
++      if (choice?.message.content) content.push({ type: 'text', text: choice.message.content });
++      for (const c of choice?.message.tool_calls ?? []) content.push({ type: 'tool_use', id: c.id, name: c.function.name, input: parseArgs(c.function.arguments) });
++      const hasCalls = (choice?.message.tool_calls?.length ?? 0) > 0;
++      const stopReason = hasCalls ? 'tool_use' : choice?.finish_reason === 'length' ? 'max_tokens' : 'end_turn';
++      return { content, stopReason, usage: json.usage ? { input: json.usage.prompt_tokens, output: json.usage.completion_tokens } : undefined };
++    },
++  };
++}
+diff --git a/src/core/ai/providers.test.ts b/src/core/ai/providers.test.ts
+new file mode 100644
+index 0000000..3d9dcb5
+--- /dev/null
++++ b/src/core/ai/providers.test.ts
+@@ -0,0 +1,139 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { createOpenAICompatProvider, ProviderError } from './openaiCompat';
++import { buildAgentProviders, createChainProvider, UsageCapError, withUsageMeter } from './providers';
++import type { ChatMessage, LLMProvider, ToolSpec } from './provider';
++
++const tools: ToolSpec[] = [{ name: 'mark_cycle_done', description: 'Mark a cycle done', input_schema: { type: 'object', properties: { id: { type: 'string' } } } }];
++
++function mockFetch(handler: (url: string, body: any) => { status?: number; json?: unknown; text?: string; headers?: Record<string, string> }) {
++  const fn = vi.fn(async (url: string, init: RequestInit) => {
++    const body = JSON.parse(String(init.body));
++    const r = handler(url, body);
++    const status = r.status ?? 200;
++    return {
++      ok: status >= 200 && status < 300,
++      status,
++      headers: { get: (k: string) => r.headers?.[k.toLowerCase()] ?? null },
++      json: async () => r.json,
++      text: async () => r.text ?? JSON.stringify(r.json ?? {}),
++    } as unknown as Response;
++  });
++  vi.stubGlobal('fetch', fn);
++  return fn;
++}
++
++afterEach(() => vi.unstubAllGlobals());
++
++describe('OpenAI-compatible provider', () => {
++  it('translates a Claude-shaped tool round-trip into OpenAI messages and back', async () => {
++    const fetch = mockFetch((_url, body) => {
++      // Assert the outbound shape on the second call (after a tool result)
++      if (body.messages.length > 2) {
++        expect(body.messages[0]).toEqual({ role: 'system', content: 'SYS' });
++        expect(body.messages[1]).toEqual({ role: 'user', content: 'did laundry' });
++        expect(body.messages[2]).toMatchObject({ role: 'assistant', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'mark_cycle_done' } }] });
++        expect(body.messages[3]).toEqual({ role: 'tool', tool_call_id: 'call_1', content: '{"ok":true}' });
++        return { json: { choices: [{ message: { content: 'Done — next laundry in 4 days.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 40, completion_tokens: 9 } } };
++      }
++      expect(body.tools[0]).toMatchObject({ type: 'function', function: { name: 'mark_cycle_done' } });
++      return {
++        json: {
++          choices: [{ message: { content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'mark_cycle_done', arguments: '{"id":"laundry"}' } }] }, finish_reason: 'tool_calls' }],
++          usage: { prompt_tokens: 30, completion_tokens: 5 },
++        },
++      };
++    });
++    const p = createOpenAICompatProvider({ id: 'groq', baseUrl: 'https://api.groq.com/openai/v1/', apiKey: 'k', model: 'm' });
++
++    const first = await p.complete({ system: 'SYS', messages: [{ role: 'user', content: 'did laundry' }], tools });
++    expect(first.stopReason).toBe('tool_use');
++    expect(first.content).toEqual([{ type: 'tool_use', id: 'call_1', name: 'mark_cycle_done', input: { id: 'laundry' } }]);
++    expect(fetch.mock.calls[0][0]).toBe('https://api.groq.com/openai/v1/chat/completions');
++    expect((fetch.mock.calls[0][1] as RequestInit).headers).toMatchObject({ authorization: 'Bearer k' });
++
++    const history: ChatMessage[] = [
++      { role: 'user', content: 'did laundry' },
++      { role: 'assistant', content: first.content },
++      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call_1', content: '{"ok":true}' }] },
++    ];
++    const second = await p.complete({ system: 'SYS', messages: history, tools });
++    expect(second.stopReason).toBe('end_turn');
++    expect(second.content).toEqual([{ type: 'text', text: 'Done — next laundry in 4 days.' }]);
++    expect(second.usage).toEqual({ input: 40, output: 9 });
++  });
++
++  it('salvages sloppy tool arguments from open models', async () => {
++    mockFetch(() => ({ json: { choices: [{ message: { content: null, tool_calls: [{ id: 'c', function: { name: 'x', arguments: '{"a":1} Let me know!' } }] }, finish_reason: 'tool_calls' }] } }));
++    const p = createOpenAICompatProvider({ id: 't', baseUrl: 'http://x', model: 'm' });
++    const r = await p.complete({ system: '', messages: [{ role: 'user', content: 'hi' }], tools });
++    expect(r.content[0]).toMatchObject({ type: 'tool_use', input: { a: 1 } });
++  });
++
++  it('turns 429 into a ProviderError with retry-after', async () => {
++    mockFetch(() => ({ status: 429, text: 'rate limited', headers: { 'retry-after': '7' } }));
++    const p = createOpenAICompatProvider({ id: 'groq', baseUrl: 'http://x', apiKey: 'k', model: 'm' });
++    await expect(p.complete({ system: '', messages: [{ role: 'user', content: 'hi' }], tools: [] })).rejects.toMatchObject({ name: 'ProviderError', status: 429, retryAfterMs: 7000, isRateLimit: true });
++  });
++});
++
++function fake(id: string, impl: () => Promise<{ text: string }> | never): LLMProvider {
++  return { id, complete: async () => ({ content: [{ type: 'text', text: (await impl()).text }], stopReason: 'end_turn', usage: { input: 10, output: 2 } }) };
++}
++
++describe('chain provider', () => {
++  it('falls through on rate limit and puts the limited provider on cooldown', async () => {
++    let groqCalls = 0;
++    const groq: LLMProvider = { id: 'groq', complete: async () => { groqCalls++; throw new ProviderError('429', 'groq', 429, 30_000); } };
++    const gemini = fake('gemini', async () => ({ text: 'from gemini' }));
++    const fallbacks: string[] = [];
++    const chain = createChainProvider([groq, gemini], { onFallback: (f, t) => fallbacks.push(`${f}>${t}`) });
++    const args = { system: '', messages: [{ role: 'user' as const, content: 'hi' }], tools: [] };
++
++    const r1 = await chain.complete(args);
++    expect(r1.content[0]).toEqual({ type: 'text', text: 'from gemini' });
++    expect(fallbacks).toEqual(['groq>gemini']);
++
++    // Second call: groq is cooling down, so gemini is tried first and groq isn't hit at all.
++    await chain.complete(args);
++    expect(groqCalls).toBe(1);
++  });
++
++  it('does not fall through on a non-retryable 400', async () => {
++    const bad: LLMProvider = { id: 'a', complete: async () => { throw new ProviderError('bad request', 'a', 400); } };
++    const ok = fake('b', async () => ({ text: 'b' }));
++    await expect(createChainProvider([bad, ok]).complete({ system: '', messages: [], tools: [] })).rejects.toMatchObject({ status: 400 });
++  });
++});
++
++describe('usage meter', () => {
++  it('accumulates tokens and enforces the monthly cap', async () => {
++    let store: Record<string, any> = {};
++    const p = withUsageMeter(fake('groq', async () => ({ text: 'x' })), { load: () => store, save: (u) => (store = u), monthlyTokenCap: () => 25 });
++    const args = { system: '', messages: [], tools: [] };
++    await p.complete(args);
++    await p.complete(args);
++    expect(store.groq).toEqual({ provider: 'groq', input: 20, output: 4, calls: 2 });
++    await p.complete(args); // 24 -> 36, allowed because check happens before the call
++    await expect(p.complete(args)).rejects.toBeInstanceOf(UsageCapError);
++  });
++});
++
++describe('buildAgentProviders', () => {
++  it('builds a main and a small chain from settings, skipping disabled entries', () => {
++    let store: Record<string, any> = {};
++    const { main, small } = buildAgentProviders({
++      chain: [
++        { kind: 'groq', apiKey: 'g' },
++        { kind: 'claude', apiKey: 'c', enabled: false },
++        { kind: 'gemini', apiKey: 'x' },
++      ],
++      usage: { load: () => store, save: (u) => (store = u) },
++    });
++    expect(main.id).toBe('chain(groq>gemini)');
++    expect(small.id).toBe('chain(groq>gemini)');
++  });
++
++  it('refuses a keyed provider without a key', () => {
++    expect(() => buildAgentProviders({ chain: [{ kind: 'groq' }], usage: { load: () => ({}), save: () => {} } })).toThrow(/no API key/);
++  });
++});
+diff --git a/src/core/ai/providers.ts b/src/core/ai/providers.ts
+new file mode 100644
+index 0000000..1dbb862
+--- /dev/null
++++ b/src/core/ai/providers.ts
+@@ -0,0 +1,216 @@
++import { createClaudeProvider, type LLMProvider } from './provider';
++import { createOpenAICompatProvider, ProviderError } from './openaiCompat';
++
++/* ------------------------------------------------------------------ */
++/* Presets — where each host lives and a sensible default model.        */
++/* Model names drift; every one of these is editable in settings.      */
++/* ------------------------------------------------------------------ */
++
++export type ProviderKind = 'groq' | 'gemini' | 'openrouter' | 'ollama' | 'claude' | 'custom';
++
++export interface ProviderPreset {
++  kind: ProviderKind;
++  label: string;
++  baseUrl: string;
++  defaultModel: string;
++  /** cheaper/faster model for side jobs like fact mining */
++  smallModel: string;
++  needsKey: boolean;
++  keyUrl?: string;
++  note: string;
++}
++
++export const PROVIDER_PRESETS: Record<ProviderKind, ProviderPreset> = {
++  groq: {
++    kind: 'groq',
++    label: 'Groq',
++    baseUrl: 'https://api.groq.com/openai/v1',
++    defaultModel: 'llama-3.3-70b-versatile',
++    smallModel: 'llama-3.1-8b-instant',
++    needsKey: true,
++    keyUrl: 'https://console.groq.com/keys',
++    note: 'Free tier, very fast. Open models. Check per-model token limits.',
++  },
++  gemini: {
++    kind: 'gemini',
++    label: 'Gemini',
++    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
++    defaultModel: 'gemini-2.5-flash',
++    smallModel: 'gemini-2.5-flash-lite',
++    needsKey: true,
++    keyUrl: 'https://aistudio.google.com/apikey',
++    note: 'Free tier. Google may use free-tier prompts to improve models.',
++  },
++  openrouter: {
++    kind: 'openrouter',
++    label: 'OpenRouter',
++    baseUrl: 'https://openrouter.ai/api/v1',
++    defaultModel: 'meta-llama/llama-3.3-70b-instruct:free',
++    smallModel: 'meta-llama/llama-3.3-70b-instruct:free',
++    needsKey: true,
++    keyUrl: 'https://openrouter.ai/keys',
++    note: 'Many models behind one key; :free models are rate-limited.',
++  },
++  ollama: {
++    kind: 'ollama',
++    label: 'Ollama (your Mac)',
++    baseUrl: 'http://100.64.0.1:11434/v1', // replace with the Mac's Tailscale IP
++    defaultModel: 'qwen3:8b',
++    smallModel: 'qwen3:4b',
++    needsKey: false,
++    note: 'Free and private; only works while the Mac is on and reachable.',
++  },
++  claude: {
++    kind: 'claude',
++    label: 'Claude',
++    baseUrl: 'https://api.anthropic.com',
++    defaultModel: 'claude-haiku-4-5',
++    smallModel: 'claude-haiku-4-5',
++    needsKey: true,
++    keyUrl: 'https://console.anthropic.com/settings/keys',
++    note: 'Paid (prepaid credits). Best tool-calling; Haiku is cheap.',
++  },
++  custom: {
++    kind: 'custom',
++    label: 'Custom (OpenAI-compatible)',
++    baseUrl: '',
++    defaultModel: '',
++    smallModel: '',
++    needsKey: false,
++    note: 'Any host that speaks /v1/chat/completions.',
++  },
++};
++
++/* ------------------------------------------------------------------ */
++/* Config → provider                                                    */
++/* ------------------------------------------------------------------ */
++
++export interface ProviderConfig {
++  kind: ProviderKind;
++  apiKey?: string;
++  model?: string; // overrides preset.defaultModel
++  baseUrl?: string; // overrides preset.baseUrl
++  enabled?: boolean; // default true
++}
++
++export function createProvider(cfg: ProviderConfig, role: 'main' | 'small' = 'main'): LLMProvider {
++  const preset = PROVIDER_PRESETS[cfg.kind];
++  const model = cfg.model || (role === 'small' ? preset.smallModel : preset.defaultModel);
++  const baseUrl = cfg.baseUrl || preset.baseUrl;
++  if (cfg.kind === 'claude') {
++    if (!cfg.apiKey) throw new ProviderError('claude: no API key', 'claude', 401);
++    return createClaudeProvider({ apiKey: cfg.apiKey, model, baseUrl });
++  }
++  if (preset.needsKey && !cfg.apiKey) throw new ProviderError(`${cfg.kind}: no API key`, cfg.kind, 401);
++  return createOpenAICompatProvider({ id: cfg.kind, baseUrl, apiKey: cfg.apiKey, model });
++}
++
++/* ------------------------------------------------------------------ */
++/* Chain — try providers in order, fall through on retryable failures   */
++/* ------------------------------------------------------------------ */
++
++export interface ChainEvents {
++  onFallback?: (from: string, to: string, err: Error) => void;
++  /** Called when a provider is rate-limited; lets the UI show "Groq is cooling down until 14:05". */
++  onCooldown?: (provider: string, untilMs: number) => void;
++}
++
++export function createChainProvider(providers: LLMProvider[], events: ChainEvents = {}): LLMProvider {
++  if (!providers.length) throw new Error('chain: no providers configured');
++  const cooldownUntil = new Map<string, number>();
++  return {
++    id: `chain(${providers.map((p) => p.id).join('>')})`,
++    async complete(args) {
++      let lastErr: Error | undefined;
++      const now = Date.now();
++      const order = [...providers].sort((a, b) => Number((cooldownUntil.get(a.id) ?? 0) > now) - Number((cooldownUntil.get(b.id) ?? 0) > now));
++      for (let i = 0; i < order.length; i++) {
++        const p = order[i];
++        try {
++          return await p.complete(args);
++        } catch (e) {
++          const err = e as Error;
++          if (err.name === 'AbortError') throw err;
++          lastErr = err;
++          const pe = err instanceof ProviderError ? err : undefined;
++          if (pe?.isRateLimit) {
++            const until = Date.now() + (pe.retryAfterMs ?? 60_000);
++            cooldownUntil.set(p.id, until);
++            events.onCooldown?.(p.id, until);
++          }
++          const retryable = pe ? pe.isRetryable : true;
++          const next = order[i + 1];
++          if (!retryable || !next) throw err;
++          events.onFallback?.(p.id, next.id, err);
++        }
++      }
++      throw lastErr ?? new Error('chain: exhausted');
++    },
++  };
++}
++
++/* ------------------------------------------------------------------ */
++/* Usage meter — counts tokens per provider, enforces a monthly cap     */
++/* ------------------------------------------------------------------ */
++
++export interface UsageRecord {
++  provider: string;
++  input: number;
++  output: number;
++  calls: number;
++}
++
++export interface UsageMeterOptions {
++  /** Persisted usage for the current month, keyed by provider id. */
++  load: () => Record<string, UsageRecord>;
++  save: (usage: Record<string, UsageRecord>) => void;
++  /** Hard stop for this provider this month (tokens in+out). undefined = unlimited. */
++  monthlyTokenCap?: (provider: string) => number | undefined;
++}
++
++export class UsageCapError extends Error {
++  constructor(public readonly provider: string, public readonly cap: number) {
++    super(`${provider}: monthly cap of ${cap.toLocaleString()} tokens reached`);
++    this.name = 'UsageCapError';
++  }
++}
++
++export function withUsageMeter(provider: LLMProvider, opts: UsageMeterOptions): LLMProvider {
++  return {
++    id: provider.id,
++    async complete(args) {
++      const usage = opts.load();
++      const rec = usage[provider.id] ?? { provider: provider.id, input: 0, output: 0, calls: 0 };
++      const cap = opts.monthlyTokenCap?.(provider.id);
++      if (cap !== undefined && rec.input + rec.output >= cap) throw new UsageCapError(provider.id, cap);
++      const result = await provider.complete(args);
++      rec.calls += 1;
++      rec.input += result.usage?.input ?? 0;
++      rec.output += result.usage?.output ?? 0;
++      usage[provider.id] = rec;
++      opts.save(usage);
++      return result;
++    },
++  };
++}
++
++/* ------------------------------------------------------------------ */
++/* Convenience: build the whole stack from settings                     */
++/* ------------------------------------------------------------------ */
++
++export interface AgentProviderSettings {
++  /** Ordered chain, first is preferred. */
++  chain: ProviderConfig[];
++  usage: UsageMeterOptions;
++  events?: ChainEvents;
++}
++
++export function buildAgentProviders(s: AgentProviderSettings): { main: LLMProvider; small: LLMProvider } {
++  const active = s.chain.filter((c) => c.enabled !== false);
++  const build = (role: 'main' | 'small') =>
++    createChainProvider(
++      active.map((c) => withUsageMeter(createProvider(c, role), s.usage)),
++      s.events,
++    );
++  return { main: build('main'), small: build('small') };
++}
+diff --git a/src/platform/agentProvider.ts b/src/platform/agentProvider.ts
+new file mode 100644
+index 0000000..c3b55d6
+--- /dev/null
++++ b/src/platform/agentProvider.ts
+@@ -0,0 +1,35 @@
++import type { LLMProvider } from '@core/ai/provider';
++import { buildAgentProviders, PROVIDER_PRESETS, type ChainEvents, type ProviderConfig } from '@core/ai/providers';
++import { useSettings } from '@ui/hooks/useSettings';
++import { getProviderKey } from './boot';
++
++/**
++ * Builds the agent's provider stack from settings + SecureStore keys:
++ *   chain(groq > gemini > claude…) each wrapped in a usage meter that persists
++ *   to settings.aiUsage and enforces settings.aiMonthlyCaps.
++ * Returns null when no provider in the chain has a usable key.
++ */
++export async function buildProvidersFromSettings(events?: ChainEvents): Promise<{ main: LLMProvider; small: LLMProvider; active: ProviderConfig[] } | null> {
++  const s = useSettings.getState();
++  const withKeys: ProviderConfig[] = [];
++  for (const c of s.aiChain) {
++    if (c.enabled === false) continue;
++    const preset = PROVIDER_PRESETS[c.kind];
++    const apiKey = preset.needsKey ? await getProviderKey(c.kind) : undefined;
++    if (preset.needsKey && !apiKey) continue; // silently skip providers without a key
++    withKeys.push({ ...c, apiKey: apiKey ?? undefined });
++  }
++  if (!withKeys.length) return null;
++
++  const month = new Date().toISOString().slice(0, 7);
++  const usage = {
++    load: () => {
++      const u = useSettings.getState().aiUsage;
++      return u.month === month ? { ...u.byProvider } : {};
++    },
++    save: (byProvider: Record<string, import('@core/ai/providers').UsageRecord>) => useSettings.getState().set('aiUsage', { month, byProvider }),
++    monthlyTokenCap: (provider: string) => useSettings.getState().aiMonthlyCaps[provider],
++  };
++  const { main, small } = buildAgentProviders({ chain: withKeys, usage, events });
++  return { main, small, active: withKeys.map((c) => ({ ...c, apiKey: undefined })) };
++}
+diff --git a/src/platform/boot.ts b/src/platform/boot.ts
+index 76ca9f4..cb245f2 100644
+--- a/src/platform/boot.ts
++++ b/src/platform/boot.ts
+@@ -70,8 +70,11 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
+     appearance: (stored.appearance as never) ?? 'system',
+     locale: { ...useSettings.getState().locale, ...((stored.locale as object) ?? {}) },
+     homeDashboardId: (stored.homeDashboardId as string) ?? null,
+-    aiModel: (stored.aiModel as string) ?? 'claude-sonnet-4-5',
++    aiModel: (stored.aiModel as string) ?? 'claude-haiku-4-5',
+     aiEnabled: stored.aiEnabled !== false,
++    aiChain: (stored.aiChain as never) ?? useSettings.getState().aiChain,
++    aiMonthlyCaps: (stored.aiMonthlyCaps as never) ?? {},
++    aiUsage: (stored.aiUsage as never) ?? { month: '', byProvider: {} },
+     hapticsEnabled: stored.hapticsEnabled !== false,
+     onboarded: !!stored.onboarded,
+   });
+@@ -120,27 +123,36 @@ async function syncReminderNotifications(os: LifeOSContext) {
+ /* API key storage — SecureStore on device, localStorage on web         */
+ /* ------------------------------------------------------------------ */
+ 
+-const KEY = 'lifeos.anthropic.apiKey';
+-export async function getApiKey(): Promise<string | null> {
++const LEGACY_KEY = 'lifeos.anthropic.apiKey';
++const keyName = (provider: string) => (provider === 'claude' ? LEGACY_KEY : `lifeos.ai.key.${provider}`);
++
++/** API key for one provider kind ('groq' | 'gemini' | 'claude' | …). */
++export async function getProviderKey(provider: string): Promise<string | null> {
++  const k = keyName(provider);
+   if (Platform.OS === 'web') {
+     try {
+-      return globalThis.localStorage?.getItem(KEY) ?? null;
++      return globalThis.localStorage?.getItem(k) ?? null;
+     } catch {
+       return null;
+     }
+   }
+-  return SecureStore.getItemAsync(KEY);
++  return SecureStore.getItemAsync(k);
+ }
+-export async function setApiKey(key: string | null): Promise<void> {
++export async function setProviderKey(provider: string, key: string | null): Promise<void> {
++  const k = keyName(provider);
+   if (Platform.OS === 'web') {
+     try {
+-      if (key) globalThis.localStorage?.setItem(KEY, key);
+-      else globalThis.localStorage?.removeItem(KEY);
++      if (key) globalThis.localStorage?.setItem(k, key);
++      else globalThis.localStorage?.removeItem(k);
+     } catch {
+       /* ignore */
+     }
+     return;
+   }
+-  if (key) await SecureStore.setItemAsync(KEY, key);
+-  else await SecureStore.deleteItemAsync(KEY);
++  if (key) await SecureStore.setItemAsync(k, key);
++  else await SecureStore.deleteItemAsync(k);
+ }
++/** @deprecated use getProviderKey('claude') */
++export const getApiKey = () => getProviderKey('claude');
++/** @deprecated use setProviderKey('claude', key) */
++export const setApiKey = (key: string | null) => setProviderKey('claude', key);
+diff --git a/src/ui/hooks/useSettings.ts b/src/ui/hooks/useSettings.ts
+index 50588f9..a06582a 100644
+--- a/src/ui/hooks/useSettings.ts
++++ b/src/ui/hooks/useSettings.ts
+@@ -1,6 +1,7 @@
+ import { create } from 'zustand';
+ import type { LocaleSettings } from '@core/format';
+ import { DEFAULT_LOCALE } from '@core/format';
++import type { ProviderConfig, UsageRecord } from '@core/ai/providers';
+ 
+ /**
+  * App-level settings mirrored from the SQLite `settings` table into a zustand
+@@ -12,6 +13,12 @@ export interface AppSettings {
+   homeDashboardId: string | null;
+   aiModel: string;
+   aiEnabled: boolean;
++  /** Ordered provider chain (keys live in SecureStore, not here). */
++  aiChain: ProviderConfig[];
++  /** Monthly token cap per provider kind; missing = unlimited. */
++  aiMonthlyCaps: Record<string, number>;
++  /** Usage for the current month: { month: 'YYYY-MM', byProvider } */
++  aiUsage: { month: string; byProvider: Record<string, UsageRecord> };
+   hapticsEnabled: boolean;
+   onboarded: boolean;
+   set: <K extends keyof Omit<AppSettings, 'set' | 'hydrate'>>(key: K, value: AppSettings[K]) => void;
+@@ -27,8 +34,11 @@ export const useSettings = create<AppSettings>((set) => ({
+   appearance: 'system',
+   locale: DEFAULT_LOCALE,
+   homeDashboardId: null,
+-  aiModel: 'claude-sonnet-4-5',
++  aiModel: 'claude-haiku-4-5',
+   aiEnabled: true,
++  aiChain: [{ kind: 'groq' }, { kind: 'gemini' }, { kind: 'claude', enabled: false }],
++  aiMonthlyCaps: {},
++  aiUsage: { month: '', byProvider: {} },
+   hapticsEnabled: true,
+   onboarded: false,
+   set: (key, value) => {
+-- 
+2.43.0
+

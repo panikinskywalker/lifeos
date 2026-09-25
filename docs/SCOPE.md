@@ -108,8 +108,11 @@ The agent must know **everything Rutvij has ever told it**, not just structured 
 - Weekly review (Sunday). **[P2]**
 - Nudges (unused subscription, price change, long gap since a person, budget pace). **[P2]**
 
-### B5. Models & cost
-- Provider interface (Claude first). Haiku default, Sonnet escalation, per-feature model choice; usage meter. **[P1]**
+### B5. Models & cost *(changed: parser-first, free-tier friendly)*
+- **Parser first.** A deterministic on-device intent parser handles the common sentences (did X, recharged X, X paid me, spent N on X, split, remind me, add a chore, remember …) with no network and no cost; the LLM is called only when the parser isn't confident. **[P1]**
+- **Provider chain:** Groq (free, fast) → Gemini (free) → Claude (paid, optional), each with its own key; automatic fall-through on rate limits or outages, rate-limited providers cool down. OpenRouter and Ollama (Mac over Tailscale) also supported. Provider order, model and keys chosen in You › Agent. **[P1]**
+- Usage meter and a monthly cap per provider; the agent stops calling the model at the cap. **[P1]**
+- On-device small model (Gemma/Qwen class) as a provider for fully offline, private use. **[P2]**
 
 ---
 
