@@ -61,7 +61,7 @@ export default function RootLayout() {
       const text = [...new Set(parts)].join('\n');
       const file = shareIntent.files?.[0];
       const uri = file ? await persistAttachment(file.path, file.fileName ?? 'shared').catch(() => file.path) : undefined;
-      router.push({ pathname: '/talk', params: { share: text, ...(file && uri ? { file: uri, fileName: file.fileName ?? 'shared file', mime: file.mimeType ?? '' } : {}) } } as never);
+      router.push({ pathname: '/dump', params: { share: text, ...(file && uri ? { file: uri, fileName: file.fileName ?? 'shared file', mime: file.mimeType ?? '' } : {}) } } as never);
       resetShareIntent();
     })();
   }, [os, hasShareIntent]); // eslint-disable-line react-hooks/exhaustive-deps

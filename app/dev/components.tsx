@@ -544,7 +544,7 @@ function Bar() {
         items={[
           { key: 'today', label: 'Today', icon: 'sun' },
           { key: 'upkeep', label: 'Upkeep', icon: 'repeat' },
-          { key: 'talk', label: 'Talk', icon: 'mic', primary: true },
+          { key: 'dump', label: 'Dump', icon: 'brain', primary: true },
           { key: 'browse', label: 'Browse', icon: 'folder' },
           { key: 'you', label: 'You', icon: 'user-circle' },
         ]}

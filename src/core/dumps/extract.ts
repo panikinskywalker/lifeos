@@ -81,6 +81,9 @@ export interface ExtractResult {
   error?: string;
 }
 
+/** Error text on a dump that waits for a model key (the parser couldn't read it). */
+export const NO_PROVIDER = 'no provider';
+
 const WRITE_INTENTS = new Set(['done', 'expense', 'paid_back', 'split', 'recharge', 'remind', 'create_routine', 'remember']);
 
 /**
@@ -113,7 +116,10 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
     }
   }
 
-  if (!provider) return { status: 'pending', via: 'none', items: filer.count };
+  if (!provider) {
+    if (dump.error !== NO_PROVIDER) os.dumps.setStatus(dumpId, 'pending', NO_PROVIDER);
+    return { status: 'pending', via: 'none', items: filer.count };
+  }
   try {
     const r = await provider.complete({ system: extractionPrompt(os), messages: [{ role: 'user', content: dump.body }], tools: [], maxTokens: 900 });
     const text = r.content.filter((b): b is Extract<typeof b, { type: 'text' }> => b.type === 'text').map((b) => b.text).join('');

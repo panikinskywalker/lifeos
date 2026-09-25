@@ -27,7 +27,7 @@ export function useBottomBarInset(): number {
 /**
  * Canvas bottom bar: dark pill 66 high, radius 22, inset 20. Tabs are a 22
  * icon over an 11/700 label; the selected one is mustard. The centre Talk is
- * a 58 mustard disc (mic) rising 26 above the bar, its label under it.
+ * a 58 mustard disc (the brain: Dump) rising 26 above the bar, its label under it.
  */
 export function BottomBar({ items, active, onPress, onLongPress, floating = true }: { items: BottomBarItem[]; active: string; onPress: (key: string) => void; onLongPress?: (key: string) => void; floating?: boolean }) {
   const t = useTheme();

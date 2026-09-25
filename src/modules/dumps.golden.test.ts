@@ -134,7 +134,7 @@ describe('dump extraction mechanics', () => {
   it('no key and not a parser sentence → stays pending; a failing model → failed, retried later', async () => {
     const d = os.dumps.add({ body: 'Karan from the gym says the protein place in Indiranagar is good' });
     expect(await extractDump(os, d.id, null)).toMatchObject({ status: 'pending' });
-    expect(os.dumps.get(d.id)!.status).toBe('pending');
+    expect(os.dumps.get(d.id)).toMatchObject({ status: 'pending', error: 'no provider', attempts: 0 });
     expect(await extractDump(os, d.id, offline)).toMatchObject({ status: 'failed' });
     expect(os.dumps.pending().map((x) => x.id)).toEqual([d.id]);
     const r = await extractPending(os, model({ facts: [{ text: 'The protein place in Indiranagar is good' }] }));

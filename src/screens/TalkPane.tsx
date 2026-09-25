@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation, useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { Assistant, type AssistantTurn } from '@core/ai/assistant';
 import type { Fact } from '@core/repo/factRepo';
 import { useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { ChatBubble, Chip, Composer, Icon, IconButton, ScreenHeader, Text, useBottomBarInset, useToast } from '@ui/kit';
+import { ChatBubble, Chip, Composer, Icon, IconButton, Text, useBottomBarInset, useToast } from '@ui/kit';
 import { ConfirmCard, ReplyCardView } from '@ui/components/ReplyCard';
-import { buildAgentFromSettings, type AgentProviders } from '../../src/platform/agentProvider';
-import { listen } from '../../src/platform/voice';
+import { buildAgentFromSettings, type AgentProviders } from '../platform/agentProvider';
+import { listen } from '../platform/voice';
 
 /** PRODUCT §7 — the sentences Talk must handle, as starting points. */
 const PROMPTS = ['Did the car service today, 6,400 at Hyundai', 'Recharged Jio 719 for 84 days', 'Did laundry', 'Dinner was 3,600, split with Arjun and Priya', 'Who owes me money?', 'What’s overdue?', 'Remember the landlord is Suresh, rent due on the 5th', 'How much did I spend on food this month?'];
@@ -34,19 +33,22 @@ type Item =
   | { kind: 'facts'; id: string; facts: Fact[] }
   | { kind: 'confirm'; id: string; summary: string; answer?: boolean; resolve: (ok: boolean) => void };
 
+export interface TalkShare {
+  text?: string;
+  file?: { uri: string; name: string; mime: string };
+}
+
 /**
- * Talk (M3, Stitch agent thread): say what happened; the agent files it.
- * Replies come as cards you can open or undo; money and people wait for an
- * inline OK. Voice uses the phone's speech recogniser.
+ * Talk (M3, Stitch agent thread), now the second half of the Dump tab
+ * (PRODUCT v4 §4): ask the agent or tell it to do something. Replies come as
+ * cards you can open or undo; money and people wait for an inline OK.
  */
-export default function TalkTab() {
+export function TalkPane({ header, share, centerPress }: { header: (o: { subtitle: string; right: ReactNode }) => ReactNode; share?: TalkShare | null; centerPress: MutableRefObject<(() => void) | null> }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
   const toast = useToast();
-  const insets = useSafeAreaInsets();
   const barInset = useBottomBarInset();
-  const params = useLocalSearchParams<{ share?: string; file?: string; fileName?: string; mime?: string }>();
   const smartModel = useSettings((s) => s.aiModel);
   const routing = useSettings((s) => s.aiRouting);
   const chain = useSettings((s) => s.aiChain);
@@ -74,9 +76,9 @@ export default function TalkTab() {
   }, [os, chain, routing, smartModel, focusTick]);
   const [shared, setShared] = useState<{ uri: string; name: string; mime: string } | null>(null);
   useEffect(() => {
-    if (params.share) setText(String(params.share));
-    if (params.file) setShared({ uri: String(params.file), name: String(params.fileName ?? 'shared file'), mime: String(params.mime ?? '') });
-  }, [params.share, params.file]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (share?.text) setText(share.text);
+    if (share?.file) setShared(share.file);
+  }, [share]);
 
   const assistant = useMemo(() => {
     if (agent === undefined) return null;
@@ -130,20 +132,10 @@ export default function TalkTab() {
     setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 60);
   }, [items.length, busy]);
 
-  // Tapping the raised mic while already on Talk starts listening.
+  // Tapping the centre button while Talk is showing starts listening.
+  centerPress.current = () => void speak();
   const navigation = useNavigation();
-  const speakRef = useRef(speak);
-  speakRef.current = speak;
-  useEffect(() => {
-    const off = navigation.addListener('tabPress' as never, () => {
-      if (navigation.isFocused()) void speakRef.current();
-    });
-    const offFocus = navigation.addListener('focus' as never, () => setFocusTick((n) => n + 1));
-    return () => {
-      off();
-      offFocus();
-    };
-  }, [navigation]);
+  useEffect(() => navigation.addListener('focus' as never, () => setFocusTick((n) => n + 1)), [navigation]);
 
   if (agent === undefined) return <View style={{ flex: 1, backgroundColor: t.c.bg.ground }} />;
 
@@ -155,23 +147,20 @@ export default function TalkTab() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
-      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: 8 }}>
-        <ScreenHeader
-          title="Talk"
-          subtitle={agent ? `On the phone first · then ${agent.active.map((c) => c.kind === 'claude' ? 'Claude' : c.kind.charAt(0).toUpperCase() + c.kind.slice(1)).join(' → ')}` : 'On the phone · no model yet'}
-          right={
-            <IconButton
-              icon="plus"
-              accessibilityLabel="New conversation"
-              filled
-              onPress={() => {
-                setItems([]);
-                setSession((n) => n + 1);
-              }}
-            />
-          }
-        />
-      </View>
+      {header({
+        subtitle: agent ? `On the phone first · then ${agent.active.map((c) => (c.kind === 'claude' ? 'Claude' : c.kind.charAt(0).toUpperCase() + c.kind.slice(1))).join(' → ')}` : 'On the phone · no model yet',
+        right: (
+          <IconButton
+            icon="plus"
+            accessibilityLabel="New conversation"
+            filled
+            onPress={() => {
+              setItems([]);
+              setSession((n) => n + 1);
+            }}
+          />
+        ),
+      })}
       {!agent ? (
         <View style={{ marginHorizontal: t.layout.gutter, marginBottom: 4 }}>
           <Chip icon="key" tone="accent" small label="Offline for everyday things · add a free key for more" onPress={() => router.push('/settings/ai')} />
@@ -189,9 +178,9 @@ export default function TalkTab() {
                 <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: t.c.accent.mustard }} />
                 <Text variant="labelCaps" style={{ textTransform: 'uppercase' }}>LifeOS agent</Text>
               </View>
-              <Text variant="heading">Say it like you’d text a friend.</Text>
+              <Text variant="heading">Ask anything, or tell it to do something.</Text>
               <Text variant="body" color="secondary">
-                “Did the car service, 6,400 at Hyundai” files the service, the expense and the next due date. Money and people wait for your OK; everything else has Undo.
+                It answers from your records, facts and dumps. “Did the car service, 6,400 at Hyundai” files the service, the expense and the next due date. Money and people wait for your OK; everything else has Undo.
               </Text>
             </View>
             <Text variant="labelMicro" color="secondary" style={{ textTransform: 'uppercase', paddingHorizontal: 4 }}>Try</Text>
