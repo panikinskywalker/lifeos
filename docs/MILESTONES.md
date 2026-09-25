@@ -76,7 +76,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] `[[links]]` in notes/facts → relations; backlinks section on every record.
 - [ ] Share-sheet intent (Android `SEND` / `SEND_MULTIPLE`) → Talk with the shared text/link/image attached.
 - [x] Model routing: Haiku default; escalate to Sonnet when the message has ≥2 intents, a plan intent, or the first attempt returned a tool error. Usage meter in You › Agent.
-- [ ] Golden tests: each sample sentence against a recorded-response fake provider asserting the exact tool calls and resulting DB state.
+- [x] Golden tests: each sample sentence against a recorded-response fake provider asserting the exact tool calls and resulting DB state. *(PRODUCT §7 flows 1–5, 8, 9 in `src/modules/golden.test.ts`; 6 and 7 arrive with M5 and M4.)*
 
 **Demo:** say the eight sentences in order; every one files correctly with zero taps except the two money/people confirmations.
 

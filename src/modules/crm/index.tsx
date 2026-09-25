@@ -3,63 +3,16 @@ import { Linking, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
-import type { Entity, EntityTypeDef } from '@core/domain/types';
+import type { Entity } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
-import { palette } from '@ui/theme/tokens';
 import { useLive } from '@ui/hooks';
 import { AttentionCard, QuickActions, RowList, Section, StatTrio, Text, useToast } from '@ui/kit';
 import { EntityRow } from '@ui/components/EntityRow';
-import { dateField, nextAnnual } from '@core/cycles/schedule';
 import { bus } from '@core/events/bus';
+import { CRM_COLOR, groupType, personType, type PersonData } from './types';
 
-export const CRM_COLOR = palette.pink;
+export * from './types';
 
-export interface PersonData {
-  relationship?: string;
-  phone?: string;
-  email?: string;
-  birthday?: string;
-  company?: string;
-  role?: string;
-  city?: string;
-  notes?: string;
-  contactEvery?: number;
-  lastContactAt?: string;
-}
-
-export const personType: EntityTypeDef<PersonData> = {
-  type: 'person',
-  module: 'crm',
-  label: 'Person',
-  labelPlural: 'People',
-  icon: 'person',
-  schema: z.object({ relationship: z.string().optional(), phone: z.string().optional(), email: z.string().optional(), birthday: z.string().optional(), company: z.string().optional(), role: z.string().optional(), city: z.string().optional(), notes: z.string().optional(), contactEvery: z.coerce.number().optional(), lastContactAt: z.string().optional() }),
-  cycleFields: { 'person.contact': { lastDoneAt: 'lastContactAt' } },
-  cycleTemplates: (d) => [
-    ...(d.contactEvery ? [{ template: 'person.contact', name: 'Keep in touch', kind: 'interval' as const, everyN: d.contactEvery, everyUnit: 'day' as const, lastDoneAt: dateField(d.lastContactAt) ?? Date.now() }] : []),
-    ...(d.birthday ? [{ template: 'person.birthday', name: 'Birthday', kind: 'fixed' as const, everyN: 1, everyUnit: 'year' as const, nextDueAt: nextAnnual(d.birthday, Date.now()), leadDays: 7 }] : []),
-  ],
-  fields: [
-    { key: 'relationship', label: 'Relationship', type: 'select', summary: true, options: [{ value: 'family', label: 'Family', color: palette.red }, { value: 'friend', label: 'Friend', color: palette.orange }, { value: 'partner', label: 'Partner', color: palette.pink }, { value: 'colleague', label: 'Colleague', color: palette.blue }, { value: 'client', label: 'Client', color: palette.indigo }, { value: 'vendor', label: 'Vendor / Service', color: palette.teal }, { value: 'acquaintance', label: 'Acquaintance', color: palette.gray }] },
-    { key: 'phone', label: 'Phone', type: 'text', section: 'Contact' },
-    { key: 'email', label: 'Email', type: 'text', section: 'Contact' },
-    { key: 'city', label: 'City', type: 'text', section: 'Contact', summary: true },
-    { key: 'company', label: 'Company', type: 'text', section: 'Work' },
-    { key: 'role', label: 'Role', type: 'text', section: 'Work' },
-    { key: 'birthday', label: 'Birthday', type: 'date', section: 'Details' },
-    { key: 'contactEvery', label: 'Keep in touch every (days)', type: 'number', section: 'Details', description: 'Surfaces a nudge when overdue' },
-    { key: 'lastContactAt', label: 'Last contact', type: 'date', section: 'Details' },
-    { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
-  ],
-  indexed: ['relationship'],
-  searchText: (d) => [d.company, d.role, d.city, d.notes, d.email, d.phone].filter(Boolean).join(' '),
-  relations: [{ kind: 'person', label: 'Mentioned in', to: ['transaction', 'trip', 'task', 'event', 'note'], cardinality: 'many' }],
-  defaultViews: [
-    { name: 'Family', definition: { filter: { and: [{ field: 'data.relationship', op: 'eq', value: 'family' }] }, sort: [{ field: 'title', dir: 'asc' }] } },
-    { name: 'Friends', definition: { filter: { and: [{ field: 'data.relationship', op: 'eq', value: 'friend' }] }, sort: [{ field: 'title', dir: 'asc' }] } },
-    { name: 'Work', definition: { filter: { and: [{ field: 'data.relationship', op: 'in', value: ['colleague', 'client'] }] }, sort: [{ field: 'title', dir: 'asc' }] } },
-  ],
-};
 
 /**
  * Person (Stitch "Record · Person"): last contact / birthday / shared spend
@@ -143,19 +96,6 @@ function nextBirthday(iso: string): { days: number; age: number | null } | null 
   return { days, age: d.getFullYear() > 1900 ? next.getFullYear() - d.getFullYear() : null };
 }
 
-/** Group (PRODUCT §4): flatmates, a trip crew, family — splits and balances run per group. Members also live in group_members. */
-export const groupType: EntityTypeDef<{ name: string; kind?: string; memberIds: string[]; notes?: string }> = {
-  type: 'group', module: 'crm', label: 'Group', labelPlural: 'Groups', icon: 'people',
-  schema: z.object({ name: z.string().min(1), kind: z.string().optional(), memberIds: z.array(z.string()).default([]), notes: z.string().optional() }),
-  fields: [
-    { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Flat 4B, Goa trip, Family' },
-    { key: 'kind', label: 'Kind', type: 'select', summary: true, options: [{ value: 'home', label: 'Home' }, { value: 'trip', label: 'Trip' }, { value: 'friends', label: 'Friends' }, { value: 'family', label: 'Family' }, { value: 'work', label: 'Work' }] },
-    { key: 'memberIds', label: 'Members', type: 'relation', relationTo: 'person', relationKind: 'member', defaultValue: [] },
-    { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
-  ],
-  computeTitle: (d) => d.name,
-  computeSubtitle: (d) => `${d.memberIds.length} member${d.memberIds.length === 1 ? '' : 's'} + you`,
-};
 
 export const crmModule: ModuleManifest = {
   id: 'crm',
