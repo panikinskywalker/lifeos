@@ -21,6 +21,8 @@ import { Loading, Text } from '@ui/components/primitives';
 import { bootLifeOS, setNavigator } from '../src/platform/boot';
 import { notifications } from '../src/platform/notifications';
 import { AppState } from 'react-native';
+import { useShareIntent } from 'expo-share-intent';
+import { persistAttachment } from '../src/ui/lib/files';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -35,6 +37,8 @@ export default function RootLayout() {
   // Native builds embed these via the expo-font plugin; this also covers web and dev clients.
   const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold });
   const fontsReady = fontsLoaded || !!fontError;
+  // Android share sheet (M3): "Share → LifeOS" opens Talk with the text, link or file. No-op in Expo Go.
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent({ resetOnBackground: true });
 
   useEffect(() => {
     setNavigator((p) => router.push(p as never));
@@ -49,6 +53,18 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsReady && (os || error)) SplashScreen.hideAsync().catch(() => {});
   }, [fontsReady, os, error]);
+
+  useEffect(() => {
+    if (!os || !hasShareIntent) return;
+    void (async () => {
+      const parts = [shareIntent.text, shareIntent.webUrl].filter((x): x is string => !!x && !!x.trim());
+      const text = [...new Set(parts)].join('\n');
+      const file = shareIntent.files?.[0];
+      const uri = file ? await persistAttachment(file.path, file.fileName ?? 'shared').catch(() => file.path) : undefined;
+      router.push({ pathname: '/talk', params: { share: text, ...(file && uri ? { file: uri, fileName: file.fileName ?? 'shared file', mime: file.mimeType ?? '' } : {}) } } as never);
+      resetShareIntent();
+    })();
+  }, [os, hasShareIntent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Foreground → run scheduler; tapping a notification → open the record.
   useEffect(() => {

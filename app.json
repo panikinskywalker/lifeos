@@ -64,6 +64,20 @@
             "./node_modules/@expo-google-fonts/plus-jakarta-sans/800ExtraBold/PlusJakartaSans_800ExtraBold.ttf"
           ]
         }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": [
+            "text/*",
+            "image/*",
+            "application/pdf"
+          ],
+          "androidMultiIntentFilters": [
+            "image/*"
+          ],
+          "disableIOS": true
+        }
       ]
     ],
     "experiments": {

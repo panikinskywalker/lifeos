@@ -134,6 +134,19 @@ export const lifeTools: AiToolDef[] = [
     },
   },
   {
+    name: 'attach_file',
+    description: 'Attach a file the user shared (a receipt photo, a PDF policy) to a record. uri comes from the "[Shared file …]" note in their message.',
+    input: z.object({ entityId: z.string(), uri: z.string(), name: z.string(), mime: z.string().optional() }),
+    run: async (input, os) => {
+      const i = input as { entityId: string; uri: string; name: string; mime?: string };
+      const e = os.entities.get(i.entityId);
+      if (!e) return { error: 'record not found' };
+      const image = !!i.mime?.startsWith('image/');
+      const a = os.attachments.add({ entityId: e.id, name: i.name, mime: i.mime ?? null, size: null, uri: i.uri, kind: image ? (e.type === 'transaction' ? 'receipt' : 'image') : 'file' }, 'assistant');
+      return withExtras({ attached: i.name, to: e.title }, { undo: () => os.attachments.remove(a.id), card: recordCard(os, e) });
+    },
+  },
+  {
     name: 'remember_fact',
     description: 'Save something the user told you that will matter later ("Dad hates surprises", "landlord is Suresh, rent due on the 5th", "I prefer aisle seats"). One short sentence per fact; subjectId when it is about a record. If it updates an older fact, pass replacesId.',
     input: z.object({ text: z.string().min(3), subjectId: z.string().optional(), replacesId: z.string().optional() }),

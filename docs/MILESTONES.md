@@ -74,7 +74,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] **Facts** store + Browse › Memory screen; fact mining after every message (second, cheap Haiku call with a strict JSON schema); facts indexed in FTS with records and notes.
 - [x] Retrieval step before every answer: FTS hits over records/notes/facts + resolved entity's timeline/relations + last N turns, packed into the system prompt with a token budget.
 - [x] `[[links]]` in notes/facts → relations; backlinks section on every record.
-- [ ] Share-sheet intent (Android `SEND` / `SEND_MULTIPLE`) → Talk with the shared text/link/image attached.
+- [x] Share-sheet intent (Android `SEND` / `SEND_MULTIPLE`) → Talk with the shared text/link/image attached. *(Native: works in the APK build, not Expo Go.)*
 - [x] Model routing: Haiku default; escalate to Sonnet when the message has ≥2 intents, a plan intent, or the first attempt returned a tool error. Usage meter in You › Agent.
 - [x] Golden tests: each sample sentence against a recorded-response fake provider asserting the exact tool calls and resulting DB state. *(PRODUCT §7 flows 1–5, 8, 9 in `src/modules/golden.test.ts`; 6 and 7 arrive with M5 and M4.)*
 

@@ -165,3 +165,13 @@ describe('learned aliases', () => {
     expect(os.aliases.lookup('call dad')).toEqual([]);
   });
 });
+
+describe('shared files', () => {
+  it('attach_file puts a shared file on the record, undoable', async () => {
+    const car = os.entities.create({ type: 'vehicle', data: { name: 'Creta' } });
+    const out = await tool('attach_file').run({ entityId: car.id, uri: 'file:///policy.pdf', name: 'policy.pdf', mime: 'application/pdf' }, os);
+    expect(os.attachments.forEntity(car.id).map((a) => [a.name, a.kind])).toEqual([['policy.pdf', 'file']]);
+    extrasOf(out).undo!();
+    expect(os.attachments.forEntity(car.id)).toEqual([]);
+  });
+});

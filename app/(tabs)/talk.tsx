@@ -43,7 +43,7 @@ export default function TalkTab() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const barInset = useBottomBarInset();
-  const params = useLocalSearchParams<{ share?: string }>();
+  const params = useLocalSearchParams<{ share?: string; file?: string; fileName?: string; mime?: string }>();
   const smartModel = useSettings((s) => s.aiModel);
   const fastModel = useSettings((s) => s.aiFastModel);
   const routing = useSettings((s) => s.aiRouting);
@@ -58,9 +58,11 @@ export default function TalkTab() {
   useEffect(() => {
     getApiKey().then(setKey);
   }, []);
+  const [shared, setShared] = useState<{ uri: string; name: string; mime: string } | null>(null);
   useEffect(() => {
     if (params.share) setText(String(params.share));
-  }, [params.share]);
+    if (params.file) setShared({ uri: String(params.file), name: String(params.fileName ?? 'shared file'), mime: String(params.mime ?? '') });
+  }, [params.share, params.file]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const assistant = useMemo(() => {
     if (!key) return null;
@@ -83,8 +85,13 @@ export default function TalkTab() {
   }, [key, smartModel, fastModel, routing, os, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (msg?: string) => {
-    const m = (msg ?? text).trim();
+    let m = (msg ?? text).trim();
+    if (!m && shared) m = 'I shared this — file it where it belongs.';
     if (!m || !assistant || busy) return;
+    if (shared) {
+      m += `\n[Shared file: ${shared.name}${shared.mime ? ` (${shared.mime})` : ''} — uri ${shared.uri}. Use attach_file to put it on the right record.]`;
+      setShared(null);
+    }
     setText('');
     setBusy(true);
     try {
@@ -221,6 +228,11 @@ export default function TalkTab() {
         ) : null}
       </ScrollView>
       <View style={{ paddingHorizontal: t.layout.gutter, paddingBottom: barInset + 32, paddingTop: 8 }}>
+        {shared ? (
+          <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+            <Chip label={`Attached: ${shared.name}`} icon="paperclip" onPress={() => setShared(null)} />
+          </View>
+        ) : null}
         <Composer value={text} onChange={setText} onSend={() => void send()} onMic={() => void speak()} disabled={busy} />
       </View>
     </KeyboardAvoidingView>
