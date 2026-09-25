@@ -107,6 +107,10 @@ export interface EntityTypeDef<TData = Record<string, unknown>> {
   hidden?: boolean;
   /** Meters the record tracks (a vehicle's odometer), mirrored into a data field; cycles read the latest reading. */
   meters?: Array<{ meter: string; field: string; label: string; unit: string }>;
+  /** Template cycle → data fields it writes back after done/skip/set (keeps "Next billing date" true). Dates as yyyy-MM-dd. */
+  cycleFields?: Record<string, { nextDueAt?: string; nextDueMeter?: string; lastDoneAt?: string }>;
+  /** Statuses in which the record's cycles are live (Subscription: active). Others drop out of Upkeep. */
+  cycleActiveStatuses?: string[];
   /** Default cycles a new record of this type gets (Upkeep), derived from its data. */
   cycleTemplates?: (data: TData) => CycleSeed[];
 }

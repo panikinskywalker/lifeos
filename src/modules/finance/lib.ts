@@ -83,22 +83,34 @@ export function budgetStatus(os: LifeOSContext, budget: Entity<BudgetData>) {
   return { spent, limit: budget.data.amount, progress: budget.data.amount ? spent / budget.data.amount : 0, remaining: budget.data.amount - spent };
 }
 
-/** Post transactions for subscriptions whose billing date has passed and roll the date forward. */
+/**
+ * Auto-post (on by default per subscription): for each active subscription
+ * whose billing date has passed, file the expense and mark its renewal cycle
+ * done — which rolls the cycle and writes the next billing date back. With
+ * auto-post off nothing happens: the renewal stays due in Upkeep until the
+ * user marks it paid.
+ */
 export function postDueSubscriptions(os: LifeOSContext, today = iso(new Date())): number {
   const subs = os.entities.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }, { field: 'data.nextBillingAt', op: 'lte', value: today }] } });
   let n = 0;
   for (const s of subs) {
+    if (s.data.autoPost === false) continue;
+    const renewal = os.cycles.forEntity(s.id).find((c) => c.template === 'subscription.renewal');
     let next = s.data.nextBillingAt;
     let guard = 0;
     while (next <= today && guard++ < 24) {
-      if (s.data.autoPost !== false) {
-        const tx = os.entities.create<TransactionData>({ type: 'transaction', data: { amount: s.data.amount, kind: 'expense', category: s.data.category || 'subscriptions', accountId: s.data.accountId, merchant: s.data.name, date: next, currency: s.data.currency, note: 'Auto-posted subscription' } }, 'automation');
-        os.relations.link(tx.id, s.id, 'subscription', {}, 'automation');
-        n++;
+      const tx = os.entities.create<TransactionData>({ type: 'transaction', data: { amount: s.data.amount, kind: 'expense', category: s.data.category || 'subscriptions', accountId: s.data.accountId, merchant: s.data.name, date: next, currency: s.data.currency, note: 'Auto-posted subscription' } }, 'automation');
+      os.relations.link(tx.id, s.id, 'subscription', {}, 'automation');
+      n++;
+      if (renewal) {
+        os.cycles.markDone(renewal.id, { at: new Date(`${next}T09:00:00`).getTime(), cost: s.data.amount, note: 'Auto-posted' }, 'automation');
+        const due = os.cycles.get(renewal.id)?.nextDueAt;
+        next = due != null ? iso(new Date(due)) : iso(new Date(nextOccurrence(s.data.rrule, new Date(next).getTime(), new Date(next).getTime())));
+      } else {
+        next = iso(new Date(nextOccurrence(s.data.rrule, new Date(next).getTime(), new Date(next).getTime())));
       }
-      next = iso(new Date(nextOccurrence(s.data.rrule, new Date(next).getTime(), new Date(next).getTime())));
     }
-    os.entities.update(s.id, { data: { nextBillingAt: next } }, 'automation');
+    if (os.entities.get<SubscriptionData>(s.id)?.data.nextBillingAt !== next) os.entities.update(s.id, { data: { nextBillingAt: next } }, 'automation');
   }
   return n;
 }

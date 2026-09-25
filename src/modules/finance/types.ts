@@ -208,6 +208,8 @@ export const subscriptionType: EntityTypeDef<SubscriptionData> = {
   occurredAtField: 'nextBillingAt',
   statuses: [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused' }, { value: 'cancelled', label: 'Cancelled', color: palette.gray }],
   computeTitle: (d) => d.name,
+  cycleFields: { 'subscription.renewal': { nextDueAt: 'nextBillingAt' } },
+  cycleActiveStatuses: ['active'],
   cycleTemplates: (d) => {
     const p = periodFromRRule(d.rrule) ?? { everyN: 1, everyUnit: 'month' as const };
     return [{ template: 'subscription.renewal', name: 'Renewal', kind: 'fixed', ...p, nextDueAt: dateField(d.nextBillingAt), leadDays: 3, costEstimate: d.amount ?? null, currency: d.currency ?? null }];

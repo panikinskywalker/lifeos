@@ -51,6 +51,7 @@ export const routineType: EntityTypeDef<RoutineData> = {
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   computeTitle: (d) => d.name,
+  cycleFields: { 'routine.cycle': { lastDoneAt: 'lastDoneOn' } },
   computeSubtitle: (d) => [`every ${d.everyN === 1 ? '' : `${d.everyN} `}${d.everyUnit}${d.everyN === 1 ? '' : 's'}`, d.minutes ? `${d.minutes} min` : null, d.weekday ? `${WEEKDAYS[Number(d.weekday)]}s` : null].filter(Boolean).join(' · '),
   cycleTemplates: (d) => {
     const last = dateField(d.lastDoneOn);
@@ -71,6 +72,7 @@ export const vehicleType: EntityTypeDef<VehicleData> = {
   ],
   computeTitle: (d) => [d.year, d.make, d.model].filter(Boolean).join(' '),
   meters: [{ meter: 'odometer', field: 'odometerKm', label: 'Odometer', unit: 'km' }],
+  cycleFields: { 'vehicle.service': { nextDueAt: 'nextServiceDate', nextDueMeter: 'nextServiceKm' }, 'vehicle.insurance': { nextDueAt: 'insuranceUntil' }, 'vehicle.puc': { nextDueAt: 'pucUntil' } },
   cycleTemplates: (d) => [
     { template: 'vehicle.service', name: 'Service', kind: 'either', everyN: 6, everyUnit: 'month', meterEvery: 10000, nextDueAt: dateField(d.nextServiceDate), nextDueMeter: d.nextServiceKm ?? null, leadDays: 14 }, // unscheduled until a next service or a done is logged
     ...(dateField(d.insuranceUntil) ? [{ template: 'vehicle.insurance', name: 'Insurance renewal', kind: 'fixed' as const, everyN: 1, everyUnit: 'year' as const, nextDueAt: dateField(d.insuranceUntil), leadDays: 30 }] : []),

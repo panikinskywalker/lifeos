@@ -127,6 +127,29 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     const latest = ctx.cycles.latestMeter(entityId, meter);
     if ((e.data as Record<string, unknown>)[m.field] !== latest) entities.update(entityId, { data: { [m.field]: latest ?? undefined } }, actor);
   };
+  const ymd = (at: number) => {
+    const d = new Date(at);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  ctx.cycles.onChanged = (c) => {
+    const e = entities.get(c.entityId);
+    const map = e && c.template ? registry.entityTypes.get(e.type)?.cycleFields?.[c.template] : undefined;
+    if (!e || !map) return;
+    const data = e.data as Record<string, unknown>;
+    const patch: Record<string, unknown> = {};
+    if (map.nextDueAt && c.nextDueAt != null && data[map.nextDueAt] !== ymd(c.nextDueAt)) patch[map.nextDueAt] = ymd(c.nextDueAt);
+    if (map.nextDueMeter && c.nextDueMeter != null && data[map.nextDueMeter] !== c.nextDueMeter) patch[map.nextDueMeter] = c.nextDueMeter;
+    if (map.lastDoneAt && c.lastDoneAt != null && data[map.lastDoneAt] !== ymd(c.lastDoneAt)) patch[map.lastDoneAt] = ymd(c.lastDoneAt);
+    if (Object.keys(patch).length) entities.update(e.id, { data: patch }, 'system');
+  };
+  // Paused / cancelled records: their cycles leave Upkeep until the record is live again.
+  const syncEnabled = (e: Entity) => {
+    const live = registry.entityTypes.get(e.type)?.cycleActiveStatuses;
+    if (!live) return;
+    const on = e.status == null || live.includes(e.status);
+    for (const c of ctx.cycles.forEntity(e.id)) if (c.enabled !== on) ctx.cycles.update(c.id, { enabled: on });
+  };
+  bus.on('entity.status', ({ entity }) => syncEnabled(entity));
   // Meters: a value typed into the mirrored field (odometerKm) becomes a reading.
   const mirrorMeters = (entity: Entity) => {
     for (const m of registry.entityTypes.get(entity.type)?.meters ?? []) {
@@ -139,12 +162,22 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   bus.on('entity.created', ({ entity }) => {
     mirrorMeters(entity);
     ctx.cycles.applyTemplates(entity, registry.entityTypes.get(entity.type));
+    syncEnabled(entity);
   });
   bus.on('entity.updated', ({ entity, previous, changed }) => {
     if (changed.some((k) => k.startsWith('data.'))) ctx.cycles.syncTemplates(entity, previous, registry.entityTypes.get(entity.type));
     const meters = registry.entityTypes.get(entity.type)?.meters ?? [];
     if (meters.some((m) => changed.includes(m.field) || changed.includes(`data.${m.field}`))) mirrorMeters(entity);
   });
+  if (!settings.get('cycles.enabledSynced', false)) {
+    db.transaction(() => {
+      for (const def of registry.entityTypes.values()) {
+        if (!def.cycleActiveStatuses) continue;
+        for (const e of entities.query(def.type, {}, { limit: 100000 })) syncEnabled(e);
+      }
+    });
+    settings.set('cycles.enabledSynced', true);
+  }
   // Records that predate meter readings: their typed value becomes the first reading, once.
   if (!settings.get('meters.backfilled', false)) {
     db.transaction(() => {
@@ -159,7 +192,10 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     db.transaction(() => {
       for (const def of registry.entityTypes.values()) {
         if (!def.cycleTemplates) continue;
-        for (const e of entities.query(def.type, {}, { limit: 100000 })) ctx.cycles.applyTemplates(e, def);
+        for (const e of entities.query(def.type, {}, { limit: 100000 })) {
+          ctx.cycles.applyTemplates(e, def);
+          syncEnabled(e);
+        }
       }
     });
     settings.set('cycles.templatesBackfilled', true);

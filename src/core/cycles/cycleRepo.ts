@@ -76,6 +76,9 @@ const COLS: Array<[keyof Cycle, string]> = [
 export class CycleRepo {
   constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
 
+  /** Set by the core: writes a cycle's dates back into its record's fields (EntityTypeDef.cycleFields). */
+  onChanged?: (cycle: Cycle) => void;
+
   /** Set by the core: mirrors the latest reading into the record's meter field (odometerKm). */
   onReading?: (entityId: string, meter: string, actor: Actor) => void;
 
@@ -319,6 +322,7 @@ export class CycleRepo {
   private write(c: Cycle) {
     this.db.run(`UPDATE cycles SET ${COLS.map(([, col]) => `${col}=?`).join(',')}, updated_at=?, version=version+1 WHERE id=?`, [...COLS.map(([k]) => toDb(c[k])), c.updatedAt, c.id]);
     this.changes.record('cycles', c.id, 'update', 1);
+    if (c.template) this.onChanged?.(c);
   }
 }
 
