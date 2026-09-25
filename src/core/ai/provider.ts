@@ -26,6 +26,8 @@ export interface CompletionResult {
 
 export interface LLMProvider {
   id: string;
+  /** Model id, for usage accounting. */
+  model?: string;
   complete(args: { system: string; messages: ChatMessage[]; tools: ToolSpec[]; maxTokens?: number; signal?: AbortSignal }): Promise<CompletionResult>;
 }
 
@@ -44,6 +46,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): LLMProvider {
   const baseUrl = (opts.baseUrl ?? 'https://api.anthropic.com').replace(/\/$/, '');
   return {
     id: 'claude',
+    model,
     async complete({ system, messages, tools, maxTokens = 2048, signal }) {
       const res = await fetch(`${baseUrl}/v1/messages`, {
         method: 'POST',

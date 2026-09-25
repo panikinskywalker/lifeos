@@ -75,7 +75,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Retrieval step before every answer: FTS hits over records/notes/facts + resolved entity's timeline/relations + last N turns, packed into the system prompt with a token budget.
 - [x] `[[links]]` in notes/facts → relations; backlinks section on every record.
 - [ ] Share-sheet intent (Android `SEND` / `SEND_MULTIPLE`) → Talk with the shared text/link/image attached.
-- [ ] Model routing: Haiku default; escalate to Sonnet when the message has ≥2 intents, a plan intent, or the first attempt returned a tool error. Usage meter in You › Agent.
+- [x] Model routing: Haiku default; escalate to Sonnet when the message has ≥2 intents, a plan intent, or the first attempt returned a tool error. Usage meter in You › Agent.
 - [ ] Golden tests: each sample sentence against a recorded-response fake provider asserting the exact tool calls and resulting DB state.
 
 **Demo:** say the eight sentences in order; every one files correctly with zero taps except the two money/people confirmations.

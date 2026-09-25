@@ -10,7 +10,12 @@ export interface AppSettings {
   appearance: 'system' | 'light' | 'dark';
   locale: LocaleSettings;
   homeDashboardId: string | null;
+  /** Smart tier (Sonnet): plans, multi-request messages, tool errors. */
   aiModel: string;
+  /** Fast tier (Haiku): everyday messages and fact mining. */
+  aiFastModel: string;
+  /** Route between the two; off = always aiModel. */
+  aiRouting: boolean;
   aiEnabled: boolean;
   hapticsEnabled: boolean;
   onboarded: boolean;
@@ -28,6 +33,8 @@ export const useSettings = create<AppSettings>((set) => ({
   locale: DEFAULT_LOCALE,
   homeDashboardId: null,
   aiModel: 'claude-sonnet-5',
+  aiFastModel: 'claude-haiku-4-5',
+  aiRouting: true,
   aiEnabled: true,
   hapticsEnabled: true,
   onboarded: false,

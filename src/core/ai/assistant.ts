@@ -6,6 +6,7 @@ import type { ChatMessage, ContentBlock, LLMProvider, ToolSpec } from './provide
 import { extrasOf, type ReplyCard } from './cards';
 import { mineFacts } from './factMiner';
 import { buildContext, historyWindow } from './retrieval';
+import { recordUsage, routeMessage, type Tier } from './routing';
 import type { Fact } from '../repo/factRepo';
 
 export interface AssistantTurn {
@@ -25,7 +26,12 @@ export interface AssistantTurn {
 }
 
 export interface AssistantOptions {
+  /** Used for every call unless `smartProvider` is given (then this is the fast tier). */
   provider: LLMProvider;
+  /** Sonnet: plans, multi-request messages, and turns where a tool failed. Routing is off without it. */
+  smartProvider?: LLMProvider;
+  /** Which tier answered (for a small "Sonnet" hint in Talk). */
+  onRoute?: (r: { tier: Tier; reason: string; model?: string }) => void;
   /** Money & people: shown as an inline confirm card with `summary`; resolve false to refuse. */
   confirm?: (tool: AiToolDef, input: unknown, summary: string) => Promise<boolean>;
   onTurn?: (turn: AssistantTurn) => void;
@@ -107,7 +113,8 @@ Guidelines:
     this.persist(userMsg);
     emit({ id: newId(), role: 'user', text: userText, createdAt: Date.now() });
     if (this.opts.factProvider) {
-      this.lastMining = mineFacts(this.os, this.opts.factProvider, userText, this.conversationId).then((facts) => {
+      const fp = this.opts.factProvider;
+      this.lastMining = mineFacts(this.os, fp, userText, this.conversationId, { onUsage: (u) => recordUsage(this.os, { model: fp.model ?? fp.id, purpose: 'facts', ...u, conversationId: this.conversationId }) }).then((facts) => {
         if (facts.length) this.opts.onFacts?.(facts);
         return facts;
       });
@@ -120,8 +127,13 @@ Guidelines:
     const context = buildContext(this.os, userText, { budget: this.opts.contextBudget });
     const system = context ? `${this.systemPrompt()}\n\n${context}` : this.systemPrompt();
 
+    let route = this.opts.smartProvider ? routeMessage(userText) : { tier: 'fast' as Tier, reason: 'routing off' };
+    const pick = () => (route.tier === 'smart' && this.opts.smartProvider ? this.opts.smartProvider : this.opts.provider);
+    this.opts.onRoute?.({ ...route, model: pick().model });
     for (let round = 0; round <= maxRounds; round++) {
-      const result = await this.opts.provider.complete({ system, messages: historyWindow(this.history, this.opts.historyTurns ?? 12), tools: specs, signal });
+      const provider = pick();
+      const result = await provider.complete({ system, messages: historyWindow(this.history, this.opts.historyTurns ?? 12), tools: specs, signal });
+      if (result.usage) recordUsage(this.os, { model: provider.model ?? provider.id, purpose: 'chat', ...result.usage, conversationId: this.conversationId });
       const assistantMsg: ChatMessage = { role: 'assistant', content: result.content };
       this.history.push(assistantMsg);
       this.persist(assistantMsg);
@@ -158,6 +170,11 @@ Guidelines:
         const extras = isError ? {} : extrasOf(output);
         emit({ id: newId(), role: 'tool', text: summarizeTool(call.name, call.input, output), toolName: call.name, toolInput: call.input, toolResult: output, createdAt: Date.now(), card: extras.card, undo: extras.undo, isError });
         results.push({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(output ?? null).slice(0, 20000), is_error: isError });
+      }
+      // A tool failed: hand the rest of this turn to the smart model.
+      if (route.tier === 'fast' && this.opts.smartProvider && results.some((r) => r.type === 'tool_result' && r.is_error && !String(r.content).includes('declined'))) {
+        route = { tier: 'smart', reason: 'a tool call failed' };
+        this.opts.onRoute?.({ ...route, model: pick().model });
       }
       const toolMsg: ChatMessage = { role: 'user', content: results };
       this.history.push(toolMsg);
