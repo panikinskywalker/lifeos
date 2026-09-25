@@ -8,6 +8,7 @@ import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
 import { registerBackgroundTick } from './background';
 import { notifications } from './notifications';
 import { openDatabase } from './openDatabase';
+import { cycleNudges } from '@core/cycles/nudges';
 
 let instance: LifeOSContext | null = null;
 let navigateRef: (path: string) => void = () => {};
@@ -67,6 +68,18 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   await syncReminderNotifications(os);
   bus.on('reminder.created', () => void syncReminderNotifications(os));
   bus.on('reminder.completed', () => void syncReminderNotifications(os));
+  // Cycle nudges follow cycles, readings and record edits (debounced: a "done" touches several tables).
+  let pending: ReturnType<typeof setTimeout> | null = null;
+  const resync = () => {
+    if (pending) clearTimeout(pending);
+    pending = setTimeout(() => void syncReminderNotifications(os), 1500);
+  };
+  bus.on('data.changed', ({ table }) => {
+    if (table === 'cycles' || table === 'meter_readings') resync();
+  });
+  bus.on('entity.updated', resync);
+  bus.on('entity.deleted', resync);
+  bus.on('app.foreground', resync);
 
   // Run any due scheduled jobs now, then hand off to the background task.
   await os.scheduler.tick();
@@ -87,8 +100,18 @@ async function syncReminderNotifications(os: LifeOSContext) {
     const perm = await Notifications.getPermissionsAsync();
     if (!perm.granted) return;
     const upcoming = os.reminders.upcoming(64).filter((r) => (r.snoozedUntil ?? r.nextAt ?? r.dueAt) > Date.now());
+    // Reminders and cycle nudges share Android's alarm budget: the soonest 60 across both.
+    const nudges = cycleNudges(os);
+    const cutoff = [...upcoming.map((r) => r.snoozedUntil ?? r.nextAt ?? r.dueAt), ...nudges.map((n) => n.at)].sort((a, b) => a - b)[59] ?? Infinity;
     await Notifications.cancelAllScheduledNotificationsAsync();
-    for (const r of upcoming) {
+    for (const n of nudges.filter((x) => x.at <= cutoff)) {
+      const entity = os.entities.get(n.entityId);
+      await Notifications.scheduleNotificationAsync({
+        content: { title: n.title, body: n.body, data: { cycleId: n.cycleId, entityId: n.entityId, entityType: entity?.type } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(n.at) },
+      });
+    }
+    for (const r of upcoming.filter((x) => (x.snoozedUntil ?? x.nextAt ?? x.dueAt) <= cutoff)) {
       const at = r.snoozedUntil ?? r.nextAt ?? r.dueAt;
       const entity = r.entityId ? os.entities.get(r.entityId) : undefined;
       const id = await Notifications.scheduleNotificationAsync({
