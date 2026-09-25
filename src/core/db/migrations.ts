@@ -423,4 +423,14 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_ai_usage_at ON ai_usage(at)`,
     ],
   },
+  {
+    version: 5,
+    name: 'ai-usage-provider',
+    up: [
+      // Which provider served each call (groq / gemini / claude …) so monthly
+      // caps apply per provider (SCOPE v2 B5).
+      `ALTER TABLE ai_usage ADD COLUMN provider TEXT`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_usage_provider ON ai_usage(provider, at)`,
+    ],
+  },
 ];

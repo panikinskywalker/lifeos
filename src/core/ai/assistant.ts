@@ -40,6 +40,8 @@ export interface AssistantOptions {
   factProvider?: LLMProvider;
   /** Facts saved from the last message (for a quiet "Remembered …" line). */
   onFacts?: (facts: Fact[]) => void;
+  /** Providers are already metered (meterProvider): don't record usage twice. */
+  metered?: boolean;
   /** User turns of history sent with each call (default 12). */
   historyTurns?: number;
   /** Character budget for retrieved context (default 6000). */
@@ -114,7 +116,7 @@ Guidelines:
     emit({ id: newId(), role: 'user', text: userText, createdAt: Date.now() });
     if (this.opts.factProvider) {
       const fp = this.opts.factProvider;
-      this.lastMining = mineFacts(this.os, fp, userText, this.conversationId, { onUsage: (u) => recordUsage(this.os, { model: fp.model ?? fp.id, purpose: 'facts', ...u, conversationId: this.conversationId }) }).then((facts) => {
+      this.lastMining = mineFacts(this.os, fp, userText, this.conversationId, { onUsage: (u) => (this.opts.metered ? undefined : recordUsage(this.os, { provider: fp.id, model: fp.model ?? fp.id, purpose: 'facts', ...u, conversationId: this.conversationId })) }).then((facts) => {
         if (facts.length) this.opts.onFacts?.(facts);
         return facts;
       });
@@ -133,7 +135,7 @@ Guidelines:
     for (let round = 0; round <= maxRounds; round++) {
       const provider = pick();
       const result = await provider.complete({ system, messages: historyWindow(this.history, this.opts.historyTurns ?? 12), tools: specs, signal });
-      if (result.usage) recordUsage(this.os, { model: provider.model ?? provider.id, purpose: 'chat', ...result.usage, conversationId: this.conversationId });
+      if (result.usage && !this.opts.metered) recordUsage(this.os, { provider: provider.id, model: provider.model ?? provider.id, purpose: 'chat', ...result.usage, conversationId: this.conversationId });
       const assistantMsg: ChatMessage = { role: 'assistant', content: result.content };
       this.history.push(assistantMsg);
       this.persist(assistantMsg);

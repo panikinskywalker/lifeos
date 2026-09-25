@@ -42,3 +42,22 @@ describe('routing', () => {
     expect(u.daily[13]!.tokens).toBe(460);
   });
 });
+
+describe('usage caps (SCOPE B5)', () => {
+  it('meters per provider, stops a provider at its cap, and the chain moves on', async () => {
+    const { meterProvider, providerTokensThisMonth, UsageCapError } = await import('./routing');
+    const { createChainProvider } = await import('./providers');
+    const mk = (id: string): LLMProvider => ({ id, model: `${id}-m`, complete: async () => ({ content: [{ type: 'text', text: id }], stopReason: 'end_turn', usage: { input: 10, output: 5 } }) });
+    const caps: Record<string, number> = { groq: 20 };
+    const groq = meterProvider(os, mk('groq'), { purpose: 'chat', cap: (p) => caps[p] });
+    const gemini = meterProvider(os, mk('gemini'), { purpose: 'chat', cap: (p) => caps[p] });
+    const chain = createChainProvider([groq, gemini]);
+    const args = { system: '', messages: [{ role: 'user' as const, content: 'hi' }], tools: [] };
+    const said = [];
+    for (let i = 0; i < 3; i++) said.push(((await chain.complete(args)).content[0] as { text: string }).text);
+    expect(said).toEqual(['groq', 'groq', 'gemini']);
+    expect(providerTokensThisMonth(os, 'groq')).toBe(30);
+    await expect(groq.complete(args)).rejects.toBeInstanceOf(UsageCapError);
+    expect(usageSummary(os).byProvider.map((p) => [p.provider, p.calls])).toEqual([['groq', 2], ['gemini', 1]]);
+  });
+});

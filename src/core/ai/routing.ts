@@ -1,5 +1,6 @@
 import { newId } from '../domain/ids';
 import type { LifeOSContext } from '../registry/context';
+import type { LLMProvider } from './provider';
 
 export type Tier = 'fast' | 'smart';
 
@@ -24,8 +25,44 @@ export function routeMessage(text: string): { tier: Tier; reason: string } {
 
 export type UsagePurpose = 'chat' | 'facts';
 
-export function recordUsage(os: LifeOSContext, u: { model: string; purpose: UsagePurpose; input: number; output: number; conversationId?: string | null; at?: number }): void {
-  os.db.run(`INSERT INTO ai_usage(id,at,model,purpose,input_tokens,output_tokens,conversation_id) VALUES (?,?,?,?,?,?,?)`, [newId(), u.at ?? Date.now(), u.model, u.purpose, Math.round(u.input), Math.round(u.output), u.conversationId ?? null]);
+export function recordUsage(os: LifeOSContext, u: { model: string; provider?: string; purpose: UsagePurpose; input: number; output: number; conversationId?: string | null; at?: number }): void {
+  os.db.run(`INSERT INTO ai_usage(id,at,model,purpose,input_tokens,output_tokens,conversation_id,provider) VALUES (?,?,?,?,?,?,?,?)`, [newId(), u.at ?? Date.now(), u.model, u.purpose, Math.round(u.input), Math.round(u.output), u.conversationId ?? null, u.provider ?? null]);
+}
+
+const monthStart = (now: number) => {
+  const d = new Date(now);
+  return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+};
+
+/** Tokens (in + out) a provider has used this calendar month. */
+export function providerTokensThisMonth(os: LifeOSContext, provider: string, now = Date.now()): number {
+  return os.db.get<{ n: number }>(`SELECT COALESCE(SUM(input_tokens + output_tokens), 0) n FROM ai_usage WHERE provider = ? AND at >= ?`, [provider, monthStart(now)])?.n ?? 0;
+}
+
+export class UsageCapError extends Error {
+  constructor(public readonly provider: string, public readonly cap: number) {
+    super(`${provider}: monthly cap of ${cap.toLocaleString('en-IN')} tokens reached`);
+    this.name = 'UsageCapError';
+  }
+}
+
+/**
+ * Meter a provider (SCOPE B5): every call is written to ai_usage with its
+ * provider and model; once this month's tokens reach the provider's cap it
+ * refuses (UsageCapError), and a chain simply moves on to the next provider.
+ */
+export function meterProvider(os: LifeOSContext, provider: LLMProvider, opts: { purpose: UsagePurpose; cap?: (providerId: string) => number | undefined; conversationId?: () => string | null }): LLMProvider {
+  return {
+    id: provider.id,
+    model: provider.model,
+    async complete(args) {
+      const cap = opts.cap?.(provider.id);
+      if (cap && providerTokensThisMonth(os, provider.id) >= cap) throw new UsageCapError(provider.id, cap);
+      const result = await provider.complete(args);
+      if (result.usage) recordUsage(os, { provider: provider.id, model: provider.model ?? provider.id, purpose: opts.purpose, ...result.usage, conversationId: opts.conversationId?.() ?? null });
+      return result;
+    },
+  };
 }
 
 export interface UsageSummary {
@@ -33,6 +70,7 @@ export interface UsageSummary {
   input: number;
   output: number;
   byModel: Array<{ model: string; calls: number; input: number; output: number }>;
+  byProvider: Array<{ provider: string; calls: number; input: number; output: number }>;
   /** Tokens per day, oldest first, `days` long. */
   daily: Array<{ day: string; tokens: number }>;
 }
@@ -52,7 +90,9 @@ export function usageSummary(os: LifeOSContext, opts: { since?: number; days?: n
     const key = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
     return { day: key, tokens: perDay.get(key) ?? 0 };
   });
+  const prov = os.db.all<{ provider: string; calls: number; input: number; output: number }>(`SELECT COALESCE(provider, 'claude') provider, COUNT(*) calls, SUM(input_tokens) input, SUM(output_tokens) output FROM ai_usage WHERE at >= ? GROUP BY COALESCE(provider, 'claude') ORDER BY SUM(input_tokens + output_tokens) DESC`, [since]);
   return {
+    byProvider: prov.map((r) => ({ provider: r.provider, calls: r.calls, input: r.input ?? 0, output: r.output ?? 0 })),
     calls: rows.reduce((a, r) => a + r.calls, 0),
     input: rows.reduce((a, r) => a + (r.input ?? 0), 0),
     output: rows.reduce((a, r) => a + (r.output ?? 0), 0),

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createOpenAICompatProvider, ProviderError } from './openaiCompat';
-import { buildAgentProviders, createChainProvider, UsageCapError, withUsageMeter } from './providers';
+import { buildAgentProviders, createChainProvider } from './providers';
 import type { ChatMessage, LLMProvider, ToolSpec } from './provider';
 
 const tools: ToolSpec[] = [{ name: 'mark_cycle_done', description: 'Mark a cycle done', input_schema: { type: 'object', properties: { id: { type: 'string' } } } }];
@@ -105,36 +105,24 @@ describe('chain provider', () => {
   });
 });
 
-describe('usage meter', () => {
-  it('accumulates tokens and enforces the monthly cap', async () => {
-    let store: Record<string, any> = {};
-    const p = withUsageMeter(fake('groq', async () => ({ text: 'x' })), { load: () => store, save: (u) => (store = u), monthlyTokenCap: () => 25 });
-    const args = { system: '', messages: [], tools: [] };
-    await p.complete(args);
-    await p.complete(args);
-    expect(store.groq).toEqual({ provider: 'groq', input: 20, output: 4, calls: 2 });
-    await p.complete(args); // 24 -> 36, allowed because check happens before the call
-    await expect(p.complete(args)).rejects.toBeInstanceOf(UsageCapError);
-  });
-});
-
 describe('buildAgentProviders', () => {
   it('builds a main and a small chain from settings, skipping disabled entries', () => {
-    let store: Record<string, any> = {};
+    const roles: string[] = [];
     const { main, small } = buildAgentProviders({
       chain: [
         { kind: 'groq', apiKey: 'g' },
         { kind: 'claude', apiKey: 'c', enabled: false },
         { kind: 'gemini', apiKey: 'x' },
       ],
-      usage: { load: () => store, save: (u) => (store = u) },
+      wrap: (p, role) => (roles.push(`${p.id}:${role}:${p.model}`), p),
     });
     expect(main.id).toBe('chain(groq>gemini)');
     expect(small.id).toBe('chain(groq>gemini)');
+    expect(roles).toEqual(['groq:main:llama-3.3-70b-versatile', 'gemini:main:gemini-2.5-flash', 'groq:small:llama-3.1-8b-instant', 'gemini:small:gemini-2.5-flash-lite']);
   });
 
   it('refuses a keyed provider without a key', () => {
-    expect(() => buildAgentProviders({ chain: [{ kind: 'groq' }], usage: { load: () => ({}), save: () => {} } })).toThrow(/no API key/);
+    expect(() => buildAgentProviders({ chain: [{ kind: 'groq' }] })).toThrow(/no API key/);
   });
 });
 

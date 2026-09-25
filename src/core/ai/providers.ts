@@ -150,66 +150,23 @@ export function createChainProvider(providers: LLMProvider[], events: ChainEvent
 }
 
 /* ------------------------------------------------------------------ */
-/* Usage meter — counts tokens per provider, enforces a monthly cap     */
-/* ------------------------------------------------------------------ */
-
-export interface UsageRecord {
-  provider: string;
-  input: number;
-  output: number;
-  calls: number;
-}
-
-export interface UsageMeterOptions {
-  /** Persisted usage for the current month, keyed by provider id. */
-  load: () => Record<string, UsageRecord>;
-  save: (usage: Record<string, UsageRecord>) => void;
-  /** Hard stop for this provider this month (tokens in+out). undefined = unlimited. */
-  monthlyTokenCap?: (provider: string) => number | undefined;
-}
-
-export class UsageCapError extends Error {
-  constructor(public readonly provider: string, public readonly cap: number) {
-    super(`${provider}: monthly cap of ${cap.toLocaleString()} tokens reached`);
-    this.name = 'UsageCapError';
-  }
-}
-
-export function withUsageMeter(provider: LLMProvider, opts: UsageMeterOptions): LLMProvider {
-  return {
-    id: provider.id,
-    async complete(args) {
-      const usage = opts.load();
-      const rec = usage[provider.id] ?? { provider: provider.id, input: 0, output: 0, calls: 0 };
-      const cap = opts.monthlyTokenCap?.(provider.id);
-      if (cap !== undefined && rec.input + rec.output >= cap) throw new UsageCapError(provider.id, cap);
-      const result = await provider.complete(args);
-      rec.calls += 1;
-      rec.input += result.usage?.input ?? 0;
-      rec.output += result.usage?.output ?? 0;
-      usage[provider.id] = rec;
-      opts.save(usage);
-      return result;
-    },
-  };
-}
-
-/* ------------------------------------------------------------------ */
 /* Convenience: build the whole stack from settings                     */
 /* ------------------------------------------------------------------ */
 
 export interface AgentProviderSettings {
   /** Ordered chain, first is preferred. */
   chain: ProviderConfig[];
-  usage: UsageMeterOptions;
+  /** Wrap each provider (usage meter + cap, see routing.ts meterProvider). */
+  wrap?: (p: LLMProvider, role: 'main' | 'small') => LLMProvider;
   events?: ChainEvents;
 }
 
+/** main = conversation, small = fact mining and other side jobs. */
 export function buildAgentProviders(s: AgentProviderSettings): { main: LLMProvider; small: LLMProvider } {
   const active = s.chain.filter((c) => c.enabled !== false);
   const build = (role: 'main' | 'small') =>
     createChainProvider(
-      active.map((c) => withUsageMeter(createProvider(c, role), s.usage)),
+      active.map((c) => (s.wrap ? s.wrap(createProvider(c, role), role) : createProvider(c, role))),
       s.events,
     );
   return { main: build('main'), small: build('small') };
