@@ -65,66 +65,73 @@ export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, val
   // On the ground a row is a tile; inside a tile it is a nested slab one level lighter (Stitch).
   const fill = useSurface() === 'tile' ? t.c.bg.tileRaised : t.c.bg.tile;
   const showChevron = chevron ?? (!!onPress && checked === undefined && !onDone && !trailing);
+  const [pressed, setPressed] = React.useState(false);
+  const interactive = !!onPress || !!onLongPress;
+  // Trailing controls (done, checkbox, switch) sit beside the pressable body, never inside it — no nested buttons.
   return (
-    <Pressable
-      accessibilityRole={onPress ? 'button' : undefined}
-      disabled={!onPress && !onLongPress}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, minHeight: 60, borderRadius: t.radius.card, backgroundColor: pressed ? t.c.bg.pressed : fill }, style]}
-    >
+    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 12, minHeight: 60, borderRadius: t.radius.card, backgroundColor: pressed ? t.c.bg.pressed : fill }, style]}>
       <Surface kind="tile">
-        {icon ? <IconBox icon={icon} tint={tint} tone={iconTone} size={36} /> : null}
-        <View style={{ flex: 1, minWidth: 0, gap: tag ? 4 : 3 }}>
-          <Text variant="rowTitle" numberOfLines={1} color={destructive ? t.c.alert.coralText : done ? 'secondary' : undefined} style={done ? { textDecorationLine: 'line-through' } : undefined}>
-            {title}
-          </Text>
-          {tag ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Chip label={tag.label} tint={tag.tint} tone={tag.tone} small />
-              {subtitle ? (
-                <Text variant="caption" color="secondary" numberOfLines={1} style={{ flexShrink: 1, fontSize: 12 }}>
-                  {subtitle}
-                </Text>
-              ) : null}
-            </View>
-          ) : subtitle ? (
-            <Text variant="caption" color="secondary" numberOfLines={1}>
-              {subtitle}
+        <Pressable
+          accessibilityRole={onPress ? 'button' : undefined}
+          disabled={!interactive}
+          onPress={onPress}
+          onLongPress={onLongPress}
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+          style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 12, alignSelf: 'stretch' }}
+        >
+          {icon ? <IconBox icon={icon} tint={tint} tone={iconTone} size={36} /> : null}
+          <View style={{ flex: 1, minWidth: 0, gap: tag ? 4 : 3 }}>
+            <Text variant="rowTitle" numberOfLines={1} color={destructive ? t.c.alert.coralText : done ? 'secondary' : undefined} style={done ? { textDecorationLine: 'line-through' } : undefined}>
+              {title}
             </Text>
-          ) : null}
-        </View>
-        {value || meta ? (
-          <View style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
-            {value ? (
-              <Text variant="rowTitle" color={tone(valueTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontSize: strong ? 15 : 14, fontWeight: strong ? '700' : '600' }}>
-                {value}
-              </Text>
-            ) : null}
-            {meta ? (
-              <Text variant="label" color={tone(metaTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>
-                {meta}
+            {tag ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Chip label={tag.label} tint={tag.tint} tone={tag.tone} small />
+                {subtitle ? (
+                  <Text variant="caption" color="secondary" numberOfLines={1} style={{ flexShrink: 1, fontSize: 12 }}>
+                    {subtitle}
+                  </Text>
+                ) : null}
+              </View>
+            ) : subtitle ? (
+              <Text variant="caption" color="secondary" numberOfLines={1}>
+                {subtitle}
               </Text>
             ) : null}
           </View>
-        ) : null}
+          {value || meta ? (
+            <View style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+              {value ? (
+                <Text variant="rowTitle" color={tone(valueTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontSize: strong ? 15 : 14, fontWeight: strong ? '700' : '600' }}>
+                  {value}
+                </Text>
+              ) : null}
+              {meta ? (
+                <Text variant="label" color={tone(metaTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>
+                  {meta}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+          {showChevron ? <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} /> : null}
+        </Pressable>
         {trailing}
         {checked !== undefined ? <Checkbox checked={checked} onChange={onToggle} accessibilityLabel={`Done: ${title}`} /> : null}
         {onDone ? (
           doneLabel ? (
-            <Pressable accessibilityRole="button" accessibilityLabel={`${doneLabel}: ${title}`} hitSlop={6} onPress={onDone} style={({ pressed }) => ({ height: 36, paddingLeft: 10, paddingRight: 12, borderRadius: t.radius.chip, backgroundColor: t.c.bg.pill, flexDirection: 'row', alignItems: 'center', gap: 6, opacity: pressed ? 0.75 : 1 })}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${doneLabel}: ${title}`} hitSlop={6} onPress={onDone} style={({ pressed: p }) => ({ height: 36, paddingLeft: 10, paddingRight: 12, borderRadius: t.radius.chip, backgroundColor: t.c.bg.pill, flexDirection: 'row', alignItems: 'center', gap: 6, opacity: p ? 0.75 : 1 })}>
               <Icon name="check" size={16} color={t.c.fg.primary} />
               <Text variant="label">{doneLabel}</Text>
             </Pressable>
           ) : (
-            <Pressable accessibilityRole="button" accessibilityLabel={`Done: ${title}`} hitSlop={6} onPress={onDone} style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Done: ${title}`} hitSlop={6} onPress={onDone} style={({ pressed: p }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.pill, alignItems: 'center', justifyContent: 'center', opacity: p ? 0.75 : 1 })}>
               <Icon name="check" size={18} color={t.c.fg.primary} />
             </Pressable>
           )
         ) : null}
-        {showChevron ? <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} /> : null}
       </Surface>
-    </Pressable>
+    </View>
   );
 }
 

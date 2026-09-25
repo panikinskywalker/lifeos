@@ -24,3 +24,4 @@ export { WeekStrip, type WeekDay } from './WeekStrip';
 export { AgentCard, ChatBubble } from './AgentCard';
 export { Composer } from './Composer';
 export { Surface, useSurface, useControlFill } from './Surface';
+export { ProgressBar } from './ProgressBar';

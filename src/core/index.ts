@@ -15,3 +15,4 @@ export * from './lifeos';
 export { coreModule } from './coreModule';
 export * from './cycles/schedule';
 export * from './cycles/cycleRepo';
+export * from './cycles/upkeep';

@@ -96,6 +96,13 @@ export function seedDemoData(os: LifeOSContext) {
     os.entities.create({ type: 'item', title: 'Paracetamol', data: { quantity: 4, unit: 'strips', location: 'Medicine box', category: 'medicine', minQuantity: 2 } });
     os.entities.create({ type: 'item', title: 'Coffee beans', data: { quantity: 1, unit: 'kg', location: 'Kitchen', category: 'pantry', minQuantity: 1 } });
 
+    // Chores (M2): routines get their cycle from their own schedule.
+    os.entities.create({ type: 'routine', data: { name: 'Laundry', kind: 'chore', everyN: 4, everyUnit: 'day', minutes: 20, lastDoneOn: daysAgo(5) } });
+    os.entities.create({ type: 'routine', data: { name: 'Water the plants', kind: 'home', everyN: 3, everyUnit: 'day', minutes: 10, lastDoneOn: daysAgo(1) } });
+    os.entities.create({ type: 'routine', data: { name: 'Change bedsheets', kind: 'chore', everyN: 1, everyUnit: 'week', minutes: 15, weekday: '0', lastDoneOn: daysAgo(6) } });
+    os.entities.create({ type: 'routine', data: { name: 'Haircut', kind: 'personal', everyN: 5, everyUnit: 'week', minutes: 45, lastDoneOn: daysAgo(30) } });
+    os.entities.create({ type: 'routine', data: { name: 'Clean the AC filters', kind: 'home', everyN: 3, everyUnit: 'month', minutes: 30, lastDoneOn: daysAgo(70) } });
+
     os.tags.apply(japan.id, 'travel');
     os.tags.apply(lifeos.id, 'side-project');
     os.tags.apply(goal.id, 'money');

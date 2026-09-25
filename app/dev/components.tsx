@@ -28,6 +28,7 @@ import {
   ListGroup,
   MoneyField,
   NumberField,
+  ProgressBar,
   RecordHeader,
   RelationField,
   Ring,
@@ -543,7 +544,20 @@ function Bar() {
   );
 }
 
+function Progress() {
+  const t = useTheme();
+  return (
+    <>
+      <ProgressBar value={0.61} accessibilityLabel="61% of income" />
+      <ProgressBar value={0.92} color={t.c.accent.gold} target={0.85} accessibilityLabel="92% with a target at 85%" />
+      <ProgressBar value={1} color={t.c.alert.coral} accessibilityLabel="Overdue" />
+      <ProgressBar value={0.4} color={t.tints.upkeep.ink} height={6} accessibilityLabel="Cycle 40% through" />
+    </>
+  );
+}
+
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
+  ['Progress bar', '8 tall · pill · optional target tick', Progress],
   ['Colour', 'surfaces · tints · chart', Colours],
   ['Type', 'Plus Jakarta Sans · tabular numerals', Type],
   ['Icons · IconBox', '2px stroke · round caps · tint + ink', Icons],
