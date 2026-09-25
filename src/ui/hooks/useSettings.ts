@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { LocaleSettings } from '@core/format';
 import { DEFAULT_LOCALE } from '@core/format';
+import type { ProviderConfig } from '@core/ai/providers';
 
 /**
  * App-level settings mirrored from the SQLite `settings` table into a zustand
@@ -16,6 +17,10 @@ export interface AppSettings {
   aiFastModel: string;
   /** Route between the two; off = always aiModel. */
   aiRouting: boolean;
+  /** Ordered provider chain, first preferred (keys live in SecureStore, not here). SCOPE B5. */
+  aiChain: ProviderConfig[];
+  /** Monthly token cap per provider kind; missing or 0 = none. */
+  aiMonthlyCaps: Record<string, number>;
   aiEnabled: boolean;
   hapticsEnabled: boolean;
   onboarded: boolean;
@@ -35,6 +40,8 @@ export const useSettings = create<AppSettings>((set) => ({
   aiModel: 'claude-sonnet-5',
   aiFastModel: 'claude-haiku-4-5',
   aiRouting: true,
+  aiChain: [{ kind: 'groq' }, { kind: 'gemini' }, { kind: 'claude' }],
+  aiMonthlyCaps: {},
   aiEnabled: true,
   hapticsEnabled: true,
   onboarded: false,

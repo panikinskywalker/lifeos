@@ -4,3 +4,5 @@ export * from './cards';
 export * from './factMiner';
 export * from './retrieval';
 export * from './routing';
+export * from './openaiCompat';
+export * from './providers';

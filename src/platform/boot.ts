@@ -59,6 +59,8 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     aiModel: (stored.aiModel as string) ?? 'claude-sonnet-5',
     aiFastModel: (stored.aiFastModel as string) ?? 'claude-haiku-4-5',
     aiRouting: stored.aiRouting !== false,
+    aiChain: (stored.aiChain as never) ?? useSettings.getState().aiChain,
+    aiMonthlyCaps: (stored.aiMonthlyCaps as never) ?? {},
     aiEnabled: stored.aiEnabled !== false,
     hapticsEnabled: stored.hapticsEnabled !== false,
     onboarded: !!stored.onboarded,
@@ -131,27 +133,37 @@ async function syncReminderNotifications(os: LifeOSContext) {
 /* API key storage — SecureStore on device, localStorage on web         */
 /* ------------------------------------------------------------------ */
 
-const KEY = 'lifeos.anthropic.apiKey';
-export async function getApiKey(): Promise<string | null> {
+const LEGACY_KEY = 'lifeos.anthropic.apiKey';
+/** Claude keeps its original key name so keys saved before the provider chain still work. */
+const keyName = (provider: string) => (provider === 'claude' ? LEGACY_KEY : `lifeos.ai.key.${provider}`);
+
+/** API key for one provider kind ('groq' | 'gemini' | 'claude' | …) — SecureStore on device, localStorage on web. */
+export async function getProviderKey(provider: string): Promise<string | null> {
+  const k = keyName(provider);
   if (Platform.OS === 'web') {
     try {
-      return globalThis.localStorage?.getItem(KEY) ?? null;
+      return globalThis.localStorage?.getItem(k) ?? null;
     } catch {
       return null;
     }
   }
-  return SecureStore.getItemAsync(KEY);
+  return SecureStore.getItemAsync(k);
 }
-export async function setApiKey(key: string | null): Promise<void> {
+export async function setProviderKey(provider: string, key: string | null): Promise<void> {
+  const k = keyName(provider);
   if (Platform.OS === 'web') {
     try {
-      if (key) globalThis.localStorage?.setItem(KEY, key);
-      else globalThis.localStorage?.removeItem(KEY);
+      if (key) globalThis.localStorage?.setItem(k, key);
+      else globalThis.localStorage?.removeItem(k);
     } catch {
       /* ignore */
     }
     return;
   }
-  if (key) await SecureStore.setItemAsync(KEY, key);
-  else await SecureStore.deleteItemAsync(KEY);
+  if (key) await SecureStore.setItemAsync(k, key);
+  else await SecureStore.deleteItemAsync(k);
 }
+/** @deprecated use getProviderKey('claude') */
+export const getApiKey = () => getProviderKey('claude');
+/** @deprecated use setProviderKey('claude', key) */
+export const setApiKey = (key: string | null) => setProviderKey('claude', key);

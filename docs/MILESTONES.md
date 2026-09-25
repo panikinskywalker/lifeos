@@ -84,7 +84,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 
 **Goal:** Talk costs nothing by default. Common sentences never leave the phone; everything else goes to free providers first, Claude only if you add it.
 
-- [ ] Provider chain: OpenAI-compatible adapter (Groq, Gemini, OpenRouter, Ollama, custom) beside Claude; per-provider keys in SecureStore; fall through on rate limits / outages / bad keys, with cooldown. Ported from `lifeos-provider-chain.patch`.
+- [x] Provider chain: OpenAI-compatible adapter (Groq, Gemini, OpenRouter, Ollama, custom) beside Claude; per-provider keys in SecureStore; fall through on rate limits / outages / bad keys, with cooldown. Ported from `lifeos-provider-chain.patch`.
 - [ ] Usage meter per provider + monthly token cap; the agent stops calling a provider at its cap.
 - [ ] Parser first: deterministic on-device intent parser for the common sentences; the LLM only when it isn't confident. Golden sentences 1–5, 9 pass with no provider at all.
 - [ ] You › Agent: provider order, keys, models (main / small / escalation), caps, usage; Talk works (parser only) with no key.

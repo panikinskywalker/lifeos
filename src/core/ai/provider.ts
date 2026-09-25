@@ -1,3 +1,5 @@
+import { ProviderError } from './openaiCompat';
+
 /**
  * Pluggable LLM provider. The assistant only depends on this interface, so an
  * on-device model or another vendor can be added without touching tools or UI.
@@ -48,7 +50,9 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): LLMProvider {
     id: 'claude',
     model,
     async complete({ system, messages, tools, maxTokens = 2048, signal }) {
-      const res = await fetch(`${baseUrl}/v1/messages`, {
+      let res: Response;
+      try {
+        res = await fetch(`${baseUrl}/v1/messages`, {
         method: 'POST',
         signal,
         headers: {
@@ -58,10 +62,17 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): LLMProvider {
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({ model, max_tokens: maxTokens, system, messages, tools: tools.length ? tools : undefined }),
-      });
+        });
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') throw e;
+        throw new ProviderError(`claude: network error (${(e as Error).message})`, 'claude', 0);
+      }
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`Claude API ${res.status}: ${text.slice(0, 300)}`);
+        const ra = res.headers.get('retry-after');
+        // 529 = overloaded: treat like a rate limit so the chain cools Claude down and moves on.
+        const status = res.status === 529 ? 429 : res.status;
+        throw new ProviderError(`Claude API ${res.status}: ${text.slice(0, 300)}`, 'claude', status, ra && Number.isFinite(Number(ra)) ? Number(ra) * 1000 : undefined);
       }
       const json = (await res.json()) as { content: ContentBlock[]; stop_reason: string; usage?: { input_tokens: number; output_tokens: number } };
       return { content: json.content, stopReason: json.stop_reason, usage: json.usage ? { input: json.usage.input_tokens, output: json.usage.output_tokens } : undefined };
