@@ -17,7 +17,8 @@ import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 import { CyclesSection, MeterSheet } from '../components/cycles';
 import { backlinks } from '@core/links';
-import { neighbours } from '@core/graph/read';
+import { egoGraph, neighbours } from '@core/graph/read';
+import { GraphView } from '../components/GraphView';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
 
@@ -108,6 +109,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
           ) : null}
           <CyclesSection entity={entity} />
           <RelationsCard entity={entity} onLink={() => setPanel('link')} />
+          <GraphCard entity={entity} />
           <BacklinksCard entity={entity} />
           <RemindersCard entity={entity} tint={tint} />
           <AttachmentsCard entity={entity} />
@@ -308,6 +310,19 @@ function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void 
       <Text variant="caption" color="tertiary" style={{ marginTop: 8 }}>
         Long-press to unlink.
       </Text>
+    </Section>
+  );
+}
+
+/** A small graph of what's linked to this record; opens the full graph view. */
+function GraphCard({ entity }: { entity: Entity }) {
+  const router = useRouter();
+  const g = useLive((o) => egoGraph(o, entity.id, { hops: 1, limit: 14 }), [entity.id]);
+  if (g.nodes.length < 3) return null;
+  const explore = () => router.push(`/graph/${entity.id}` as never);
+  return (
+    <Section title="Graph" meta={`${g.nodes.length - 1} linked`} action="Explore" onAction={explore}>
+      <GraphView nodes={g.nodes} edges={g.edges} height={240} labels={false} onSelect={explore} onOpen={(n) => router.push(`/entity/${n.type}/${n.id}` as never)} />
     </Section>
   );
 }

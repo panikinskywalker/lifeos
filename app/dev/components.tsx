@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { GraphView } from '@ui/components/GraphView';
 import { ConfirmCard, ReplyCardView } from '@ui/components/ReplyCard';
 import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -602,7 +603,37 @@ function Progress() {
   );
 }
 
+const DEMO_GRAPH = {
+  nodes: [
+    { id: 'k', type: 'person', title: 'Kendal', module: 'crm', hop: 0 },
+    { id: 'f', type: 'event', title: 'Flight to Canada', module: 'projects', hop: 1 },
+    { id: 't', type: 'trip', title: 'Trip to Canada', module: 'travel', hop: 1 },
+    { id: 'm', type: 'person', title: 'Mike', module: 'crm', hop: 1 },
+    { id: 'd', type: 'event', title: 'Dinner at Canoe', module: 'projects', hop: 1 },
+    { id: 'z', type: 'org', title: 'Zomato', module: 'places', hop: 1 },
+    { id: 'c', type: 'place', title: 'Canada', module: 'places', hop: 2 },
+    { id: 'u', type: 'place', title: 'USA', module: 'places', hop: 2 },
+    { id: 'o', type: 'place', title: 'Canoe', module: 'places', hop: 2 },
+  ],
+  edges: [
+    { from: 'f', to: 'k', kind: 'with' },
+    { from: 't', to: 'k', kind: 'with' },
+    { from: 'm', to: 'k', kind: 'family_of' },
+    { from: 'd', to: 'k', kind: 'with' },
+    { from: 'k', to: 'z', kind: 'works_at' },
+    { from: 'f', to: 't', kind: 'part_of' },
+    { from: 'f', to: 'c', kind: 'to' },
+    { from: 'f', to: 'u', kind: 'from' },
+    { from: 'd', to: 'o', kind: 'at' },
+    { from: 'd', to: 'm', kind: 'with' },
+  ],
+};
+function GraphDemo() {
+  return <GraphView nodes={DEMO_GRAPH.nodes} edges={DEMO_GRAPH.edges} height={340} />;
+}
+
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
+  ['Graph view', 'around a record · 2 hops · module tints · link words (d3-force)', GraphDemo],
   ['Progress bar', '8 tall · pill · optional target tick', Progress],
   ['Charts', 'sparkline · line · columns · legend (Stitch)', ChartsDemo],
   ['Record insights', 'stat trio · attention · quick actions · day timeline (Stitch)', InsightDemo],

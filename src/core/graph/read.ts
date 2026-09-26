@@ -72,3 +72,55 @@ export const graphReadTools: AiToolDef[] = [
     },
   },
 ];
+
+export interface GraphNode {
+  id: string;
+  type: string;
+  title: string;
+  module: string | null;
+  /** 0 = the centre, 1 = linked to it, 2 = linked to those. */
+  hop: number;
+}
+export interface GraphEdge {
+  from: string;
+  to: string;
+  kind: string;
+}
+
+/**
+ * The graph around one record for the graph view: breadth-first to `hops`,
+ * nearest first, capped at `limit` nodes so a phone screen stays readable.
+ */
+export function egoGraph(os: LifeOSContext, centreId: string, opts: { hops?: number; limit?: number } = {}): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const hops = opts.hops ?? 2;
+  const limit = opts.limit ?? 36;
+  const centre = os.entities.get(centreId);
+  if (!centre) return { nodes: [], edges: [] };
+  const node = (id: string, hop: number): GraphNode | null => {
+    const e = os.entities.get(id);
+    return e ? { id: e.id, type: e.type, title: e.title, module: os.registry.entityTypes.get(e.type)?.module ?? null, hop } : null;
+  };
+  const nodes = new Map<string, GraphNode>([[centre.id, node(centre.id, 0)!]]);
+  const edges = new Map<string, GraphEdge>();
+  let frontier = [centre.id];
+  for (let hop = 1; hop <= hops && frontier.length; hop++) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const r of os.relations.forEntity(id)) {
+        if (r.relation.kind === 'mention') continue;
+        const other = r.other.id;
+        if (!nodes.has(other)) {
+          if (nodes.size >= limit) continue;
+          const n = node(other, hop);
+          if (!n) continue;
+          nodes.set(other, n);
+          next.push(other);
+        }
+        const key = r.relation.id;
+        if (!edges.has(key)) edges.set(key, { from: r.relation.fromId, to: r.relation.toId, kind: r.relation.kind });
+      }
+    }
+    frontier = next;
+  }
+  return { nodes: [...nodes.values()], edges: [...edges.values()].filter((e) => nodes.has(e.from) && nodes.has(e.to)) };
+}

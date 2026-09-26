@@ -13,7 +13,7 @@ import { bus } from '@core/events/bus';
 import { graphTools, newSession, resolveNode, reverseWrite, type GraphSession } from '@core/graph/tools';
 import { parseDateish } from '@core/ai/createAnything';
 import { edgeLabel } from '@core/graph/edges';
-import { graphReadTools, neighbours } from '@core/graph/read';
+import { egoGraph, graphReadTools, neighbours } from '@core/graph/read';
 import { accountType, transactionType } from './finance/types';
 import { groupType, personType } from './crm/types';
 import { eventType, taskType } from './projects/types';
@@ -83,6 +83,12 @@ describe('graph tools', () => {
     const tool = graphReadTools[0]!;
     const out = (await tool.run(tool.input.parse({ name: 'Kendal' }), os)) as { connections: Array<{ title: string; at?: string }> };
     expect(out.connections[0]).toMatchObject({ title: 'Flight to Canada', at: parseDateish('8 sept') });
+    // The graph view around Kendal: her flight and trip at hop 1, the places at hop 2.
+    const g = egoGraph(os, kendal.id);
+    expect(g.nodes.map((n) => `${n.hop} ${n.title}`).sort()).toEqual(['0 Kendal', '1 Flight to Canada', '1 Trip to Canada', '2 Canada', '2 USA']);
+    expect(g.edges).toHaveLength(5);
+    expect(egoGraph(os, kendal.id, { hops: 1 }).nodes).toHaveLength(3);
+    expect(egoGraph(os, kendal.id, { limit: 2 }).nodes).toHaveLength(2);
     // A second travel event that week joins the same trip.
     const s2 = session('hotel in Toronto on 9 sept');
     await call(s2, 'record_event', { kind: 'stay', when: '9 Sept', roles: [{ role: 'at', node: 'Toronto' }] });
