@@ -3,6 +3,7 @@ import type { ModuleManifest } from '@core/registry/types';
 import type { EntityTypeDef } from '@core/domain/types';
 import { palette } from '@ui/theme/tokens';
 import { dateField } from '@core/cycles/schedule';
+import { inventoryOverview } from './overview';
 
 export const INVENTORY_COLOR = palette.teal;
 
@@ -26,6 +27,7 @@ export const itemType: EntityTypeDef<ItemData> = {
 };
 
 export const inventoryModule: ModuleManifest = {
+  overview: inventoryOverview,
   id: 'inventory', name: 'Inventory', version: '1.0.0', description: 'What you have, where it is, and when to restock.', icon: 'shippingbox', color: INVENTORY_COLOR,
   entityTypes: [itemType],
   quickActions: [{ id: 'inventory.add', label: 'Item', icon: 'shippingbox', route: '/entity/item/new' }],

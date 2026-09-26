@@ -38,6 +38,7 @@ export function toggleTask(os: LifeOSContext, task: Entity<TaskData>) {
 /* ------------------------------------------------------------------ */
 
 import { useOS } from '@ui/hooks';
+import { projectsOverview } from './overview';
 
 export function TaskList({ tasks, showProject, empty }: { tasks: Entity<TaskData>[]; showProject?: boolean; empty?: string }) {
   const t = useTheme();
@@ -374,6 +375,7 @@ const widgets: WidgetDef[] = [
 /* ------------------------------------------------------------------ */
 
 export const projectsModule: ModuleManifest = {
+  overview: projectsOverview,
   id: 'projects',
   name: 'Projects & Tasks',
   version: '1.0.0',

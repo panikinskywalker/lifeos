@@ -1,10 +1,12 @@
 import type { ModuleManifest } from '@core/registry/types';
 import { deliveryType } from './types';
 import { DeliveryHero } from './hero';
+import { deliveriesOverview } from './overview';
 
 export * from './types';
 
 export const deliveriesModule: ModuleManifest = {
+  overview: deliveriesOverview,
   id: 'deliveries',
   name: 'Deliveries',
   version: '1.0.0',

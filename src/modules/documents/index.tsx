@@ -3,6 +3,7 @@ import type { ModuleManifest } from '@core/registry/types';
 import type { EntityTypeDef } from '@core/domain/types';
 import { palette } from '@ui/theme/tokens';
 import { dateField } from '@core/cycles/schedule';
+import { documentsOverview } from './overview';
 
 export const DOCUMENTS_COLOR = palette.indigo;
 
@@ -28,6 +29,7 @@ export const documentType: EntityTypeDef<DocumentData> = {
 };
 
 export const documentsModule: ModuleManifest = {
+  overview: documentsOverview,
   id: 'documents', name: 'Documents', version: '1.0.0', description: 'IDs, insurance, contracts and receipts — attach the scan, track the expiry.', icon: 'folder', color: DOCUMENTS_COLOR,
   dependencies: ['crm', 'travel', 'assets'], entityTypes: [documentType],
   quickActions: [{ id: 'documents.add', label: 'Document', icon: 'doc.text', route: '/entity/document/new' }],

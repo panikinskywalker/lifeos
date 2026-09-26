@@ -1,6 +1,7 @@
 import type { ModuleManifest } from '@core/registry/types';
 import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES, debtType } from './types';
 import { applyCategories, trackCategoryField } from './categories';
+import { financeOverview } from './overview';
 import { financeWidgets } from './widgets';
 import { AccountSection, BudgetSection, FinanceHome } from './screens';
 import { postDueSubscriptions } from './lib';
@@ -62,6 +63,7 @@ export const financeModule: ModuleManifest = {
     },
   ],
   aiTools: financeAiTools,
+  overview: financeOverview,
   onStart: async (os) => {
     // Your own categories join the built-in list in every category picker.
     for (const def of [transactionType, budgetType, subscriptionType]) trackCategoryField(def.fields.find((f) => f.key === 'category'));

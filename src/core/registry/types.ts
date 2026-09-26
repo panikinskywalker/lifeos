@@ -123,6 +123,8 @@ export interface ModuleManifest {
   /** Runs once when installed: seed default views/dashboards/rules. */
   onInstall?: (os: LifeOSContext) => void | Promise<void>;
   /** Runs every app start after install. */
+  /** The module's overview (Browse page and Today's area card): numbers, charts, what needs you. Pure. */
+  overview?: (os: LifeOSContext, now?: number) => import('../dashboard/overview').ModuleOverview;
   onStart?: (os: LifeOSContext) => void | Promise<void>;
   /** Default widgets added to the home dashboard on install. */
   defaultWidgets?: Array<{ type: string; size?: WidgetSize; config?: Record<string, unknown> }>;

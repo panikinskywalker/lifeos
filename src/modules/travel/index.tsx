@@ -14,6 +14,7 @@ import { categoryOf } from '@modules/finance/types';
 import { withExtras } from '@core/ai/cards';
 
 import { TRAVEL_COLOR, tripType, type TripData } from './types';
+import { travelOverview } from './overview';
 export { TRAVEL_COLOR, tripType, type TripData };
 
 function TripSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
@@ -80,6 +81,7 @@ function TripSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext 
 }
 
 export const travelModule: ModuleManifest = {
+  overview: travelOverview,
   id: 'travel',
   name: 'Travel',
   version: '1.0.0',

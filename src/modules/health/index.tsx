@@ -11,6 +11,7 @@ import { Bars, Sparkline } from '@ui/components/charts';
 
 export const HEALTH_COLOR = palette.red;
 import { measurementType, workoutType, type MeasurementData, type WorkoutData } from './types';
+import { healthOverview } from './overview';
 export { measurementType, workoutType, type MeasurementData, type WorkoutData };
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 function ActivityWidget({ size }: WidgetProps) {
@@ -43,6 +44,7 @@ function ActivityWidget({ size }: WidgetProps) {
 const widgets: WidgetDef[] = [{ type: 'health.activity', module: 'health', name: 'Activity', icon: 'figure.run', sizes: ['small', 'medium', 'large'], defaultSize: 'medium', component: ActivityWidget }];
 
 export const healthModule: ModuleManifest = {
+  overview: healthOverview,
   id: 'health', name: 'Health & Fitness', version: '1.0.0', description: 'Workouts and body measurements with trends.', icon: 'heart', color: HEALTH_COLOR,
   entityTypes: [workoutType, measurementType], widgets,
   quickActions: [{ id: 'health.addWorkout', label: 'Workout', icon: 'figure.run', route: '/entity/workout/new', global: true }, { id: 'health.addMeasurement', label: 'Measurement', icon: 'scalemass', route: '/entity/measurement/new' }],

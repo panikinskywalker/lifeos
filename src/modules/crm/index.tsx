@@ -10,6 +10,7 @@ import { AttentionCard, QuickActions, RowList, Section, StatTrio, Text, useToast
 import { EntityRow } from '@ui/components/EntityRow';
 import { bus } from '@core/events/bus';
 import { CRM_COLOR, groupType, personType, type PersonData } from './types';
+import { peopleOverview } from './overview';
 
 export * from './types';
 
@@ -98,6 +99,7 @@ function nextBirthday(iso: string): { days: number; age: number | null } | null 
 
 
 export const crmModule: ModuleManifest = {
+  overview: peopleOverview,
   id: 'crm',
   name: 'People',
   version: '1.0.0',

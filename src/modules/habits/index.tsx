@@ -10,6 +10,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { useLive, useOS } from '@ui/hooks';
 import { Card, Icon, SectionHeader, Stat, Text } from '@ui/components/primitives';
 import { HeatGrid, ProgressRing } from '@ui/components/charts';
+import { habitsOverview } from './overview';
 
 export const HABITS_COLOR = palette.orange;
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -178,6 +179,7 @@ function HabitSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
 const widgets: WidgetDef[] = [{ type: 'habits.today', module: 'habits', name: 'Habits today', icon: 'flame', sizes: ['small', 'medium', 'large'], defaultSize: 'medium', component: HabitsWidget }];
 
 export const habitsModule: ModuleManifest = {
+  overview: habitsOverview,
   id: 'habits',
   name: 'Habits',
   version: '1.0.0',
