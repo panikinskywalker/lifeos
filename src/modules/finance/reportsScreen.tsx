@@ -27,7 +27,7 @@ export function ReportsScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
   const router = useRouter();
   const [tab, setTab] = useState<Tab>((params.tab as Tab) || 'month');
   return (
-    <Screen title="Reports" subtitle="Finance" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}>
+    <Screen title="Reports" subtitle="Finance" onBack={() => (router.canGoBack() ? router.back() : router.replace('/almanac'))}>
       <Segmented value={tab} onChange={setTab} options={[{ value: 'month', label: 'Month' }, { value: 'subs', label: 'Subscriptions' }, { value: 'worth', label: 'Net worth' }]} />
       {tab === 'month' ? <MonthView ctx={ctx} /> : tab === 'subs' ? <SubsView ctx={ctx} /> : <WorthView ctx={ctx} />}
     </Screen>

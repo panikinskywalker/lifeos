@@ -167,7 +167,7 @@ Decisions: foreign spends stored in their currency and converted at that day's r
 - [x] Empty states that say which permission to grant, with a button to You › Data sources. *(Each metric names its source and opens You › Data sources.)*
 
 ### M4.4 — Almanac (replaces Browse)
-- [ ] Almanac tab: search field; sections *People · Things · Money · Body · Mind · Places · Time*; each a list of types with counts.
+- [x] Almanac tab: search field; sections *People · Things · Money · Body · Mind · Places · Time*; each a list of types with counts. *(`src/core/almanac/almanac.ts`; Body lists its measures (steps, sleep, heart rate, weight) with this week's value; Mind has Dumps (all, searchable, by month) and Facts; each section shows what changed lately. The old module grid moved to You › Modules.)*
 - [ ] **Time view**: pick a day / month / year → spend by category, dumps, events, health averages, screen time, cycles done, records created. "On this day" row on Today.
 - [ ] Facts as browsable records; every record page shows Facts, Dumps that mention it, and backlinks.
 - [ ] One FTS index over records + notes + facts + dumps (extend migration; don't rebuild).

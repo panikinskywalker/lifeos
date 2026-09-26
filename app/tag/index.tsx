@@ -7,7 +7,7 @@ export default function TagsRoute() {
   const router = useRouter();
   const tags = useLive((o) => o.tags.counts(), []);
   return (
-    <Screen title="Tags" subtitle={`${tags.length} in use`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}>
+    <Screen title="Tags" subtitle={`${tags.length} in use`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/almanac'))}>
       {tags.length === 0 ? (
         <EmptyState icon="tag" line="Tag any record — “#car”, “#goa-trip” — and every tag gets a page here." />
       ) : (

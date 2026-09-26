@@ -126,7 +126,7 @@ function CountsWidget() {
       <View style={{ height: 0 }}>
         <Icon name="circle" size={0} />
       </View>
-      <Text variant="caption" color="tertiary" onPress={() => router.push('/browse')} style={{ marginTop: 8 }}>
+      <Text variant="caption" color="tertiary" onPress={() => router.push('/almanac')} style={{ marginTop: 8 }}>
         Browse all modules →
       </Text>
     </Card>

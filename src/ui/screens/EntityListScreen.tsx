@@ -115,7 +115,7 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
     <Screen
       title={title ?? def.labelPlural}
       subtitle={subtitle}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}
+      onBack={() => (router.canGoBack() ? router.back() : router.replace('/almanac'))}
       right={
         <>
           <IconButton icon="filter" accessibilityLabel="Filter and sort" filled onPress={() => setShowFilter(true)} />

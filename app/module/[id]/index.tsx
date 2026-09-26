@@ -12,7 +12,7 @@ export default function ModuleRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const counts = useLive((o) => o.entities.countsByType(), []);
   const m = os.registry.modules.get(id ?? '');
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/browse'));
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/almanac'));
   if (!m) {
     return (
       <Screen title="Not found" onBack={back}>
