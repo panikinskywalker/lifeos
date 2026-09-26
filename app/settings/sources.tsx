@@ -45,6 +45,7 @@ export default function SourcesScreen() {
   }, [os, refresh]);
 
   const turnOn = async (id: SourceId) => {
+    if (id === 'contacts') return router.push('/settings/contacts' as never);
     setBusy(id);
     try {
       const ok = await requestAccess(id);
@@ -98,8 +99,9 @@ export default function SourcesScreen() {
                 </Text>
               ) : null}
               <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                {!on && a !== 'unavailable' ? <Button title={busy === s.id ? 'Asking…' : 'Turn on'} size="sm" icon="check" disabled={!!busy} onPress={() => void turnOn(s.id)} /> : null}
+                {!on && a !== 'unavailable' ? <Button title={busy === s.id ? 'Asking…' : s.id === 'contacts' ? 'Pick contacts' : 'Turn on'} size="sm" icon="check" disabled={!!busy} onPress={() => void turnOn(s.id)} /> : null}
                 {on ? <Button title="Sync now" size="sm" variant="secondary" icon="refresh" onPress={() => void syncSources(os).then(() => toast.show({ message: `${s.label} synced`, icon: 'check' }))} /> : null}
+                {s.id === 'contacts' && a === 'granted' ? <Button title="Pick contacts" size="sm" variant="secondary" icon="people" onPress={() => router.push('/settings/contacts' as never)} /> : null}
                 {s.id === 'sms' && on ? <Button title="Senders" size="sm" variant="secondary" icon="list" onPress={() => router.push('/settings/sms' as never)} /> : null}
                 {s.id === 'health' && a === 'unavailable' && deviceAvailable ? <Chip label="Get Health Connect" icon="download" small onPress={() => void requestAccess('health')} /> : null}
               </View>

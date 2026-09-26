@@ -16,6 +16,8 @@ export interface PersonData {
   notes?: string;
   contactEvery?: number;
   lastContactAt?: string;
+  /** The phone contact this person was imported from (re-syncs fill gaps). */
+  contactId?: string;
 }
 
 export const personType: EntityTypeDef<PersonData> = {
@@ -24,7 +26,7 @@ export const personType: EntityTypeDef<PersonData> = {
   label: 'Person',
   labelPlural: 'People',
   icon: 'person',
-  schema: z.object({ relationship: z.string().optional(), phone: z.string().optional(), email: z.string().optional(), birthday: z.string().optional(), company: z.string().optional(), role: z.string().optional(), city: z.string().optional(), notes: z.string().optional(), contactEvery: z.coerce.number().optional(), lastContactAt: z.string().optional() }),
+  schema: z.object({ relationship: z.string().optional(), phone: z.string().optional(), email: z.string().optional(), birthday: z.string().optional(), company: z.string().optional(), role: z.string().optional(), city: z.string().optional(), notes: z.string().optional(), contactEvery: z.coerce.number().optional(), lastContactAt: z.string().optional(), contactId: z.string().optional() }),
   cycleFields: { 'person.contact': { lastDoneAt: 'lastContactAt' } },
   cycleTemplates: (d) => [
     ...(d.contactEvery ? [{ template: 'person.contact', name: 'Keep in touch', kind: 'interval' as const, everyN: d.contactEvery, everyUnit: 'day' as const, lastDoneAt: dateField(d.lastContactAt) ?? Date.now() }] : []),

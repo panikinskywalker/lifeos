@@ -93,7 +93,20 @@
           }
         }
       ],
-      "./modules/lifeos-device/app.plugin.js"
+      "./modules/lifeos-device/app.plugin.js",
+      "expo-web-browser",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "LifeOS adds the contacts you pick to People."
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "LifeOS shows your events and links them to the people and places in them."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

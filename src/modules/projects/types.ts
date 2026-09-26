@@ -112,6 +112,9 @@ export interface EventData {
   airline?: string;
   flightNo?: string;
   cost?: number;
+  /** calendar, gmail… and the source's id (a re-sync updates, never duplicates). */
+  source?: string;
+  sourceKey?: string;
 }
 
 export const eventType: EntityTypeDef<EventData> = {
@@ -121,7 +124,7 @@ export const eventType: EntityTypeDef<EventData> = {
   labelPlural: 'Events',
   icon: 'calendar',
   color: palette.red,
-  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), tripId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional() }),
+  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), tripId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional(), source: z.string().optional(), sourceKey: z.string().optional() }),
   fields: [
     { key: 'kind', label: 'Kind', type: 'text', summary: true, placeholder: 'flight, dinner, meeting, concert…' },
     { key: 'startAt', label: 'Starts', type: 'datetime', required: true, defaultValue: () => Date.now() + 3600000 },

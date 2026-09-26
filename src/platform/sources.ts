@@ -4,6 +4,7 @@ import { ingestMessage } from '@core/ingest/ingest';
 import { PAYMENT_APPS } from '@core/ingest/bankSms';
 import { saveHealthDays, saveUsageDays, setSourceState, sourceState } from '@core/sources/deviceData';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
+import { calendarGranted, callLogGranted, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
 
 /**
  * Data sources on the phone (M4.2): bank SMS, payment-app notifications,
@@ -12,7 +13,7 @@ import { Device, deviceAvailable } from '../../modules/lifeos-device';
  * Everything lands through core: raw kept, parsed, deduped, filed, To check.
  */
 
-export type SourceId = 'sms' | 'notifications' | 'usage' | 'health';
+export type SourceId = 'sms' | 'notifications' | 'usage' | 'health' | 'contacts' | 'calendar' | 'calllog';
 
 export interface SourceInfo {
   id: SourceId;
@@ -26,6 +27,9 @@ export const SOURCES: SourceInfo[] = [
   { id: 'notifications', label: 'Payment apps', line: 'GPay, PhonePe, Paytm and bank-app notifications, matched with the SMS so nothing is counted twice.', icon: 'bell' },
   { id: 'usage', label: 'Screen time', line: 'Time per app, unlocks, first and last use — per day, on the phone only.', icon: 'signal' },
   { id: 'health', label: 'Health Connect', line: 'Steps, sleep, heart rate, weight and workouts from your watch or fitness app.', icon: 'activity' },
+  { id: 'contacts', label: 'Contacts', line: 'Pick the people to add — never your whole phonebook. The ones you add stay filled in (phone, email, birthday).', icon: 'people' },
+  { id: 'calendar', label: 'Calendar', line: 'Events from your phone’s calendars (a month back, two ahead), linked to the people in them.', icon: 'calendar' },
+  { id: 'calllog', label: 'Call log', line: 'Calls with people in LifeOS update when you last spoke — so keep-in-touch reminders need no logging.', icon: 'phone' },
 ];
 
 export type Access = 'granted' | 'needed' | 'unavailable';
@@ -37,8 +41,12 @@ const HISTORY_USAGE_DAYS = 30;
 
 /** What's needed to read a source right now. */
 export async function access(id: SourceId): Promise<Access> {
+  if (id === 'contacts') return (await contactsGranted()) ? 'granted' : 'needed';
+  if (id === 'calendar') return (await calendarGranted()) ? 'granted' : 'needed';
   if (!deviceAvailable || !Device) return 'unavailable';
   switch (id) {
+    case 'calllog':
+      return (await callLogGranted()) ? 'granted' : 'needed';
     case 'sms':
       return (await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_SMS)) && (await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS)) ? 'granted' : 'needed';
     case 'notifications':
@@ -53,8 +61,12 @@ export async function access(id: SourceId): Promise<Access> {
 
 /** Ask for access (a system dialog, or the settings screen where you flip a switch). Returns whether it's granted now. */
 export async function requestAccess(id: SourceId): Promise<boolean> {
+  if (id === 'calendar') return requestCalendar();
+  if (id === 'contacts') return false; // the picker asks
   if (!Device) return false;
   switch (id) {
+    case 'calllog':
+      return requestCallLog();
     case 'sms': {
       const r = await PermissionsAndroid.requestMultiple([PermissionsAndroid.PERMISSIONS.READ_SMS, PermissionsAndroid.PERMISSIONS.RECEIVE_SMS]);
       return Object.values(r).every((v) => v === PermissionsAndroid.RESULTS.GRANTED);
@@ -138,9 +150,11 @@ let running: Promise<void> | null = null;
 
 /** Sync every source that has access. Safe to call often; one run at a time. */
 export function syncSources(os: LifeOSContext): Promise<void> {
-  if (!deviceAvailable || Platform.OS !== 'android') return Promise.resolve();
+  if (Platform.OS === 'web') return Promise.resolve();
   if (running) return running;
   running = (async () => {
+    await syncPhoneSources(os);
+    if (!deviceAvailable) return;
     for (const [id, fn] of [['sms', syncSms], ['notifications', syncNotifications], ['usage', syncUsage], ['health', syncHealth]] as const) {
       try {
         await fn(os);
