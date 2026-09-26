@@ -156,6 +156,34 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
     expect(categoryFor(os, 'ZOMATO LTD')).toBe('food');
     expect(categoryFor(os, 'Parent')).toBe('other'); // "rent" inside "Parent" is not the word rent
   });
+
+  it('amount rules: exactly ₹28 is the water bottle; keyword + amount beats either alone; credits never match', async () => {
+    const { setCategoryRules, categoryFor } = await import('@core/ingest/ingest');
+    setCategoryRules(os, [{ keyword: '', amount: 28, category: 'c_water' }, { keyword: 'SWIGGY', category: 'food' }, { keyword: 'SWIGGY', amount: 149, category: 'subscriptions' }]);
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.28.00 From HDFC Bank A/C *1234 To RAMESH STORE On 26/09/26', receivedAt: at });
+    expect(txs()[0]!.data.category).toBe('c_water');
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.28.50 From HDFC Bank A/C *1234 To RAMESH STORE On 26/09/26', receivedAt: at + 3_600_000 });
+    expect(txs().find((t) => t.data.amount === 28.5)!.data.category).not.toBe('c_water');
+    expect(categoryFor(os, 'SWIGGY', '', 149)).toBe('subscriptions');
+    expect(categoryFor(os, 'SWIGGY', '', 450)).toBe('food');
+    expect(categoryFor(os, 'SWIGGY', '', 28)).toBe('food'); // a keyword rule beats an amount-only one
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.28.00 credited to HDFC Bank A/c XX1234 on 26-09-26 from VPA priya@okaxis', receivedAt: at + 7_200_000 });
+    expect(txs().find((t) => t.data.kind === 'income')!.data.category).not.toBe('c_water');
+  });
+
+  it('amount rules for money in, with multiples: football shares ₹147 / ₹131, or a friend’s share too', async () => {
+    const { setCategoryRules, categoryFor, ruleText } = await import('@core/ingest/ingest');
+    const rule = { keyword: '', amounts: [147, 131], multiples: true, direction: 'received' as const, category: 'c_football' };
+    setCategoryRules(os, [rule, { keyword: '', amounts: [28], multiples: true, category: 'c_water' }]);
+    expect(ruleText(rule)).toBe('₹147 / ₹131 (or multiples) · received');
+    for (const [amt, want] of [[147, 'c_football'], [131, 'c_football'], [294, 'c_football'], [393, 'c_football'], [150, 'other']] as const)
+      expect([amt, categoryFor(os, 'Arjun', '', amt, 'credit')]).toEqual([amt, want]);
+    expect(categoryFor(os, 'Arjun', '', 147, 'debit')).toBe('other'); // paying 147 out isn't a share coming in
+    expect(categoryFor(os, 'Kirana', '', 56, 'debit')).toBe('c_water'); // two bottles
+    expect(categoryFor(os, 'Kirana', '', 56, 'credit')).toBe('other');
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.294.00 credited to HDFC Bank A/c XX1234 on 26-09-26 from VPA arjun.m@okaxis (UPI 426912345699)', receivedAt: at });
+    expect(txs()[0]!.data).toMatchObject({ kind: 'income', category: 'c_football' });
+  });
 });
 
 describe('deliveries from shipping texts', () => {

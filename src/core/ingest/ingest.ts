@@ -131,9 +131,40 @@ const KNOWN: Array<[RegExp, string]> = [
 ];
 
 export interface CategoryRule {
-  /** A word or phrase; matched case-insensitively against the merchant and the message. */
+  /** A word or phrase; matched case-insensitively against the merchant and the message. Empty = any merchant. */
   keyword: string;
+  /** Only money of exactly this much (₹28 is always the water bottle). Older rules; see `amounts`. */
+  amount?: number | null;
+  /** Only these exact amounts (football shares: ₹147, ₹131). */
+  amounts?: number[] | null;
+  /** Also 2×, 3× … 10× an amount (someone paying a friend's share too). */
+  multiples?: boolean;
+  /** Money out, money in, or either (default: out for amount rules, either for keyword-only ones). */
+  direction?: 'spent' | 'received' | 'any';
   category: string;
+}
+
+export const ruleAmounts = (r: CategoryRule): number[] => (r.amounts?.length ? r.amounts : r.amount != null ? [r.amount] : []);
+
+/** Does this rule's amount part match? (No amounts = matches any amount.) */
+function amountMatches(r: CategoryRule, amount: number | null | undefined): boolean {
+  const list = ruleAmounts(r);
+  if (!list.length) return true;
+  if (amount == null) return false;
+  return list.some((x) => {
+    if (Math.abs(x - amount) < 0.005) return true;
+    if (!r.multiples || x <= 0) return false;
+    const k = Math.round(amount / x);
+    return k >= 2 && k <= 10 && Math.abs(k * x - amount) < 0.005;
+  });
+}
+
+/** What a rule says, for lists and toasts: "₹28", "ZOMATO", "ZOMATO · ₹28", "₹147 / ₹131 (or multiples) · received". */
+export function ruleText(r: CategoryRule, currency: (n: number) => string = (n) => `₹${n}`): string {
+  const list = ruleAmounts(r);
+  const money = list.length ? `${list.map(currency).join(' / ')}${r.multiples ? ' (or multiples)' : ''}` : null;
+  const dir = r.direction === 'received' ? 'received' : r.direction === 'any' ? 'in or out' : null;
+  return [r.keyword.trim() || null, money, dir].filter(Boolean).join(' · ');
 }
 
 /** Your keyword rules (You › Categories), in order. */
@@ -142,7 +173,7 @@ export function categoryRules(os: LifeOSContext): CategoryRule[] {
 }
 
 export function setCategoryRules(os: LifeOSContext, rules: CategoryRule[]) {
-  os.settings.set('categoryRules', rules.filter((r) => r.keyword.trim() && r.category));
+  os.settings.set('categoryRules', rules.filter((r) => (r.keyword.trim() || ruleAmounts(r).length) && r.category));
   bus.emit('data.changed', { table: 'settings', id: 'categoryRules' });
 }
 
@@ -150,16 +181,39 @@ export function setCategoryRules(os: LifeOSContext, rules: CategoryRule[]) {
 export const BUILTIN_CATEGORIES = KNOWN;
 
 /**
- * A transaction's category: your keyword rules first (merchant or message
- * text), then what you taught it by recategorising, then the built-in
- * merchant list, else other.
+ * The category one of your rules gives a spend, if any: keyword + amount
+ * first, then keyword ("ZOMATO"), then an exact amount alone (₹28 → Water).
  */
-export function categoryFor(os: LifeOSContext, merchant: string | null | undefined, text = ''): string {
+export function ruleCategory(os: LifeOSContext, merchant: string | null | undefined, text = '', amount?: number | null, direction: 'debit' | 'credit' = 'debit'): string | null {
   const hay = `${merchant ?? ''} ${text}`.toLowerCase();
-  for (const r of categoryRules(os)) {
+  const rules = categoryRules(os);
+  const words = (r: CategoryRule) => {
     const k = r.keyword.trim().toLowerCase();
-    if (k && new RegExp(`(^|[^a-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`, 'i').test(hay)) return r.category;
-  }
+    return !k || new RegExp(`(^|[^a-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`, 'i').test(hay);
+  };
+  // Keyword-only rules work both ways (as they always have); amount rules default to money out.
+  const way = (r: CategoryRule) => {
+    const d = r.direction ?? (ruleAmounts(r).length ? 'spent' : 'any');
+    return d === 'any' || d === (direction === 'credit' ? 'received' : 'spent');
+  };
+  const byAmount = (r: CategoryRule) => ruleAmounts(r).length > 0 && amountMatches(r, amount);
+  const live = rules.filter(way);
+  // Most specific first: keyword and amount, then keyword, then amount alone.
+  const hit =
+    live.find((r) => r.keyword.trim() && byAmount(r) && words(r)) ??
+    live.find((r) => r.keyword.trim() && !ruleAmounts(r).length && words(r)) ??
+    live.find((r) => !r.keyword.trim() && byAmount(r));
+  return hit?.category ?? null;
+}
+
+/**
+ * A transaction's category: your rules first (keywords in the merchant or
+ * message, exact amounts), then what you taught it by recategorising, then
+ * the built-in merchant list, else other.
+ */
+export function categoryFor(os: LifeOSContext, merchant: string | null | undefined, text = '', amount?: number | null, direction: 'debit' | 'credit' = 'debit'): string {
+  const byRule = ruleCategory(os, merchant, text, amount, direction);
+  if (byRule) return byRule;
   if (merchant) {
     const learned = os.settings.get<Record<string, string>>('merchantCategories', {});
     const key = norm(merchant);
@@ -380,7 +434,7 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
     const accountId = accountFor(os, t, item.from, created);
     const kind = t.transfer || t.channel === 'atm' ? 'transfer' : t.direction === 'credit' ? 'income' : 'expense';
     const merchant = t.counterparty ?? (t.channel === 'atm' ? 'ATM withdrawal' : undefined);
-    let category = t.channel === 'atm' || t.transfer ? 'transfer' : categoryFor(os, merchant, item.text);
+    let category = t.channel === 'atm' || t.transfer ? 'transfer' : categoryFor(os, merchant, item.text, amount, t.direction);
     // An autopay / e-mandate / SI charge from somewhere we don't know is still a subscription.
     if (category === 'other' && kind === 'expense' && t.recurring) category = 'subscriptions';
     const note = [item.source === 'email' ? `From ${item.account ?? 'email'}` : null, t.ref ? `Ref ${t.ref}` : null].filter(Boolean).join(' · ');

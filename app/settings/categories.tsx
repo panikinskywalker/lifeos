@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BUILTIN_CATEGORIES, categoryFor, categoryRules, setCategoryRules } from '@core/ingest/ingest';
+import { BUILTIN_CATEGORIES, categoryRules, ruleAmounts, ruleCategory, ruleText, setCategoryRules } from '@core/ingest/ingest';
 import { CATEGORIES } from '@modules/finance/types';
 import { CATEGORY_COLORS, CATEGORY_ICONS, addCategory, customCategories, deleteCategory, updateCategory, type CustomCategory } from '@modules/finance/categories';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, ChipRow, FilterChip, Icon, IconButton, RowItem, RowList, Screen, Section, Sheet, Text, TextField, useToast } from '@ui/kit';
+import { Button, ChipRow, FilterChip, Icon, IconButton, RowItem, Segmented, SwitchField, RowList, Screen, Section, Sheet, Text, TextField, useToast } from '@ui/kit';
 
 const label = (v: string) => CATEGORIES.find((c) => c.value === v)?.label ?? v;
 
@@ -21,6 +21,10 @@ export default function CategoriesScreen() {
   const toast = useToast();
   const rules = useLive((o) => categoryRules(o), []);
   const [keyword, setKeyword] = useState('');
+  const [amountText, setAmountText] = useState('');
+  const [multiples, setMultiples] = useState(false);
+  const [direction, setDirection] = useState<'spent' | 'received' | 'any'>('spent');
+  const amounts = [...new Set(amountText.split(/[,/\s]+/).map((x) => Number(x.replace(/[₹rs.]+$/i, '').replace(/^(?:₹|rs\.?)/i, ''))).filter((n) => Number.isFinite(n) && n > 0))];
   const [category, setCategory] = useState('food');
   const [showBuiltin, setShowBuiltin] = useState(false);
   const mine = useLive((o) => customCategories(o), []);
@@ -28,17 +32,22 @@ export default function CategoriesScreen() {
 
   const add = () => {
     const k = keyword.trim();
-    if (!k) return;
-    setCategoryRules(os, [...rules.filter((r) => r.keyword.toLowerCase() !== k.toLowerCase()), { keyword: k, category }]);
+    if (!k && !amounts.length) return;
+    const rule = { keyword: k, amounts: amounts.length ? amounts : null, multiples: amounts.length ? multiples : undefined, direction: amounts.length || direction !== 'spent' ? direction : undefined, category };
+    const same = (r: (typeof rules)[number]) => r.keyword.toLowerCase() === k.toLowerCase() && ruleAmounts(r).join() === amounts.join() && (r.direction ?? 'spent') === direction;
+    setCategoryRules(os, [...rules.filter((r) => !same(r)), rule]);
     setKeyword('');
-    toast.show({ message: `“${k}” → ${label(category)}`, icon: 'tag' });
+    setAmountText('');
+    setMultiples(false);
+    toast.show({ message: `${ruleText(rule, os.format.currency)} → ${label(category)}`, icon: 'tag' });
   };
   // Re-sort past spends that ended up in Other (or where a rule now says otherwise).
   const apply = () => {
     let n = 0;
-    for (const e of os.entities.query<{ merchant?: string; category?: string; kind?: string; note?: string }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }] } }, { limit: 5000 })) {
-      const c = categoryFor(os, e.data.merchant, e.data.note ?? '');
-      if (c !== 'other' && c !== e.data.category && (e.data.category === 'other' || rules.some((r) => (e.data.merchant ?? '').toLowerCase().includes(r.keyword.toLowerCase())))) {
+    for (const e of os.entities.query<{ merchant?: string; category?: string; kind?: string; note?: string; amount?: number }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'in', value: ['expense', 'income'] }] } }, { limit: 5000 })) {
+      // A rule decides; nothing else overrides a category you (or it) already set.
+      const c = ruleCategory(os, e.data.merchant, e.data.note ?? '', e.data.amount ?? null, e.data.kind === 'income' ? 'credit' : 'debit');
+      if (c && c !== e.data.category) {
         os.entities.update(e.id, { data: { category: c } }, 'system');
         n++;
       }
@@ -63,24 +72,31 @@ export default function CategoriesScreen() {
         </Section>
         <Section title="Add a rule">
           <View style={{ gap: 10 }}>
-            <TextField label="If the merchant or message says" value={keyword} onChange={setKeyword} placeholder="ZOMATO, rent, Guru Tailors…" autoCapitalize="characters" />
+            <TextField label="If the merchant or message says" value={keyword} onChange={setKeyword} placeholder="ZOMATO, rent, Guru Tailors…" autoCapitalize="characters" hint="Leave empty to go by the amount alone." />
+            <TextField label="And / or the amount is exactly" value={amountText} onChange={setAmountText} placeholder="28   or   147, 131" keyboardType="numbers-and-punctuation" hint="One amount or several, separated by commas — ₹28 is always the water bottle; ₹147 or ₹131 is a football share." />
+            {amounts.length ? (
+              <>
+                <SwitchField label="Also 2×, 3× … of these" value={multiples} onChange={setMultiples} hint="Two bottles (₹56), or someone paying a friend’s share too (₹294)." />
+                <Segmented<'spent' | 'received' | 'any'> options={[{ value: 'spent', label: 'Money out' }, { value: 'received', label: 'Money in' }, { value: 'any', label: 'Either' }]} value={direction} onChange={setDirection} />
+              </>
+            ) : null}
             <ChipRow>
               {CATEGORIES.filter((c) => c.value !== 'transfer').map((c) => (
                 <FilterChip key={c.value} label={c.label} selected={category === c.value} onPress={() => setCategory(c.value)} />
               ))}
             </ChipRow>
-            <Button title="Add rule" icon="plus" size="sm" disabled={!keyword.trim()} onPress={add} />
+            <Button title="Add rule" icon="plus" size="sm" disabled={!keyword.trim() && !amounts.length} onPress={add} />
           </View>
         </Section>
         <Section title="Your rules" meta={String(rules.length)}>
           {rules.length ? (
             <RowList>
               {rules.map((r) => (
-                <RowItem key={r.keyword} icon="tag" tint="finance" title={r.keyword} value={label(r.category)} chevron={false} trailing={<IconButton icon="trash" size={34} accessibilityLabel={`Remove ${r.keyword}`} onPress={() => setCategoryRules(os, rules.filter((x) => x !== r))} />} />
+                <RowItem key={`${r.keyword}|${ruleAmounts(r).join()}|${r.direction ?? ''}`} icon={r.keyword.trim() ? 'tag' : 'rupee'} tint="finance" title={ruleText(r, os.format.currency)} subtitle={r.keyword.trim() && ruleAmounts(r).length ? 'Both must match' : r.keyword.trim() ? 'Merchant or message says' : 'Exact amount'} value={label(r.category)} chevron={false} trailing={<IconButton icon="trash" size={34} accessibilityLabel={`Remove ${ruleText(r)}`} onPress={() => setCategoryRules(os, rules.filter((x) => x !== r))} />} />
               ))}
             </RowList>
           ) : (
-            <Text variant="caption" color="secondary">No rules yet. Add one when a merchant keeps landing in the wrong place.</Text>
+            <Text variant="caption" color="secondary">No rules yet. Add one when a merchant keeps landing in the wrong place, or when an exact amount always means the same thing.</Text>
           )}
         </Section>
         <Button title="Apply to past transactions" icon="refresh" variant="secondary" onPress={apply} />

@@ -1,3 +1,4 @@
+import { ruleCategory } from '../ingest/ingest';
 import { z } from 'zod';
 import type { EntityTypeDef, FieldDef } from '../domain/types';
 import type { LifeOSContext } from '../registry/context';
@@ -498,7 +499,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         const amount = typeof i.amount === 'number' ? i.amount : parseAmount(i.amount);
         if (!amount) return { error: 'no amount' };
         const account = i.account ? resolveCandidates(os, i.account, ['account']).find((c) => c.score >= 0.8) : undefined;
-        const data = { amount, kind: i.kind ?? 'expense', category: categoryValue(os, i.category), merchant: i.merchant ?? (i.for ? nameOf(i.for) : undefined), date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined) };
+        const data = { amount, kind: i.kind ?? 'expense', category: i.category ? categoryValue(os, i.category) : (ruleCategory(os, i.merchant ?? (i.for ? nameOf(i.for) : null), i.note ?? '', typeof amount === 'number' ? amount : null) ?? 'other'), merchant: i.merchant ?? (i.for ? nameOf(i.for) : undefined), date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined) };
         const tx = os.entities.create({ type: 'transaction', data }, 'assistant');
         log(os, s, { kind: 'transaction', action: 'created', entityId: tx.id, label: `${data.kind === 'income' ? 'Income' : 'Spent'}: ${os.format.currency(amount)}${data.merchant ? ` · ${data.merchant}` : ''}` });
         if (i.for) {
