@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { format } from 'date-fns';
 import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +40,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
   const tags = useLive((o) => o.tags.forEntity(id), [id]);
   const cover = useLive((o) => o.attachments.cover(id), [id]);
   const [panel, setPanel] = useState<Panel>(null);
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/browse'));
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/almanac'));
   if (!entity) {
     return (
       <View style={{ flex: 1, backgroundColor: t.c.bg.ground, paddingTop: insets.top + 48 }}>
@@ -113,6 +114,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
           <RelationsCard entity={entity} onLink={() => setPanel('link')} />
           <GraphCard entity={entity} />
           <BacklinksCard entity={entity} />
+          <DumpsCard entity={entity} />
           <RemindersCard entity={entity} tint={tint} />
           <AttachmentsCard entity={entity} />
           <NotesCard entity={entity} />
@@ -229,6 +231,36 @@ function DetailsCard({ entity, fields }: { entity: Entity; fields: FieldDef[] })
           return <DetailRow key={f.key} label={f.label} value={r.text} stacked={f.type === 'longtext' ? true : undefined} divider={i < rows.length - 1} onPress={r.target ? () => router.push(`/entity/${r.target!.type}/${r.target!.id}`) : undefined} />;
         })}
       </Card>
+    </Section>
+  );
+}
+
+/** Dumps that filed into this record, or that mention it by name (M4.4) — newest first, word for word. */
+function DumpsCard({ entity }: { entity: Entity }) {
+  const router = useRouter();
+  const dumps = useLive(
+    (o) => {
+      const filed = o.dumps.forEntity(entity.id);
+      const seen = new Set(filed.map((d) => d.id));
+      const named =
+        entity.title.trim().length >= 3
+          ? o.entities.search
+              .search(`"${entity.title.replace(/"/g, '')}"`, { types: ['dump'], limit: 20 })
+              .map((h) => o.dumps.get(h.id))
+              .filter((d): d is NonNullable<typeof d> => !!d && !seen.has(d.id) && d.body.toLowerCase().includes(entity.title.toLowerCase()))
+          : [];
+      return [...filed, ...named].sort((a, b) => b.createdAt - a.createdAt);
+    },
+    [entity.id, entity.title],
+  );
+  if (!dumps.length) return null;
+  return (
+    <Section title="Dumps" meta={String(dumps.length)}>
+      <RowList>
+        {dumps.slice(0, 8).map((d) => (
+          <RowItem key={d.id} icon="brain" tint="memory" title={d.body.trim().split('\n')[0]!} subtitle={format(new Date(d.createdAt), 'd MMM yyyy')} chevron onPress={() => router.push(`/dump/${d.id}` as never)} />
+        ))}
+      </RowList>
     </Section>
   );
 }
