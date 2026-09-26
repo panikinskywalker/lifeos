@@ -19,6 +19,7 @@ import { bus } from './events/bus';
 import { coreModule } from './coreModule';
 import type { Entity } from './domain/types';
 import { resolveLink, syncMentions } from './links';
+import { learnCategory } from './ingest/ingest';
 
 export interface LifeOSOptions {
   db: DatabaseAdapter;
@@ -244,6 +245,12 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   }
 
   ctx.automation.start();
+  // You recategorised a transaction: that merchant keeps the category next time (SMS, notifications).
+  bus.on('entity.updated', ({ entity, previous, actor }) => {
+    if (actor !== 'user' || entity.type !== 'transaction') return;
+    const d = entity.data as { category?: string; merchant?: string };
+    if (d.merchant && d.category && d.category !== (previous.data as { category?: string }).category) learnCategory(ctx, d.merchant, d.category);
+  });
   // One-time backfill: records indexed before notes, tags and attachment names were searchable.
   if (!settings.get<boolean>('search.indexV2', false)) {
     for (const e of entities.query(null, { includeArchived: true }, { limit: 100000 })) reindex(e.id);

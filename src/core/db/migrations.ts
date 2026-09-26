@@ -544,5 +544,76 @@ export const migrations: Migration[] = [
       )`,
       `CREATE INDEX IF NOT EXISTS idx_queued_questions ON queued_questions(status, created_at)`,
     ],
+  },  {
+    version: 9,
+    name: 'data-sources',
+    up: [
+      // To check also lists what SMS, notifications and other sources filed:
+      // dump_id becomes optional and each row says where it came from.
+      `CREATE TABLE dump_extractions_v9 (
+        id TEXT PRIMARY KEY,
+        dump_id TEXT REFERENCES dumps(id),
+        kind TEXT NOT NULL,
+        action TEXT NOT NULL DEFAULT 'created' CHECK (action IN ('created', 'updated', 'logged')),
+        entity_id TEXT,
+        fact_id TEXT,
+        label TEXT NOT NULL,
+        undone INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        relation_id TEXT,
+        before TEXT,
+        confidence REAL NOT NULL DEFAULT 1,
+        flag TEXT,
+        checked INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'dump',
+        source_ref TEXT
+      )`,
+      `INSERT INTO dump_extractions_v9 (id, dump_id, kind, action, entity_id, fact_id, label, undone, created_at, relation_id, before, confidence, flag, checked)
+         SELECT id, dump_id, kind, action, entity_id, fact_id, label, undone, created_at, relation_id, before, confidence, flag, checked FROM dump_extractions`,
+      `DROP TABLE dump_extractions`,
+      `ALTER TABLE dump_extractions_v9 RENAME TO dump_extractions`,
+      `CREATE INDEX IF NOT EXISTS idx_dump_extractions_dump ON dump_extractions(dump_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_dump_extractions_entity ON dump_extractions(entity_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_dump_extractions_check ON dump_extractions(checked, undone, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_dump_extractions_source ON dump_extractions(source, source_ref)`,
+      // Who sends bank/card/UPI texts, and whether to trust them (ticked in You › Data sources › SMS).
+      `CREATE TABLE IF NOT EXISTS sms_senders (
+        address TEXT PRIMARY KEY,
+        bank TEXT,
+        trusted INTEGER NOT NULL DEFAULT 0,
+        decided INTEGER NOT NULL DEFAULT 0,
+        count INTEGER NOT NULL DEFAULT 0,
+        first_seen INTEGER NOT NULL,
+        last_seen INTEGER NOT NULL,
+        sample TEXT
+      )`,
+      // One row per data source (sms, notifications, health, usage, contacts, calendar, gmail…).
+      `CREATE TABLE IF NOT EXISTS source_state (
+        id TEXT PRIMARY KEY,
+        enabled INTEGER NOT NULL DEFAULT 0,
+        last_sync INTEGER,
+        cursor TEXT,
+        total INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        updated_at INTEGER NOT NULL
+      )`,
+      // Screen time from Android UsageStats, per day and per app per day.
+      `CREATE TABLE IF NOT EXISTS usage_daily (
+        day TEXT PRIMARY KEY,
+        total_ms INTEGER NOT NULL DEFAULT 0,
+        pickups INTEGER,
+        first_use INTEGER,
+        last_use INTEGER,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS usage_app_daily (
+        day TEXT NOT NULL,
+        package TEXT NOT NULL,
+        label TEXT,
+        ms INTEGER NOT NULL DEFAULT 0,
+        launches INTEGER,
+        PRIMARY KEY (day, package)
+      )`,
+    ],
   },
 ];

@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { Extraction } from '@core/repo/dumpRepo';
 import { undoExtraction } from '@core/dumps/extract';
+import { ingestItem, sourceLabel } from '@core/ingest/ingest';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, EmptyState, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
@@ -19,11 +20,13 @@ export default function ToCheckScreen() {
   const toast = useToast();
   const items = useLive((o) => o.dumps.toCheck(), []);
   // Group by what was said, keeping the list order (flagged first, newest first).
-  const groups: Array<{ dumpId: string; items: Extraction[] }> = [];
+  // By what it came from: a dump, or one SMS / notification / other source item.
+  const groups: Array<{ key: string; dumpId: string | null; source: string; sourceRef: string | null; items: Extraction[] }> = [];
   for (const x of items) {
-    const g = groups.find((y) => y.dumpId === x.dumpId);
+    const key = x.dumpId ?? `${x.source}:${x.sourceRef ?? x.id}`;
+    const g = groups.find((y) => y.key === key);
     if (g) g.items.push(x);
-    else groups.push({ dumpId: x.dumpId, items: [x] });
+    else groups.push({ key, dumpId: x.dumpId, source: x.source, sourceRef: x.sourceRef, items: [x] });
   }
   const tick = (ids: string[]) => os.dumps.setChecked(ids);
   const cancel = (x: Extraction) => {
@@ -44,16 +47,20 @@ export default function ToCheckScreen() {
       ) : (
         <View style={{ gap: 14 }}>
           {groups.map((g) => {
-            const dump = os.dumps.get(g.dumpId);
+            const dump = g.dumpId ? os.dumps.get(g.dumpId) : null;
+            const msg = !g.dumpId && g.sourceRef ? ingestItem(os, g.sourceRef) : null;
+            const when = dump?.createdAt ?? msg?.receivedAt ?? g.items[0]!.createdAt;
+            const head = dump ? `${dumpWhen(when)}${dump.subjectId ? ` · on ${os.entities.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : `${dumpWhen(when)} · ${msg ? sourceLabel(msg) : g.source}`;
+            const quote = dump?.body ?? msg?.text ?? null;
             return (
-              <View key={g.dumpId} style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>
-                <Pressable accessibilityRole="button" onPress={() => router.push(`/dump/${g.dumpId}` as never)} style={{ gap: 4 }}>
+              <View key={g.key} style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>
+                <Pressable accessibilityRole="button" disabled={!dump} onPress={() => dump && router.push(`/dump/${dump.id}` as never)} style={{ gap: 4 }}>
                   <Text variant="labelMicro" color="secondary" style={{ textTransform: 'uppercase' }}>
-                    {dump ? `${dumpWhen(dump.createdAt)}${dump.subjectId ? ` · on ${os.entities.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : 'Filed'}
+                    {head}
                   </Text>
-                  {dump ? (
+                  {quote ? (
                     <Text variant="caption" color="secondary" numberOfLines={2}>
-                      “{dump.body.trim()}”
+                      “{quote.trim()}”
                     </Text>
                   ) : null}
                 </Pressable>

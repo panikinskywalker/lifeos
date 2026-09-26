@@ -27,6 +27,10 @@ export const BACKUP_TABLES = [
   'dumps',
   'dump_extractions',
   'queued_questions',
+  'sms_senders',
+  'source_state',
+  'usage_daily',
+  'usage_app_daily',
 ] as const;
 
 /** Rebuilt or re-derived on this device, so not worth carrying in a backup. */

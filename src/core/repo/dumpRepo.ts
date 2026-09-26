@@ -33,7 +33,12 @@ export interface DumpProgress {
 
 export interface Extraction {
   id: string;
-  dumpId: string;
+  /** The dump it came from, or null for other sources (see `source`). */
+  dumpId: string | null;
+  /** dump | sms | notification | health | calendar | gmail … */
+  source: string;
+  /** The source item (an ingest_queue id for SMS/notifications). */
+  sourceRef: string | null;
   /** person | task | fact | event | transaction | cycle | asset | … (a record type, 'fact' or 'cycle'). */
   kind: string;
   action: 'created' | 'updated' | 'logged';
@@ -67,7 +72,9 @@ const toDump = (r: Row): Dump => ({
 
 const toExtraction = (r: Row): Extraction => ({
   id: r.id as string,
-  dumpId: r.dump_id as string,
+  dumpId: (r.dump_id as string | null) ?? null,
+  source: (r.source as string | undefined) ?? 'dump',
+  sourceRef: (r.source_ref as string | null) ?? null,
   kind: r.kind as string,
   action: r.action as Extraction['action'],
   entityId: (r.entity_id as string | null) ?? null,
@@ -162,11 +169,13 @@ export class DumpRepo {
     bus.emit('data.changed', { table: 'dumps', id });
   }
 
-  addExtraction(x: { dumpId: string; kind: string; action?: Extraction['action']; entityId?: string | null; factId?: string | null; relationId?: string | null; label: string; before?: Record<string, unknown> | null; confidence?: number; flag?: string | null }): Extraction {
+  addExtraction(x: { dumpId?: string | null; source?: string; sourceRef?: string | null; kind: string; action?: Extraction['action']; entityId?: string | null; factId?: string | null; relationId?: string | null; label: string; before?: Record<string, unknown> | null; confidence?: number; flag?: string | null }): Extraction {
     const id = newId();
-    this.db.run(`INSERT INTO dump_extractions(id,dump_id,kind,action,entity_id,fact_id,relation_id,label,before,confidence,flag,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    this.db.run(`INSERT INTO dump_extractions(id,dump_id,source,source_ref,kind,action,entity_id,fact_id,relation_id,label,before,confidence,flag,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
       id,
-      x.dumpId,
+      x.dumpId ?? null,
+      x.source ?? 'dump',
+      x.sourceRef ?? null,
       x.kind,
       x.action ?? 'created',
       x.entityId ?? null,
@@ -178,7 +187,7 @@ export class DumpRepo {
       x.flag ?? null,
       Date.now(),
     ]);
-    bus.emit('data.changed', { table: 'dumps', id: x.dumpId });
+    bus.emit('data.changed', { table: 'dumps', id: x.dumpId ?? id });
     return this.extraction(id)!;
   }
 
@@ -219,7 +228,7 @@ export class DumpRepo {
   markUndone(extractionId: string, undone = true) {
     const x = this.extraction(extractionId);
     this.db.run(`UPDATE dump_extractions SET undone=? WHERE id=?`, [undone ? 1 : 0, extractionId]);
-    if (x) bus.emit('data.changed', { table: 'dumps', id: x.dumpId });
+    if (x) bus.emit('data.changed', { table: 'dumps', id: x.dumpId ?? x.id });
   }
 
   /** Put every dump back in the search index (after a full rebuild). */
