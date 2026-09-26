@@ -49,6 +49,8 @@ export interface AssistantOptions {
   historyTurns?: number;
   /** Character budget for retrieved context (default 6000). */
   contextBudget?: number;
+  /** Only these tools (the one box's question path is read-only: filing goes through dumps). */
+  toolFilter?: (t: AiToolDef) => boolean;
 }
 
 export function toolSpec(t: AiToolDef): ToolSpec {
@@ -104,7 +106,8 @@ Guidelines:
   }
 
   tools(): AiToolDef[] {
-    return [...this.os.registry.aiTools.values()];
+    const all = [...this.os.registry.aiTools.values()];
+    return this.opts.toolFilter ? all.filter(this.opts.toolFilter) : all;
   }
 
   async send(userText: string, signal?: AbortSignal): Promise<AssistantTurn[]> {
@@ -252,7 +255,7 @@ const TOOL_GROUPS: Array<[RegExp, string[]]> = [
   [/\b(friend|met|meet|colleague|works? (at|for)|boss|neighbou?r|cousin|introduced)\b/i, ['create_person_from_mention', 'suggest_cycle']],
   [/\b(warranty|guarantee|keep in touch|renew\w*|expires?|every)\b/i, ['suggest_cycle']],
 ];
-const CORE_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'create_entity', 'update_entity', 'link_entities', 'list_entity_types']);
+const CORE_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'create_entity', 'update_entity', 'link_entities', 'list_entity_types', 'connections']);
 
 export function selectTools(text: string, tools: AiToolDef[], history: ChatMessage[] = []): AiToolDef[] {
   const want = new Set(CORE_TOOLS);
@@ -262,6 +265,9 @@ export function selectTools(text: string, tools: AiToolDef[], history: ChatMessa
   // Tools we don't classify (a new module's) always go, so nothing silently disappears.
   return tools.filter((t) => want.has(t.name) || !known.has(t.name));
 }
+
+/** Tools that only read — the one box's question path (docs/GRAPH.md §5). */
+export const READ_ONLY_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'aggregate', 'list_entity_types', 'connections', 'recall', 'upkeep_status', 'balances', 'finance_summary', 'list_reminders', 'recent_activity', 'attach_file']);
 
 /** The confirm card's line: the tool's own describe(), else its name and the key inputs. */
 export function confirmSummary(def: AiToolDef, input: unknown, os: LifeOSContext): string {

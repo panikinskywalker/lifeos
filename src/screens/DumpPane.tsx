@@ -1,16 +1,14 @@
-import { useEffect, useState, type MutableRefObject, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
-import type { Dump, DumpSource, Extraction } from '@core/repo/dumpRepo';
+import type { Dump, Extraction } from '@core/repo/dumpRepo';
 import { NO_PROVIDER, undoExtraction } from '@core/dumps/extract';
-import { useLive, useOS } from '@ui/hooks';
+import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, Chip, EmptyState, Icon, IconButton, Text, useBottomBarInset, useToast } from '@ui/kit';
+import { Chip, Icon, IconButton, Text, useToast } from '@ui/kit';
 import type { IconName } from '@ui/icons';
-import { runDumpExtraction, saveDump } from '../platform/dumpExtraction';
-import { listen } from '../platform/voice';
+import { runDumpExtraction } from '../platform/dumpExtraction';
 
 const KIND_ICON: Record<string, IconName> = { link: 'link', place: 'location', org: 'briefcase', person: 'user', fact: 'sparkle', task: 'check-circle', transaction: 'rupee', asset: 'box', vehicle: 'car', cycle: 'repeat', routine: 'repeat', reminder: 'bell', subscription: 'card', note: 'file', trip: 'plane', event: 'calendar' };
 export const kindIcon = (k: string): IconName => KIND_ICON[k] ?? 'file';
@@ -35,90 +33,6 @@ export function dumpStatusLine(d: Dump, xs: Extraction[]): string {
   if (d.status === 'failed') return d.attempts >= 5 ? 'Couldn’t read it — kept as is' : 'Couldn’t read it yet — will retry';
   const s = extractedSummary(xs);
   return s ? `Extracted: ${s}` : 'Nothing to file — kept as is';
-}
-
-/**
- * The Dump half of the centre tab (PRODUCT v4 §1.3): one big box, type or
- * talk, and it's saved verbatim the moment you tap Dump. What it extracts
- * shows up under each dump seconds later, each item with its own Undo.
- */
-export function DumpPane({ header, share, centerPress }: { header: (o: { subtitle: string; right?: ReactNode }) => ReactNode; share?: string | null; centerPress: MutableRefObject<(() => void) | null> }) {
-  const os = useOS();
-  const t = useTheme();
-  const router = useRouter();
-  const toast = useToast();
-  const barInset = useBottomBarInset();
-  const [text, setText] = useState('');
-  const [source, setSource] = useState<DumpSource>('typed');
-  const dumps = useLive((o) => o.dumps.list({ limit: 30 }), []);
-
-  useEffect(() => {
-    if (share) {
-      setText(share);
-      setSource('share');
-    }
-  }, [share]);
-  useEffect(() => {
-    void runDumpExtraction(os);
-  }, [os]);
-
-  const speak = async () => {
-    const heard = await listen();
-    if (!heard) return toast.show({ message: Platform.OS === 'web' ? 'Voice isn’t available in this browser' : 'Didn’t catch that', icon: 'mic' });
-    setText((x) => (x.trim() ? `${x.trimEnd()} ${heard}` : heard));
-    if (source === 'typed' && !text.trim()) setSource('voice');
-  };
-  centerPress.current = () => void speak();
-
-  const dump = () => {
-    const body = text.trim() ? text : '';
-    if (!body) return;
-    saveDump(os, body, source);
-    setText('');
-    setSource('typed');
-    toast.show({ message: 'Dumped. Filing what’s in it…', icon: 'brain' });
-  };
-
-  return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
-      {header({ subtitle: 'Anything on your mind. Kept word for word.' })}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: t.layout.gutter, paddingTop: 8, paddingBottom: barInset + 32, gap: 14 }} keyboardShouldPersistTaps="handled">
-        <View style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 12 }}>
-          <TextInput
-            accessibilityLabel="Brain dump"
-            value={text}
-            onChangeText={(v) => {
-              setText(v);
-              if (!v) setSource('typed');
-            }}
-            placeholder="Made a new friend today… need to call the plumber… bought a Dyson for 32k…"
-            placeholderTextColor={t.c.fg.tertiary}
-            multiline
-            textAlignVertical="top"
-            style={{ minHeight: 132, maxHeight: 320, color: t.c.fg.primary, fontSize: 17, lineHeight: 24, fontFamily: t.type.body.fontFamily, padding: 4 }}
-          />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <IconButton icon="mic" accessibilityLabel="Speak your dump" filled onPress={() => void speak()} />
-            <Text variant="caption" color="secondary" style={{ flex: 1 }} numberOfLines={1}>
-              {source === 'voice' ? 'From your voice' : source === 'share' ? 'Shared into LifeOS' : text.trim() ? `${text.trim().split(/\s+/).length} words` : 'Type or talk'}
-            </Text>
-            <Button title="Dump" icon="brain" size="sm" onPress={dump} disabled={!text.trim()} />
-          </View>
-        </View>
-
-        {dumps.length ? (
-          <Text variant="labelMicro" color="secondary" style={{ textTransform: 'uppercase', paddingHorizontal: 4, marginTop: 6 }}>
-            Recent dumps
-          </Text>
-        ) : (
-          <EmptyState icon="brain" tint="memory" line="Nothing dumped yet. Half thoughts, lists, rants, plans — it keeps every word and files the people, tasks, spends and facts it finds." bare />
-        )}
-        {dumps.map((d) => (
-          <DumpCard key={d.id} dump={d} os={os} onOpen={() => router.push(`/dump/${d.id}` as never)} />
-        ))}
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
 }
 
 /** One dump: when, the text, and what came out of it (tap to open, Undo per item). */

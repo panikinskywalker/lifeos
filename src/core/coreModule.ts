@@ -6,6 +6,7 @@ import type { LifeOSContext } from './registry/context';
 import { lifeTools, recordCard, touchesMoneyOrPeople } from './ai/lifeTools';
 import { withExtras } from './ai/cards';
 import { createAnythingTools, fillDefaults } from './ai/createAnything';
+import { graphReadTools } from './graph/read';
 
 /* ------------------------------------------------------------------ */
 /* Generic triggers — work for every entity type                       */
@@ -172,6 +173,7 @@ function slim(e: Entity, os: LifeOSContext) {
 const aiTools: AiToolDef[] = [
   ...lifeTools,
   ...createAnythingTools,
+  ...graphReadTools,
   {
     name: 'list_entity_types',
     description: 'List every record type in LifeOS with its fields, statuses and relation kinds. Call this first when unsure how data is shaped.',

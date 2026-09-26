@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '../registry/context';
 import type { ChatMessage } from './provider';
 import { resolveCandidates } from './lifeTools';
+import { describeNeighbours } from '../graph/read';
 
 export interface RetrievalOptions {
   /** Rough character budget for the whole block (≈ 4 chars per token). */
@@ -25,13 +26,13 @@ function describeRecord(os: LifeOSContext, id: string): string | null {
     return `${c.name} (cycleId ${c.id}) ${s.state}${s.daysLeft != null ? `, ${s.daysLeft < 0 ? `${-s.daysLeft} d late` : `in ${s.daysLeft} d`}` : ''}${s.meterLeft != null ? `, ${Math.round(s.meterLeft)} km left` : ''}`;
   });
   const timeline = os.entities.timeline.forEntity(e.id, 5).map((t) => `${iso(t.occurredAt)} ${t.title}${t.body ? ` — ${t.body.slice(0, 60)}` : ''}`);
-  const rels = os.relations.forEntity(e.id).slice(0, 6).map((r) => `${r.relation.kind}: ${r.other.title}`);
+  const rels = describeNeighbours(os, e.id, 10);
   const facts = os.facts.list({ subjectId: e.id, limit: 5 }).map((f) => f.text);
   return [
     `• ${e.title} [${def?.label ?? e.type}, id ${e.id}${e.status ? `, ${e.status}` : ''}]${data ? ` — ${data}` : ''}`,
     cycles.length ? `  cycles: ${cycles.join(' | ')}` : '',
     timeline.length ? `  recent: ${timeline.join(' | ')}` : '',
-    rels.length ? `  linked: ${rels.join(', ')}` : '',
+    rels.length ? `  connections: ${rels.join(' | ')}` : '',
     facts.length ? `  facts: ${facts.join(' | ')}` : '',
   ].filter(Boolean).join('\n');
 }

@@ -13,6 +13,7 @@ import { bus } from '@core/events/bus';
 import { graphTools, newSession, resolveNode, reverseWrite, type GraphSession } from '@core/graph/tools';
 import { parseDateish } from '@core/ai/createAnything';
 import { edgeLabel } from '@core/graph/edges';
+import { graphReadTools, neighbours } from '@core/graph/read';
 import { accountType, transactionType } from './finance/types';
 import { groupType, personType } from './crm/types';
 import { eventType, taskType } from './projects/types';
@@ -76,6 +77,12 @@ describe('graph tools', () => {
     expect(linksOf(flight!.id)).toEqual(['From USA', 'Part of Trip to Canada', 'To Canada', 'With Kendal']);
     expect(linksOf(kendal.id)).toEqual(['Was at Flight to Canada', 'Was at Trip to Canada']);
     expect(os.entities.query('place').map((p) => p.title).sort()).toEqual(['Canada', 'USA']);
+    // Reading it back: "when did I last see Kendal" = her newest dated neighbour, with who/where around it.
+    const [latest] = neighbours(os, kendal.id);
+    expect(latest).toMatchObject({ title: 'Flight to Canada', label: 'Was at', context: expect.stringContaining('to Canada') });
+    const tool = graphReadTools[0]!;
+    const out = (await tool.run(tool.input.parse({ name: 'Kendal' }), os)) as { connections: Array<{ title: string; at?: string }> };
+    expect(out.connections[0]).toMatchObject({ title: 'Flight to Canada', at: parseDateish('8 sept') });
     // A second travel event that week joins the same trip.
     const s2 = session('hotel in Toronto on 9 sept');
     await call(s2, 'record_event', { kind: 'stay', when: '9 Sept', roles: [{ role: 'at', node: 'Toronto' }] });
