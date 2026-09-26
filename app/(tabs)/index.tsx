@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { upkeep, type Upkeep } from '@core/cycles/upkeep';
+import { onThisDay } from '@core/almanac/almanac';
 import { METRICS, formatMetric, metricSeries, peopleToCall, screenTopApps, spendPace, upcoming, type MetricId } from '@core/dashboard/metrics';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -16,7 +17,7 @@ function greeting(d = new Date()) {
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
-type TileId = 'steps' | 'sleep' | 'screen' | 'spend' | 'upcoming' | 'people' | 'overdue';
+type TileId = 'steps' | 'sleep' | 'screen' | 'spend' | 'upcoming' | 'people' | 'overdue' | 'onthisday';
 const TILES: Record<TileId, { label: string; wide: boolean }> = {
   steps: { label: 'Steps', wide: false },
   sleep: { label: 'Sleep', wide: false },
@@ -25,8 +26,9 @@ const TILES: Record<TileId, { label: string; wide: boolean }> = {
   upcoming: { label: 'Upcoming', wide: true },
   people: { label: 'People to call', wide: false },
   overdue: { label: 'Overdue', wide: false },
+  onthisday: { label: 'On this day', wide: true },
 };
-const DEFAULT: Array<{ id: TileId; hidden?: boolean }> = (['steps', 'sleep', 'screen', 'spend', 'upcoming', 'people', 'overdue'] as TileId[]).map((id) => ({ id }));
+const DEFAULT: Array<{ id: TileId; hidden?: boolean }> = (['steps', 'sleep', 'screen', 'spend', 'upcoming', 'people', 'overdue', 'onthisday'] as TileId[]).map((id) => ({ id }));
 const SOURCE_NAME = { health: 'Health Connect', usage: 'Screen time', money: 'Bank SMS' } as const;
 const METRIC_LOOK: Partial<Record<MetricId, { icon: IconName; tint: TintKey }>> = {
   steps: { icon: 'shoe', tint: 'health' },
@@ -118,6 +120,8 @@ function TodayTile({ id, u }: { id: TileId; u: Upkeep }) {
       return <PeopleTile u={u} />;
     case 'overdue':
       return <OverdueTile u={u} />;
+    case 'onthisday':
+      return <OnThisDayTile />;
   }
 }
 
@@ -246,6 +250,26 @@ function PeopleTile({ u }: { u: Upkeep }) {
     </Tile>
   );
 }
+
+/** What happened on this date a month, six months and years ago — only when there's something. */
+function OnThisDayTile() {
+  const router = useRouter();
+  const days = useLive((o) => onThisDay(o), []);
+  if (!days.length) return null;
+  const open = (i: (typeof days)[number]['items'][number]) => router.push((i.kind === 'dump' ? `/dump/${i.id}` : `/entity/${i.type}/${i.id}`) as never);
+  return (
+    <Tile size="2x1" tint="memory" icon="history" label="On this day" onPress={() => router.push({ pathname: '/almanac/time', params: { span: 'day', day: days[0]!.day } } as never)}>
+      <RowList>
+        {days.slice(0, 3).flatMap((d) =>
+          d.items.slice(0, 2).map((i) => (
+            <RowItem key={`${d.day}-${i.kind}-${i.id}`} icon={ON_THIS_DAY_ICON[i.kind]} tint="memory" title={i.title} value={d.ago} valueTone="secondary" onPress={() => open(i)} />
+          )),
+        )}
+      </RowList>
+    </Tile>
+  );
+}
+const ON_THIS_DAY_ICON = { dump: 'brain', event: 'calendar', trip: 'plane', person: 'user', done: 'repeat', fact: 'sparkle' } as const;
 
 function OverdueTile({ u }: { u: Upkeep }) {
   const router = useRouter();
