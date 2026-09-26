@@ -17,6 +17,7 @@ import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 import { CyclesSection, MeterSheet } from '../components/cycles';
 import { backlinks } from '@core/links';
+import { neighbours } from '@core/graph/read';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
 
@@ -25,7 +26,8 @@ type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 
  * sections, tags, relations, reminders, attachments, notes and the full
  * timeline. Modules add sections via manifest.detailSections.
  */
-export function EntityDetailScreen({ id }: { id: string }) {
+/** `say` renders the "Tell me about …" bar (it lives in the app shell: voice + filing). */
+export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Entity) => React.ReactNode }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
@@ -79,6 +81,7 @@ export function EntityDetailScreen({ id }: { id: string }) {
 
         <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 20, gap: 20 }}>
           {entity.archived ? <Chip label="Archived" icon="archive" tone="muted" /> : null}
+          {say ? say(entity) : null}
 
           {sections.filter((s) => s.placement === 'top').map((s) => {
             const C = s.component;
@@ -249,35 +252,62 @@ function BacklinksCard({ entity }: { entity: Entity }) {
   );
 }
 
+/** Connections (docs/GRAPH.md §5): everything linked, grouped by link word; events dated, with who/where. */
 function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void }) {
   const os = useOS();
   const router = useRouter();
   const toast = useToast();
   // Incoming [[mentions]] have their own section (Mentioned in).
-  const rels = useLive((o) => o.relations.forEntity(entity.id).filter((r) => !(r.relation.kind === 'mention' && r.direction === 'in')), [entity.id]);
-  if (!rels.length) return null;
+  const items = useLive((o) => neighbours(o, entity.id, { limit: 60 }).filter((n) => n.kind !== 'mention'), [entity.id]);
+  if (!items.length) return null;
   const def = os.registry.type(entity.type);
-  const kindLabel = (k: string) => def.relations?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
+  const groups: Array<{ label: string; items: typeof items }> = [];
+  for (const n of items) {
+    const label = def.relations?.find((r) => r.kind === n.kind)?.label ?? n.label;
+    const g = groups.find((x) => x.label === label);
+    if (g) g.items.push(n);
+    else groups.push({ label, items: [n] });
+  }
+  const unlink = (n: (typeof items)[number]) => {
+    os.relations.unlink(entity.id, n.id, n.kind);
+    toast.show({ message: `Unlinked ${n.title}`, icon: 'link', undo: () => void os.relations.link(entity.id, n.id, n.kind) });
+  };
   return (
-    <Section title="Related" action="Link" onAction={onLink}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {rels.map((r) => {
-          const d = os.registry.entityTypes.get(r.other.type);
-          const kind = r.relation.kind;
-          return (
-            <Chip
-              key={r.relation.id}
-              label={kind === 'related' ? r.other.title : `${r.other.title} · ${kindLabel(kind).toLowerCase()}`}
-              icon={d?.icon}
-              onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)}
-              onLongPress={() => {
-                os.relations.unlink(entity.id, r.other.id, kind);
-                toast.show({ message: `Unlinked ${r.other.title}`, icon: 'link', undo: () => void os.relations.link(entity.id, r.other.id, kind) });
-              }}
-            />
-          );
-        })}
+    <Section title="Connections" meta={String(items.length)} action="Link" onAction={onLink}>
+      <View style={{ gap: 12 }}>
+        {groups.map((g) => (
+          <View key={g.label} style={{ gap: 6 }}>
+            <Text variant="labelMicro" color="secondary" style={{ textTransform: 'uppercase' }}>
+              {g.label}
+            </Text>
+            {g.items.some((n) => n.at) ? (
+              <RowList>
+                {g.items.map((n) => (
+                  <RowItem
+                    key={`${n.kind}${n.id}`}
+                    icon={os.registry.entityTypes.get(n.type)?.icon}
+                    tint={tintForModule(os.registry.entityTypes.get(n.type)?.module)}
+                    title={n.title}
+                    subtitle={n.context}
+                    meta={n.at ? os.format.date(n.at) : undefined}
+                    onPress={() => router.push(`/entity/${n.type}/${n.id}`)}
+                    onLongPress={() => unlink(n)}
+                  />
+                ))}
+              </RowList>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {g.items.map((n) => (
+                  <Chip key={`${n.kind}${n.id}`} label={n.title} icon={os.registry.entityTypes.get(n.type)?.icon} onPress={() => router.push(`/entity/${n.type}/${n.id}`)} onLongPress={() => unlink(n)} />
+                ))}
+              </View>
+            )}
+          </View>
+        ))}
       </View>
+      <Text variant="caption" color="tertiary" style={{ marginTop: 8 }}>
+        Long-press to unlink.
+      </Text>
     </Section>
   );
 }

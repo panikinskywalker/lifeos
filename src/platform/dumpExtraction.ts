@@ -15,8 +15,9 @@ let retry: ReturnType<typeof setTimeout> | null = null;
 const RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000];
 let failures = 0;
 
-export function saveDump(os: LifeOSContext, body: string, source: DumpSource = 'typed') {
-  const d = os.dumps.add({ body, source });
+/** Keep what was said and file it in the background; `subjectId` = said on that record's page. */
+export function saveDump(os: LifeOSContext, body: string, source: DumpSource = 'typed', subjectId?: string) {
+  const d = os.dumps.add({ body, source, subjectId });
   void runDumpExtraction(os);
   return d;
 }
