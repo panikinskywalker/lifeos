@@ -1,0 +1,7 @@
+{
+  "name": "lifeos-device",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "LifeOS device data: SMS, payment notifications, screen time, Health Connect, call log (Android, sideloaded build)."
+}
