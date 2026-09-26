@@ -5,6 +5,7 @@ import { parseMessage } from '../ai/parser';
 import { stripNulls, toolSpec } from '../ai/assistant';
 import { extrasOf } from '../ai/cards';
 import { exactUndo, graphTools, newSession, reverseWrite } from '../graph/tools';
+import { classifyFailure } from '../ai/limits';
 import type { Dump } from '../repo/dumpRepo';
 
 /**
@@ -24,7 +25,8 @@ const MAX_ROUNDS = 6;
 const CHUNK = 1400;
 
 export interface ExtractResult {
-  status: 'done' | 'pending' | 'failed';
+  /** pending = no key yet (the parser did what it could) · waiting = a provider limit/outage, will resume. */
+  status: 'done' | 'pending' | 'waiting' | 'failed';
   via: 'parser' | 'model' | 'none';
   items: number;
   error?: string;
@@ -69,9 +71,16 @@ export function chunks(body: string, size = CHUNK): string[] {
   return out;
 }
 
+/** Sentences, as said (keeps "Dr." etc. together well enough for everyday speech). */
+export function sentences(body: string): string[] {
+  return body.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+}
+
 /**
- * File one dump. No provider and nothing the parser understands → it waits
- * (runs again when a key is added or the phone is online).
+ * File one dump. The parser files the everyday sentences in it straight
+ * away (once); the model files the rest, chunk by chunk, resuming where it
+ * stopped. Limits and outages make it wait (never fail); with no key it
+ * waits for one.
  */
 export async function extractDump(os: LifeOSContext, dumpId: string, provider?: LLMProvider | null): Promise<ExtractResult> {
   const dump = os.dumps.get(dumpId);
@@ -79,10 +88,64 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
   if (dump.status === 'done' || dump.status === 'skipped') return { status: 'done', via: 'none', items: os.dumps.extractions(dumpId).length };
   const session = newSession(dump.id, { source: dump.subjectId ? 'record-voice' : 'dump', subjectId: dump.subjectId, saidNew: /\bnew\b/i.test(dump.body) });
 
-  // Parser first: one everyday sentence ("did laundry", "spent 450 on lunch"), filed offline.
-  const oneLine = dump.body.trim().replace(/\s+/g, ' ');
-  const plan = !dump.subjectId && !/\n\s*\S/.test(dump.body.trim()) ? parseMessage(os, oneLine) : null;
-  if (plan && WRITE_INTENTS.has(plan.intent)) {
+  // 1. Parser first, once: every everyday sentence ("did laundry", "spent 450 on lunch") is filed offline now.
+  let progress = dump.progress;
+  if (!progress.parsed) {
+    const rest = dump.subjectId ? dump.body.trim() : await parserPass(os, dump);
+    progress = { parsed: true, rest, chunksDone: 0 };
+    os.dumps.setProgress(dumpId, progress);
+  }
+  const rest = (progress.rest ?? '').trim();
+  const parsedItems = os.dumps.extractions(dumpId).length;
+  if (!rest) {
+    os.dumps.setStatus(dumpId, 'done');
+    return { status: 'done', via: 'parser', items: parsedItems };
+  }
+
+  // 2. The rest needs a model.
+  if (!provider) {
+    if (dump.error !== NO_PROVIDER || dump.retryAt) os.dumps.setStatus(dumpId, 'pending', NO_PROVIDER);
+    return { status: 'pending', via: parsedItems ? 'parser' : 'none', items: parsedItems };
+  }
+  const subject = dump.subjectId ? os.entities.get(dump.subjectId) : undefined;
+  const system = filingPrompt(os, subject ? { type: os.registry.entityTypes.get(subject.type)?.label.toLowerCase() ?? subject.type, title: subject.title } : null);
+  const tools = graphTools(session);
+  const byName = new Map(tools.map((t) => [t.name, t]));
+  const specs = tools.map(toolSpec);
+  const parts = chunks(rest);
+  try {
+    for (let i = progress.chunksDone ?? 0; i < parts.length; i++) {
+      // Resuming (or the parser took some sentences): tell the model what's already filed so nothing doubles.
+      const filed = os.dumps.extractions(dumpId).filter((x) => !x.undone).map((x) => `- ${x.label}`);
+      const sys = filed.length ? `${system}\nAlready filed from this text — don't file these again:\n${filed.slice(-40).join('\n')}` : system;
+      await fileChunk(os, provider, sys, specs, byName, parts[i]!);
+      progress = { ...progress, chunksDone: i + 1 };
+      os.dumps.setProgress(dumpId, progress);
+    }
+    os.dumps.setStatus(dumpId, 'done');
+    return { status: 'done', via: 'model', items: os.dumps.extractions(dumpId).length };
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw e;
+    const f = classifyFailure(e);
+    if (f.kind === 'wait') {
+      // Not a failure: file it when the provider is back. Never counts toward giving up.
+      os.dumps.setWaiting(dumpId, f.reason, f.until);
+      return { status: 'waiting', via: 'model', items: os.dumps.extractions(dumpId).length, error: f.reason };
+    }
+    os.dumps.setStatus(dumpId, 'failed', f.reason);
+    return { status: 'failed', via: 'model', items: os.dumps.extractions(dumpId).length, error: f.reason };
+  }
+}
+
+/** Files every sentence the parser understands; returns the sentences left for the model. */
+async function parserPass(os: LifeOSContext, dump: Dump): Promise<string> {
+  const left: string[] = [];
+  for (const sentence of sentences(dump.body)) {
+    const plan = sentence.length <= 200 ? parseMessage(os, sentence.replace(/[.!]+$/, '')) : null;
+    if (!plan || !WRITE_INTENTS.has(plan.intent)) {
+      left.push(sentence);
+      continue;
+    }
     const results: unknown[] = [];
     let failed = false;
     for (const step of plan.steps) {
@@ -95,36 +158,9 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
         break;
       }
     }
-    if (!failed) {
-      os.dumps.setStatus(dumpId, 'done');
-      return { status: 'done', via: 'parser', items: os.dumps.extractions(dumpId).length };
-    }
+    if (failed && !results.some((r) => !(r as { error?: unknown })?.error)) left.push(sentence);
   }
-
-  if (!provider) {
-    if (dump.error !== NO_PROVIDER) os.dumps.setStatus(dumpId, 'pending', NO_PROVIDER);
-    return { status: 'pending', via: 'none', items: 0 };
-  }
-  const subject = dump.subjectId ? os.entities.get(dump.subjectId) : undefined;
-  const system = filingPrompt(os, subject ? { type: os.registry.entityTypes.get(subject.type)?.label.toLowerCase() ?? subject.type, title: subject.title } : null);
-  const tools = graphTools(session);
-  const byName = new Map(tools.map((t) => [t.name, t]));
-  const specs = tools.map(toolSpec);
-  try {
-    for (const part of chunks(dump.body)) await fileChunk(os, provider, system, specs, byName, part);
-    os.dumps.setStatus(dumpId, 'done');
-    return { status: 'done', via: 'model', items: session.writes };
-  } catch (e) {
-    if ((e as Error).name === 'AbortError') throw e;
-    const msg = (e as Error).message.slice(0, 300);
-    // Part of it is already filed (and in To check): don't file it twice on a retry.
-    if (session.writes) {
-      os.dumps.setStatus(dumpId, 'done', `partly filed: ${msg}`);
-      return { status: 'done', via: 'model', items: session.writes, error: msg };
-    }
-    os.dumps.setStatus(dumpId, 'failed', msg);
-    return { status: 'failed', via: 'model', items: 0, error: msg };
-  }
+  return left.join(' ');
 }
 
 async function fileChunk(os: LifeOSContext, provider: LLMProvider, system: string, specs: ReturnType<typeof toolSpec>[], byName: Map<string, AiToolDef>, text: string) {

@@ -260,3 +260,28 @@ describe('Gemini specifics', () => {
     expect(p.model).toBe('gemini-3.8-flash');
   });
 });
+
+describe('remembered provider rests (M4.1c)', () => {
+  it('a daily limit is written down; the chain skips that provider until then, and says when all are resting', async () => {
+    const { providerLimits, classifyFailure } = await import('./limits');
+    const store: Record<string, unknown> = {};
+    const settings = { get: <T,>(k: string, d: T) => (k in store ? (store[k] as T) : d), set: (k: string, v: unknown) => void (store[k] = v) };
+    const limits = providerLimits({ settings } as never);
+    let groqCalls = 0;
+    const groq: LLMProvider = { id: 'groq', complete: async () => { groqCalls++; throw new ProviderError('groq 429: tokens per day (TPD) … try again in 7m50s', 'groq', 429, 470_000); } };
+    const gemini = fake('gemini', async () => ({ text: 'g' }));
+    const chain = createChainProvider([groq, gemini], {}, 25_000, limits);
+    await chain.complete({ system: '', messages: [], tools: [] });
+    expect(limits.get('groq')).toMatchObject({ reason: "Groq's free daily limit is used up" });
+    // A fresh chain (next app launch) doesn't call Groq at all.
+    await createChainProvider([groq, gemini], {}, 25_000, limits).complete({ system: '', messages: [], tools: [] });
+    expect(groqCalls).toBe(1);
+    // Everyone resting → one clear error with the earliest wake-up, and no calls.
+    limits.set('gemini', { until: Date.now() + 60 * 60_000, reason: "Gemini's free daily limit is used up" });
+    const err = await createChainProvider([groq, gemini], {}, 25_000, limits).complete({ system: '', messages: [], tools: [] }).catch((e) => e);
+    expect(err).toMatchObject({ status: 429 });
+    expect(err.retryAfterMs).toBeGreaterThan(460_000);
+    expect(classifyFailure(err)).toMatchObject({ kind: 'wait' });
+    expect(limits.earliest()).toBe(limits.get('groq')!.until);
+  });
+});

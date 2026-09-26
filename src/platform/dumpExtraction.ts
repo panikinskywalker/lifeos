@@ -11,6 +11,7 @@ import { buildAgentFromSettings } from './agentProvider';
  * sentences with no key at all.
  */
 let running: Promise<void> | null = null;
+let wake: ReturnType<typeof setTimeout> | null = null;
 let retry: ReturnType<typeof setTimeout> | null = null;
 const RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000];
 let failures = 0;
@@ -22,18 +23,25 @@ export function saveDump(os: LifeOSContext, body: string, source: DumpSource = '
   return d;
 }
 
+/**
+ * The filing queue (M4.1c): files what's due, then sleeps until the
+ * earliest waiting dump is due (a rate limit lifting, a daily quota
+ * resetting). Also runs on every app foreground and from the background task.
+ */
 export function runDumpExtraction(os: LifeOSContext): Promise<void> {
   if (running) return running;
   running = (async () => {
     try {
-      if (!os.dumps.pending().length) return;
-      const agent = await buildAgentFromSettings(os).catch(() => null);
-      // Filing is a tool loop: the main chain (the small models are weak at tool calls).
-      const results = await extractPending(os, agent?.main ?? null);
-      const failed = results.some((r) => r.status === 'failed');
-      failures = failed ? failures + 1 : 0;
-      if (retry) clearTimeout(retry);
-      retry = failed && failures <= RETRY_MS.length ? setTimeout(() => void runDumpExtraction(os), RETRY_MS[failures - 1]) : null;
+      if (os.dumps.pending().length) {
+        const agent = await buildAgentFromSettings(os).catch(() => null);
+        // Filing is a tool loop: the main chain (the small models are weak at tool calls).
+        const results = await extractPending(os, agent?.main ?? null);
+        const failed = results.some((r) => r.status === 'failed');
+        failures = failed ? failures + 1 : 0;
+        if (retry) clearTimeout(retry);
+        retry = failed && failures <= RETRY_MS.length ? setTimeout(() => void runDumpExtraction(os), RETRY_MS[failures - 1]) : null;
+      }
+      scheduleWake(os);
     } catch (e) {
       console.warn('[dumps] extraction failed', (e as Error).message);
     } finally {
@@ -41,4 +49,14 @@ export function runDumpExtraction(os: LifeOSContext): Promise<void> {
     }
   })();
   return running;
+}
+
+/** Wake up when the earliest waiting dump is due (capped, so a long wait is re-checked now and then). */
+function scheduleWake(os: LifeOSContext) {
+  if (wake) clearTimeout(wake);
+  wake = null;
+  const at = os.dumps.nextWake();
+  if (at == null) return;
+  const ms = Math.min(Math.max(at - Date.now(), 1_000) + 500, 30 * 60_000);
+  wake = setTimeout(() => void runDumpExtraction(os), ms);
 }

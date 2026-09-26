@@ -523,5 +523,26 @@ export const migrations: Migration[] = [
       `ALTER TABLE dump_extractions ADD COLUMN checked INTEGER NOT NULL DEFAULT 0`,
       `CREATE INDEX IF NOT EXISTS idx_dump_extractions_check ON dump_extractions(checked, undone, created_at DESC)`,
     ],
+  },  {
+    version: 8,
+    name: 'filing-queue',
+    up: [
+      // A dump waiting on a provider (rate limit, daily quota, offline) is not
+      // failed: it waits until retry_at, and filing resumes where it stopped.
+      `ALTER TABLE dumps ADD COLUMN retry_at INTEGER`,
+      `ALTER TABLE dumps ADD COLUMN progress TEXT`,
+      // Questions asked while no model was free: answered when one is.
+      `CREATE TABLE IF NOT EXISTS queued_questions (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting', 'answered', 'failed')),
+        answer TEXT,
+        answered_at INTEGER,
+        retry_at INTEGER,
+        attempts INTEGER NOT NULL DEFAULT 0
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_queued_questions ON queued_questions(status, created_at)`,
+    ],
   },
 ];

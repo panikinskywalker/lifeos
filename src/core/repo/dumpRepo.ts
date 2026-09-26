@@ -17,6 +17,18 @@ export interface Dump {
   error: string | null;
   /** Said on a record's page: files into this record. */
   subjectId: string | null;
+  /** Waiting on a provider until then (rate limit, daily quota, offline); `error` says why. */
+  retryAt: number | null;
+  /** How far filing got, so a cut-off dump resumes instead of restarting. */
+  progress: DumpProgress;
+}
+
+export interface DumpProgress {
+  /** The parser has filed the everyday sentences; `rest` is what's left for the model. */
+  parsed?: boolean;
+  rest?: string;
+  /** Model chunks of `rest` already filed. */
+  chunksDone?: number;
 }
 
 export interface Extraction {
@@ -49,6 +61,8 @@ const toDump = (r: Row): Dump => ({
   extractedAt: (r.extracted_at as number | null) ?? null,
   error: (r.error as string | null) ?? null,
   subjectId: (r.subject_id as string | null) ?? null,
+  retryAt: (r.retry_at as number | null) ?? null,
+  progress: r.progress ? (JSON.parse(r.progress as string) as DumpProgress) : {},
 });
 
 const toExtraction = (r: Row): Extraction => ({
@@ -106,14 +120,37 @@ export class DumpRepo {
       .map(toDump);
   }
 
-  /** Dumps still waiting for extraction (oldest first), skipping ones that failed too often. */
-  pending(maxAttempts = 5): Dump[] {
-    return this.db.all<Row>(`SELECT * FROM dumps WHERE status IN ('pending','failed') AND attempts < ? ORDER BY created_at`, [maxAttempts]).map(toDump);
+  /** Dumps due for filing now (oldest first): pending ones whose wait is over, and failed ones not given up on. */
+  pending(maxAttempts = 5, now = Date.now()): Dump[] {
+    return this.db
+      .all<Row>(`SELECT * FROM dumps WHERE (status='pending' AND (retry_at IS NULL OR retry_at <= ?)) OR (status='failed' AND attempts < ?) ORDER BY created_at`, [now, maxAttempts])
+      .map(toDump);
+  }
+
+  /** Dumps waiting on a provider (not due yet). */
+  waiting(now = Date.now()): Dump[] {
+    return this.db.all<Row>(`SELECT * FROM dumps WHERE status='pending' AND retry_at > ? ORDER BY created_at`, [now]).map(toDump);
+  }
+
+  /** When the earliest waiting dump is due (to schedule a wake-up), or null. */
+  nextWake(): number | null {
+    return this.db.get<{ t: number | null }>(`SELECT MIN(retry_at) AS t FROM dumps WHERE status='pending' AND retry_at IS NOT NULL`)?.t ?? null;
+  }
+
+  /** Can't file right now for a reason that will pass: wait, without counting it as an attempt. */
+  setWaiting(id: string, reason: string, until: number) {
+    this.db.run(`UPDATE dumps SET status='pending', error=?, retry_at=?, version=version+1 WHERE id=?`, [reason, until, id]);
+    this.changes.record('dumps', id, 'update', 1);
+    bus.emit('data.changed', { table: 'dumps', id });
+  }
+
+  setProgress(id: string, progress: DumpProgress) {
+    this.db.run(`UPDATE dumps SET progress=? WHERE id=?`, [JSON.stringify(progress), id]);
   }
 
   setStatus(id: string, status: DumpStatus, error?: string | null) {
     const done = status === 'done' || status === 'skipped';
-    this.db.run(`UPDATE dumps SET status=?, error=?, attempts=attempts+?, extracted_at=CASE WHEN ? THEN ? ELSE extracted_at END, version=version+1 WHERE id=?`, [
+    this.db.run(`UPDATE dumps SET status=?, error=?, retry_at=NULL, attempts=attempts+?, extracted_at=CASE WHEN ? THEN ? ELSE extracted_at END, version=version+1 WHERE id=?`, [
       status,
       error ?? null,
       status === 'pending' ? 0 : 1,

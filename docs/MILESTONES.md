@@ -121,10 +121,10 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 ### M4.1c — Never lose a thing: the filing queue (26 Sep)
 **Why:** free tiers run out (Groq 200k tokens/day, Gemini per-minute and daily quotas, 503 spikes). Today a dump that can't be filed is retried for ~20 minutes then marked failed; a half-filed dump stays half-filed; a question just errors. Decisions (26 Sep): on-phone answer + queued full answer for questions; the parser files what it can right away; queued filings surface only through the bell.
 - [x] Search covers everything: record Notes (comments), tags and attachment names go into the same index; existing ones backfilled once.
-- [ ] Waiting ≠ failed: rate limits, quota, 503 and offline put a dump in *Waiting to file* (with why and roughly when) and never count toward giving up; only bad model output does. Dumps never end up failed for lack of a provider.
-- [ ] Provider limits remembered: "try again in 7h" / daily quota / cooldowns stored per provider (and per model); the queue skips a provider until then and wakes at the earliest free time (foreground, background task, timer).
-- [ ] Resume, don't restart: filing progress per chunk, so a dump cut off halfway continues from the next chunk; the model is told what's already filed.
-- [ ] Parser inside dumps: the everyday sentences in a longer dump are filed on the phone right away; the model files the rest later without doubling them.
+- [x] Waiting ≠ failed: rate limits, quota, 503 and offline put a dump in *Waiting to file* (with why and roughly when) and never count toward giving up; only bad model output does. Dumps never end up failed for lack of a provider.
+- [x] Provider limits remembered: "try again in 7h" / daily quota / cooldowns stored per provider (and per model); the queue skips a provider until then and wakes at the earliest free time (foreground, background task, timer).
+- [x] Resume, don't restart: filing progress per chunk, so a dump cut off halfway continues from the next chunk; the model is told what's already filed.
+- [x] Parser inside dumps: the everyday sentences in a longer dump are filed on the phone right away; the model files the rest later without doubling them.
 - [ ] Questions without a model: an on-phone answer (search + connections + dates, no model) straight away, and the full answer queued and shown when it lands.
 - [ ] Budget: per-provider daily usage in You › Agent; when a free budget runs low, new dumps go first and the older backlog waits.
 

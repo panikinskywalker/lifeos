@@ -28,8 +28,20 @@ export function dumpWhen(at: number): string {
   return isToday(at) ? `Today ${format(at, 'HH:mm')}` : isYesterday(at) ? `Yesterday ${format(at, 'HH:mm')}` : format(at, 'EEE d MMM, HH:mm');
 }
 
+/** "in a minute" / "around 2:30 pm" / "tomorrow around 9:10 am". */
+export function waitText(at: number): string {
+  const ms = at - Date.now();
+  if (ms < 90_000) return 'in a minute';
+  if (ms < 60 * 60_000) return `in about ${Math.round(ms / 60_000)} min`;
+  const t = format(at, 'h:mm a');
+  return isToday(at) ? `around ${t}` : `tomorrow around ${t}`;
+}
+
 export function dumpStatusLine(d: Dump, xs: Extraction[]): string {
-  if (d.status === 'pending') return d.error === NO_PROVIDER ? 'Saved · add a free key in You › Agent to file what’s in it' : d.attempts ? 'Waiting to retry' : 'Reading it…';
+  const filedSoFar = extractedSummary(xs);
+  if (d.status === 'pending' && d.error === NO_PROVIDER) return `${filedSoFar ? `Filed ${filedSoFar} · ` : 'Saved · '}add a free key in You › Agent to file the rest`;
+  if (d.status === 'pending' && d.retryAt && d.retryAt > Date.now()) return `Waiting to file · ${d.error ?? 'provider busy'} · ${waitText(d.retryAt)}${filedSoFar ? ` · filed so far: ${filedSoFar}` : ''}`;
+  if (d.status === 'pending') return filedSoFar ? `Filed ${filedSoFar} · filing the rest…` : 'Reading it…';
   if (d.status === 'failed') return d.attempts >= 5 ? 'Couldn’t read it — kept as is' : 'Couldn’t read it yet — will retry';
   const s = extractedSummary(xs);
   return s ? `Extracted: ${s}` : 'Nothing to file — kept as is';
@@ -68,7 +80,7 @@ export function DumpCard({ dump: d, os, onOpen, full }: { dump: Dump; os: LifeOS
         </Text>
       </Pressable>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Icon name={busy && d.error === NO_PROVIDER ? 'key' : busy ? 'hourglass' : d.status === 'failed' ? 'alert' : 'check'} size={13} color={d.status === 'failed' ? t.c.alert.coral : busy ? t.c.fg.secondary : t.c.ok.sageText} />
+        <Icon name={busy && d.error === NO_PROVIDER ? 'key' : busy && d.retryAt ? 'clock' : busy ? 'hourglass' : d.status === 'failed' ? 'alert' : 'check'} size={13} color={d.status === 'failed' ? t.c.alert.coral : busy ? t.c.fg.secondary : t.c.ok.sageText} />
         <Text variant="caption" color="secondary" style={{ flex: 1 }}>
           {dumpStatusLine(d, xs)}
         </Text>

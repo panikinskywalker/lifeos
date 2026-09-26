@@ -170,17 +170,68 @@ describe('filing mechanics', () => {
     expect(undoExtraction(os, x!.id)).toBe(true);
   });
 
-  it('no key → waits; offline → failed and retried; partly filed then offline → done, never filed twice', async () => {
+  it('no key → waits for one; offline or rate-limited → waiting (never counted as a failure); garbage → failed', async () => {
     const { d } = await say('Kendal’s sister is Ana', null);
     expect(os.dumps.get(d.id)).toMatchObject({ status: 'pending', error: 'no provider', attempts: 0 });
-    expect(await extractDump(os, d.id, offline)).toMatchObject({ status: 'failed' });
-    expect(await extractPending(os, model([{ name: 'link', input: { from: 'Ana', to: 'Kendal', kind: 'family_of' } }]))).toEqual([{ status: 'done', via: 'model', items: 3 }]);
-
-    let n = 0;
-    const flaky: LLMProvider = { id: 'flaky', complete: async () => { if (n++) throw new Error('groq 429: rate limit'); return { content: [{ type: 'tool_use', id: 'a', name: 'create_task', input: { title: 'Buy milk' } }], stopReason: 'tool_use' }; } };
-    const { r } = await say('buy milk and also call mum', flaky);
-    expect(r).toMatchObject({ status: 'done', items: 1, error: 'groq 429: rate limit' });
+    // No connection: waits a minute, not a failed attempt; not due before then.
+    expect(await extractDump(os, d.id, offline)).toMatchObject({ status: 'waiting', error: 'No connection' });
+    const w = os.dumps.get(d.id)!;
+    expect(w).toMatchObject({ status: 'pending', attempts: 0 });
+    expect(w.retryAt! - Date.now()).toBeGreaterThan(30_000);
     expect(os.dumps.pending()).toEqual([]);
+    expect(os.dumps.nextWake()).toBe(w.retryAt);
+    // Groq's daily limit: waits for as long as Groq says.
+    const daily: LLMProvider = { id: 'groq', complete: async () => { throw Object.assign(new Error('groq 429: Rate limit reached on tokens per day (TPD): Limit 200000. Please try again in 7m50.4s.'), { status: 429, retryAfterMs: 470_400 }); } };
+    expect(await extractDump(os, d.id, daily)).toMatchObject({ status: 'waiting', error: "Groq's free daily limit is used up" });
+    expect(os.dumps.get(d.id)!.retryAt! - Date.now()).toBeGreaterThan(460_000);
+    // Once it's due, a working model files it.
+    expect(await extractPending(os, model([{ name: 'link', input: { from: 'Ana', to: 'Kendal', kind: 'family_of' } }]))).toEqual([]);
+    os.db.run(`UPDATE dumps SET retry_at=? WHERE id=?`, [Date.now() - 1, d.id]);
+    expect(await extractPending(os, model([{ name: 'link', input: { from: 'Ana', to: 'Kendal', kind: 'family_of' } }]))).toEqual([{ status: 'done', via: 'model', items: 3 }]);
+    // Unusable output is a real failure (counts toward giving up).
+    const garbage: LLMProvider = { id: 'x', complete: async () => { throw new Error('extraction: model returned nonsense'); } };
+    const { r } = await say('Asha moved to Pune', garbage);
+    expect(r.status).toBe('failed');
+  });
+
+  it('cut off mid-dump → resumes from the next chunk, told what is already filed', async () => {
+    const long = `Kendal called about the trip. ${'We talked for a long time about many unrelated plans and ideas. '.repeat(25)}\nNeed to book the Toronto hotel tomorrow.`;
+    expect(chunks(long).length).toBe(2);
+    let n = 0;
+    const flaky: LLMProvider = {
+      id: 'gemini',
+      complete: async ({ messages }) => {
+        n++;
+        if (n === 1) return { content: [{ type: 'tool_use', id: 'a', name: 'upsert_node', input: { name: 'Kendal', type: 'person' } }], stopReason: 'tool_use' };
+        if (n === 2) return { content: [{ type: 'text', text: 'done' }], stopReason: 'end_turn' }; // chunk 1 filed
+        void messages;
+        throw Object.assign(new Error('gemini 503: high demand'), { status: 503 });
+      },
+    };
+    const { d, r } = await say(long, flaky);
+    expect(r).toMatchObject({ status: 'waiting', error: 'Gemini is overloaded right now' });
+    expect(os.dumps.get(d.id)!.progress).toMatchObject({ parsed: true, chunksDone: 1 });
+    os.db.run(`UPDATE dumps SET retry_at=? WHERE id=?`, [Date.now() - 1, d.id]);
+    const m = model([{ name: 'create_task', input: { title: 'Book the Toronto hotel', due: 'tomorrow' } }]);
+    await extractPending(os, m);
+    expect(m.seen[0]!.first).toContain('Toronto hotel');
+    expect(m.seen[0]!.first).not.toContain('Kendal called');
+    expect(m.seen[0]!.system).toContain('Already filed from this text');
+    expect(m.seen[0]!.system).toContain('Person: Kendal');
+    expect(os.entities.query('person')).toHaveLength(1);
+    expect(os.dumps.get(d.id)!.status).toBe('done');
+  });
+
+  it('the parser files the everyday sentences inside a longer dump now; the model gets only the rest', async () => {
+    os.entities.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
+    const { d, r } = await say('Did laundry. Spent 450 on lunch at Toit. Met Kendal there, she just moved to Pune.', null);
+    // No key: the everyday sentences are filed anyway, the rest waits.
+    expect(r).toMatchObject({ status: 'pending', via: 'parser', items: 2 });
+    expect(os.dumps.extractions(d.id).map((x) => x.kind)).toEqual(['routine', 'transaction']);
+    const m = model([{ name: 'link', input: { from: 'Kendal', to: 'Pune', kind: 'lives_in' } }]);
+    await extractPending(os, m);
+    expect(m.seen[0]!.first).toBe('Met Kendal there, she just moved to Pune.');
+    expect(os.entities.query('transaction')).toHaveLength(1);
   });
 
   it('a bad tool call goes back to the model as an error instead of failing the dump', async () => {

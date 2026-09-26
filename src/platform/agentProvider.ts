@@ -1,6 +1,7 @@
 import type { LLMProvider } from '@core/ai/provider';
 import { buildAgentProviders, createProvider, PROVIDER_PRESETS, type ChainEvents, type ProviderConfig } from '@core/ai/providers';
 import { meterProvider } from '@core/ai/routing';
+import { providerLimits } from '@core/ai/limits';
 import type { LifeOSContext } from '@core/registry/context';
 import { useSettings } from '@ui/hooks/useSettings';
 import { getProviderKey } from './boot';
@@ -38,6 +39,8 @@ export async function buildAgentFromSettings(os: LifeOSContext, events?: ChainEv
   const { main, small } = buildAgentProviders({
     chain: withKeys,
     events,
+    // Daily quotas and caps are remembered across restarts, so a resting provider isn't called.
+    limits: providerLimits(os),
     onModelChanged: (kind, role, model) => {
       if (role !== 'main') return;
       const st = useSettings.getState();

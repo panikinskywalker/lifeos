@@ -26,6 +26,7 @@ export const BACKUP_TABLES = [
   'aliases',
   'dumps',
   'dump_extractions',
+  'queued_questions',
 ] as const;
 
 /** Rebuilt or re-derived on this device, so not worth carrying in a backup. */

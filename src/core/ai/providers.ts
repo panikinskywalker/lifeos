@@ -1,5 +1,6 @@
 import { createClaudeProvider, type LLMProvider } from './provider';
 import { createOpenAICompatProvider, ProviderError } from './openaiCompat';
+import { classifyFailure, type LimitStore } from './limits';
 
 /* ------------------------------------------------------------------ */
 /* Presets — where each host lives and a sensible default model.        */
@@ -126,16 +127,24 @@ const sleep = (ms: number, signal?: AbortSignal) =>
     signal?.addEventListener('abort', () => (clearTimeout(t), reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
   });
 
-export function createChainProvider(providers: LLMProvider[], events: ChainEvents = {}, maxWaitMs = 25_000): LLMProvider {
+export function createChainProvider(providers: LLMProvider[], events: ChainEvents = {}, maxWaitMs = 25_000, limits?: LimitStore): LLMProvider {
   if (!providers.length) throw new Error('chain: no providers configured');
   const cooldownUntil = new Map<string, number>();
+  const restUntil = (id: string) => Math.max(cooldownUntil.get(id) ?? 0, limits?.get(id)?.until ?? 0);
   return {
     id: `chain(${providers.map((p) => p.id).join('>')})`,
     async complete(args) {
       let lastErr: Error | undefined;
       let waits = 0;
       const now = Date.now();
-      const order = [...providers].sort((a, b) => Number((cooldownUntil.get(a.id) ?? 0) > now) - Number((cooldownUntil.get(b.id) ?? 0) > now));
+      // A provider resting for a while (daily quota, monthly cap, remembered across restarts) isn't called at all.
+      const awake = providers.filter((p) => !limits?.get(p.id));
+      if (!awake.length) {
+        const until = Math.min(...providers.map((p) => limits!.get(p.id)!.until));
+        const why = providers.map((p) => limits!.get(p.id)!.reason).join('; ');
+        throw new ProviderError(`chain: every provider is resting (${why})`, 'chain', 429, Math.max(0, until - now));
+      }
+      const order = [...awake].sort((a, b) => Number(restUntil(a.id) > now) - Number(restUntil(b.id) > now));
       for (let i = 0; i < order.length; i++) {
         const p = order[i];
         try {
@@ -150,6 +159,9 @@ export function createChainProvider(providers: LLMProvider[], events: ChainEvent
             cooldownUntil.set(p.id, until);
             events.onCooldown?.(p.id, until);
           }
+          // Out for longer than a moment: remember it, so nothing calls it again until then.
+          const rest = restFor(p.id, err);
+          if (rest && limits) limits.set(p.id, rest);
           const retryable = pe ? pe.isRetryable : true;
           const next = order[i + 1];
           // Free tiers count tokens per minute: a limit that lifts in a moment is waited out on the same
@@ -170,6 +182,14 @@ export function createChainProvider(providers: LLMProvider[], events: ChainEvent
   };
 }
 
+/** How long a provider should rest after this error (only for rests worth remembering: > a minute). */
+function restFor(provider: string, err: Error): { until: number; reason: string } | null {
+  const f = classifyFailure(err);
+  if (f.kind !== 'wait') return null;
+  if (f.until - Date.now() <= 60_000) return null;
+  return { until: f.until, reason: f.reason.replace(/^The model/, provider.charAt(0).toUpperCase() + provider.slice(1)) };
+}
+
 /* ------------------------------------------------------------------ */
 /* Convenience: build the whole stack from settings                     */
 /* ------------------------------------------------------------------ */
@@ -182,6 +202,8 @@ export interface AgentProviderSettings {
   /** Wrap each provider (usage meter + cap, see routing.ts meterProvider). */
   wrap?: (p: LLMProvider, role: 'main' | 'small') => LLMProvider;
   events?: ChainEvents;
+  /** Remembered provider rests (daily quotas, caps); see limits.ts. */
+  limits?: LimitStore;
 }
 
 /** main = conversation, small = fact mining and other side jobs. */
@@ -194,6 +216,8 @@ export function buildAgentProviders(s: AgentProviderSettings): { main: LLMProvid
         return s.wrap ? s.wrap(p, role) : p;
       }),
       s.events,
+      25_000,
+      s.limits,
     );
   return { main: build('main'), small: build('small') };
 }
