@@ -2,6 +2,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { DumpSource } from '@core/repo/dumpRepo';
 import { extractPending } from '@core/dumps/extract';
 import { answerQueued } from '@core/ai/questionQueue';
+import { pruneIfDue } from '@core/sources/retention';
 import { budgetLow, providerLimits } from '@core/ai/limits';
 import { providerTokensToday } from '@core/ai/routing';
 import { PROVIDER_PRESETS } from '@core/ai/providers';
@@ -38,6 +39,8 @@ export function runDumpExtraction(os: LifeOSContext): Promise<void> {
     try {
       // To check: what you haven't touched in 15 days is approved as filed.
       os.dumps.autoApprove(15);
+      // Once a day: the 60-day clean-up (ignored messages, raw wording, per-app screen time, past calendar events).
+      pruneIfDue(os);
       const dumpsDue = os.dumps.pending().length > 0;
       const questionsDue = os.questions.due().length > 0;
       if (dumpsDue || questionsDue) {

@@ -154,7 +154,7 @@ Decisions: foreign spends stored in their currency and converted at that day's r
 - [x] Deliveries from shipping SMS: one record per order (shop, carrier, tracking, expected date, status) updated by later texts; in Upcoming until delivered. *(`src/core/ingest/delivery.ts`, `src/modules/deliveries`; shops + couriers; food / quick commerce skipped.)*
 - [x] Health: one page per metric (Steps, Sleep, Heart rate, Weight, Workouts); "Measurements" no longer shown as a category. *(`src/screens/HealthHome.tsx`; heart rate added as a metric; sleep: Samsung Health must share Sleep with Health Connect.)*
 - [x] To check: untouched items auto-approve after 15 days.
-- [ ] 60-day clean-up job.
+- [x] 60-day clean-up job. *(`src/core/sources/retention.ts`, once a day.)*
 - [ ] Speed: measure and fix the slow screens.
 
 ### M4.3 — Today as a dashboard

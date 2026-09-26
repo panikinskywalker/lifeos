@@ -179,3 +179,21 @@ describe('deliveries from shipping texts', () => {
     expect(os.dumps.toCheck().filter((x) => x.kind === 'delivery').length).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('60-day clean-up', () => {
+  it('drops ignored messages, raw wording of filed ones, old per-app screen time and past calendar events — records stay', async () => {
+    const { pruneOldData } = await import('@core/sources/retention');
+    const { saveUsageDays } = await import('@core/sources/deviceData');
+    const old = Date.now() - 70 * 86_400_000;
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: '123456 is your OTP', receivedAt: old });
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On 26/07/26', receivedAt: old + 1 });
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.90.00 From HDFC Bank A/C *1234 To CHAI POINT', receivedAt: Date.now() });
+    const d70 = new Date(old).toISOString().slice(0, 10);
+    saveUsageDays(os, [{ day: d70, totalMs: 3_600_000, apps: [{ package: 'a', ms: 3_600_000 }] }]);
+    const r = pruneOldData(os);
+    expect(r).toMatchObject({ ignoredMessages: 1, rawTexts: 1, appUsageRows: 1 });
+    expect(txs()).toHaveLength(2); // the expenses themselves stay
+    expect(ingestList(os).map((i) => i.text)).toEqual(['Sent Rs.90.00 From HDFC Bank A/C *1234 To CHAI POINT', '']);
+    expect(os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM usage_daily`)!.n).toBe(1); // the day's total stays
+  });
+});
