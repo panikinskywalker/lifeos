@@ -3,6 +3,7 @@ import type { Row } from '../db/adapter';
 import { bus } from '../events/bus';
 import { toInr } from './fx';
 import { linkPayee, payeeFor } from './payee';
+import { knownMerchant } from './merchants';
 import { parseDeliverySms, type ParsedDelivery } from './delivery';
 import { parseBankSms, parsePaymentNotification, looksLikeBankSender, bankOf, BANK_NAMES, PAYMENT_APPS, type ParsedTxn, type SmsKind } from './bankSms';
 
@@ -157,6 +158,8 @@ export function categoryFor(os: LifeOSContext, merchant: string | null | undefin
     const learned = os.settings.get<Record<string, string>>('merchantCategories', {});
     const key = norm(merchant);
     if (learned[key]) return learned[key]!;
+    const brand = knownMerchant(merchant);
+    if (brand) return brand.category;
     const hit = KNOWN.find(([re]) => re.test(merchant));
     if (hit) return hit[1];
   }
@@ -370,7 +373,9 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
     const accountId = accountFor(os, t, item.from, created);
     const kind = t.transfer || t.channel === 'atm' ? 'transfer' : t.direction === 'credit' ? 'income' : 'expense';
     const merchant = t.counterparty ?? (t.channel === 'atm' ? 'ATM withdrawal' : undefined);
-    const category = t.channel === 'atm' || t.transfer ? 'transfer' : categoryFor(os, merchant, item.text);
+    let category = t.channel === 'atm' || t.transfer ? 'transfer' : categoryFor(os, merchant, item.text);
+    // An autopay / e-mandate / SI charge from somewhere we don't know is still a subscription.
+    if (category === 'other' && kind === 'expense' && t.recurring) category = 'subscriptions';
     data = { amount, kind, category, merchant, date, accountId: accountId ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined, ...fx };
     const shown = t.currency !== 'INR' ? `${t.currency} ${t.amount.toLocaleString('en-IN')}${fx.fxRate ? ` (${os.format.currency(amount)})` : ''}` : os.format.currency(amount);
     label = `${kind === 'income' ? 'Received' : kind === 'transfer' ? (t.channel === 'atm' ? 'Cash' : 'Transfer') : 'Spent'} ${shown}${merchant ? ` · ${merchant}` : ''}${t.last4 ? ` · ••${t.last4}` : ''}`;
@@ -387,14 +392,61 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
       if (pm.created) created.push(pm.id);
     }
   }
+  if (!t.investment && !t.transfer && t.direction === 'debit' && data.category === 'subscriptions' && typeof data.merchant === 'string') {
+    linkSubscription(os, e.id, data.merchant, amount, date, (data.accountId as string | undefined) ?? undefined, created);
+  }
   os.entities.timeline.add({ entityId: e.id, kind: item.source, title: `From ${sourceLabel(item)}`, body: item.text.slice(0, 300), actor: 'system', occurredAt: item.receivedAt, meta: { ingestId: id } });
   setItem(os, id, { status: 'confirmed', entityId: e.id });
   for (const a of created) {
     const ce = os.entities.get(a);
-    os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: ce?.type === 'org' ? 'org' : 'account', entityId: a, label: ce?.type === 'org' ? `Payee: ${ce.title}` : `Account: ${ce?.title ?? 'new account'}` });
+    const kind = ce?.type === 'org' || ce?.type === 'subscription' ? ce.type : 'account';
+    const label = kind === 'org' ? `Payee: ${ce!.title}` : kind === 'subscription' ? `Subscription: ${ce!.title} (monthly — change if yearly)` : `Account: ${ce?.title ?? 'new account'}`;
+    os.dumps.addExtraction({ source: item.source, sourceRef: id, kind, entityId: a, label });
   }
   os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: 'transaction', entityId: e.id, label, flag });
   return { id, status: 'confirmed', entityId: e.id };
+}
+
+const DAY_MS = 86_400_000;
+const addMonths = (day: string, n = 1) => {
+  const d = new Date(`${day}T12:00:00`);
+  d.setMonth(d.getMonth() + n);
+  return iso(d.getTime());
+};
+/** Months between renewals for a subscription's billing cycle. */
+const cycleMonths = (rrule = '') => (/YEARLY/.test(rrule) ? 12 : /MONTHLY/.test(rrule) ? Number(/INTERVAL=(\d+)/.exec(rrule)?.[1] ?? 1) : 1);
+
+/**
+ * A subscription charge (Adobe, Netflix, an e-mandate) joins its Subscription
+ * record — made on the first charge seen (not auto-posted: the bank texts
+ * bring each renewal), kept current after. When an auto-posted bill for the
+ * same renewal already exists, the real charge replaces it.
+ */
+function linkSubscription(os: LifeOSContext, txId: string, name: string, amount: number, date: string, accountId: string | undefined, created: string[]) {
+  if (!os.registry.entityTypes.has('subscription')) return;
+  const key = norm(name);
+  const subs = os.entities.query<{ name: string; amount: number; nextBillingAt: string; rrule?: string; accountId?: string }>('subscription', {}, { limit: 500 });
+  const sub = subs.find((s) => s.status !== 'cancelled' && (norm(s.data.name) === key || norm(s.data.name).startsWith(`${key} `) || key.startsWith(`${norm(s.data.name)} `)));
+  if (!sub) {
+    const s = os.entities.create({ type: 'subscription', data: { name, amount, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: addMonths(date), category: 'subscriptions', accountId, autoPost: false } }, 'assistant');
+    os.relations.link(txId, s.id, 'subscription', {}, 'assistant', { source: 'sms' });
+    created.push(s.id);
+    return;
+  }
+  os.relations.link(txId, sub.id, 'subscription', {}, 'assistant', { source: 'sms' });
+  const at = new Date(`${date}T12:00:00`).getTime();
+  // An auto-posted bill for this renewal (within five days) was a placeholder for this charge.
+  for (const r of os.relations.forEntity(sub.id, 'subscription')) {
+    if (r.direction !== 'in' || r.other.id === txId) continue;
+    const tx = os.entities.get<{ note?: string; date?: string }>(r.other.id);
+    if (tx?.data.note === 'Auto-posted subscription' && tx.data.date && Math.abs(new Date(`${tx.data.date}T12:00:00`).getTime() - at) <= 5 * DAY_MS) os.entities.delete(tx.id, 'assistant');
+  }
+  const patch: Record<string, unknown> = {};
+  if (sub.data.amount !== amount) patch.amount = amount;
+  if (!sub.data.accountId && accountId) patch.accountId = accountId;
+  // Billed now: the next renewal is a cycle on (only when this charge is the one that was due).
+  if (sub.data.nextBillingAt <= iso(at + 5 * DAY_MS)) patch.nextBillingAt = addMonths(date, cycleMonths(sub.data.rrule));
+  if (Object.keys(patch).length) os.entities.update(sub.id, { data: patch }, 'assistant');
 }
 
 const STAGE: Record<string, number> = { ordered: 0, shipped: 1, out_for_delivery: 2, delivered: 3, cancelled: 4, returned: 4 };

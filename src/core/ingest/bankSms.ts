@@ -7,6 +7,8 @@
  * are recognised and skipped. The raw text is always kept by the caller.
  */
 
+import { cleanMerchant, knownMerchant, RECURRING, type KnownMerchant } from './merchants';
+
 export type TxnChannel = 'upi' | 'card' | 'netbanking' | 'atm' | 'wallet' | 'emi' | 'other';
 
 export interface ParsedTxn {
@@ -33,6 +35,10 @@ export interface ParsedTxn {
   /** A mutual fund purchase (SIP) or redemption: an investment, not spending. */
   investment: boolean;
   fund: string | null;
+  /** An autopay / e-mandate / standing-instruction charge that went through (usually a subscription). */
+  recurring: boolean;
+  /** The brand behind the merchant descriptor, when it's one we know ("PAYPAL *ADOBE" → Adobe, subscriptions). */
+  brand: KnownMerchant | null;
 }
 
 export type SmsKind = { kind: 'txn'; txn: ParsedTxn } | { kind: 'skip'; reason: 'otp' | 'promo' | 'bill' | 'mandate' | 'declined' | 'info' | 'investment-confirmation' | 'delivery' };
@@ -83,7 +89,7 @@ export function looksLikeBankSender(sender: string, sampleText = ''): boolean {
 }
 
 /** Every money mention: "Rs.450", "INR 1,240.00", "USD 45.00", "$45", "£12.50", "¥3,200", "AED 150", "45.00 USD". */
-const MONEY = /(?:(INR|Rs\.?|₹|USD|US\$|\$|GBP|£|JPY|JP¥|¥|AED|Dhs\.?)\s?([\d,]+(?:\.\d{1,2})?))|(?:\b([\d,]+(?:\.\d{1,2})?)\s?(INR|USD|GBP|JPY|AED)\b)/gi;
+const MONEY = /(?:(INR|Rs|₹|USD|US\$|\$|GBP|£|JPY|JP¥|¥|AED|Dhs)\.?:?\s?([\d,]+(?:\.\d{1,2})?))|(?:\b([\d,]+(?:\.\d{1,2})?)\s?(INR|USD|GBP|JPY|AED)\b)/gi;
 const CURRENCY: Record<string, string> = { inr: 'INR', rs: 'INR', 'rs.': 'INR', '₹': 'INR', usd: 'USD', 'us$': 'USD', $: 'USD', gbp: 'GBP', '£': 'GBP', jpy: 'JPY', 'jp¥': 'JPY', '¥': 'JPY', aed: 'AED', dhs: 'AED', 'dhs.': 'AED' };
 /** Words right before a figure that make it not the transaction: a limit, a balance, a due. */
 const NOT_THE_AMOUNT = /(?:\b(?:avl|avbl|available|avail|total|credit|cr|card|clear|ledger|min(?:imum)?|outstanding|o\/s)\b[\s.:]*)?\b(?:lmt|limit|bal|balance|outstanding|due|amount due|amt due|dues)\b[^\d\n]{0,14}$/i;
@@ -128,41 +134,52 @@ const clean = (s: string) =>
     .replace(/[\s.;,:-]+$/, '')
     .trim();
 
-function counterpartyOf(t: string): { name: string | null; vpa: string | null } {
+function counterpartyOf(t: string): { name: string | null; raw: string | null; vpa: string | null } {
   const vpa = /\b([a-z0-9._-]{2,}@[a-z]{2,})\b/i.exec(t)?.[1]?.toLowerCase() ?? null;
+  const END = String.raw`(?=\s+(?:on|dated|via|using|for|was|is|has|with|Ref|UPI|RRN|Avl|Bal|Not)\b|\s*[(;]|\.(?=\s|Avl|Bal|$)|\n|$)`;
+  const NAME = String.raw`([A-Za-z0-9][A-Za-z0-9 &'._*,/-]{1,60}?)`;
   const patterns: RegExp[] = [
     /UPI\/(?:P2[AM]|CR|DR)\/\d+\/([^/\n]+?)(?:\/|\n|$)/i, // UPI/P2M/4269…/NETFLIX
-    /\bInfo:?\s*(?:UPI\/)?([A-Za-z][^\n.;]{1,40}?)(?:\.(?=\s|$)|;|\n|$)/i,
-    /\bon\s+\d{1,2}[-\s/]?[A-Za-z]{3}[-\s/]?\d{2,4}\s+(?:on|at)\s+([A-Za-z0-9][A-Za-z0-9 &'._*-]{1,40}?)(?:\.(?=\s|$)|\n|$)/i, // ICICI: "on 26-Sep-26 on AMAZON US."
-    /\bat\s+([A-Za-z0-9][A-Za-z0-9 &'._*-]{1,40}?)\s+(?:on|dated|via|using|at\s+\d|\.(?=\s|$)|Avl|Bal)\b/i,
-    /\bat\s+([A-Za-z0-9][A-Za-z0-9 &'._*-]{1,40}?)(?:\.(?=\s|$)|\n|$)/i,
-    /;\s*([A-Za-z][A-Za-z0-9 &'._-]{1,40}?)\s+credited\b/i, // ICICI: "…; SWIGGY credited."
-    /\b(?:trf|transfer(?:red)?)\s+(?:to|from)\s+([A-Za-z][A-Za-z0-9 &'._-]{1,40}?)(?:\s+Ref|\s+on\b|\.(?=\s|$)|\n|$)/i,
-    /\bfrom\s+(?:VPA\s+)?([A-Za-z][A-Za-z0-9 &'._@-]{1,40}?)(?:\s*\(|\s+on\b|\s+Ref|\.(?=\s|$)|\n|$)/i,
-    /\bto\s+(?:VPA\s+)?([A-Za-z][A-Za-z0-9 &'._@-]{1,40}?)(?:\s+on\b|\s+Ref|\s+UPI|\.(?=\s|$)|\n|$)/i,
-    /\bby\s+([A-Za-z][A-Za-z0-9 &'._-]{1,40}?)(?:\s+on\b|\s+Ref|\.(?=\s|$)|\n|$)/i,
-    /\btowards\s+([A-Za-z][A-Za-z0-9 &'._-]{1,40}?)(?:\s+on\b|\.(?=\s|$)|\n|$)/i,
+    /\bInfo:?\s*([A-Za-z][^\n;]{1,50}?)(?:\.(?=\s|Avl|Bal|$)|;|\n|$)/i, // ICICI "Info: NEFT-…-NAME", "InfoBIL*NEFT*…"
+    // Axis card alerts: the merchant sits on its own line after the date/time.
+    /\n\d{2}-\d{2}-\d{2,4},?\s+\d{2}:\d{2}(?::\d{2})?(?:\s*IST)?\n(?!Avl|Not)([^\n]{2,60})\n/i,
+    new RegExp(String.raw`\bon\s+\d{1,2}[-\s/]?[A-Za-z]{3}[-\s/]?\d{2,4}\s+(?:on|at)\s+${NAME}${END}`, 'i'), // ICICI: "on 26-Sep-26 on AMAZON US."
+    new RegExp(String.raw`\b(?:at|used at|spent at|paid at)\s+${NAME}${END}`, 'i'),
+    /;\s*(?:M\/S\.?\s*)?([A-Za-z][A-Za-z0-9 &'._-]{1,40}?)\s+credited\b/i, // ICICI / IDFC: "…; SWIGGY credited."
+    /\b(?:raised by|mandate (?:for|to)|towards|for)\s+([A-Za-z][A-Za-z0-9 &'._*-]{1,40}?)\s+(?:transaction|mandate|subscription|e-?mandate|autopay|si\b|on\b)/i, // "for SamplePay transaction", "raised by X on"
+    new RegExp(String.raw`\bfor\s+((?:NEFT|RTGS|IMPS|UPI)\s*[/*-][^\n]{2,60}?)${END}`, 'i'), // IDFC "for NEFT/ IFSC…/NAME"
+    /\bFvg:?\s*([A-Za-z][A-Za-z .'-]{1,40}?)(?:\s+Avl|\.|\n|$)/i, // Union Bank "Fvg: NAME"
+    new RegExp(String.raw`\b(?:trf|transfer(?:red)?)\s+(?:to|from)\s+${NAME}${END}`, 'i'),
+    new RegExp(String.raw`\bfrom\s+(?:VPA\s+)?([A-Za-z][A-Za-z0-9 &'._@-]{1,40}?)${END}`, 'i'),
+    new RegExp(String.raw`\b(?:Cr\.\s+)?to\s+(?:VPA\s+)?([A-Za-z][A-Za-z0-9 &'._@-]{1,40}?)${END}`, 'i'),
+    new RegExp(String.raw`\bby\s+([A-Za-z][A-Za-z0-9 &'._-]{1,40}?)${END}`, 'i'),
+    new RegExp(String.raw`\btowards\s+([A-Za-z][A-Za-z0-9 &'._*-]{1,40}?)${END}`, 'i'),
   ];
   for (const re of patterns) {
-    const m = re.exec(t);
-    if (!m) continue;
-    let name = clean(m[1]!);
-    if (/^(your|a\/?c|acct|account|card|hdfc|icici|sbi|axis|kotak|bank|you|the)\b/i.test(name) || /^x+\d+$/i.test(name)) continue;
-    if (name.includes('@')) name = name.split('@')[0]!.replace(/[._-]+/g, ' ');
-    if (name.length >= 2) return { name: name.slice(0, 40), vpa };
+    for (const m of t.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+      const raw = m[1]!.trim();
+      if (/^(?:your|a\/?c|acct|account|card|hdfc|icici|sbi|axis|kotak|bank|you|mobile|debit card|credit card|pay your|paying)\b/i.test(raw) || /^[xX*]+\d+$/.test(raw)) continue;
+      const name = cleanMerchant(raw);
+      if (name) return { name, raw, vpa };
+    }
   }
-  return { name: vpa ? vpa.split('@')[0]!.replace(/[._-]+/g, ' ') : null, vpa };
+  return { name: vpa ? vpa.split('@')[0]!.replace(/[._-]+/g, ' ') : null, raw: vpa, vpa };
 }
 
 /** Read one bank / card / UPI alert. */
 export function parseBankSms(text: string, sender?: string | null): SmsKind {
   const t = text.replace(/\r/g, '');
   const lower = t.toLowerCase();
-  if (/\b(otp|one[- ]time password|verification code|passcode)\b/.test(lower)) return { kind: 'skip', reason: 'otp' };
+  // "Never share PIN/OTP" footers aren't OTP messages.
+  if (/\b(otp|one[- ]time password|verification code|passcode)\b/.test(lower.replace(/\b(?:never|do not|don'?t)\s+share\b[^.\n]*/g, ''))) return { kind: 'skip', reason: 'otp' };
   if (/\b(declined|failed|unsuccessful|could not be processed|reversal pending)\b/.test(lower) && !/\b(reversed|refund)/.test(lower)) return { kind: 'skip', reason: 'declined' };
   if (/\b(pre-?approved|offer|cashback up to|apply now|eligible for|loan of|win |congratulations|limit increase|upgrade)\b/.test(lower) && !/\b(debited|credited|spent|sent|received)\b/.test(lower)) return { kind: 'skip', reason: 'promo' };
   if (/\b(is due|due on|due date|minimum amount due|total amount due|statement (?:generated|for)|bill (?:of|for) .* (?:generated|is))\b/.test(lower) && !/\b(debited|credited|spent|received|paid)\b/.test(lower)) return { kind: 'skip', reason: 'bill' };
-  if (/\b(will be debited|mandate|autopay (?:request|set)|e-?mandate|si (?:registered|request)|standing instruction)\b/.test(lower) && !/\b(has been debited|was debited|is debited|got debited)\b/.test(lower)) return { kind: 'skip', reason: 'mandate' };
+  // Autopay / e-mandate / SI: the heads-up before a charge and the set-up notice are skipped; the charge itself is a transaction.
+  const recurring = RECURRING.test(t);
+  const executed = /\b(?:has been|have been|was|got|is successfully|successfully)\s+(?:debited|charged|paid|processed|executed|redeemed|deducted)\b|\b(?:processed|executed) successfully\b/i.test(t);
+  const upcoming = /\b(will be (?:debited|charged|deducted|processed)|to be debited|is scheduled|scheduled (?:on|for)|upcoming|pre-?debit|due on|is due|registered|set up|created successfully|activated|mandate request|to opt out|to cancel|revoked|cancelled)\b/i.test(t);
+  if ((recurring || upcoming) && upcoming && !executed) return { kind: 'skip', reason: 'mandate' };
 
   // Mutual funds: the registrar's "units allotted / folio" confirmation repeats the bank debit — skip it; the debit is the investment.
   const mf = MF.test(t);
@@ -180,13 +197,16 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
   const currency = main.currency;
   const inrAmount = foreign && inr && inr.at > foreign.at && inr.at - foreign.at < 60 ? inr.amount : null;
 
-  const creditWords = /\b(credited|received|deposited|refund(?:ed)?|reversed|cashback (?:of|credited)|added to|payment (?:of .* )?received)\b/i;
-  const debitWords = /\b(debited|spent|withdrawn|sent|paid|purchase|charged|debit(?:ed)?|txn of|transferred to|used for|made a (?:payment|transaction))\b/i;
+  const creditWords = /\b(credited|received|deposited|refund(?:ed)?|reversed|reversal of|cashback (?:of|credited)|added to|payment (?:of .* )?received)\b/i;
+  const debitWords = /\b(debited|spent|withdrawn|sent|paid|purchase|charged|debit(?:ed)?|deducted|txn of|txn (?:rs|inr)|transferred to|used (?:for|at)|made a (?:payment|transaction)|txn initiated|transaction initiated|payment of [^\n]{0,30}?from (?:your )?a\/c|mandate of .* (?:redeemed|executed|processed))\b|\bDr\b/i;
   const ci = t.search(creditWords);
   const di = t.search(debitWords);
-  if (ci < 0 && di < 0) return { kind: 'skip', reason: 'info' };
+  // Paying off a card ("payment of Rs 12,345 for your … Credit Card was successful") credits the card.
+  const cardPayment = /\bpayment\b[^\n]{0,60}\b(?:for|towards|against)\s+your\b[^.]{0,40}\bcard\b/i.test(t) || /\bpayment\b[^\n]{0,40}\b(?:received\b[^.]{0,20}\btowards|credited to your (?:\w+ )?card)\b/i.test(t);
+  // "Your SI for Adobe Rs.1675.60 has been processed" is a charge even without the word "debited".
+  if (ci < 0 && di < 0 && !(recurring && executed) && !cardPayment) return { kind: 'skip', reason: 'info' };
   // "debited … ; SWIGGY credited" (ICICI) is a debit: the first word decides.
-  const direction: 'debit' | 'credit' = di >= 0 && (ci < 0 || di < ci) ? 'debit' : 'credit';
+  const direction: 'debit' | 'credit' = cardPayment ? 'credit' : ci < 0 || (di >= 0 && di < ci) ? 'debit' : 'credit';
 
   const isCard = /\b(credit card|debit card|card (?:no\.?|ending|xx|x+|\*+)|card\s*[x*]{0,4}\d{4}|using (?:your )?(?:\w+ )?card|on (?:your )?(?:\w+ )?card|amex card)\b/i.test(t);
   const last4 =
@@ -198,8 +218,9 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
   const channel: TxnChannel = /\batm\b|withdrawn/i.test(t) ? 'atm' : upi ? 'upi' : isCard ? 'card' : /\b(neft|imps|rtgs|net ?banking|ib)\b/i.test(t) ? 'netbanking' : /\bemi\b/i.test(t) ? 'emi' : /wallet/i.test(t) ? 'wallet' : 'other';
   const bal = /(?:\b(?:avl|avbl|available|a\/c|clear)\.?\s*)?\b(?:bal(?:ance)?|lmt|limit)[:\s.]*(?:is\s*)?(?:INR|Rs\.?|₹)\s?([\d,]+(?:\.\d{1,2})?)/i.exec(t);
   const ref = /(?:upi\s*ref(?:\s*no)?|ref(?:erence)?\s*(?:no|number)?|utr|rrn|txn\s*(?:id|no)|upi)[:\s#.]*\b([A-Z0-9]{8,})\b/i.exec(t)?.[1] ?? null;
-  const { name, vpa } = counterpartyOf(t);
-  const transfer = direction === 'credit' && isCard && /\b(payment|received towards|thank you for (?:your )?payment)\b/i.test(t);
+  const { name, raw, vpa } = counterpartyOf(t);
+  const brand = knownMerchant(raw ?? name, recurring ? t : '');
+  const transfer = cardPayment || direction === 'credit' && isCard && /\b(payment|received towards|thank you for (?:your )?payment)\b/i.test(t);
   const fund = mf ? (/\b(?:in|of|for|towards|to)\s+([A-Z][A-Za-z0-9&.' -]{2,50}?(?:Mutual Fund|Fund|MF|Scheme))\b/i.exec(t)?.[1]?.trim() ?? /\b([A-Z][A-Za-z&]+(?:\s[A-Z][A-Za-z&]+){0,3})\s+(?:Mutual Fund|MF)\b/.exec(t)?.[1]?.trim() ?? null) : null;
   return {
     kind: 'txn',
@@ -214,12 +235,14 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
       channel,
       last4,
       isCard,
-      counterparty: name,
+      counterparty: brand?.name ?? name,
       vpa,
       ref,
       balance: bal ? num(bal[1]!) : null,
       date: findDate(t),
       transfer,
+      recurring: recurring || !!brand?.subscription,
+      brand,
     },
   };
 }
@@ -252,7 +275,7 @@ export function parsePaymentNotification(pkg: string, title: string, text: strin
     const direction = /received/.test(verb) || /\bfrom\b/i.test(m[0]) ? 'credit' : 'debit';
     return {
       kind: 'txn',
-      txn: { amount: num(m[2]!), direction, currency: 'INR', inrAmount: null, investment: false, fund: null, bank: null, channel: 'upi', last4: /[xX*]{2,}(\d{3,4})/.exec(both)?.[1] ?? null, isCard: false, counterparty: clean(m[4]!), vpa: /\b([a-z0-9._-]{2,}@[a-z]{2,})\b/i.exec(both)?.[1] ?? null, ref: null, balance: null, date: null, transfer: false },
+      txn: { amount: num(m[2]!), direction, currency: 'INR', inrAmount: null, investment: false, fund: null, recurring: RECURRING.test(both), brand: knownMerchant(m[4]!), bank: null, channel: 'upi', last4: /[xX*]{2,}(\d{3,4})/.exec(both)?.[1] ?? null, isCard: false, counterparty: knownMerchant(m[4]!)?.name ?? clean(m[4]!), vpa: /\b([a-z0-9._-]{2,}@[a-z]{2,})\b/i.exec(both)?.[1] ?? null, ref: null, balance: null, date: null, transfer: false },
     };
   }
   // Bank apps post the same text as their SMS.

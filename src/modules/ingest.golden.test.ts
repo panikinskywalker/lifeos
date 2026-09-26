@@ -12,7 +12,7 @@ import { bus } from '@core/events/bus';
 import { confirmProposed, ingestList, ingestMessage, learnCategory, senders, setSenderTrusted } from '@core/ingest/ingest';
 import { extractDump } from '@core/dumps/extract';
 import { undoExtraction } from '@core/dumps/extract';
-import { accountType, transactionType } from './finance/types';
+import { accountType, subscriptionType, transactionType } from './finance/types';
 import { financeAiTools } from './finance/aiTools';
 import { personType } from './crm/types';
 import { deliveryType } from './deliveries/types';
@@ -39,10 +39,10 @@ describe('bank SMS → transactions', () => {
     const r = ingestMessage(os, { source: 'sms', from: 'AD-HDFCBK', body: SWIGGY, receivedAt: at });
     expect(r.status).toBe('confirmed');
     const [t] = txs();
-    expect(t!.data).toMatchObject({ amount: 1240, kind: 'expense', category: 'food', merchant: 'SWIGGY', date: '2026-09-26' });
+    expect(t!.data).toMatchObject({ amount: 1240, kind: 'expense', category: 'food', merchant: 'Swiggy', date: '2026-09-26' });
     const acc = os.entities.get(t!.data.accountId as string)!;
     expect(acc).toMatchObject({ title: 'HDFC Bank card ••5678', data: { kind: 'credit', last4: '5678', institution: 'HDFC Bank' } });
-    expect(os.dumps.toCheck().map((x) => x.label)).toEqual(['Spent ₹1,240 · SWIGGY · ••5678', 'Account: HDFC Bank card ••5678']);
+    expect(os.dumps.toCheck().map((x) => x.label)).toEqual(['Spent ₹1,240 · Swiggy · ••5678', 'Account: HDFC Bank card ••5678']);
     expect(os.dumps.toCheck()[0]).toMatchObject({ source: 'sms', dumpId: null });
     // The raw text is on the transaction's timeline.
     expect(os.entities.timeline.forEntity(t!.id).some((e) => e.body?.includes('SWIGGY'))).toBe(true);
@@ -99,7 +99,7 @@ describe('bank SMS → transactions', () => {
     expect(txs()).toEqual([]);
     learnCategory(os, 'GURU TAILORS', 'shopping');
     expect(confirmProposed(os, [ids[1]!, ids[2]!], [ids[0]!])).toBe(2);
-    expect(txs().map((t) => [t.data.merchant, t.data.kind, t.data.category]).sort()).toEqual([['ACME PVT LTD', 'income', 'other'], ['GURU TAILORS', 'expense', 'shopping']]);
+    expect(txs().map((t) => [t.data.merchant, t.data.kind, t.data.category]).sort()).toEqual([['ACME', 'income', 'other'], ['GURU TAILORS', 'expense', 'shopping']]);
     expect(ingestList(os, { status: 'dismissed' })).toHaveLength(1);
   });
 });
@@ -128,7 +128,7 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
     expect(txs()[0]!.data).toMatchObject({ amount: 3780, fxRate: 84 });
     // With a rate on file: converted at once. When the SMS gives the rupee figure, that wins.
     ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent USD 10.00 (INR 861.50) on HDFC Bank Card 5678 at OPENAI On 2026-09-26', receivedAt: at + 3_600_000 });
-    expect(txs().find((t) => t.data.merchant === 'OPENAI')!.data).toMatchObject({ amount: 861.5, originalAmount: 10, originalCurrency: 'USD' });
+    expect(txs().find((t) => t.data.merchant === 'ChatGPT')!.data).toMatchObject({ amount: 861.5, originalAmount: 10, originalCurrency: 'USD' });
     ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent AED 150.00 On HDFC Bank Card 5678 At DUBAI MALL On 2026-09-26', receivedAt: at + 7_200_000 });
     expect(txs().find((t) => t.data.merchant === 'DUBAI MALL')!.data.amount).toBeCloseTo(3435, 0);
   });
@@ -230,5 +230,24 @@ describe('payees: one record per person or shop you pay', () => {
     rejectPayee(os, payeeOf(t4.id)!.relation.id);
     expect(payeeOf(t4.id)!.other.title).toBe('John');
     expect(payeeOf(t4.id)!.other.type).toBe('org');
+  });
+
+  it('subscriptions: an Adobe charge (any descriptor) is Adobe, Subscriptions, and joins one Adobe subscription record', () => {
+    os.registry.entityTypes.set('subscription', subscriptionType as never);
+    const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: Date.parse('2026-08-12T10:00:00') + dt });
+    send('Spent Rs.1,675.60 On HDFC Bank Card 5678 At PAYPAL *ADOBE On 2026-08-12:10:02:11', 0);
+    const [t1] = txs();
+    expect(t1!.data).toMatchObject({ merchant: 'Adobe', category: 'subscriptions', kind: 'expense' });
+    const [sub] = os.entities.query<{ name: string; amount: number; nextBillingAt: string; autoPost: boolean }>('subscription');
+    expect(sub!.data).toMatchObject({ name: 'Adobe', amount: 1675.6, nextBillingAt: '2026-09-12', autoPost: false });
+    expect(os.dumps.toCheck().some((x) => x.label.startsWith('Subscription: Adobe'))).toBe(true);
+    // Next month, a different descriptor and a new price: same record, amount and next date updated.
+    send('Rs.1799.00 has been debited from your HDFC Bank Credit Card XX5678 towards ADOBE SYSTEMS for e-mandate (SI) on 12-09-26.', 31 * 86_400_000);
+    expect(os.entities.query('subscription')).toHaveLength(1);
+    expect(os.entities.get<{ amount: number; nextBillingAt: string }>(sub!.id)!.data).toMatchObject({ amount: 1799, nextBillingAt: '2026-10-12' });
+    expect(os.relations.forEntity(sub!.id, 'subscription').filter((r) => r.direction === 'in')).toHaveLength(2);
+    // An unknown e-mandate charge is still a subscription.
+    send('Rs.499.00 debited from A/c XX1234 on 14-09-26 for UPI AutoPay to FITPASS SERVICES. UPI Ref 426912345696', 33 * 86_400_000);
+    expect(txs().find((t) => t.data.amount === 499)!.data).toMatchObject({ merchant: 'FITPASS SERVICES', category: 'subscriptions' });
   });
 });

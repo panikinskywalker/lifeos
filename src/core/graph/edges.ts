@@ -25,6 +25,7 @@ export const EDGE_WORDS: Record<string, EdgeWord> = {
   owns: { out: 'Owns', in: 'Owned by' },
   paid_for: { out: 'Paid for', in: 'Paid by' },
   payee: { out: 'Paid to / from', in: 'Payments' },
+  subscription: { out: 'Subscription', in: 'Charges' },
   about: { out: 'About', in: 'Mentioned in' },
   located_in: { out: 'In', in: 'Contains' },
 };
