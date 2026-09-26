@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import { upkeep } from '@core/cycles/upkeep';
+import { upkeep, type Upkeep } from '@core/cycles/upkeep';
 import { METRICS, formatMetric, metricSeries, peopleToCall, screenTopApps, spendPace, upcoming, type MetricId } from '@core/dashboard/metrics';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -57,6 +57,8 @@ export default function TodayTab() {
     os.settings.set('today.tiles', next);
   };
   const shown = layout.filter((x) => !x.hidden);
+  // One upkeep pass for every tile that needs it (Upcoming, People, Overdue).
+  const u = useLive((o) => upkeep(o), []);
 
   // Pair 1×1 tiles into rows; wide tiles take a row of their own.
   const rows: TileId[][] = [];
@@ -79,7 +81,7 @@ export default function TodayTab() {
         </View>
       }
     >
-      {rows.map((r) => (r.length === 2 ? <BentoGrid key={r.join()}>{r.map((id) => <TodayTile key={id} id={id} />)}</BentoGrid> : <TodayTile key={r[0]} id={r[0]!} />))}
+      {rows.map((r) => (r.length === 2 ? <BentoGrid key={r.join()}>{r.map((id) => <TodayTile key={id} id={id} u={u} />)}</BentoGrid> : <TodayTile key={r[0]} id={r[0]!} u={u} />))}
       <Pressable accessibilityRole="button" onPress={() => setEditing(true)} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10 }}>
         <Icon name="edit" size={14} />
         <Text variant="caption" color="secondary">Edit tiles</Text>
@@ -101,7 +103,7 @@ export default function TodayTab() {
   );
 }
 
-function TodayTile({ id }: { id: TileId }) {
+function TodayTile({ id, u }: { id: TileId; u: Upkeep }) {
   switch (id) {
     case 'steps':
     case 'sleep':
@@ -111,11 +113,11 @@ function TodayTile({ id }: { id: TileId }) {
     case 'spend':
       return <SpendTile />;
     case 'upcoming':
-      return <UpcomingTile />;
+      return <UpcomingTile u={u} />;
     case 'people':
-      return <PeopleTile />;
+      return <PeopleTile u={u} />;
     case 'overdue':
-      return <OverdueTile />;
+      return <OverdueTile u={u} />;
   }
 }
 
@@ -206,9 +208,9 @@ function SpendTile() {
   );
 }
 
-function UpcomingTile() {
+function UpcomingTile({ u }: { u: Upkeep }) {
   const router = useRouter();
-  const items = useLive((o) => upcoming(o, 5), []);
+  const items = useLive((o) => upcoming(o, 5, Date.now(), 14, u), [u]);
   return (
     <Tile size="2x1" tint="upkeep" icon="calendar" label="Upcoming" meta="next 2 weeks" onPress={() => router.navigate('/upkeep')}>
       {items.length ? (
@@ -224,9 +226,9 @@ function UpcomingTile() {
   );
 }
 
-function PeopleTile() {
+function PeopleTile({ u }: { u: Upkeep }) {
   const router = useRouter();
-  const people = useLive((o) => peopleToCall(o, 3), []);
+  const people = useLive((o) => peopleToCall(o, 3, Date.now(), u), [u]);
   return (
     <Tile tint="people" icon="people" label="People" meta="to call">
       {people.length ? (
@@ -245,9 +247,8 @@ function PeopleTile() {
   );
 }
 
-function OverdueTile() {
+function OverdueTile({ u }: { u: Upkeep }) {
   const router = useRouter();
-  const u = useLive((o) => upkeep(o), []);
   return (
     <Tile iconTone="alert" icon="alert" label="Overdue" onPress={() => router.navigate('/upkeep')}>
       <Stat value={String(u.overdue)} size="count" tone={u.overdue ? 'alert' : undefined} caption={u.overdue ? u.sections.overdue[0]!.entity.title + (u.overdue > 1 ? ` + ${u.overdue - 1} more` : '') : 'Nothing late'} />

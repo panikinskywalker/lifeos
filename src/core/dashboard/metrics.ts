@@ -1,6 +1,6 @@
 import type { LifeOSContext } from '../registry/context';
 import { metricDays, topApps, usageDays } from '../sources/deviceData';
-import { upkeep } from '../cycles/upkeep';
+import { upkeep, type Upkeep } from '../cycles/upkeep';
 
 /**
  * Today's numbers (M4.3): every tile and full-screen chart reads a metric as
@@ -197,9 +197,9 @@ export interface UpcomingItem {
 }
 
 /** Next dues (cycles) and events, soonest first; overdue first of all. */
-export function upcoming(os: LifeOSContext, limit = 5, now = Date.now(), days = 14): UpcomingItem[] {
+export function upcoming(os: LifeOSContext, limit = 5, now = Date.now(), days = 14, u: Upkeep = upkeep(os)): UpcomingItem[] {
   const out: UpcomingItem[] = [];
-  for (const i of upkeep(os).items) {
+  for (const i of u.items) {
     const at = i.cycle.nextDueAt;
     if (at == null || at > now + days * DAY) continue;
     out.push({ id: i.cycle.id, entityId: i.entity.id, type: i.entity.type, title: i.entity.title === i.cycle.name ? i.entity.title : `${i.entity.title} · ${i.cycle.name}`, at, kind: 'due', overdue: at < now - DAY / 2 });
@@ -221,9 +221,9 @@ export function upcoming(os: LifeOSContext, limit = 5, now = Date.now(), days = 
 }
 
 /** Keep-in-touch cycles due within a week (or late), and birthdays in the next two weeks. */
-export function peopleToCall(os: LifeOSContext, limit = 4, now = Date.now()): Array<{ entityId: string; title: string; why: string; late: boolean }> {
+export function peopleToCall(os: LifeOSContext, limit = 4, now = Date.now(), u: Upkeep = upkeep(os)): Array<{ entityId: string; title: string; why: string; late: boolean }> {
   const out: Array<{ entityId: string; title: string; why: string; late: boolean; at: number }> = [];
-  for (const i of upkeep(os).items) {
+  for (const i of u.items) {
     if (i.entity.type !== 'person' || i.cycle.nextDueAt == null) continue;
     const days = Math.round((i.cycle.nextDueAt - now) / DAY);
     if (i.cycle.template === 'person.birthday' && days <= 14) out.push({ entityId: i.entity.id, title: i.entity.title, why: days <= 0 ? 'Birthday today' : `Birthday in ${days} d`, late: false, at: i.cycle.nextDueAt });

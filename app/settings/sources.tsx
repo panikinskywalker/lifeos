@@ -23,6 +23,7 @@ export default function SourcesScreen() {
   const toast = useToast();
   const [states, setStates] = useState<Partial<Record<SourceId, Access>>>({});
   const [busy, setBusy] = useState<SourceId | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const info = useLive((o) => Object.fromEntries(SOURCES.map((s) => [s.id, sourceState(o, s.id)])), []);
   const proposed = useLive((o) => o.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ingest_queue WHERE status='proposed'`)?.n ?? 0, []);
 
@@ -65,7 +66,26 @@ export default function SourcesScreen() {
   };
 
   return (
-    <Screen title="Data sources" subtitle="What fills LifeOS without you typing" onBack={() => router.back()}>
+    <Screen
+      title="Data sources"
+      subtitle="What fills LifeOS without you typing"
+      onBack={() => router.back()}
+      right={
+        <Button
+          title={syncing ? 'Syncing…' : 'Sync all'}
+          size="sm"
+          icon="refresh"
+          disabled={syncing}
+          onPress={() => {
+            setSyncing(true);
+            void syncSources(os)
+              .then(refresh)
+              .then(() => toast.show({ message: 'Everything synced', icon: 'check' }))
+              .finally(() => setSyncing(false));
+          }}
+        />
+      }
+    >
       <View style={{ gap: 14 }}>
         {!deviceAvailable ? (
           <Card icon="info" tint="documents" title="Needs the LifeOS build">

@@ -16,22 +16,39 @@ export function useOS(): LifeOSContext {
 
 const DATA_EVENTS: EventName[] = ['entity.created', 'entity.updated', 'entity.deleted', 'entity.restored', 'entity.status', 'relation.added', 'relation.removed', 'comment.added', 'attachment.added', 'reminder.created', 'reminder.completed', 'tag.applied', 'schedule.tick', 'module.installed', 'data.changed'];
 
-/** Global data version — bumps on any mutation. Cheap and always consistent for a local DB. */
+/**
+ * Global data version — bumps on any mutation. Screens re-read at most every
+ * 300 ms: a burst (an SMS import, a filed dump, an automation) renders once,
+ * and a steady trickle can't keep every mounted screen recalculating.
+ */
 let version = 0;
 const listeners = new Set<() => void>();
 for (const ev of DATA_EVENTS) bus.on(ev, () => bump());
+const THROTTLE_MS = 300;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let lastFlush = 0;
+let paused = 0;
+function flush() {
+  timer = null;
+  lastFlush = Date.now();
+  for (const l of listeners) l();
+}
 export function bump() {
   version++;
-  // Batch into a microtask so bursts (imports, automations) render once.
-  if (!scheduled) {
-    scheduled = true;
-    Promise.resolve().then(() => {
-      scheduled = false;
-      for (const l of listeners) l();
-    });
+  if (paused || timer) return;
+  const wait = Math.max(0, THROTTLE_MS - (Date.now() - lastFlush));
+  timer = setTimeout(flush, wait);
+}
+/** Hold screen refreshes during bulk work (an SMS history import); one refresh when it ends. */
+export async function quietly<T>(work: () => Promise<T>): Promise<T> {
+  paused++;
+  try {
+    return await work();
+  } finally {
+    paused--;
+    if (!paused) bump();
   }
 }
-let scheduled = false;
 
 export function useDataVersion(): number {
   const [, force] = useReducer((x: number) => x + 1, 0);

@@ -5,6 +5,8 @@ import { PAYMENT_APPS } from '@core/ingest/bankSms';
 import { saveHealthDays, saveUsageDays, setSourceState, sourceState } from '@core/sources/deviceData';
 import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@core/ingest/fx';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
+import { quietly } from '@ui/hooks';
+import type { RawMessage } from '@core/ingest/ingest';
 import { calendarGranted, callLogGranted, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
 
 /**
@@ -91,16 +93,34 @@ export async function requestAccess(id: SourceId): Promise<boolean> {
 /* Sync                                                                 */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Many messages at once (a history import, a backlog after days offline):
+ * 200 per database transaction, a breath between batches so the app stays
+ * responsive, and one screen refresh at the end.
+ */
+async function ingestMany(os: LifeOSContext, msgs: RawMessage[], mode: 'live' | 'import'): Promise<{ confirmed: number; proposed: number }> {
+  const out = { confirmed: 0, proposed: 0 };
+  await quietly(async () => {
+    for (let i = 0; i < msgs.length; i += 200) {
+      os.db.transaction(() => {
+        for (const m of msgs.slice(i, i + 200)) {
+          const r = ingestMessage(os, m, { mode });
+          if (r.status === 'confirmed') out.confirmed++;
+          if (r.status === 'proposed') out.proposed++;
+        }
+      });
+      await new Promise((r) => setTimeout(r, 16));
+    }
+  });
+  return out;
+}
+
 /** First SMS sync: the last six months as proposals for the review screen. Returns how many were proposed. */
 export async function importSmsHistory(os: LifeOSContext): Promise<number> {
   if (!Device || (await access('sms')) !== 'granted') return 0;
   const since = Date.now() - HISTORY_SMS_DAYS * DAY;
   const all = await Device.readSms(since, 5000);
-  let proposed = 0;
-  for (const m of all.reverse()) {
-    const r = ingestMessage(os, { source: 'sms', from: m.from, body: m.body, receivedAt: m.at }, { mode: 'import' });
-    if (r.status === 'proposed') proposed++;
-  }
+  const { proposed } = await ingestMany(os, all.reverse().map((m) => ({ source: 'sms' as const, from: m.from, body: m.body, receivedAt: m.at })), 'import');
   setSourceState(os, 'sms', { enabled: true, lastSync: Date.now(), cursor: String(Date.now()), error: null });
   return proposed;
 }
@@ -109,10 +129,10 @@ async function syncSms(os: LifeOSContext) {
   const st = sourceState(os, 'sms');
   if (!Device || !st.enabled || (await access('sms')) !== 'granted') return;
   // Anything that arrived while the app was closed: the receiver's queue, then the inbox since the last sync.
-  let n = 0;
-  for (const m of Device.drain('sms') as Array<{ from: string; body: string; at: number }>) if (ingestMessage(os, { source: 'sms', from: m.from, body: m.body, receivedAt: m.at }).status === 'confirmed') n++;
   const since = Number(st.cursor ?? Date.now() - DAY);
-  for (const m of (await Device.readSms(since, 500)).reverse()) if (ingestMessage(os, { source: 'sms', from: m.from, body: m.body, receivedAt: m.at }).status === 'confirmed') n++;
+  const queued = Device.drain('sms') as Array<{ from: string; body: string; at: number }>;
+  const inbox = (await Device.readSms(since, 500)).reverse();
+  const n = (await ingestMany(os, [...queued, ...inbox].map((m) => ({ source: 'sms' as const, from: m.from, body: m.body, receivedAt: m.at })), 'live')).confirmed;
   setSourceState(os, 'sms', { lastSync: Date.now(), cursor: String(Date.now()), addTotal: n, error: null });
 }
 

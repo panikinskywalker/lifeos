@@ -156,7 +156,7 @@ Decisions: foreign spends stored in their currency and converted at that day's r
 - [x] To check: untouched items auto-approve after 15 days.
 - [x] 60-day clean-up job. *(`src/core/sources/retention.ts`, once a day.)*
 - [x] Payees: one record per person / shop you pay or get paid by; every payment links to it (a Person when the name or UPI ID matches someone in People — a guess is flagged in To check and on the payment with Yes / Not them); a payee's page shows its payments and total. *(`src/core/ingest/payee.ts`; past payments linked once on start.)*
-- [ ] Speed: measure and fix the slow screens.
+- [x] Speed: measure and fix the slow screens. *(Screens refresh at most every 300 ms instead of on every change; SMS imports in batches of 200 per transaction with breaks; senders and duplicate checks are single lookups (+ indexes, migration v10); Today computes upkeep once. Data sources got Sync all.)*
 
 ### M4.3 — Today as a dashboard
 - [x] Chart components on the design tokens: Sparkline, Bars (daily/weekly), Ring, StackedBar (exists), HeatMap (habits/steps), Comparison ("vs. yesterday" delta chip). Built with react-native-svg; no chart library that pulls in web deps. *(MiniBars, DeltaChip (good/bad per metric), HeatMap added; Sparkline, LineChart, ColumnChart, Ring, StackedBar already existed. All in the gallery.)*

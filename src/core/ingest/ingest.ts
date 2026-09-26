@@ -100,7 +100,8 @@ function seeSender(os: LifeOSContext, m: RawMessage): SmsSender {
        trusted=CASE WHEN decided=1 THEN trusted ELSE MAX(trusted, excluded.trusted) END, sample=COALESCE(sample, excluded.sample)`,
     [m.from, bank, looksLikeBankSender(m.from, m.body) ? 1 : 0, m.receivedAt, m.receivedAt, m.body.slice(0, 200)],
   );
-  return senders(os).find((s) => s.address === m.from)!;
+  const r = os.db.get<Row>(`SELECT * FROM sms_senders WHERE address=?`, [m.from])!;
+  return { address: r.address as string, bank: (r.bank as string | null) ?? null, trusted: r.trusted === 1, decided: r.decided === 1, count: r.count as number, lastSeen: r.last_seen as number, sample: (r.sample as string | null) ?? null };
 }
 
 /* ------------------------------------------------------------------ */
@@ -240,9 +241,13 @@ function findDuplicate(os: LifeOSContext, itemId: string, t: ParsedTxn, at: numb
   const day = iso(at);
   const prev = iso(at - DAY);
   const kind = t.direction === 'credit' ? 'income' : 'expense';
-  const tx = os.entities
-    .query<{ amount: number; kind: string; date: string }>('transaction', {}, { limit: 400 })
-    .find((e) => e.data.amount === t.amount && e.data.kind === kind && (e.data.date === day || e.data.date === prev) && !os.db.get(`SELECT 1 AS x FROM ingest_queue WHERE entity_id=?`, [e.id]));
+  // Straight to the few candidates (date and kind are indexed), not a scan of recent transactions.
+  const tx = os.db.get<{ id: string }>(
+    `SELECT e.id FROM entities e WHERE e.type='transaction' AND e.deleted_at IS NULL
+       AND json_extract(e.data,'$.date') IN (?, ?) AND json_extract(e.data,'$.kind')=? AND json_extract(e.data,'$.amount')=?
+       AND NOT EXISTS (SELECT 1 FROM ingest_queue q WHERE q.entity_id = e.id) LIMIT 1`,
+    [day, prev, kind, t.amount],
+  );
   return tx ? { entityId: tx.id } : null;
 }
 

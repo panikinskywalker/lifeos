@@ -615,5 +615,14 @@ export const migrations: Migration[] = [
         PRIMARY KEY (day, package)
       )`,
     ],
+  },  {
+    version: 10,
+    name: 'speed',
+    up: [
+      // "Is this SMS a payment you already filed?" looks up by the record it became.
+      `CREATE INDEX IF NOT EXISTS idx_ingest_entity ON ingest_queue(entity_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_ingest_received ON ingest_queue(received_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_timeline_kind_time ON timeline_events(kind, occurred_at)`,
+    ],
   },
 ];
