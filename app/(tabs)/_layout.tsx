@@ -2,12 +2,12 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { BottomBar, type BottomBarItem } from '@ui/kit';
 
-/** PRODUCT v4 §4: Today · Upkeep · Dump (centre, raised; Talk is a toggle inside) · Almanac · You. */
+/** PRODUCT v4 §4: Today · Upkeep · Dump (centre, raised; Talk is a toggle inside) · Browse (→ Almanac in M4.4) · You. */
 export const TABS: BottomBarItem[] = [
   { key: 'index', label: 'Today', icon: 'sun' },
   { key: 'upkeep', label: 'Upkeep', icon: 'repeat' },
   { key: 'dump', label: 'Dump', icon: 'brain', primary: true },
-  { key: 'almanac', label: 'Almanac', icon: 'library' },
+  { key: 'browse', label: 'Browse', icon: 'folder' },
   { key: 'you', label: 'You', icon: 'user-circle' },
 ];
 

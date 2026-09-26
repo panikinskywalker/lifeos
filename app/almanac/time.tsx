@@ -50,7 +50,7 @@ export default function TimeScreen() {
   const cats = s.spend.byCategory.slice(0, 6);
 
   return (
-    <Screen title="Time" subtitle="Your life by date" onBack={() => (router.canGoBack() ? router.back() : router.replace('/almanac'))}>
+    <Screen title="Time" subtitle="Your life by date" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}>
       <Segmented<Span> options={[{ value: 'day', label: 'Day' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }]} value={span} onChange={(v) => go({ span: v })} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <IconButton icon="chevron-left" accessibilityLabel="Earlier" onPress={() => go({ day: p.prev })} />

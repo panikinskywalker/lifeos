@@ -38,7 +38,7 @@ export default function MemoryScreen() {
     toast.show({ message: 'Forgotten', icon: 'trash', undo: () => os.facts.restore(f.id) });
   };
   return (
-    <Screen title="Memory" subtitle={`${all.length} thing${all.length === 1 ? '' : 's'} you’ve told me`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/almanac'))} right={<IconButton icon="plus" accessibilityLabel="Add a fact" filled onPress={() => setAdding(true)} />}>
+    <Screen title="Memory" subtitle={`${all.length} thing${all.length === 1 ? '' : 's'} you’ve told me`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))} right={<IconButton icon="plus" accessibilityLabel="Add a fact" filled onPress={() => setAdding(true)} />}>
       <TextField value={q} onChange={setQ} placeholder="Search memory" leading="search" />
       {all.length === 0 ? (
         <EmptyState icon="sparkle" tint="memory" title="Nothing remembered yet" line="Tell Talk things worth keeping — “Dad hates surprises”, “the landlord is Suresh, rent on the 5th” — and they’ll live here." action="Add one yourself" onAction={() => setAdding(true)} />

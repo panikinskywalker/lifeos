@@ -40,7 +40,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
   const tags = useLive((o) => o.tags.forEntity(id), [id]);
   const cover = useLive((o) => o.attachments.cover(id), [id]);
   const [panel, setPanel] = useState<Panel>(null);
-  const back = () => (router.canGoBack() ? router.back() : router.replace('/almanac'));
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/browse'));
   if (!entity) {
     return (
       <View style={{ flex: 1, backgroundColor: t.c.bg.ground, paddingTop: insets.top + 48 }}>
