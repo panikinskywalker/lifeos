@@ -282,6 +282,14 @@ function nodeLabel(os: LifeOSContext, id: string): string {
   return e.title;
 }
 
+/** A category as the model said it ("Pets", "food") → the category's stored value (your own ones included); unknown words kept as said. */
+function categoryValue(os: LifeOSContext, said: string | undefined): string {
+  if (!said) return 'other';
+  const opts = os.registry.entityTypes.get('transaction')?.fields.find((f) => f.key === 'category')?.options ?? [];
+  const k = said.trim().toLowerCase();
+  return (opts.find((o) => o.value.toLowerCase() === k || o.label.toLowerCase() === k) ?? opts.find((o) => o.label.toLowerCase().split(/\s*&\s*/)[0] === k))?.value ?? said;
+}
+
 const TRAVEL_KINDS = /^(flight|train|bus|drive|road trip|ferry|cruise|stay|hotel|check.?in|check.?out)$/i;
 
 function dayStart(iso: string) {
@@ -490,7 +498,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         const amount = typeof i.amount === 'number' ? i.amount : parseAmount(i.amount);
         if (!amount) return { error: 'no amount' };
         const account = i.account ? resolveCandidates(os, i.account, ['account']).find((c) => c.score >= 0.8) : undefined;
-        const data = { amount, kind: i.kind ?? 'expense', category: i.category ?? 'other', merchant: i.merchant ?? (i.for ? nameOf(i.for) : undefined), date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined) };
+        const data = { amount, kind: i.kind ?? 'expense', category: categoryValue(os, i.category), merchant: i.merchant ?? (i.for ? nameOf(i.for) : undefined), date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined) };
         const tx = os.entities.create({ type: 'transaction', data }, 'assistant');
         log(os, s, { kind: 'transaction', action: 'created', entityId: tx.id, label: `${data.kind === 'income' ? 'Income' : 'Spent'}: ${os.format.currency(amount)}${data.merchant ? ` · ${data.merchant}` : ''}` });
         if (i.for) {

@@ -216,9 +216,9 @@ export interface Option {
 }
 
 /** Up to 6 options as chips inline; more open a searchable sheet. */
-export function SelectField({ label, required, hint, error, options, value, onChange }: { label?: string; required?: boolean; hint?: string; error?: string; options: Option[]; value: string | undefined; onChange: (v: string | undefined) => void }) {
+export function SelectField({ label, required, hint, error, options, value, onChange, onCreate }: { label?: string; required?: boolean; hint?: string; error?: string; options: Option[]; value: string | undefined; onChange: (v: string | undefined) => void; /** Offer "Add “…”" for what was typed; returns the new option's value. */ onCreate?: (label: string) => string | null }) {
   const [open, setOpen] = useState(false);
-  if (options.length <= 6) {
+  if (options.length <= 6 && !onCreate) {
     return (
       <Field label={label} required={required} hint={hint} error={error}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -242,6 +242,15 @@ export function SelectField({ label, required, hint, error, options, value, onCh
           onChange(id);
           setOpen(false);
         }}
+        onCreate={
+          onCreate
+            ? (q) => {
+                const v = onCreate(q);
+                if (v) onChange(v);
+                setOpen(false);
+              }
+            : undefined
+        }
       />
     </>
   );
@@ -258,7 +267,7 @@ export interface PickerItem {
  * Searchable list in a sheet. Filters `items` locally unless `onSearch` is
  * given, in which case the caller supplies results for the query.
  */
-export function PickerSheet({ visible, onClose, title, items, selected = [], onSelect, onSearch, header }: { visible: boolean; onClose: () => void; title?: string; items: PickerItem[]; selected?: string[]; onSelect: (id: string) => void; onSearch?: (q: string) => void; header?: React.ReactNode }) {
+export function PickerSheet({ visible, onClose, title, items, selected = [], onSelect, onSearch, header, onCreate }: { visible: boolean; onClose: () => void; title?: string; items: PickerItem[]; selected?: string[]; onSelect: (id: string) => void; onSearch?: (q: string) => void; header?: React.ReactNode; /** Show "Add “…”" for a typed name that isn't in the list. */ onCreate?: (q: string) => void }) {
   const t = useTheme();
   const [q, setQ] = useState('');
   const shown = onSearch || !q ? items : items.filter((i) => i.title.toLowerCase().includes(q.toLowerCase()));
@@ -275,8 +284,18 @@ export function PickerSheet({ visible, onClose, title, items, selected = [], onS
         }}
       />
       {header}
+      {onCreate && q.trim() && !items.some((i) => i.title.toLowerCase() === q.trim().toLowerCase()) ? (
+        <RowItem icon="plus" title={`Add “${q.trim()}”`} subtitle="A new one — you can change its colour and icon later" chevron={false} onPress={() => {
+          onCreate(q.trim());
+          setQ('');
+        }} />
+      ) : onCreate && !q.trim() ? (
+        <Text variant="caption" color="secondary" style={{ paddingHorizontal: 4 }}>
+          Not in the list? Type a name to add it.
+        </Text>
+      ) : null}
       <RowList>
-        {shown.length === 0 ? (
+        {shown.length === 0 && !onCreate ? (
           <Text variant="body" color="secondary" style={{ padding: 16, textAlign: 'center' }}>
             Nothing found
           </Text>

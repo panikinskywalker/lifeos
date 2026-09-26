@@ -58,6 +58,8 @@ export interface FieldDef {
   required?: boolean;
   /** For select/multiselect. */
   options?: FieldOption[];
+  /** For select: the picker offers "Add “…”" and this makes the new option (e.g. a new spending category). */
+  onCreateOption?: (label: string) => FieldOption | null;
   /** For relation: which entity type(s) may be linked; `relationKind` names the edge. */
   relationTo?: string | string[];
   relationKind?: string;

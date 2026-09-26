@@ -1,5 +1,6 @@
 import type { ModuleManifest } from '@core/registry/types';
 import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES, debtType } from './types';
+import { applyCategories, trackCategoryField } from './categories';
 import { financeWidgets } from './widgets';
 import { AccountSection, BudgetSection, FinanceHome } from './screens';
 import { postDueSubscriptions } from './lib';
@@ -62,6 +63,9 @@ export const financeModule: ModuleManifest = {
   ],
   aiTools: financeAiTools,
   onStart: async (os) => {
+    // Your own categories join the built-in list in every category picker.
+    for (const def of [transactionType, budgetType, subscriptionType]) trackCategoryField(def.fields.find((f) => f.key === 'category'));
+    applyCategories(os);
     // Post due subscription bills daily (and on every app start).
     os.scheduler.registerHandler('finance.subscriptions', (_j, o) => void postDueSubscriptions(o));
     if (!os.scheduler.get('finance.subscriptions')) os.scheduler.schedule({ id: 'finance.subscriptions', kind: 'finance.subscriptions', at: Date.now(), rrule: 'FREQ=DAILY;INTERVAL=1' });
@@ -70,3 +74,4 @@ export const financeModule: ModuleManifest = {
 
 export * from './types';
 export * from './lib';
+export * from './categories';

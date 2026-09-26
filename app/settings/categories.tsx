@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Alert, Platform, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BUILTIN_CATEGORIES, categoryFor, categoryRules, setCategoryRules } from '@core/ingest/ingest';
 import { CATEGORIES } from '@modules/finance/types';
+import { CATEGORY_COLORS, CATEGORY_ICONS, addCategory, customCategories, deleteCategory, updateCategory, type CustomCategory } from '@modules/finance/categories';
 import { useLive, useOS } from '@ui/hooks';
-import { Button, ChipRow, FilterChip, IconButton, RowItem, RowList, Screen, Section, Text, TextField, useToast } from '@ui/kit';
+import { useTheme } from '@ui/theme/ThemeProvider';
+import { Button, ChipRow, FilterChip, Icon, IconButton, RowItem, RowList, Screen, Section, Sheet, Text, TextField, useToast } from '@ui/kit';
 
 const label = (v: string) => CATEGORIES.find((c) => c.value === v)?.label ?? v;
 
@@ -21,6 +23,8 @@ export default function CategoriesScreen() {
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('food');
   const [showBuiltin, setShowBuiltin] = useState(false);
+  const mine = useLive((o) => customCategories(o), []);
+  const [editing, setEditing] = useState<CustomCategory | 'new' | null>(null);
 
   const add = () => {
     const k = keyword.trim();
@@ -43,8 +47,20 @@ export default function CategoriesScreen() {
   };
 
   return (
-    <Screen title="Categories" subtitle="Keywords that decide a spend’s category" onBack={() => router.back()}>
+    <Screen title="Categories" subtitle="Your categories, and the keywords that decide them" onBack={() => router.back()}>
       <View style={{ gap: 16 }}>
+        <Section title="Your categories" meta={mine.length ? String(mine.length) : undefined} action="New" onAction={() => setEditing('new')}>
+          {mine.length ? (
+            <RowList>
+              {mine.map((c) => (
+                <RowItem key={c.value} icon={c.icon} title={c.label} subtitle="Tap to rename, recolour or delete" trailing={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.color }} />} onPress={() => setEditing(c)} />
+              ))}
+            </RowList>
+          ) : (
+            <Text variant="caption" color="secondary">Add your own — Pets, Gym, Kids… They show up wherever you pick a category, in budgets, charts and rules. You can also add one straight from a transaction’s category picker.</Text>
+          )}
+          <Button title="New category" icon="plus" size="sm" variant="secondary" onPress={() => setEditing('new')} />
+        </Section>
         <Section title="Add a rule">
           <View style={{ gap: 10 }}>
             <TextField label="If the merchant or message says" value={keyword} onChange={setKeyword} placeholder="ZOMATO, rent, Guru Tailors…" autoCapitalize="characters" />
@@ -82,6 +98,71 @@ export default function CategoriesScreen() {
           )}
         </Section>
       </View>
+      <CategorySheet
+        editing={editing}
+        nextColor={CATEGORY_COLORS[mine.length % CATEGORY_COLORS.length]!}
+        onClose={() => setEditing(null)}
+        onSave={(c) => {
+          if (editing === 'new') {
+            const made = addCategory(os, c);
+            if (made) {
+              setCategory(made.value);
+              toast.show({ message: `${made.label} added`, icon: 'check' });
+            }
+          } else if (editing) updateCategory(os, editing.value, c);
+          setEditing(null);
+        }}
+        onDelete={(c) => {
+          const go = () => {
+            const n = deleteCategory(os, c.value);
+            setEditing(null);
+            toast.show({ message: n ? `${c.label} deleted · ${n} moved to Other` : `${c.label} deleted`, icon: 'trash' });
+          };
+          if (Platform.OS === 'web') return go();
+          Alert.alert(`Delete ${c.label}?`, 'Transactions, budgets and subscriptions in it move to Other; rules that point to it are removed.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: go }]);
+        }}
+      />
     </Screen>
+  );
+}
+
+/** New or edit: a name, a colour, an icon. */
+function CategorySheet({ editing, nextColor, onClose, onSave, onDelete }: { editing: CustomCategory | 'new' | null; nextColor: string; onClose: () => void; onSave: (c: { label: string; color: string; icon: string }) => void; onDelete: (c: CustomCategory) => void }) {
+  const t = useTheme();
+  const existing = editing && editing !== 'new' ? editing : null;
+  const [name, setName] = useState('');
+  const [color, setColor] = useState(CATEGORY_COLORS[0]!);
+  const [icon, setIcon] = useState('tag');
+  const [shownFor, setShownFor] = useState<string | null>(null);
+  const key = existing?.value ?? (editing === 'new' ? 'new' : null);
+  if (key !== shownFor) {
+    setShownFor(key);
+    setName(existing?.label ?? '');
+    setColor(existing?.color ?? nextColor);
+    setIcon(existing?.icon ?? 'tag');
+  }
+  const taken = !!name.trim() && CATEGORIES.some((c) => c.label.toLowerCase() === name.trim().toLowerCase() && c.value !== existing?.value);
+  return (
+    <Sheet visible={!!editing} onClose={onClose} title={existing ? 'Edit category' : 'New category'}>
+      <View style={{ gap: 14 }}>
+        <TextField label="Name" value={name} onChange={setName} placeholder="Pets, Gym, Kids…" autoFocus={!existing} error={taken ? 'There’s already a category with this name' : undefined} />
+        <Text variant="label" color="secondary">Colour</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {CATEGORY_COLORS.map((c) => (
+            <Pressable key={c} accessibilityRole="button" accessibilityLabel={`Colour ${c}`} accessibilityState={{ selected: color === c }} onPress={() => setColor(c)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c, borderWidth: color === c ? 3 : 0, borderColor: t.c.fg.primary }} />
+          ))}
+        </View>
+        <Text variant="label" color="secondary">Icon</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {CATEGORY_ICONS.map((i) => (
+            <Pressable key={i} accessibilityRole="button" accessibilityLabel={`Icon ${i}`} accessibilityState={{ selected: icon === i }} onPress={() => setIcon(i)} style={{ width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: icon === i ? color : t.c.bg.tile }}>
+              <Icon name={i} size={20} color={icon === i ? '#fff' : t.c.fg.secondary} />
+            </Pressable>
+          ))}
+        </View>
+        <Button title={existing ? 'Save' : 'Add category'} icon="check" disabled={!name.trim() || taken} onPress={() => onSave({ label: name, color, icon })} />
+        {existing ? <Button title="Delete category" icon="trash" variant="destructive" onPress={() => onDelete(existing)} /> : null}
+      </View>
+    </Sheet>
   );
 }

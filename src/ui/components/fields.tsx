@@ -34,7 +34,7 @@ export function FieldInput(props: FieldInputProps) {
     case 'datetime':
       return <DateField {...props} />;
     case 'select':
-      return <KitSelectField {...common} options={toOptions(field.options)} value={value == null ? undefined : String(value)} onChange={onChange} />;
+      return <KitSelectField {...common} options={toOptions(field.options)} value={value == null ? undefined : String(value)} onChange={onChange} onCreate={field.onCreateOption ? (label) => field.onCreateOption!(label)?.value ?? null : undefined} />;
     case 'multiselect':
       return <MultiSelectField {...props} />;
     case 'relation':
