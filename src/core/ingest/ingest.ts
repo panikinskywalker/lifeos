@@ -141,8 +141,23 @@ export interface CategoryRule {
   multiples?: boolean;
   /** Money out, money in, or either (default: out for amount rules, either for keyword-only ones). */
   direction?: 'spent' | 'received' | 'any';
+  /**
+   * A range ("anything from ₹100 to ₹200"): too loose alone, so it's sure only
+   * when the money is from someone in `fromGroupId`, or came within
+   * `withinHours` of a payment out whose merchant says `afterKeyword`
+   * (friends' shares after you book the turf). Otherwise it's filed as a
+   * flagged guess — and once you recategorise a payer, their payments stop
+   * being guessed.
+   */
+  min?: number | null;
+  max?: number | null;
+  fromGroupId?: string | null;
+  afterKeyword?: string | null;
+  withinHours?: number | null;
   category: string;
 }
+
+const isRange = (r: CategoryRule) => r.min != null || r.max != null;
 
 export const ruleAmounts = (r: CategoryRule): number[] => (r.amounts?.length ? r.amounts : r.amount != null ? [r.amount] : []);
 
@@ -159,10 +174,11 @@ function amountMatches(r: CategoryRule, amount: number | null | undefined): bool
   });
 }
 
-/** What a rule says, for lists and toasts: "₹28", "ZOMATO", "ZOMATO · ₹28", "₹147 / ₹131 (or multiples) · received". */
+/** What a rule says, for lists and toasts: "₹28", "ZOMATO", "ZOMATO · ₹28", "₹147 / ₹131 (or multiples) · received", "₹100–₹200 · received". */
 export function ruleText(r: CategoryRule, currency: (n: number) => string = (n) => `₹${n}`): string {
   const list = ruleAmounts(r);
-  const money = list.length ? `${list.map(currency).join(' / ')}${r.multiples ? ' (or multiples)' : ''}` : null;
+  const range = isRange(r) ? (r.min != null && r.max != null ? `${currency(r.min)}–${currency(r.max)}` : r.min != null ? `${currency(r.min)} or more` : `up to ${currency(r.max!)}`) : null;
+  const money = list.length ? `${list.map(currency).join(' / ')}${r.multiples ? ' (or multiples)' : ''}` : range;
   const dir = r.direction === 'received' ? 'received' : r.direction === 'any' ? 'in or out' : null;
   return [r.keyword.trim() || null, money, dir].filter(Boolean).join(' · ');
 }
@@ -173,7 +189,7 @@ export function categoryRules(os: LifeOSContext): CategoryRule[] {
 }
 
 export function setCategoryRules(os: LifeOSContext, rules: CategoryRule[]) {
-  os.settings.set('categoryRules', rules.filter((r) => (r.keyword.trim() || ruleAmounts(r).length) && r.category));
+  os.settings.set('categoryRules', rules.filter((r) => (r.keyword.trim() || ruleAmounts(r).length || isRange(r)) && r.category));
   bus.emit('data.changed', { table: 'settings', id: 'categoryRules' });
 }
 
@@ -197,13 +213,45 @@ export function ruleCategory(os: LifeOSContext, merchant: string | null | undefi
     return d === 'any' || d === (direction === 'credit' ? 'received' : 'spent');
   };
   const byAmount = (r: CategoryRule) => ruleAmounts(r).length > 0 && amountMatches(r, amount);
-  const live = rules.filter(way);
+  const live = rules.filter((r) => way(r) && !isRange(r));
   // Most specific first: keyword and amount, then keyword, then amount alone.
   const hit =
     live.find((r) => r.keyword.trim() && byAmount(r) && words(r)) ??
     live.find((r) => r.keyword.trim() && !ruleAmounts(r).length && words(r)) ??
     live.find((r) => !r.keyword.trim() && byAmount(r));
   return hit?.category ?? null;
+}
+
+/**
+ * A range rule for money already linked to its payer: sure when the payer is
+ * in the rule's group or it came soon after the named payment out; a guess
+ * (with why) when only the amount fits; null when it doesn't apply or you
+ * already taught LifeOS what this payer's money is.
+ */
+export function rangeRule(os: LifeOSContext, p: { amount: number; direction: 'debit' | 'credit'; payerId?: string | null; merchant?: string | null; at: number }): { category: string; sure: boolean; why: string } | null {
+  const learned = p.merchant ? os.settings.get<Record<string, string>>('merchantCategories', {})[norm(p.merchant)] : undefined;
+  for (const r of categoryRules(os).filter(isRange)) {
+    const d = r.direction ?? 'received';
+    if (d !== 'any' && d !== (p.direction === 'credit' ? 'received' : 'spent')) continue;
+    if ((r.min != null && p.amount < r.min) || (r.max != null && p.amount > r.max)) continue;
+    const group = r.fromGroupId && p.payerId ? os.groups.groupsOf(p.payerId).includes(r.fromGroupId) || ((os.entities.get<{ memberIds?: string[] }>(r.fromGroupId)?.data.memberIds ?? []).includes(p.payerId)) : false;
+    if (group) return { category: r.category, sure: true, why: `from ${os.entities.get(r.fromGroupId!)?.title ?? 'the group'}` };
+    const k = r.afterKeyword?.trim();
+    if (k) {
+      const hours = r.withinHours ?? 48;
+      const since = iso(p.at - hours * 3_600_000);
+      const until = iso(p.at);
+      const re = new RegExp(`(^|[^a-z0-9])${k.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`, 'i');
+      const paid = os.entities
+        .query<{ merchant?: string; note?: string; kind?: string }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: since }, { field: 'data.date', op: 'lte', value: until }] } }, { limit: 200 })
+        .find((t) => re.test(`${t.data.merchant ?? ''} ${t.data.note ?? ''}`));
+      if (paid) return { category: r.category, sure: true, why: `after your ${paid.title} payment` };
+    }
+    // Only the amount fits: a guess — unless you've said what this payer's money is.
+    if (learned) return null;
+    return { category: r.category, sure: false, why: `only the amount fits${r.fromGroupId ? ` — not from ${os.entities.get(r.fromGroupId)?.title ?? 'the group'}` : ''}` };
+  }
+  return null;
 }
 
 /**
@@ -453,6 +501,18 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
       linkPayee(os, e.id, pm, t.counterparty, t.vpa, item.source);
       if (pm.guess) flag = pm.guess;
       if (pm.created) created.push(pm.id);
+    }
+  }
+  // A range rule ("₹100–200 received → Football") needs the payer, so it's checked once they're linked.
+  if (!t.investment && !t.transfer && t.channel !== 'atm' && !ruleCategory(os, data.merchant as string | undefined, item.text, amount, t.direction)) {
+    const payerId = os.relations.forEntity(e.id).find((r) => r.relation.kind === 'person' && r.direction === 'out')?.other.id ?? null;
+    const rr = rangeRule(os, { amount, direction: t.direction, payerId, merchant: data.merchant as string | undefined, at: item.receivedAt });
+    if (rr && rr.category !== data.category) {
+      os.entities.update(e.id, { data: { category: rr.category } }, 'assistant');
+      data.category = rr.category;
+      const name = os.registry.entityTypes.get('transaction')?.fields.find((f) => f.key === 'category')?.options?.find((o) => o.value === rr.category)?.label ?? rr.category;
+      label += ` · ${name}`;
+      if (!rr.sure) flag = `Guessed ${name}: ${rr.why}. Change the category if not — it won’t guess for this payer again`;
     }
   }
   if (!t.investment && !t.transfer && t.direction === 'debit' && data.category === 'subscriptions' && typeof data.merchant === 'string') {

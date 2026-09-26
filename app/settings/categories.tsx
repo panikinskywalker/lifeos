@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BUILTIN_CATEGORIES, categoryRules, ruleAmounts, ruleCategory, ruleText, setCategoryRules } from '@core/ingest/ingest';
+import { BUILTIN_CATEGORIES, categoryRules, rangeRule, ruleAmounts, ruleCategory, ruleText, setCategoryRules } from '@core/ingest/ingest';
 import { CATEGORIES } from '@modules/finance/types';
 import { CATEGORY_COLORS, CATEGORY_ICONS, addCategory, customCategories, deleteCategory, updateCategory, type CustomCategory } from '@modules/finance/categories';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, ChipRow, FilterChip, Icon, IconButton, RowItem, Segmented, SwitchField, RowList, Screen, Section, Sheet, Text, TextField, useToast } from '@ui/kit';
+import { Button, ChipRow, FilterChip, Icon, IconButton, NumberField, RowItem, Segmented, SwitchField, RowList, Screen, Section, Sheet, Text, TextField, useToast } from '@ui/kit';
 
 const label = (v: string) => CATEGORIES.find((c) => c.value === v)?.label ?? v;
 
@@ -28,10 +28,28 @@ export default function CategoriesScreen() {
   const [category, setCategory] = useState('food');
   const [showBuiltin, setShowBuiltin] = useState(false);
   const mine = useLive((o) => customCategories(o), []);
+  const groups = useLive((o) => (o.registry.entityTypes.has('group') ? o.entities.query('group', {}, { limit: 200 }) : []), []);
+  const [mode, setMode] = useState<'exact' | 'range'>('exact');
+  const [min, setMin] = useState<number | undefined>(undefined);
+  const [max, setMax] = useState<number | undefined>(undefined);
+  const [groupId, setGroupId] = useState<string | null>(null);
+  const [after, setAfter] = useState('');
+  const [hours, setHours] = useState<number | undefined>(48);
+  const hasRange = mode === 'range' && (min != null || max != null);
   const [editing, setEditing] = useState<CustomCategory | 'new' | null>(null);
 
   const add = () => {
     const k = keyword.trim();
+    if (hasRange) {
+      const rule = { keyword: '', min: min ?? null, max: max ?? null, direction, fromGroupId: groupId, afterKeyword: after.trim() || null, withinHours: after.trim() ? (hours ?? 48) : null, category };
+      setCategoryRules(os, [...rules, rule]);
+      setMin(undefined);
+      setMax(undefined);
+      setAfter('');
+      setGroupId(null);
+      toast.show({ message: `${ruleText(rule, os.format.currency)} → ${label(category)}`, icon: 'tag' });
+      return;
+    }
     if (!k && !amounts.length) return;
     const rule = { keyword: k, amounts: amounts.length ? amounts : null, multiples: amounts.length ? multiples : undefined, direction: amounts.length || direction !== 'spent' ? direction : undefined, category };
     const same = (r: (typeof rules)[number]) => r.keyword.toLowerCase() === k.toLowerCase() && ruleAmounts(r).join() === amounts.join() && (r.direction ?? 'spent') === direction;
@@ -46,7 +64,14 @@ export default function CategoriesScreen() {
     let n = 0;
     for (const e of os.entities.query<{ merchant?: string; category?: string; kind?: string; note?: string; amount?: number }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'in', value: ['expense', 'income'] }] } }, { limit: 5000 })) {
       // A rule decides; nothing else overrides a category you (or it) already set.
-      const c = ruleCategory(os, e.data.merchant, e.data.note ?? '', e.data.amount ?? null, e.data.kind === 'income' ? 'credit' : 'debit');
+      const dir = e.data.kind === 'income' ? 'credit' : 'debit';
+      let c = ruleCategory(os, e.data.merchant, e.data.note ?? '', e.data.amount ?? null, dir);
+      // Range rules: only where they're sure (from the group / after the payment) — past guesses aren't worth the noise.
+      if (!c && e.data.amount != null) {
+        const payerId = os.relations.forEntity(e.id).find((r) => r.relation.kind === 'person' && r.direction === 'out')?.other.id ?? null;
+        const rr = rangeRule(os, { amount: e.data.amount, direction: dir, payerId, merchant: e.data.merchant, at: e.occurredAt ?? e.createdAt });
+        if (rr?.sure) c = rr.category;
+      }
       if (c && c !== e.data.category) {
         os.entities.update(e.id, { data: { category: c } }, 'system');
         n++;
@@ -72,27 +97,63 @@ export default function CategoriesScreen() {
         </Section>
         <Section title="Add a rule">
           <View style={{ gap: 10 }}>
-            <TextField label="If the merchant or message says" value={keyword} onChange={setKeyword} placeholder="ZOMATO, rent, Guru Tailors…" autoCapitalize="characters" hint="Leave empty to go by the amount alone." />
-            <TextField label="And / or the amount is exactly" value={amountText} onChange={setAmountText} placeholder="28   or   147, 131" keyboardType="numbers-and-punctuation" hint="One amount or several, separated by commas — ₹28 is always the water bottle; ₹147 or ₹131 is a football share." />
-            {amounts.length ? (
+            <Segmented<'exact' | 'range'>
+              options={[{ value: 'exact', label: 'Words or exact amounts' }, { value: 'range', label: 'A range' }]}
+              value={mode}
+              onChange={(m) => {
+                setMode(m);
+                if (m === 'range') setDirection('received');
+              }}
+            />
+            {mode === 'exact' ? (
               <>
-                <SwitchField label="Also 2×, 3× … of these" value={multiples} onChange={setMultiples} hint="Two bottles (₹56), or someone paying a friend’s share too (₹294)." />
-                <Segmented<'spent' | 'received' | 'any'> options={[{ value: 'spent', label: 'Money out' }, { value: 'received', label: 'Money in' }, { value: 'any', label: 'Either' }]} value={direction} onChange={setDirection} />
+                <TextField label="If the merchant or message says" value={keyword} onChange={setKeyword} placeholder="ZOMATO, rent, Guru Tailors…" autoCapitalize="characters" hint="Leave empty to go by the amount alone." />
+                <TextField label="And / or the amount is exactly" value={amountText} onChange={setAmountText} placeholder="28   or   147, 131" keyboardType="numbers-and-punctuation" hint="One amount or several, separated by commas — ₹28 is always the water bottle; ₹147 or ₹131 is a football share." />
+                {amounts.length ? <SwitchField label="Also 2×, 3× … of these" value={multiples} onChange={setMultiples} hint="Two bottles (₹56), or someone paying a friend’s share too (₹294)." /> : null}
               </>
+            ) : (
+              <>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <NumberField label="From ₹" value={min} onChange={setMin} placeholder="100" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <NumberField label="To ₹" value={max} onChange={setMax} placeholder="200" />
+                  </View>
+                </View>
+                <Text variant="caption" color="secondary">A range alone catches too much, so it’s sure only when one of these is true — otherwise it files it as a guess you can check in the bell.</Text>
+                {groups.length ? (
+                  <>
+                    <Text variant="label" color="secondary">From someone in</Text>
+                    <ChipRow>
+                      {groups.map((g) => (
+                        <FilterChip key={g.id} label={g.title} selected={groupId === g.id} onPress={() => setGroupId(groupId === g.id ? null : g.id)} />
+                      ))}
+                    </ChipRow>
+                  </>
+                ) : (
+                  <Text variant="caption" color="secondary">Tip: make a group of the people (Browse › People › Groups) and it can go by who paid.</Text>
+                )}
+                <TextField label="Or soon after you paid" value={after} onChange={setAfter} placeholder="TURF, Green Arena…" autoCapitalize="characters" hint="A word in that payment’s merchant — shares come in after you book." />
+                {after.trim() ? <NumberField label="Within hours" value={hours} onChange={setHours} placeholder="48" /> : null}
+              </>
+            )}
+            {mode === 'range' || amounts.length ? (
+              <Segmented<'spent' | 'received' | 'any'> options={[{ value: 'spent', label: 'Money out' }, { value: 'received', label: 'Money in' }, { value: 'any', label: 'Either' }]} value={direction} onChange={setDirection} />
             ) : null}
             <ChipRow>
               {CATEGORIES.filter((c) => c.value !== 'transfer').map((c) => (
                 <FilterChip key={c.value} label={c.label} selected={category === c.value} onPress={() => setCategory(c.value)} />
               ))}
             </ChipRow>
-            <Button title="Add rule" icon="plus" size="sm" disabled={!keyword.trim() && !amounts.length} onPress={add} />
+            <Button title="Add rule" icon="plus" size="sm" disabled={mode === 'range' ? !hasRange : !keyword.trim() && !amounts.length} onPress={add} />
           </View>
         </Section>
         <Section title="Your rules" meta={String(rules.length)}>
           {rules.length ? (
             <RowList>
               {rules.map((r) => (
-                <RowItem key={`${r.keyword}|${ruleAmounts(r).join()}|${r.direction ?? ''}`} icon={r.keyword.trim() ? 'tag' : 'rupee'} tint="finance" title={ruleText(r, os.format.currency)} subtitle={r.keyword.trim() && ruleAmounts(r).length ? 'Both must match' : r.keyword.trim() ? 'Merchant or message says' : 'Exact amount'} value={label(r.category)} chevron={false} trailing={<IconButton icon="trash" size={34} accessibilityLabel={`Remove ${ruleText(r)}`} onPress={() => setCategoryRules(os, rules.filter((x) => x !== r))} />} />
+                <RowItem key={`${r.keyword}|${ruleAmounts(r).join()}|${r.min ?? ''}-${r.max ?? ''}|${r.direction ?? ''}`} icon={r.keyword.trim() ? 'tag' : 'rupee'} tint="finance" title={ruleText(r, os.format.currency)} subtitle={r.min != null || r.max != null ? [r.fromGroupId ? `from ${os.entities.get(r.fromGroupId)?.title ?? 'a group'}` : null, r.afterKeyword ? `after a ${r.afterKeyword} payment (${r.withinHours ?? 48} h)` : null].filter(Boolean).join(' or ') || 'Always a guess to check' : r.keyword.trim() && ruleAmounts(r).length ? 'Both must match' : r.keyword.trim() ? 'Merchant or message says' : 'Exact amount'} value={label(r.category)} chevron={false} trailing={<IconButton icon="trash" size={34} accessibilityLabel={`Remove ${ruleText(r)}`} onPress={() => setCategoryRules(os, rules.filter((x) => x !== r))} />} />
               ))}
             </RowList>
           ) : (

@@ -14,7 +14,7 @@ import { extractDump } from '@core/dumps/extract';
 import { undoExtraction } from '@core/dumps/extract';
 import { accountType, subscriptionType, transactionType } from './finance/types';
 import { financeAiTools } from './finance/aiTools';
-import { personType } from './crm/types';
+import { groupType, personType } from './crm/types';
 import { deliveryType } from './deliveries/types';
 import { eventType } from './projects/types';
 import { tripType } from './travel/types';
@@ -183,6 +183,39 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
     expect(categoryFor(os, 'Kirana', '', 56, 'credit')).toBe('other');
     ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.294.00 credited to HDFC Bank A/c XX1234 on 26-09-26 from VPA arjun.m@okaxis (UPI 426912345699)', receivedAt: at });
     expect(txs()[0]!.data).toMatchObject({ kind: 'income', category: 'c_football' });
+  });
+
+  it('a range rule is sure only with a second signal (from the group, or soon after the turf payment); otherwise a flagged guess, and never again for a payer you corrected', async () => {
+    const { setCategoryRules } = await import('@core/ingest/ingest');
+    os.registry.entityTypes.set('group', groupType as never);
+    const arjun = os.entities.create({ type: 'person', title: 'Arjun Mehta', data: { upi: 'arjun.m@okaxis' } });
+    os.entities.create({ type: 'person', title: 'Priya Nair', data: { upi: 'priya.n@okaxis' } });
+    const team = os.entities.create({ type: 'group', data: { name: 'Football', memberIds: [arjun.id] } });
+    os.groups.setMembers(team.id, [arjun.id]);
+    setCategoryRules(os, [{ keyword: '', min: 100, max: 200, direction: 'received', fromGroupId: team.id, afterKeyword: 'TURF', withinHours: 48, category: 'c_football' }]);
+    const credit = (amt: number, vpa: string, when: string) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: `Rs.${amt}.00 credited to HDFC Bank A/c XX1234 on ${when} from VPA ${vpa} (UPI ${Math.floor(Math.random() * 1e12)})`, receivedAt: Date.parse(`20${when.slice(6)}-${when.slice(3, 5)}-${when.slice(0, 2)}T20:00:00`) });
+    const byAmt = (n: number) => txs().find((t) => t.data.amount === n)!;
+    const checkFor = (id: string) => os.dumps.toCheck().find((x) => x.entityId === id)!;
+    // From the group: sure.
+    credit(147, 'arjun.m@okaxis', '12-09-26');
+    expect(byAmt(147).data.category).toBe('c_football');
+    expect(checkFor(byAmt(147).id).flag).toBeNull();
+    // Not in the group, no turf payment: filed as a guess, flagged.
+    credit(152, 'priya.n@okaxis', '14-09-26');
+    expect(byAmt(152).data.category).toBe('c_football');
+    expect(checkFor(byAmt(152).id).flag).toMatch(/^Guessed c_football: only the amount fits — not from Football/);
+    // You booked the turf; Priya's share the next day is sure.
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.1800.00 From HDFC Bank A/C *1234 To GREEN TURF ARENA On 19/09/26', receivedAt: Date.parse('2026-09-19T18:00:00') });
+    credit(131, 'priya.n@okaxis', '20-09-26');
+    expect(byAmt(131).data.category).toBe('c_football');
+    expect(checkFor(byAmt(131).id).flag).toBeNull();
+    // Outside the range: untouched.
+    credit(450, 'priya.n@okaxis', '21-09-26');
+    expect(byAmt(450).data.category).not.toBe('c_football');
+    // You say Priya's ₹152 wasn't football: her in-range money isn't guessed again (but the turf signal still counts).
+    os.entities.update(byAmt(152).id, { data: { category: 'other' } }, 'user');
+    credit(160, 'priya.n@okaxis', '25-09-26');
+    expect(byAmt(160).data.category).toBe('other');
   });
 });
 
