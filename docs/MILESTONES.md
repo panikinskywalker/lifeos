@@ -116,6 +116,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [ ] To check: bell with count in the header; list of everything filed and unticked, guesses first; tick / edit / cancel (cancel reverses exactly that write).
 - [ ] One box on the centre tab: statement vs question routing; questions answered from the graph (retrieval walks edges); the Dump/Talk toggle removed.
 - [ ] Record pages: mic to speak updates into this record; Connections section grouped by edge word.
+- [ ] Graph view around a record: a small force-directed network (react-native-svg + d3-force) centred on the record, 1–2 hops, tinted by module, edge words on the lines; tap a node to re-centre, long-press to open it. On record pages and from the Almanac.
 
 ### M4.2 — Data sources
 - [ ] **Health Connect** (`react-native-health-connect`): permissions screen; daily sync of steps, sleep sessions, heart rate, workouts, weight into `measurements`/`workouts` with source = health_connect; backfill 90 days on first grant; hourly refresh via background task.
@@ -148,4 +149,4 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 ---
 
 ## After phase 1 (backlog, in rough order)
-Supabase sync + web client (iPhone) · Mac screen time helper · Android home-screen widgets · semantic search / embeddings · weekly review & nudges · Developer Mode · calendar/gallery/timeline layouts · OCR · CSV import · photo memory.
+Whole-life graph view with filters (people only · this year · around a trip) · Supabase sync + web client (iPhone) · Mac screen time helper · Android home-screen widgets · semantic search / embeddings · weekly review & nudges · Developer Mode · calendar/gallery/timeline layouts · OCR · CSV import · photo memory.
