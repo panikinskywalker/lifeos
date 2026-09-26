@@ -74,6 +74,31 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     notify: opts.notify ?? (async () => null),
     cancelNotification: opts.cancelNotification ?? (async () => {}),
   };
+  // Notes, tags and attachment names are part of a record's search text: reindex it when they change.
+  const reindex = (entityId: string | null | undefined) => {
+    const e = entityId ? entities.get(entityId) : undefined;
+    const def = e ? registry.entityTypes.get(e.type) : undefined;
+    if (e && def) entities.search.index(e, def);
+  };
+  const ownerOf = (table: 'comments' | 'attachments', id: string) => db.get<{ entity_id: string }>(`SELECT entity_id FROM ${table} WHERE id=?`, [id])?.entity_id;
+  const wrap = <T extends object, K extends keyof T>(repo: T, name: K, entityOf: (args: never[], result: unknown) => string | null | undefined, before = false) => {
+    const fn = (repo[name] as unknown as (...a: never[]) => unknown).bind(repo);
+    (repo as Record<K, unknown>)[name] = (...args: never[]) => {
+      const owner = before ? entityOf(args, undefined) : undefined;
+      const result = fn(...args);
+      reindex(before ? owner : entityOf(args, result));
+      return result;
+    };
+  };
+  wrap(ctx.comments, 'add', (a) => a[0] as string);
+  wrap(ctx.comments, 'remove', (a) => ownerOf('comments', a[0] as string), true);
+  wrap(ctx.tags, 'apply', (a) => a[0] as string);
+  wrap(ctx.tags, 'remove', (a) => a[0] as string);
+  wrap(ctx.tags, 'set', (a) => a[0] as string);
+  wrap(ctx.attachments, 'add', (a) => (a[0] as { entityId: string }).entityId);
+  wrap(ctx.attachments, 'setCover', (a) => (a[0] as { entityId: string }).entityId);
+  wrap(ctx.attachments, 'remove', (a) => ownerOf('attachments', a[0] as string), true);
+
   // Relation fields: data.<key> holding an entity id (or ids) mirrors into the
   // relations table so the graph and the JSON stay consistent.
   entities.syncRelations = (entity, def, actor) => {
@@ -217,6 +242,11 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   }
 
   ctx.automation.start();
+  // One-time backfill: records indexed before notes, tags and attachment names were searchable.
+  if (!settings.get<boolean>('search.indexV2', false)) {
+    for (const e of entities.query(null, { includeArchived: true }, { limit: 100000 })) reindex(e.id);
+    settings.set('search.indexV2', true);
+  }
   for (const m of all) await m.onStart?.(ctx);
   return ctx;
 }

@@ -23,6 +23,13 @@ export class SearchIndex {
     const body = [
       def.searchText?.(e.data as never) ?? '',
       ...def.fields.filter((f) => ['text', 'longtext', 'select'].includes(f.type)).map((f) => String((e.data as Record<string, unknown>)[f.key] ?? '')),
+      // What's hung on the record: notes (comments), tags, attachment names.
+      ...this.db.all<{ t: string }>(
+        `SELECT body AS t FROM comments WHERE entity_id=? AND deleted_at IS NULL
+         UNION ALL SELECT tg.name FROM entity_tags et JOIN tags tg ON tg.id = et.tag_id WHERE et.entity_id=?
+         UNION ALL SELECT name FROM attachments WHERE entity_id=? AND deleted_at IS NULL`,
+        [e.id, e.id, e.id],
+      ).map((r) => r.t),
     ]
       .filter(Boolean)
       .join(' ');

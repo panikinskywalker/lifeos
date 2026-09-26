@@ -49,3 +49,23 @@ describe('dumps (PRODUCT v4 §1.3)', () => {
     expect(os.facts.add({ text: 'Karan works at Zomato', source: 'dump', sourceRef: d.id }).source).toBe('dump');
   });
 });
+
+describe('search covers what hangs on a record', () => {
+  it('notes (comments), tags and attachment names are searchable and follow edits', async () => {
+    const { z } = await import('zod');
+    const reg = new Registry();
+    const o = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), registry: reg, modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [{ type: 'thing', module: 'm', label: 'Thing', labelPlural: 'Things', icon: 'box', schema: z.object({}), fields: [] }] }] });
+    const e = o.entities.create({ type: 'thing', title: 'Balcony', data: {} });
+    const ids = (q: string) => o.entities.search.search(q).map((h) => h.id);
+    const c = o.comments.add(e.id, 'the plumber fixed the leak');
+    o.tags.apply(e.id, 'renovation');
+    o.attachments.add({ entityId: e.id, name: 'quote-marble.pdf', uri: 'file://x', mime: 'application/pdf', size: 1, kind: 'file' });
+    expect(ids('plumber')).toEqual([e.id]);
+    expect(ids('renovation')).toEqual([e.id]);
+    expect(ids('marble')).toEqual([e.id]);
+    o.comments.remove(c.id);
+    expect(ids('plumber')).toEqual([]);
+    expect(o.settings.get('search.indexV2', false)).toBe(true);
+    o.db.close();
+  });
+});
