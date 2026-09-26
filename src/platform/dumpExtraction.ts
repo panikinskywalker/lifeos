@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { DumpSource } from '@core/repo/dumpRepo';
 import { extractPending } from '@core/dumps/extract';
+import { answerQueued } from '@core/ai/questionQueue';
 import { buildAgentFromSettings } from './agentProvider';
 
 /**
@@ -24,18 +25,21 @@ export function saveDump(os: LifeOSContext, body: string, source: DumpSource = '
 }
 
 /**
- * The filing queue (M4.1c): files what's due, then sleeps until the
- * earliest waiting dump is due (a rate limit lifting, a daily quota
+ * The filing queue (M4.1c): answers queued questions and files what's due,
+ * then sleeps until the earliest waiting item is due (a rate limit lifting, a daily quota
  * resetting). Also runs on every app foreground and from the background task.
  */
 export function runDumpExtraction(os: LifeOSContext): Promise<void> {
   if (running) return running;
   running = (async () => {
     try {
-      if (os.dumps.pending().length) {
+      const dumpsDue = os.dumps.pending().length > 0;
+      const questionsDue = os.questions.due().length > 0;
+      if (dumpsDue || questionsDue) {
         const agent = await buildAgentFromSettings(os).catch(() => null);
-        // Filing is a tool loop: the main chain (the small models are weak at tool calls).
-        const results = await extractPending(os, agent?.main ?? null);
+        // Questions first: someone is waiting on those. Then filing (a tool loop: the main chain).
+        if (questionsDue) await answerQueued(os, agent?.main, { smart: agent?.smart });
+        const results = dumpsDue ? await extractPending(os, agent?.main ?? null) : [];
         const failed = results.some((r) => r.status === 'failed');
         failures = failed ? failures + 1 : 0;
         if (retry) clearTimeout(retry);
@@ -55,8 +59,9 @@ export function runDumpExtraction(os: LifeOSContext): Promise<void> {
 function scheduleWake(os: LifeOSContext) {
   if (wake) clearTimeout(wake);
   wake = null;
-  const at = os.dumps.nextWake();
-  if (at == null) return;
+  const times = [os.dumps.nextWake(), os.questions.nextWake()].filter((t): t is number => t != null);
+  if (!times.length) return;
+  const at = Math.min(...times);
   const ms = Math.min(Math.max(at - Date.now(), 1_000) + 500, 30 * 60_000);
   wake = setTimeout(() => void runDumpExtraction(os), ms);
 }

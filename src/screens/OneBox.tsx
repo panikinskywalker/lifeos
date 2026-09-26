@@ -4,6 +4,9 @@ import { useNavigation, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Assistant, READ_ONLY_TOOLS, type AssistantTurn } from '@core/ai/assistant';
 import { classifyInput } from '@core/ai/route';
+import { classifyFailure } from '@core/ai/limits';
+import { localAnswer } from '@core/ai/localAnswer';
+import { parseMessage } from '@core/ai/parser';
 import type { DumpSource } from '@core/repo/dumpRepo';
 import { useLive, useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -12,7 +15,7 @@ import { ReplyCardView } from '@ui/components/ReplyCard';
 import { buildAgentFromSettings, type AgentProviders } from '../platform/agentProvider';
 import { runDumpExtraction, saveDump } from '../platform/dumpExtraction';
 import { listen } from '../platform/voice';
-import { DumpCard } from './DumpPane';
+import { DumpCard, waitText } from './DumpPane';
 import { ToCheckBell } from './ToCheckBell';
 
 /** Provider failures in plain words. */
@@ -63,6 +66,7 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
   const [file, setFile] = useState<Shared['file'] | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const dumps = useLive((o) => o.dumps.list({ limit: 30 }), []);
+  const queued = useLive((o) => o.questions.list(20), []);
 
   const [focusTick, setFocusTick] = useState(0);
   const navigation = useNavigation();
@@ -92,8 +96,15 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
     [agent, os],
   );
 
+  /** No model free: answer from the phone now, queue the full answer. */
+  const queueQuestion = (question: string, until?: number | null) => {
+    os.questions.add(question, until ?? null);
+    void runDumpExtraction(os);
+  };
   const ask = async (question: string) => {
     if (!assistant) return;
+    // No key and not something the parser answers ("who owes me money"): phone answer + queue.
+    if (!agent && !parseMessage(os, question)) return queueQuestion(question);
     const id = `a${Date.now()}`;
     setAnswers((xs) => [{ id, at: Date.now(), question, turns: [], busy: true }, ...xs]);
     const patch = (p: Partial<Answer> | ((a: Answer) => Partial<Answer>)) => setAnswers((xs) => xs.map((a) => (a.id === id ? { ...a, ...(typeof p === 'function' ? p(a) : p) } : a)));
@@ -101,6 +112,12 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
       const turns = await assistant.send(question);
       patch({ turns: turns.filter((x) => x.role !== 'user'), busy: false });
     } catch (e) {
+      const f = classifyFailure(e);
+      if (f.kind === 'wait') {
+        // Every provider is resting or offline: the phone's answer now, the full one when a model is free.
+        setAnswers((xs) => xs.filter((a) => a.id !== id));
+        return queueQuestion(question, f.until);
+      }
       patch({ busy: false, error: friendlyError((e as Error).message) });
     }
   };
@@ -132,12 +149,13 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
   centerPress.current = () => void speak(true);
 
   const feed = useMemo(() => {
-    const items: Array<{ at: number; key: string; node: 'dump' | 'answer'; id: string }> = [
+    const items: Array<{ at: number; key: string; node: 'dump' | 'answer' | 'queued'; id: string }> = [
       ...dumps.map((d) => ({ at: d.createdAt, key: `d${d.id}`, node: 'dump' as const, id: d.id })),
       ...answers.map((a) => ({ at: a.at, key: a.id, node: 'answer' as const, id: a.id })),
+      ...queued.map((q) => ({ at: q.createdAt, key: `q${q.id}`, node: 'queued' as const, id: q.id })),
     ];
     return items.sort((a, b) => b.at - a.at);
-  }, [dumps, answers]);
+  }, [dumps, answers, queued]);
 
   const kind = text.trim() ? classifyInput(text) : null;
   const open = (id: string, type?: string) => {
@@ -188,6 +206,10 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
             const d = dumps.find((x) => x.id === f.id);
             return d ? <DumpCard key={f.key} dump={d} os={os} onOpen={() => router.push(`/dump/${d.id}` as never)} /> : null;
           }
+          if (f.node === 'queued') {
+            const q = queued.find((x) => x.id === f.id);
+            return q ? <QueuedAnswer key={f.key} q={q} onOpen={open} /> : null;
+          }
           const a = answers.find((x) => x.id === f.id)!;
           const text = a.turns.filter((x) => x.role === 'assistant').map((x) => x.text).join('\n\n');
           return (
@@ -218,5 +240,38 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
         })}
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+/** A question asked while no model was free: the phone's answer until the full one lands. */
+function QueuedAnswer({ q, onOpen }: { q: import('@core/repo/questionRepo').QueuedQuestion; onOpen: (id: string, type?: string) => void }) {
+  const t = useTheme();
+  const os = useOS();
+  const local = useMemo(() => (q.status === 'answered' ? null : localAnswer(os, q.text)), [os, q.status, q.text]);
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 }}>
+        <Icon name="search" size={13} color={t.c.fg.secondary} />
+        <Text variant="caption" color="secondary" style={{ flex: 1 }} numberOfLines={2}>
+          {q.text}
+        </Text>
+      </View>
+      <View style={{ backgroundColor: t.c.bg.container, borderRadius: 24, borderTopLeftRadius: 8, padding: 14, gap: 10 }}>
+        {q.status === 'answered' ? (
+          <Text variant="body" selectable style={{ lineHeight: 22 }}>{q.answer}</Text>
+        ) : (
+          <>
+            <Text variant="body" selectable style={{ lineHeight: 22 }}>{local!.text}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name={q.status === 'failed' ? 'alert' : 'clock'} size={12} color={t.c.fg.secondary} />
+              <Text variant="caption" color="secondary" style={{ flex: 1 }}>
+                {q.status === 'failed' ? 'Couldn’t get a full answer — this is what the phone knows' : `From the phone · full answer ${q.retryAt ? waitText(q.retryAt) : 'when a model is free'}`}
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
+      {local?.cards.map((c, i) => <ReplyCardView key={`${q.id}${i}`} label="On the phone" card={c} onOpen={onOpen} />)}
+    </View>
   );
 }

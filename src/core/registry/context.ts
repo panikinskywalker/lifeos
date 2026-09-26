@@ -8,6 +8,7 @@ import type { GroupRepo } from '../repo/groupRepo';
 import type { AliasRepo } from '../repo/aliasRepo';
 import type { FactRepo } from '../repo/factRepo';
 import type { DumpRepo } from '../repo/dumpRepo';
+import type { QuestionRepo } from '../repo/questionRepo';
 import type { Scheduler } from '../automation/scheduler';
 
 /**
@@ -26,6 +27,7 @@ export interface LifeOSContext {
   aliases: AliasRepo;
   facts: FactRepo;
   dumps: DumpRepo;
+  questions: QuestionRepo;
   comments: CommentRepo;
   reminders: ReminderRepo;
   customFields: CustomFieldRepo;

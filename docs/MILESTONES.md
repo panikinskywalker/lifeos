@@ -125,7 +125,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Provider limits remembered: "try again in 7h" / daily quota / cooldowns stored per provider (and per model); the queue skips a provider until then and wakes at the earliest free time (foreground, background task, timer).
 - [x] Resume, don't restart: filing progress per chunk, so a dump cut off halfway continues from the next chunk; the model is told what's already filed.
 - [x] Parser inside dumps: the everyday sentences in a longer dump are filed on the phone right away; the model files the rest later without doubling them.
-- [ ] Questions without a model: an on-phone answer (search + connections + dates, no model) straight away, and the full answer queued and shown when it lands.
+- [x] Questions without a model: an on-phone answer (search + connections + dates, no model) straight away, and the full answer queued and shown when it lands.
 - [ ] Budget: per-provider daily usage in You › Agent; when a free budget runs low, new dumps go first and the older backlog waits.
 
 ### M4.2 — Data sources
