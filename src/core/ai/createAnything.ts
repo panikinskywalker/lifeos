@@ -36,13 +36,28 @@ export function parseDateish(v: unknown, from = new Date()): string | undefined 
     else d.setFullYear(d.getFullYear() + n);
     return isoDay(d);
   }
+  const dm = dayMonth(s, from);
+  if (dm) return dm;
   const t = Date.parse(v);
   return Number.isFinite(t) ? isoDay(new Date(t)) : undefined;
 }
 
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+/** "8 sept" / "8th of september 2025" / "sept 8" / "september 8th, 2025" / "8/9" (day first). No year → this year. */
+function dayMonth(s: string, from: Date): string | undefined {
+  const mon = '(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?';
+  let m = new RegExp(`^(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+of)?\\s+${mon}(?:,?\\s+(\\d{4}))?$`).exec(s);
+  let day: number | undefined, month: number | undefined, year: number | undefined;
+  if (m) [day, month, year] = [Number(m[1]), MONTHS.indexOf(m[2]!.slice(0, 3)), m[3] ? Number(m[3]) : undefined];
+  else if ((m = new RegExp(`^${mon}\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?$`).exec(s))) [month, day, year] = [MONTHS.indexOf(m[1]!.slice(0, 3)), Number(m[2]), m[3] ? Number(m[3]) : undefined];
+  else if ((m = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/.exec(s))) [day, month, year] = [Number(m[1]), Number(m[2]) - 1, m[3] ? Number(m[3].length === 2 ? `20${m[3]}` : m[3]) : undefined];
+  if (day == null || month == null || month < 0 || month > 11 || day < 1 || day > 31) return undefined;
+  return isoDay(new Date(year ?? from.getFullYear(), month, day));
+}
+
 const empty = (v: unknown) => v === undefined || v === null || v === '';
 
-function coerce(f: FieldDef, v: unknown): unknown {
+export function coerce(f: FieldDef, v: unknown): unknown {
   if (empty(v)) return v;
   switch (f.type) {
     case 'number':

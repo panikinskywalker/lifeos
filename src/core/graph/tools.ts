@@ -1,0 +1,443 @@
+import { z } from 'zod';
+import type { EntityTypeDef, FieldDef } from '../domain/types';
+import type { LifeOSContext } from '../registry/context';
+import type { AiToolDef } from '../registry/types';
+import { coerce, parseDateish } from '../ai/createAnything';
+import { resolveCandidates } from '../ai/lifeTools';
+import { parseAmount } from '../ai/parser';
+import { EDGE_WORDS, SYMMETRIC_EDGES, type Provenance } from './edges';
+
+/**
+ * The agent's graph tools (docs/GRAPH.md §3). Every input — a dump, a day, an
+ * update said on a record's page — is filed through these: find-or-create the
+ * things mentioned, set their details, record what happened with who/where,
+ * link things, add to-dos. Each write is logged against the dump with what it
+ * replaced, so To check can tick it or cancel exactly that write. Nothing here
+ * ever asks: best match wins and guesses are flagged.
+ */
+
+/* ------------------------------------------------------------------ */
+/* Session: one dump being filed                                       */
+/* ------------------------------------------------------------------ */
+
+export interface GraphSession {
+  dumpId: string;
+  source: NonNullable<Provenance['source']>;
+  /** The record whose page this was said on ("her", "it", "this" mean it). */
+  subjectId?: string | null;
+  /** Nodes already found or made in this dump, by "type:name" and by "name". */
+  seen: Map<string, string>;
+  /** Why a node was a guess ("Guessed Kendal Rao"), carried onto every write that touches it. */
+  flags: Map<string, string>;
+  writes: number;
+}
+
+export function newSession(dumpId: string, opts: { source?: GraphSession['source']; subjectId?: string | null } = {}): GraphSession {
+  return { dumpId, source: opts.source ?? 'dump', subjectId: opts.subjectId ?? null, seen: new Map(), flags: new Map(), writes: 0 };
+}
+
+function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['dumps']['addExtraction']>[0] extends infer T ? Omit<T & object, 'dumpId'> : never) {
+  const flag = x.flag ?? (x.entityId ? s.flags.get(x.entityId) : undefined) ?? null;
+  s.writes++;
+  return os.dumps.addExtraction({ ...x, dumpId: s.dumpId, flag });
+}
+
+const prov = (s: GraphSession, confidence = 1): Provenance => ({ source: s.source, sourceId: s.dumpId, confidence });
+const norm = (t: string) => t.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+const titleCase = (t: string) => t.trim().replace(/\s+/g, ' ').replace(/(^|\s)(\p{L})/gu, (m) => m.toUpperCase());
+const SELF = /^(i|me|myself|self|we|us|you)$/i;
+const THIS = /^(she|he|her|him|they|them|it|this|this one|that|here|same)$/i;
+
+/* ------------------------------------------------------------------ */
+/* Identity resolution                                                  */
+/* ------------------------------------------------------------------ */
+
+export const NodeRef = z.union([
+  z.string(),
+  z.object({ name: z.string(), type: z.string().optional(), id: z.string().optional() }),
+]);
+export type NodeRef = z.infer<typeof NodeRef>;
+
+const TYPE_GUESS: Array<[RegExp, string]> = [
+  [/\b(airport|city|country|town|village|beach|park|mall|restaurant|cafe|café|bar|hotel|station|office|home)\b/i, 'place'],
+  [/\b(inc|ltd|pvt|llp|corp|co|bank|airlines?|technologies|labs)\b\.?$/i, 'org'],
+];
+
+/** Which existing record a name means — or null to create. Aliases → exact title → fuzzy (≥0.8 is a flagged guess) → session/page context first. */
+export function resolveNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, opts: { type?: string; isNew?: boolean } = {}): { id: string | null; confidence: number; flag?: string; type?: string; name: string } {
+  const r = typeof ref === 'string' ? { name: ref } : ref;
+  const name = r.name.trim();
+  const type = (r.type ?? opts.type)?.toLowerCase();
+  if (r.id && os.entities.get(r.id)) return { id: r.id, confidence: 1, name };
+  if (s.subjectId && (THIS.test(name) || norm(name) === norm(os.entities.get(s.subjectId)?.title ?? '\0'))) return { id: s.subjectId, confidence: 1, name };
+  const seen = s.seen.get(`${type ?? ''}:${norm(name)}`) ?? s.seen.get(norm(name));
+  if (seen) return { id: seen, confidence: 1, name };
+  if (opts.isNew) {
+    // "Made a new friend, Kendal" — create, but say so if a Kendal already exists.
+    const dup = resolveCandidates(os, name, type ? [type] : undefined).find((c) => c.score >= 0.95);
+    return { id: null, confidence: 1, flag: dup ? `Possible duplicate of ${dup.title}` : undefined, type, name };
+  }
+  const cands = resolveCandidates(os, name, type && os.registry.entityTypes.has(type) ? [type] : undefined).filter((c) => c.why !== `a ${c.type}`);
+  const [a, b] = cands;
+  if (a && a.score >= 0.95 && (!b || a.score - b.score >= 0.1)) return { id: a.id, confidence: a.score, type: a.type, name };
+  if (a && a.score >= 0.8) {
+    const other = b && b.score >= 0.8 ? ` (also ${b.title})` : '';
+    return { id: a.id, confidence: a.score, flag: `Guessed “${name}” is ${a.title}${other}`, type: a.type, name };
+  }
+  return { id: null, confidence: 1, type, name };
+}
+
+/** Find the node, or create it with sensible defaults. Logs a creation. */
+export function upsertNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, opts: { type?: string; isNew?: boolean; attributes?: Record<string, unknown> } = {}): { id: string; created: boolean } | null {
+  const r = resolveNode(os, s, ref, opts);
+  if (SELF.test(r.name)) return null;
+  let id = r.id;
+  let created = false;
+  if (!id) {
+    const type = pickType(os, r.type, r.name);
+    const def = os.registry.entityTypes.get(type)!;
+    const title = titleCase(r.name);
+    const data = baseData(def, title);
+    const e = os.entities.create({ type, title, data }, 'assistant');
+    id = e.id;
+    created = true;
+    if (r.flag) s.flags.set(id, r.flag);
+    log(os, s, { kind: type, action: 'created', entityId: id, label: `${def.label}: ${title}`, flag: r.flag });
+  } else if (r.flag) s.flags.set(id, r.flag);
+  const e = os.entities.get(id)!;
+  s.seen.set(`${e.type}:${norm(r.name)}`, id);
+  s.seen.set(norm(r.name), id);
+  s.seen.set(norm(e.title), id);
+  if (opts.attributes && Object.keys(opts.attributes).length) setAttributes(os, s, id, opts.attributes);
+  return { id, created };
+}
+
+function pickType(os: LifeOSContext, type: string | undefined, name: string): string {
+  const alias: Record<string, string> = { people: 'person', friend: 'person', contact: 'person', organisation: 'org', organization: 'org', company: 'org', employer: 'org', brand: 'org', shop: 'org', city: 'place', country: 'place', venue: 'place', location: 'place', flight: 'event', meeting: 'event', car: 'vehicle', bike: 'vehicle', todo: 'task', book: 'note' };
+  const t = type ? (alias[type] ?? type) : TYPE_GUESS.find(([re]) => re.test(name))?.[1] ?? 'person';
+  if (os.registry.entityTypes.has(t)) return t;
+  return os.registry.entityTypes.has('note') ? 'note' : [...os.registry.entityTypes.keys()][0]!;
+}
+
+/** Required fields filled from the title or first option, so any type can be created from just a name. */
+function baseData(def: EntityTypeDef, title: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const f of def.fields) {
+    if (f.defaultValue !== undefined) out[f.key] = typeof f.defaultValue === 'function' ? (f.defaultValue as () => unknown)() : f.defaultValue;
+    else if (f.required) {
+      if (f.type === 'text' || f.type === 'longtext') out[f.key] = title;
+      else if (f.type === 'date') out[f.key] = parseDateish('today');
+      else if (f.type === 'datetime') out[f.key] = Date.now();
+      else if (f.type === 'select' && f.options?.length) out[f.key] = (f.options.find((o) => o.value === 'other') ?? f.options[0]!).value;
+      else if (f.type === 'number' || f.type === 'currency') out[f.key] = 0;
+    }
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Attributes and notes                                                 */
+/* ------------------------------------------------------------------ */
+
+const KEY_SYNONYMS: Record<string, string[]> = {
+  birthday: ['birthday', 'birth date', 'birthdate', 'dob', 'date of birth', 'bday'],
+  phone: ['phone', 'mobile', 'number', 'phone number', 'cell'],
+  email: ['email', 'mail', 'e mail'],
+  company: ['company', 'employer', 'works at', 'workplace'],
+  role: ['role', 'job', 'title', 'job title', 'position', 'works as'],
+  city: ['city', 'lives in', 'home town', 'hometown', 'based in'],
+  relationship: ['relationship', 'relation', 'is my'],
+};
+
+function fieldFor(def: EntityTypeDef, key: string): FieldDef | undefined {
+  const k = norm(key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' '));
+  return (
+    def.fields.find((f) => norm(f.key.replace(/([a-z])([A-Z])/g, '$1 $2')) === k || norm(f.label) === k) ??
+    def.fields.find((f) => KEY_SYNONYMS[f.key]?.includes(k)) ??
+    undefined
+  );
+}
+
+const shown = (v: unknown) => (v == null || v === '' ? '—' : Array.isArray(v) ? v.join(', ') : String(v));
+
+/** Typed fields where the type has them, everything else as a tidy Notes line. Returns what went where. */
+export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, attributes: Record<string, unknown>): { fields: string[]; notes: string[] } {
+  const e = os.entities.get(id);
+  if (!e) return { fields: [], notes: [] };
+  const def = os.registry.entityTypes.get(e.type)!;
+  const data = e.data as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+  const before: Record<string, unknown> = {};
+  const notes: Array<[string, string]> = [];
+  for (const [k, raw] of Object.entries(attributes)) {
+    if (raw == null || raw === '') continue;
+    const f = fieldFor(def, k);
+    if (!f || f.type === 'relation' || f.type === 'longtext') {
+      notes.push([k, shown(raw)]);
+      continue;
+    }
+    const v = coerce(f, raw);
+    const ok = def.schema.safeParse({ ...data, ...patch, [f.key]: v });
+    if (!ok.success) {
+      notes.push([f.label, shown(raw)]);
+      continue;
+    }
+    if (data[f.key] === v) continue;
+    patch[f.key] = v;
+    before[f.key] = data[f.key] ?? null;
+  }
+  const fields = Object.keys(patch);
+  if (fields.length) {
+    os.entities.update(id, { data: patch }, 'assistant');
+    const label = fields.map((k) => `${fieldFor(def, k)?.label ?? k} → ${shown(patch[k])}`).join(', ');
+    log(os, s, { kind: e.type, action: 'updated', entityId: id, label: `${e.title} · ${label}`, before });
+  }
+  for (const [label, value] of notes) addNoteLine(os, s, id, label, value);
+  // A person's company is also a link to the organisation.
+  if (e.type === 'person' && typeof patch.company === 'string' && os.registry.entityTypes.has('org')) {
+    const org = upsertNode(os, s, { name: patch.company, type: 'org' });
+    if (org) link(os, s, id, org.id, 'works_at');
+  }
+  return { fields, notes: notes.map(([l]) => l) };
+}
+
+/** "• Favourite colour: pink" in the record's Notes; the same label again updates its line. */
+export function addNoteLine(os: LifeOSContext, s: GraphSession, id: string, label: string, value: string): void {
+  const e = os.entities.get(id);
+  if (!e) return;
+  const def = os.registry.entityTypes.get(e.type)!;
+  const key = def.fields.find((f) => f.key === 'notes' || f.key === 'body')?.key ?? def.fields.find((f) => f.type === 'longtext')?.key;
+  const nice = titleCase(label.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).replace(/^(\p{L})(.*)$/u, (_m, a: string, b: string) => a + b.toLowerCase());
+  const line = `• ${nice}: ${value.trim()}`;
+  if (!key) {
+    const f = os.facts.add({ text: `${e.title} — ${nice}: ${value}`, subjectId: id, source: 'dump', sourceRef: s.dumpId });
+    log(os, s, { kind: 'fact', factId: f.id, entityId: null, label: `${e.title} · ${nice}: ${value}` });
+    return;
+  }
+  const old = String((e.data as Record<string, unknown>)[key] ?? '');
+  const lines = old ? old.split('\n') : [];
+  const at = lines.findIndex((l) => norm(l.replace(/^[•\-*]\s*/, '').split(':')[0] ?? '') === norm(nice));
+  if (at >= 0 && lines[at] === line) return;
+  if (at >= 0) lines[at] = line;
+  else lines.push(line);
+  os.entities.update(id, { data: { [key]: lines.join('\n') } }, 'assistant');
+  log(os, s, { kind: e.type, action: 'updated', entityId: id, label: `${e.title} · ${nice}: ${value}`, before: { [key]: old || null } });
+}
+
+/* ------------------------------------------------------------------ */
+/* Links, events, tasks, money                                          */
+/* ------------------------------------------------------------------ */
+
+export function link(os: LifeOSContext, s: GraphSession, fromId: string, toId: string, kind: string, confidence = 1): string | null {
+  if (fromId === toId) return null;
+  const [a, b] = [fromId, toId];
+  if (SYMMETRIC_EDGES.has(kind) && os.relations.forEntity(a, kind).some((x) => x.other.id === b)) return null;
+  const existing = os.relations.forEntity(a, kind).find((x) => x.other.id === b && x.direction === 'out');
+  if (existing) return null;
+  const r = os.relations.link(a, b, kind, {}, 'assistant', prov(s, confidence));
+  const ta = os.entities.get(a)?.title ?? 'record';
+  const tb = os.entities.get(b)?.title ?? 'record';
+  const word = EDGE_WORDS[kind]?.out.toLowerCase() ?? kind.replace(/_/g, ' ');
+  const flag = s.flags.get(a) ?? s.flags.get(b);
+  log(os, s, { kind: 'link', action: 'created', relationId: r.id, entityId: a, label: `${ta} — ${word} — ${tb}`, flag });
+  return r.id;
+}
+
+const TRAVEL_KINDS = /^(flight|train|bus|drive|road trip|ferry|cruise|stay|hotel|check.?in|check.?out)$/i;
+
+function dayStart(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y!, m! - 1, d!, 12, 0, 0, 0).getTime();
+}
+
+/** A trip this travel belongs to: one whose dates cover the day or whose destination matches, else a new "Trip to X". */
+function tripFor(os: LifeOSContext, s: GraphSession, day: string, destination?: string): string | null {
+  if (!os.registry.entityTypes.has('trip')) return null;
+  const trips = os.entities.query<{ destination?: string; startDate?: string; endDate?: string }>('trip', {}, { limit: 200 });
+  // A trip with no end date is open for two weeks from its start.
+  const openEnd = (start: string) => new Date(Date.parse(start) + 14 * 86400000).toISOString().slice(0, 10);
+  const covers = trips.find((t) => t.data.startDate && t.data.startDate <= day && (t.data.endDate ?? openEnd(t.data.startDate)) >= day);
+  const named = destination ? trips.find((t) => norm(t.data.destination ?? '') === norm(destination) && (!t.data.startDate || Math.abs(Date.parse(t.data.startDate) - Date.parse(day)) < 45 * 86400000)) : undefined;
+  const hit = covers ?? named;
+  if (hit) return hit.id;
+  if (!destination) return null;
+  const t = os.entities.create({ type: 'trip', title: `Trip to ${titleCase(destination)}`, data: { destination: titleCase(destination), startDate: day } }, 'assistant');
+  log(os, s, { kind: 'trip', action: 'created', entityId: t.id, label: `Trip: Trip to ${titleCase(destination)}` });
+  return t.id;
+}
+
+export interface EventInput {
+  kind: string;
+  title?: string;
+  when?: string;
+  end?: string;
+  cost?: number | string;
+  roles?: Array<{ role: string; node: NodeRef }>;
+  partOf?: NodeRef;
+  details?: Record<string, unknown>;
+}
+
+/** Something that happened: an event with a kind, a date, and role links to who/where. Travel joins a trip. */
+export function recordEvent(os: LifeOSContext, s: GraphSession, i: EventInput): { id: string } | { error: string } {
+  if (!os.registry.entityTypes.has('event')) return { error: 'no event type installed' };
+  const day = parseDateish(i.when ?? 'today') ?? parseDateish('today')!;
+  const hasTime = !!i.when && /\d{1,2}[:.]\d{2}|\b\d{1,2}\s*(am|pm)\b/i.test(i.when);
+  const startAt = hasTime && Number.isFinite(Date.parse(`${day} ${i.when!.match(/\d{1,2}([:.]\d{2})?\s*(am|pm)?/i)![0]}`)) ? Date.parse(`${day} ${i.when!.match(/\d{1,2}([:.]\d{2})?\s*(am|pm)?/i)![0]}`) : dayStart(day);
+  const kind = i.kind.trim().toLowerCase();
+  const roles = (i.roles ?? []).map((r) => ({ role: r.role.toLowerCase().replace(/\s+/g, '_'), node: r.node }));
+  const placeName = (role: string) => {
+    const r = roles.find((x) => x.role === role)?.node;
+    return r ? (typeof r === 'string' ? r : r.name) : undefined;
+  };
+  const to = placeName('to');
+  const at = placeName('at');
+  const title = i.title?.trim() || (kind === 'flight' && to ? `Flight to ${titleCase(to)}` : `${titleCase(kind)}${at ? ` at ${titleCase(at)}` : to ? ` to ${titleCase(to)}` : ''}`);
+  const cost = typeof i.cost === 'string' ? (parseAmount(i.cost) ?? undefined) : i.cost;
+  const details = Object.fromEntries(Object.entries(i.details ?? {}).filter(([k]) => ['airline', 'flightNo', 'location', 'notes'].includes(k)).map(([k, v]) => [k, String(v)]));
+  const ev = os.entities.create({ type: 'event', title, data: { kind, startAt, allDay: !hasTime, ...(i.end ? { endAt: dayStart(parseDateish(i.end) ?? day) } : {}), ...(cost ? { cost } : {}), ...details } }, 'assistant');
+  log(os, s, { kind: 'event', action: 'created', entityId: ev.id, label: `${titleCase(kind)}: ${title} (${new Date(startAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})` });
+  const withIds: string[] = [];
+  for (const r of roles) {
+    const typeHint = ['from', 'to', 'at', 'in', 'location', 'venue', 'where'].includes(r.role) ? 'place' : r.role === 'with' ? 'person' : undefined;
+    const n = upsertNode(os, s, r.node, { type: typeof r.node === 'object' && r.node.type ? r.node.type : typeHint });
+    if (!n) continue;
+    const kindWord = ['where', 'venue', 'location', 'in'].includes(r.role) ? 'at' : r.role;
+    link(os, s, ev.id, n.id, kindWord);
+    if (kindWord === 'with') withIds.push(n.id);
+  }
+  let tripId: string | null = null;
+  if (i.partOf) tripId = upsertNode(os, s, i.partOf, { type: 'trip' })?.id ?? null;
+  else if (TRAVEL_KINDS.test(kind)) tripId = tripFor(os, s, day, to ?? at);
+  if (tripId) {
+    link(os, s, ev.id, tripId, 'part_of');
+    for (const p of withIds) link(os, s, tripId, p, 'with');
+  }
+  return { id: ev.id };
+}
+
+/* ------------------------------------------------------------------ */
+/* Undo one write (To check › cancel)                                   */
+/* ------------------------------------------------------------------ */
+
+/** Reverse exactly one logged write: remove the link, delete what was created, restore replaced fields, forget the fact. */
+export function reverseWrite(os: LifeOSContext, extractionId: string): boolean {
+  const x = os.dumps.extraction(extractionId);
+  if (!x || x.undone) return false;
+  if (x.relationId) os.relations.remove(x.relationId);
+  else if (x.factId) os.facts.forget(x.factId);
+  else if (x.entityId && x.action === 'created') os.entities.delete(x.entityId, 'user');
+  else if (x.entityId && x.action === 'updated' && x.before) {
+    const back = Object.fromEntries(Object.entries(x.before).map(([k, v]) => [k, v ?? undefined]));
+    if (os.entities.get(x.entityId)) os.entities.update(x.entityId, { data: back }, 'user');
+  } else return false;
+  os.dumps.markUndone(extractionId);
+  return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* The tools                                                            */
+/* ------------------------------------------------------------------ */
+
+const Attr = z.record(z.string(), z.unknown());
+const nameOf = (r: NodeRef) => (typeof r === 'string' ? r : r.name);
+
+/** Graph tools bound to one filing session (a dump). */
+export function graphTools(s: GraphSession): AiToolDef[] {
+  return [
+    {
+      name: 'upsert_node',
+      description: 'A person, place, organisation, trip, thing or other record mentioned. Finds the existing one or creates it; optional details go on it. Set is_new when the user says it is new ("made a new friend Kendal").',
+      input: z.object({ name: z.string(), type: z.string().optional().describe('person | place | org | trip | vehicle | asset | … (see record types)'), is_new: z.boolean().optional(), attributes: Attr.optional() }),
+      run: async (input, os) => {
+        const i = input as { name: string; type?: string; is_new?: boolean; attributes?: Record<string, unknown> };
+        const n = upsertNode(os, s, { name: i.name, type: i.type }, { isNew: i.is_new, attributes: i.attributes });
+        if (!n) return { skipped: 'that is the user' };
+        const e = os.entities.get(n.id)!;
+        return { id: n.id, name: e.title, type: e.type, created: n.created };
+      },
+    },
+    {
+      name: 'set_attributes',
+      description: 'Details about a record: {"birthday": "8 Sept", "company": "Zomato", "favourite colour": "pink"}. Known fields are filled; anything else becomes a line in its Notes. Use "this" as the node on a record page.',
+      input: z.object({ node: NodeRef, attributes: Attr }),
+      run: async (input, os) => {
+        const i = input as { node: NodeRef; attributes: Record<string, unknown> };
+        const n = upsertNode(os, s, i.node);
+        if (!n) return { skipped: 'that is the user' };
+        return { id: n.id, ...setAttributes(os, s, n.id, i.attributes) };
+      },
+    },
+    {
+      name: 'record_event',
+      description: 'Something that happened: kind (flight, dinner, meeting, concert, hike, call, visit…), when (a date like "8 Sept" or "yesterday", optional time), and roles linking who and where: [{"role":"with","node":"Kendal"},{"role":"from","node":"USA"},{"role":"to","node":"Canada"},{"role":"at","node":"Toit"}]. Travel joins a trip automatically.',
+      input: z.object({
+        kind: z.string(),
+        title: z.string().optional(),
+        when: z.string().optional(),
+        end: z.string().optional(),
+        cost: z.union([z.number(), z.string()]).optional(),
+        roles: z.array(z.object({ role: z.string(), node: NodeRef })).optional(),
+        part_of: NodeRef.optional(),
+        details: Attr.optional().describe('airline, flightNo, notes'),
+      }),
+      run: async (input, os) => {
+        const i = input as { kind: string; title?: string; when?: string; end?: string; cost?: number | string; roles?: Array<{ role: string; node: NodeRef }>; part_of?: NodeRef; details?: Record<string, unknown> };
+        return recordEvent(os, s, { ...i, partOf: i.part_of });
+      },
+    },
+    {
+      name: 'link',
+      description: `A relationship between two things: "Kendal is Priya's sister" → family_of; "works at Zomato" → works_at. Words: ${Object.keys(EDGE_WORDS).join(', ')} (others allowed).`,
+      input: z.object({ from: NodeRef, to: NodeRef, kind: z.string() }),
+      run: async (input, os) => {
+        const i = input as { from: NodeRef; to: NodeRef; kind: string };
+        const a = upsertNode(os, s, i.from);
+        const b = upsertNode(os, s, i.to, { type: i.kind === 'works_at' ? 'org' : i.kind === 'lives_in' || i.kind === 'located_in' ? 'place' : undefined });
+        if (!a || !b) return { skipped: 'that is the user' };
+        const kind = i.kind.toLowerCase().replace(/\s+/g, '_');
+        return { linked: !!link(os, s, a.id, b.id, kind), from: nameOf(i.from), to: nameOf(i.to), kind };
+      },
+    },
+    {
+      name: 'create_task',
+      description: 'Something the user needs to do ("need to call the plumber tomorrow"). Only real to-dos.',
+      input: z.object({ title: z.string(), due: z.string().optional(), about: NodeRef.optional() }),
+      run: async (input, os) => {
+        const i = input as { title: string; due?: string; about?: NodeRef };
+        if (!os.registry.entityTypes.has('task')) return { error: 'no task type installed' };
+        const t = os.entities.create({ type: 'task', title: i.title.trim(), data: { dueDate: parseDateish(i.due), priority: 'medium' } }, 'assistant');
+        log(os, s, { kind: 'task', action: 'created', entityId: t.id, label: `Task: ${t.title}${i.due ? ` (${parseDateish(i.due) ?? i.due})` : ''}` });
+        if (i.about) {
+          const n = upsertNode(os, s, i.about);
+          if (n) link(os, s, t.id, n.id, 'about');
+        }
+        return { id: t.id };
+      },
+    },
+    {
+      name: 'log_spend',
+      description: 'Money spent or received: amount, merchant, what it was for (a record, e.g. the Dyson just bought), who with, which card/account, date.',
+      input: z.object({ amount: z.union([z.number(), z.string()]), kind: z.enum(['expense', 'income']).optional(), merchant: z.string().optional(), category: z.string().optional(), date: z.string().optional(), for: NodeRef.optional(), with: z.array(NodeRef).optional(), account: z.string().optional(), note: z.string().optional() }),
+      run: async (input, os) => {
+        const i = input as { amount: number | string; kind?: 'expense' | 'income'; merchant?: string; category?: string; date?: string; for?: NodeRef; with?: NodeRef[]; account?: string; note?: string };
+        if (!os.registry.entityTypes.has('transaction')) return { error: 'no finance module installed' };
+        const amount = typeof i.amount === 'number' ? i.amount : parseAmount(i.amount);
+        if (!amount) return { error: 'no amount' };
+        const account = i.account ? resolveCandidates(os, i.account, ['account']).find((c) => c.score >= 0.8) : undefined;
+        const data = { amount, kind: i.kind ?? 'expense', category: i.category ?? 'other', merchant: i.merchant ?? (i.for ? nameOf(i.for) : undefined), date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined) };
+        const tx = os.entities.create({ type: 'transaction', data }, 'assistant');
+        log(os, s, { kind: 'transaction', action: 'created', entityId: tx.id, label: `${data.kind === 'income' ? 'Income' : 'Spent'}: ${os.format.currency(amount)}${data.merchant ? ` · ${data.merchant}` : ''}` });
+        if (i.for) {
+          const n = upsertNode(os, s, i.for);
+          if (n) link(os, s, tx.id, n.id, 'paid_for');
+        }
+        for (const w of i.with ?? []) {
+          const n = upsertNode(os, s, w, { type: 'person' });
+          if (n) link(os, s, tx.id, n.id, 'with');
+        }
+        return { id: tx.id };
+      },
+    },
+  ];
+}
+

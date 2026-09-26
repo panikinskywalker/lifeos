@@ -182,7 +182,15 @@ export class CycleRepo {
     const live = new Map(this.forEntity(entity.id).filter((c) => c.template).map((c) => [c.template!, c]));
     for (const seed of def.cycleTemplates(entity.data as never)) {
       const c = live.get(seed.template);
-      if (!c) continue;
+      if (!c) {
+        // A field that seeds a cycle was just filled (a birthday, a warranty date): add that cycle, once.
+        const ever = this.db.get(`SELECT 1 AS x FROM cycles WHERE entity_id=? AND template=?`, [entity.id, seed.template]);
+        if (!before.has(seed.template) && !ever) {
+          this.create({ ...seed, entityId: entity.id }, 'system');
+          bus.emit('data.changed', { table: 'cycles', id: entity.id });
+        }
+        continue;
+      }
       const old = before.get(seed.template);
       const patch: Partial<Cycle> = { name: seed.name, kind: seed.kind, everyN: seed.everyN ?? null, everyUnit: seed.everyUnit ?? null, meterEvery: seed.meterEvery ?? null, leadDays: seed.leadDays ?? 0, costEstimate: seed.costEstimate ?? null, currency: seed.currency ?? null };
       if (seed.nextDueAt != null && seed.nextDueAt !== old?.nextDueAt) patch.nextDueAt = seed.nextDueAt;
