@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { upkeep } from '@core/cycles/upkeep';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
+import { ToCheckBell } from '../../src/screens/ToCheckBell';
 import { BentoGrid, Card, IconButton, Ring, RowItem, RowList, Screen, StackedBar, Stat, Text, Tile } from '@ui/kit';
 import { monthReport } from '@modules/finance/reports';
 import { categoryOf } from '@modules/finance/types';
@@ -31,7 +32,7 @@ export default function TodayTab() {
     [t.c.alert.coral, 'Anything overdue'],
   ];
   return (
-    <Screen tab compact title={greeting()} subtitle={format(new Date(), 'EEEE d MMM')} right={<IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} />}>
+    <Screen tab compact title={greeting()} subtitle={format(new Date(), 'EEEE d MMM')} right={<View style={{ flexDirection: 'row', gap: 8 }}><ToCheckBell /><IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} /></View>}>
       <Card icon="sparkle" iconTone="accent" title="Brief" meta="arrives in M4">
         <View style={{ gap: 10 }}>
           {bullets.map(([c, line]) => (

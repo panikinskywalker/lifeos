@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
+import { ToCheckBell } from '../../src/screens/ToCheckBell';
 import { shortNameForModule, tintForModule } from '@ui/theme/moduleTint';
 import { Icon, IconBox, IconButton, RowList, Screen, Section, Text, RowItem } from '@ui/kit';
 import { EntityRow } from '@ui/components/EntityRow';
@@ -17,7 +18,7 @@ export default function BrowseTab() {
   const recent = useLive((o) => o.entities.recent(6), []);
   const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core' && m.id !== 'dashboard');
   return (
-    <Screen tab title="Browse" right={<IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} />}>
+    <Screen tab title="Browse" right={<View style={{ flexDirection: 'row', gap: 8 }}><ToCheckBell /><IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} /></View>}>
       <Pressable accessibilityRole="search" accessibilityLabel="Search everything" onPress={() => router.push('/search')} style={{ height: 50, borderRadius: t.radius.card, backgroundColor: t.c.bg.tile, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 }}>
         <Icon name="search" size={18} color={t.c.fg.secondary} />
         <Text variant="body" color="tertiary">
