@@ -33,8 +33,14 @@
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -97,6 +103,12 @@
       "eas": {
         "projectId": "db32f19a-c1a6-475e-8875-558fe563760f"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/db32f19a-c1a6-475e-8875-558fe563760f"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
     }
   }
 }
