@@ -36,6 +36,8 @@ export function runDumpExtraction(os: LifeOSContext): Promise<void> {
   if (running) return running;
   running = (async () => {
     try {
+      // To check: what you haven't touched in 15 days is approved as filed.
+      os.dumps.autoApprove(15);
       const dumpsDue = os.dumps.pending().length > 0;
       const questionsDue = os.questions.due().length > 0;
       if (dumpsDue || questionsDue) {

@@ -41,7 +41,7 @@ export default function ToCheckScreen() {
   };
 
   return (
-    <Screen title="To check" subtitle={items.length ? `${items.length} filed from what you said` : 'All caught up'} onBack={() => router.back()} right={items.length ? <Button title="Tick all" icon="check" size="sm" variant="secondary" onPress={() => tick(items.map((x) => x.id))} /> : undefined}>
+    <Screen title="To check" subtitle={items.length ? `${items.length} filed · already saved · untouched ones are approved after 15 days` : 'All caught up'} onBack={() => router.back()} right={items.length ? <Button title="Tick all" icon="check" size="sm" variant="secondary" onPress={() => tick(items.map((x) => x.id))} /> : undefined}>
       {!items.length ? (
         <EmptyState icon="check-circle" tint="memory" line="Everything you’ve said has been filed and looked at. New things show up here, already saved — tick them, fix them or cancel them." />
       ) : (
@@ -69,9 +69,14 @@ export default function ToCheckScreen() {
                     <View key={x.id} style={{ paddingLeft: 12, paddingRight: 4, paddingVertical: 4, gap: 2 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
                         <Icon name={kindIcon(x.kind)} size={16} color={x.flag ? t.c.accent.gold : t.tints.memory.ink} />
-                        <Text variant="label" numberOfLines={3} style={{ flex: 1 }}>
-                          {x.label}
-                        </Text>
+                        <View style={{ flex: 1 }}>
+                          <Text variant="label" numberOfLines={3}>
+                            {x.label}
+                          </Text>
+                          <Text variant="caption" color="tertiary">
+                            {approvesIn(x.createdAt)}
+                          </Text>
+                        </View>
                         <IconButton icon="check" size={36} accessibilityLabel={`Looks right: ${x.label}`} onPress={() => tick([x.id])} />
                         <IconButton icon="edit" size={36} accessibilityLabel={`Edit ${x.label}`} onPress={() => edit(x)} />
                         <IconButton icon="x" size={36} accessibilityLabel={`Cancel ${x.label}`} onPress={() => cancel(x)} />
@@ -94,4 +99,10 @@ export default function ToCheckScreen() {
       )}
     </Screen>
   );
+}
+
+/** "approved in 12 days" — To check's auto-approve window is 15 days. */
+function approvesIn(createdAt: number): string {
+  const left = Math.ceil((createdAt + 15 * 86_400_000 - Date.now()) / 86_400_000);
+  return left <= 1 ? 'Approved tomorrow if untouched' : `Approved in ${left} days if untouched`;
 }

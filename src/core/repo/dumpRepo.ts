@@ -198,6 +198,17 @@ export class DumpRepo {
       .map(toExtraction);
   }
 
+  /** Untouched for `days` (15): the record stays as filed and the item leaves To check as approved. */
+  autoApprove(days = 15, now = Date.now()): number {
+    const cutoff = now - days * 86_400_000;
+    const n = this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM dump_extractions WHERE checked=0 AND undone=0 AND created_at < ?`, [cutoff])?.n ?? 0;
+    if (n) {
+      this.db.run(`UPDATE dump_extractions SET checked=1 WHERE checked=0 AND undone=0 AND created_at < ?`, [cutoff]);
+      bus.emit('data.changed', { table: 'dumps', id: 'auto-approve' });
+    }
+    return n;
+  }
+
   toCheckCount(): number {
     return this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM dump_extractions WHERE checked=0 AND undone=0`)?.n ?? 0;
   }

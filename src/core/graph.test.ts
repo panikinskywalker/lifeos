@@ -41,5 +41,10 @@ describe('life graph model (v7)', () => {
     expect(os.dumps.extraction(a.id)!.before).toEqual({ notes: null });
     os.dumps.setChecked(b.id);
     expect(os.dumps.toCheckCount()).toBe(1);
+    // 15 days untouched → approved (the record itself was always saved).
+    expect(os.dumps.autoApprove(15, Date.now() + 14 * 86_400_000)).toBe(0);
+    expect(os.dumps.autoApprove(15, Date.now() + 16 * 86_400_000)).toBe(1);
+    expect(os.dumps.toCheckCount()).toBe(0);
+    expect(os.dumps.extraction(a.id)).toMatchObject({ checked: true, undone: false });
   });
 });
