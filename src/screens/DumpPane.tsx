@@ -12,11 +12,11 @@ import type { IconName } from '@ui/icons';
 import { runDumpExtraction, saveDump } from '../platform/dumpExtraction';
 import { listen } from '../platform/voice';
 
-const KIND_ICON: Record<string, IconName> = { person: 'user', fact: 'sparkle', task: 'check-circle', transaction: 'rupee', asset: 'box', vehicle: 'car', cycle: 'repeat', routine: 'repeat', reminder: 'bell', subscription: 'card', note: 'file', trip: 'plane', event: 'calendar' };
+const KIND_ICON: Record<string, IconName> = { link: 'link', place: 'location', org: 'briefcase', person: 'user', fact: 'sparkle', task: 'check-circle', transaction: 'rupee', asset: 'box', vehicle: 'car', cycle: 'repeat', routine: 'repeat', reminder: 'bell', subscription: 'card', note: 'file', trip: 'plane', event: 'calendar' };
 export const kindIcon = (k: string): IconName => KIND_ICON[k] ?? 'file';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const KIND_WORD: Record<string, [string, string?]> = { person: ['person', 'people'], fact: ['fact'], task: ['task'], transaction: ['expense'], cycle: ['update'], entity: ['record'] };
+const KIND_WORD: Record<string, [string, string?]> = { person: ['person', 'people'], fact: ['fact'], task: ['task'], transaction: ['expense'], cycle: ['update'], entity: ['record'], link: ['link'], event: ['event'], place: ['place'], org: ['organisation'], trip: ['trip'] };
 
 /** "extracted: 1 person · 2 facts · 1 task" */
 export function extractedSummary(xs: Extraction[]): string {

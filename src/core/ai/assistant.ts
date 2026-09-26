@@ -51,7 +51,7 @@ export interface AssistantOptions {
   contextBudget?: number;
 }
 
-function toolSpec(t: AiToolDef): ToolSpec {
+export function toolSpec(t: AiToolDef): ToolSpec {
   const schema = z.toJSONSchema(t.input, { target: 'draft-7' }) as Record<string, unknown>;
   delete schema.$schema;
   return { name: t.name, description: t.description, input_schema: schema };

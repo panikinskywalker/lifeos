@@ -7,7 +7,7 @@ import { buildAgentFromSettings } from './agentProvider';
  * Brain-dump extraction on the phone (M4.1): saving a dump never waits for
  * it. Extraction runs right after a save, on every app foreground, from the
  * OS background task, and again a little later after a failure (offline, a
- * rate limit), using the small model chain; the parser handles everyday
+ * rate limit), using the main model chain; the parser handles everyday
  * sentences with no key at all.
  */
 let running: Promise<void> | null = null;
@@ -27,7 +27,8 @@ export function runDumpExtraction(os: LifeOSContext): Promise<void> {
     try {
       if (!os.dumps.pending().length) return;
       const agent = await buildAgentFromSettings(os).catch(() => null);
-      const results = await extractPending(os, agent?.small ?? null);
+      // Filing is a tool loop: the main chain (the small models are weak at tool calls).
+      const results = await extractPending(os, agent?.main ?? null);
       const failed = results.some((r) => r.status === 'failed');
       failures = failed ? failures + 1 : 0;
       if (retry) clearTimeout(retry);

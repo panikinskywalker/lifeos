@@ -6,6 +6,10 @@ import { coerce, parseDateish } from '../ai/createAnything';
 import { resolveCandidates } from '../ai/lifeTools';
 import { parseAmount } from '../ai/parser';
 import { EDGE_WORDS, SYMMETRIC_EDGES, type Provenance } from './edges';
+import { extrasOf } from '../ai/cards';
+
+/** Exact Undo for writes made through other tools (a rolled cycle), while the app runs. */
+export const exactUndo = new Map<string, () => void>();
 
 /**
  * The agent's graph tools (docs/GRAPH.md §3). Every input — a dump, a day, an
@@ -39,7 +43,13 @@ export function newSession(dumpId: string, opts: { source?: GraphSession['source
 function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['dumps']['addExtraction']>[0] extends infer T ? Omit<T & object, 'dumpId'> : never) {
   const flag = x.flag ?? (x.entityId ? s.flags.get(x.entityId) : undefined) ?? null;
   s.writes++;
-  return os.dumps.addExtraction({ ...x, dumpId: s.dumpId, flag });
+  const row = os.dumps.addExtraction({ ...x, dumpId: s.dumpId, flag });
+  // The record's own timeline points back at what was said.
+  if (x.entityId && x.kind !== 'link' && os.entities.get(x.entityId)) {
+    const body = os.dumps.get(s.dumpId)?.body ?? '';
+    os.entities.timeline.add({ entityId: x.entityId, kind: 'dump', title: x.action === 'created' ? 'From something you said' : x.label, body: body.slice(0, 160), actor: 'assistant', meta: { dumpId: s.dumpId, extractionId: row.id }, occurredAt: Date.now() });
+  }
+  return row;
 }
 
 const prov = (s: GraphSession, confidence = 1): Provenance => ({ source: s.source, sourceId: s.dumpId, confidence });
@@ -323,7 +333,11 @@ export function recordEvent(os: LifeOSContext, s: GraphSession, i: EventInput): 
 export function reverseWrite(os: LifeOSContext, extractionId: string): boolean {
   const x = os.dumps.extraction(extractionId);
   if (!x || x.undone) return false;
-  if (x.relationId) os.relations.remove(x.relationId);
+  const exact = exactUndo.get(extractionId);
+  if (exact) {
+    exact();
+    exactUndo.delete(extractionId);
+  } else if (x.relationId) os.relations.remove(x.relationId);
   else if (x.factId) os.facts.forget(x.factId);
   else if (x.entityId && x.action === 'created') os.entities.delete(x.entityId, 'user');
   else if (x.entityId && x.action === 'updated' && x.before) {
@@ -412,6 +426,25 @@ export function graphTools(s: GraphSession): AiToolDef[] {
           if (n) link(os, s, t.id, n.id, 'about');
         }
         return { id: t.id };
+      },
+    },
+    {
+      name: 'log_done',
+      description: 'A chore or service done on something the user has ("did the car service, 6,400 at Hyundai", "watered the plants", "car at 34,200 km"). Rolls its due date and files the cost.',
+      input: z.object({ thing: NodeRef, what: z.string(), date: z.string().optional(), cost: z.union([z.number(), z.string()]).optional(), meter: z.number().optional() }),
+      run: async (input, os) => {
+        const i = input as { thing: NodeRef; what: string; date?: string; cost?: number | string; meter?: number };
+        const r = resolveNode(os, s, i.thing);
+        if (!r.id) return { error: `no record called ${nameOf(i.thing)}` };
+        const tool = os.registry.aiTools.get('log_event');
+        if (!tool) return { error: 'cycles not available' };
+        const cost = typeof i.cost === 'string' ? (parseAmount(i.cost) ?? undefined) : i.cost;
+        const out = (await tool.run(tool.input.parse({ entityId: r.id, what: i.what, date: parseDateish(i.date ?? 'today'), cost, meter: i.meter }), os)) as Record<string, unknown>;
+        if (out?.error) return out;
+        const row = log(os, s, { kind: 'cycle', action: 'logged', entityId: r.id, label: String(out.logged ?? `${i.what} on ${os.entities.get(r.id)?.title}`), flag: r.flag });
+        const undo = extrasOf(out).undo;
+        if (undo) exactUndo.set(row.id, undo);
+        return { done: out.logged, next: out.next };
       },
     },
     {
