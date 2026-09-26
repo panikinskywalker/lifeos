@@ -102,6 +102,10 @@ export const transactionType: EntityTypeDef<TransactionData> = {
     date: z.string(),
     note: z.string().optional(),
     currency: z.string().optional(),
+    /** Spent in another currency: what the message said, and the rate used to get `amount` in rupees. */
+    originalAmount: z.coerce.number().optional(),
+    originalCurrency: z.string().optional(),
+    fxRate: z.coerce.number().optional(),
     tripId: z.string().optional(),
     personIds: z.array(z.string()).optional(),
     projectId: z.string().optional(),

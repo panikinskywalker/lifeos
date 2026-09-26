@@ -146,6 +146,17 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [ ] Google Calendar: same as the phone calendar, deduped against it.
 - [ ] Drive: titles and text searchable; linked when they mention a person or trip.
 
+### M4.2c — Feedback round 1 (26 Sep, from using it on the S22)
+Decisions: foreign spends stored in their currency and converted at that day's rate (INR totals); mutual funds are investments, never spend or bank accounts; 60-day clean-up of ignored messages, raw text of filed messages, per-app screen time and past calendar events; To check auto-approves after 15 days; deliveries are records that update; Health is one page per metric.
+- [x] SMS amounts: limits / balances / dues never taken as the amount; tighter debit vs credit; USD / GBP / JPY / AED (+ INR) with the day's rate; mutual funds as investment transfers (registrar confirmations skipped); ATM = cash transfer. *(Rates from open.er-api.com once a day; merchant matching is whole-word now.)*
+- [ ] Category keywords in settings (e.g. ZOMATO → Food), checked before the built-in list and what you've taught it.
+- [ ] Spend: sort (date, amount) and filters (category, account, kind, date range); spend by category.
+- [ ] Deliveries from shipping SMS: one record per order (shop, carrier, tracking, expected date, status) updated by later texts; in Upcoming until delivered.
+- [ ] Health: one page per metric (Steps, Sleep, Heart rate, Weight, Workouts); "Measurements" no longer shown as a category.
+- [ ] To check: untouched items auto-approve after 15 days.
+- [ ] 60-day clean-up job.
+- [ ] Speed: measure and fix the slow screens.
+
 ### M4.3 — Today as a dashboard
 - [x] Chart components on the design tokens: Sparkline, Bars (daily/weekly), Ring, StackedBar (exists), HeatMap (habits/steps), Comparison ("vs. yesterday" delta chip). Built with react-native-svg; no chart library that pulls in web deps. *(MiniBars, DeltaChip (good/bad per metric), HeatMap added; Sparkline, LineChart, ColumnChart, Ring, StackedBar already existed. All in the gallery.)*
 - [x] Today tiles, all live from real data: Steps (today vs. yesterday + 7-day bars), Sleep (last night + 7-day), Screen time (today total + top 3 apps + 7-day), Spend this month (pace line vs. usual month), Upcoming (next 5 dues/events), Streaks, People to call, Brief (one line from the agent, optional). *(Steps, Sleep, Screen time (+ top 3 apps), Spend pace vs usual month, Upcoming, People to call, Overdue. Streaks wait for habit check-ins (M5); the Brief comes with M5's morning brief.)*

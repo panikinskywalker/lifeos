@@ -16,6 +16,21 @@ const FIXTURES: Array<[sender: string, text: string, expect: Partial<ParsedTxn>]
   ['VM-HDFCBK', 'Rs.2000 withdrawn from A/c XX1234 at ATM S1AW0123 on 26-09-26. Avl Bal Rs.12,000', { amount: 2000, direction: 'debit', channel: 'atm', balance: 12000 }],
   ['VM-HDFCBK', 'Rs.450.00 refunded to your HDFC Bank A/c XX1234 by SWIGGY on 27-09-26.', { amount: 450, direction: 'credit', counterparty: 'SWIGGY' }],
   ['JM-ICICIB', 'Payment of Rs 20,000.00 received towards your ICICI Bank Credit Card XX9012. Thank you.', { amount: 20000, direction: 'credit', isCard: true, transfer: true }],
+  // The limit is never the amount — even when it comes first or is the only rupee figure.
+  ['AX-ICICIB', 'Avl Lmt: INR 1,20,000.00. INR 649.00 spent on ICICI Bank Card XX9012 on 26-Sep-26 at NETFLIX.', { amount: 649, currency: 'INR', counterparty: 'NETFLIX' }],
+  ['VM-HDFCBK', 'Available limit Rs 85,000. Spent Rs.1,240 on HDFC Bank Card 5678 at SWIGGY', { amount: 1240 }],
+  // Foreign currency: the amount in its currency (the limit in rupees ignored); with the rupee figure when given.
+  ['AX-ICICIB', 'USD 45.00 spent using ICICI Bank Card XX9012 on 26-Sep-26 on AMAZON US. Avl Limit: INR 1,20,000.00.', { amount: 45, currency: 'USD', inrAmount: null, counterparty: 'AMAZON US' }],
+  ['VM-HDFCBK', 'Spent USD 45.00 (INR 3,760.12) on HDFC Bank Card 5678 at AMAZON US On 2026-09-26', { amount: 45, currency: 'USD', inrAmount: 3760.12 }],
+  ['AM-AMEXIN', "Alert: You've spent GBP 12.50 on your AMEX card ** 31007 at PRET A MANGER on 26 September 2026.", { amount: 12.5, currency: 'GBP', counterparty: 'PRET A MANGER' }],
+  ['AX-ICICIB', 'JPY 3,200 spent on ICICI Bank Card XX9012 on 26-Sep-26 at LAWSON TOKYO. Avl Lmt INR 1,18,000', { amount: 3200, currency: 'JPY' }],
+  ['VM-HDFCBK', 'Spent AED 150.00 On HDFC Bank Card 5678 At DUBAI MALL On 2026-09-26', { amount: 150, currency: 'AED' }],
+  ['VM-HDFCBK', 'Spent £8.40 On HDFC Bank Card 5678 At TFL TRAVEL On 2026-09-26', { amount: 8.4, currency: 'GBP' }],
+  // Mutual funds: the bank debit is an investment, never a spend or a new "bank account" from the folio.
+  ['VM-HDFCBK', 'Rs.5,000.00 debited from A/c XX1234 on 05-09-26 towards Parag Parikh Flexi Cap Fund SIP. Avl Bal Rs.40,000', { amount: 5000, investment: true, fund: 'Parag Parikh Flexi Cap Fund', last4: '1234' }],
+  // Plain debit / credit with a balance after.
+  ['VM-SBIINB', 'Your A/c X4567 is credited by Rs.1,500.00 on 26Sep26 by UPI from priya@okaxis. Avl Bal Rs 22,345.50 -SBI', { amount: 1500, direction: 'credit', balance: 22345.5 }],
+  ['VM-SBIINB', 'Your A/c X4567 is debited by Rs.300.00 on 26Sep26. Avl Bal Rs 22,045.50 -SBI', { amount: 300, direction: 'debit', balance: 22045.5 }],
 ];
 
 const SKIPS: Array<[sender: string, text: string, reason: string]> = [
@@ -24,6 +39,8 @@ const SKIPS: Array<[sender: string, text: string, reason: string]> = [
   ['JM-ICICIB', 'Your ICICI Bank Credit Card XX9012 statement is generated. Total Amount Due Rs 32,450.00, Minimum Amount Due Rs 1,630.00, due date 15-Oct-26.', 'bill'],
   ['VM-AXISBK', 'Rs 649 will be debited from A/c XX7890 on 01-10-26 towards NETFLIX mandate. To cancel, visit axisbank.com', 'mandate'],
   ['VM-HDFCBK', 'Txn of Rs.1240 on HDFC Bank Card 5678 at SWIGGY was declined due to insufficient balance.', 'declined'],
+  ['CP-CAMSPM', 'Dear Investor, units allotted in Folio No XX7788 for Rs 5000 under Parag Parikh Flexi Cap Fund at NAV 78.12. CAMS', 'investment-confirmation'],
+  ['VM-HDFCBK', 'Your HDFC Bank Credit Card XX5678 has an available limit of Rs 1,20,000 as on 26-Sep-26.', 'info'],
 ];
 
 describe('bank SMS', () => {

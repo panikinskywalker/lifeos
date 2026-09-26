@@ -3,6 +3,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { ingestMessage } from '@core/ingest/ingest';
 import { PAYMENT_APPS } from '@core/ingest/bankSms';
 import { saveHealthDays, saveUsageDays, setSourceState, sourceState } from '@core/sources/deviceData';
+import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@core/ingest/fx';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { calendarGranted, callLogGranted, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
 
@@ -146,6 +147,21 @@ async function syncHealth(os: LifeOSContext) {
   setSourceState(os, 'health', { enabled: true, lastSync: Date.now(), addTotal: created, error: null });
 }
 
+/** Today's exchange rates for USD / GBP / JPY / AED (once a day, when online), then convert anything waiting. */
+export async function refreshFxRates(os: LifeOSContext) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (fxRates(os)?.day !== today) {
+    try {
+      const r = await fetch('https://open.er-api.com/v6/latest/INR');
+      const j = (await r.json()) as { result?: string; rates?: Record<string, number> };
+      if (j.result === 'success' && j.rates) setFxRatesFromInrBase(os, today, j.rates);
+    } catch {
+      /* offline: keep the last rates */
+    }
+  }
+  applyPendingFx(os);
+}
+
 let running: Promise<void> | null = null;
 
 /** Sync every source that has access. Safe to call often; one run at a time. */
@@ -153,6 +169,7 @@ export function syncSources(os: LifeOSContext): Promise<void> {
   if (Platform.OS === 'web') return Promise.resolve();
   if (running) return running;
   running = (async () => {
+    await refreshFxRates(os);
     await syncPhoneSources(os);
     if (!deviceAvailable) return;
     for (const [id, fn] of [['sms', syncSms], ['notifications', syncNotifications], ['usage', syncUsage], ['health', syncHealth]] as const) {

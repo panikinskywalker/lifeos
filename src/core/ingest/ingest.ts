@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '../registry/context';
 import type { Row } from '../db/adapter';
 import { bus } from '../events/bus';
+import { toInr } from './fx';
 import { parseBankSms, parsePaymentNotification, looksLikeBankSender, bankOf, BANK_NAMES, PAYMENT_APPS, type ParsedTxn, type SmsKind } from './bankSms';
 
 /**
@@ -104,26 +105,59 @@ function seeSender(os: LifeOSContext, m: RawMessage): SmsSender {
 /* Categories, accounts                                                  */
 /* ------------------------------------------------------------------ */
 
+/** Whole words only: "ola" is not in "Coca-Cola", "rent" is not in "Parent". */
+const w = (alts: string) => new RegExp(`(?:^|[^a-z0-9])(?:${alts})(?:$|[^a-z0-9])`, 'i');
 const KNOWN: Array<[RegExp, string]> = [
-  [/swiggy|zomato|eatfit|domino|pizza|mcdonald|kfc|burger|starbucks|cafe|coffee|chai|restaurant|dining|canoe|toit|barbeque|biryani|haldiram/i, 'food'],
-  [/bigbasket|blinkit|zepto|instamart|dmart|jiomart|grofers|more retail|nature.?s basket|milk|dairy/i, 'groceries'],
-  [/uber|ola|rapido|metro|irctc|redbus|fuel|petrol|hpcl|bpcl|iocl|indian oil|shell|fastag|parking/i, 'transport'],
-  [/amazon|flipkart|myntra|ajio|nykaa|meesho|tata cliq|croma|reliance digital|decathlon|ikea/i, 'shopping'],
-  [/netflix|spotify|hotstar|prime video|youtube|bookmyshow|pvr|inox|steam|playstation/i, 'entertainment'],
-  [/airtel|jio|vodafone|vi |bsnl|act fibernet|electricity|bescom|tata power|gas|water bill|broadband|recharge/i, 'utilities'],
-  [/apollo|pharmeasy|1mg|netmeds|medplus|hospital|clinic|diagnostic|practo/i, 'health'],
-  [/makemytrip|goibibo|cleartrip|yatra|indigo|air india|vistara|akasa|spicejet|airbnb|oyo|booking\.com|agoda|hotel/i, 'travel'],
-  [/rent|nobroker|housing/i, 'housing'],
-  [/salary|payroll/i, 'salary'],
+  [w('swiggy|zomato|eatfit|dominos?|pizza|mcdonalds?|kfc|burger|starbucks|cafe|coffee|chai|restaurant|dining|barbeque|biryani|haldiram'), 'food'],
+  [w('bigbasket|blinkit|zepto|instamart|dmart|jiomart|grofers|more retail|nature.?s basket|milk|dairy'), 'groceries'],
+  [w('uber|ola|rapido|metro|irctc|redbus|fuel|petrol|hpcl|bpcl|iocl|indian oil|shell|fastag|parking'), 'transport'],
+  [w('amazon|flipkart|myntra|ajio|nykaa|meesho|tata cliq|croma|reliance digital|decathlon|ikea'), 'shopping'],
+  [w('netflix|spotify|hotstar|prime video|youtube|bookmyshow|pvr|inox|steam|playstation'), 'entertainment'],
+  [w('airtel|jio|vodafone|vi|bsnl|act fibernet|electricity|bescom|tata power|gas|water bill|broadband|recharge'), 'utilities'],
+  [w('apollo|pharmeasy|1mg|netmeds|medplus|hospital|clinic|diagnostic|practo'), 'health'],
+  [w('makemytrip|goibibo|cleartrip|yatra|indigo|air india|vistara|akasa|spicejet|airbnb|oyo|booking\\.com|agoda|hotel'), 'travel'],
+  [w('rent|nobroker|housing'), 'housing'],
+  [w('salary|payroll'), 'salary'],
 ];
 
-/** What category a merchant is: what you set it to before, else a known merchant, else other. */
-export function categoryFor(os: LifeOSContext, merchant: string | null | undefined): string {
-  if (!merchant) return 'other';
-  const learned = os.settings.get<Record<string, string>>('merchantCategories', {});
-  const key = norm(merchant);
-  if (learned[key]) return learned[key]!;
-  return KNOWN.find(([re]) => re.test(merchant))?.[1] ?? 'other';
+export interface CategoryRule {
+  /** A word or phrase; matched case-insensitively against the merchant and the message. */
+  keyword: string;
+  category: string;
+}
+
+/** Your keyword rules (You › Categories), in order. */
+export function categoryRules(os: LifeOSContext): CategoryRule[] {
+  return os.settings.get<CategoryRule[]>('categoryRules', []);
+}
+
+export function setCategoryRules(os: LifeOSContext, rules: CategoryRule[]) {
+  os.settings.set('categoryRules', rules.filter((r) => r.keyword.trim() && r.category));
+  bus.emit('data.changed', { table: 'settings', id: 'categoryRules' });
+}
+
+/** The built-in merchant list, for showing in settings. */
+export const BUILTIN_CATEGORIES = KNOWN;
+
+/**
+ * A transaction's category: your keyword rules first (merchant or message
+ * text), then what you taught it by recategorising, then the built-in
+ * merchant list, else other.
+ */
+export function categoryFor(os: LifeOSContext, merchant: string | null | undefined, text = ''): string {
+  const hay = `${merchant ?? ''} ${text}`.toLowerCase();
+  for (const r of categoryRules(os)) {
+    const k = r.keyword.trim().toLowerCase();
+    if (k && new RegExp(`(^|[^a-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`, 'i').test(hay)) return r.category;
+  }
+  if (merchant) {
+    const learned = os.settings.get<Record<string, string>>('merchantCategories', {});
+    const key = norm(merchant);
+    if (learned[key]) return learned[key]!;
+    const hit = KNOWN.find(([re]) => re.test(merchant));
+    if (hit) return hit[1];
+  }
+  return text ? (KNOWN.find(([re]) => re.test(text))?.[1] ?? 'other') : 'other';
 }
 
 /** You changed a merchant's category on a transaction: remember it for next time. */
@@ -149,6 +183,17 @@ export function accountFor(os: LifeOSContext, t: ParsedTxn, from: string, create
   const existing = accounts.find((a) => a.title === title);
   if (existing) return existing.id;
   const a = os.entities.create({ type: 'account', title, data: { kind, institution: bankName ?? undefined, last4: t.last4 ?? undefined, currency: 'INR', openingBalance: 0 } }, 'assistant');
+  created.push(a.id);
+  return a.id;
+}
+
+/** The investment account a mutual fund lives in (one per fund, or "Mutual funds"). */
+function fundAccount(os: LifeOSContext, fund: string | null, created: string[]): string | null {
+  if (!os.registry.entityTypes.has('account')) return null;
+  const title = fund ? fund.replace(/\s+(?:SIP|Direct|Growth|Plan)\b.*$/i, '').trim() : 'Mutual funds';
+  const hit = os.entities.query<{ kind?: string }>('account', {}, { limit: 500 }).find((a) => a.title.toLowerCase() === title.toLowerCase());
+  if (hit) return hit.id;
+  const a = os.entities.create({ type: 'account', title, data: { kind: 'investment', institution: 'Mutual fund', currency: 'INR', openingBalance: 0 } }, 'assistant');
   created.push(a.id);
   return a.id;
 }
@@ -286,22 +331,43 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
   }
   const t = item.parsed.txn;
   const created: string[] = [];
-  const accountId = accountFor(os, t, item.from, created);
-  const kind = t.transfer ? 'transfer' : t.direction === 'credit' ? 'income' : 'expense';
-  const merchant = t.counterparty ?? (t.channel === 'atm' ? 'ATM withdrawal' : undefined);
-  const category = t.channel === 'atm' ? 'cash' : t.transfer ? 'transfer' : categoryFor(os, merchant);
-  const e = os.entities.create({ type: 'transaction', data: { amount: t.amount, kind, category, merchant, date: t.date ?? iso(item.receivedAt), accountId: accountId ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined } }, 'assistant');
+  const date = t.date ?? iso(item.receivedAt);
+
+  // Spent abroad: rupees from the message when it says, else the day's rate (converted later if none yet).
+  let amount = t.amount;
+  let fx: Record<string, unknown> = {};
+  if (t.currency !== 'INR') {
+    const conv = t.inrAmount ? { inr: t.inrAmount, rate: Math.round((t.inrAmount / t.amount) * 10000) / 10000 } : toInr(os, t.amount, t.currency);
+    amount = conv?.inr ?? t.amount;
+    fx = { originalAmount: t.amount, originalCurrency: t.currency, fxRate: conv?.rate, currency: 'INR' };
+  }
+
+  let data: Record<string, unknown>;
+  let label: string;
+  let flag: string | null = null;
+  if (t.investment) {
+    // A mutual fund SIP / redemption: money moving into (or out of) an investment, never spend.
+    const bank = t.last4 ? accountFor(os, { ...t, investment: false }, item.from, created) : null;
+    const fund = fundAccount(os, t.fund, created);
+    const out = t.direction === 'debit';
+    data = { amount, kind: 'transfer', category: 'investment', merchant: t.fund ?? 'Mutual fund', date, accountId: (out ? bank : fund) ?? undefined, toAccountId: (out ? fund : bank) ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined };
+    label = `${out ? 'Invested' : 'Redeemed'} ${os.format.currency(amount)} · ${t.fund ?? 'mutual fund'}`;
+  } else {
+    const accountId = accountFor(os, t, item.from, created);
+    const kind = t.transfer || t.channel === 'atm' ? 'transfer' : t.direction === 'credit' ? 'income' : 'expense';
+    const merchant = t.counterparty ?? (t.channel === 'atm' ? 'ATM withdrawal' : undefined);
+    const category = t.channel === 'atm' || t.transfer ? 'transfer' : categoryFor(os, merchant, item.text);
+    data = { amount, kind, category, merchant, date, accountId: accountId ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined, ...fx };
+    const shown = t.currency !== 'INR' ? `${t.currency} ${t.amount.toLocaleString('en-IN')}${fx.fxRate ? ` (${os.format.currency(amount)})` : ''}` : os.format.currency(amount);
+    label = `${kind === 'income' ? 'Received' : kind === 'transfer' ? (t.channel === 'atm' ? 'Cash' : 'Transfer') : 'Spent'} ${shown}${merchant ? ` · ${merchant}` : ''}${t.last4 ? ` · ••${t.last4}` : ''}`;
+    if (category === 'other' && kind === 'expense') flag = 'Category unknown — set it once and it’s learned (or add a keyword rule)';
+    if (t.currency !== 'INR' && !fx.fxRate) flag = `No ${t.currency} rate yet — converted to rupees when the app is next online`;
+  }
+  const e = os.entities.create({ type: 'transaction', data }, 'assistant');
   os.entities.timeline.add({ entityId: e.id, kind: item.source, title: `From ${sourceLabel(item)}`, body: item.text.slice(0, 300), actor: 'system', occurredAt: item.receivedAt, meta: { ingestId: id } });
   setItem(os, id, { status: 'confirmed', entityId: e.id });
   for (const a of created) os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: 'account', entityId: a, label: `Account: ${os.entities.get(a)?.title ?? 'new account'}` });
-  os.dumps.addExtraction({
-    source: item.source,
-    sourceRef: id,
-    kind: 'transaction',
-    entityId: e.id,
-    label: `${kind === 'income' ? 'Received' : kind === 'transfer' ? 'Transfer' : 'Spent'} ${os.format.currency(t.amount)}${merchant ? ` · ${merchant}` : ''}${t.last4 ? ` · ••${t.last4}` : ''}`,
-    flag: category === 'other' && kind === 'expense' ? 'Category unknown — set it once and it’s learned' : null,
-  });
+  os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: 'transaction', entityId: e.id, label, flag });
   return { id, status: 'confirmed', entityId: e.id };
 }
 

@@ -28,9 +28,14 @@ export interface ParsedTxn {
   date: string | null;
   /** Money moved between your own accounts (card bill paid, self transfer). */
   transfer: boolean;
+  /** When spent in another currency and the message also gives the rupee amount. */
+  inrAmount: number | null;
+  /** A mutual fund purchase (SIP) or redemption: an investment, not spending. */
+  investment: boolean;
+  fund: string | null;
 }
 
-export type SmsKind = { kind: 'txn'; txn: ParsedTxn } | { kind: 'skip'; reason: 'otp' | 'promo' | 'bill' | 'mandate' | 'declined' | 'info' };
+export type SmsKind = { kind: 'txn'; txn: ParsedTxn } | { kind: 'skip'; reason: 'otp' | 'promo' | 'bill' | 'mandate' | 'declined' | 'info' | 'investment-confirmation' | 'delivery' };
 
 /** DLT sender headers ("VM-HDFCBK", "AX-ICICIT-S", "JD-SBIINB") → bank. */
 const HEADERS: Array<[RegExp, string, string]> = [
@@ -77,7 +82,29 @@ export function looksLikeBankSender(sender: string, sampleText = ''): boolean {
   return !!bankOf(s) || /(debited|credited|spent|a\/c|acct|avl bal|upi|card ending|withdrawn)/i.test(sampleText);
 }
 
-const AMOUNT = /(?:INR|Rs\.?|₹|RS)\s?([\d,]+(?:\.\d{1,2})?)/i;
+/** Every money mention: "Rs.450", "INR 1,240.00", "USD 45.00", "$45", "£12.50", "¥3,200", "AED 150", "45.00 USD". */
+const MONEY = /(?:(INR|Rs\.?|₹|USD|US\$|\$|GBP|£|JPY|JP¥|¥|AED|Dhs\.?)\s?([\d,]+(?:\.\d{1,2})?))|(?:\b([\d,]+(?:\.\d{1,2})?)\s?(INR|USD|GBP|JPY|AED)\b)/gi;
+const CURRENCY: Record<string, string> = { inr: 'INR', rs: 'INR', 'rs.': 'INR', '₹': 'INR', usd: 'USD', 'us$': 'USD', $: 'USD', gbp: 'GBP', '£': 'GBP', jpy: 'JPY', 'jp¥': 'JPY', '¥': 'JPY', aed: 'AED', dhs: 'AED', 'dhs.': 'AED' };
+/** Words right before a figure that make it not the transaction: a limit, a balance, a due. */
+const NOT_THE_AMOUNT = /(?:\b(?:avl|avbl|available|avail|total|credit|cr|card|clear|ledger|min(?:imum)?|outstanding|o\/s)\b[\s.:]*)?\b(?:lmt|limit|bal|balance|outstanding|due|amount due|amt due|dues)\b[^\d\n]{0,14}$/i;
+
+interface Money { amount: number; currency: string; at: number }
+
+export function moneyMentions(t: string): Money[] {
+  const out: Money[] = [];
+  for (const m of t.matchAll(MONEY)) {
+    const cur = CURRENCY[(m[1] ?? m[4] ?? '').toLowerCase()] ?? 'INR';
+    const amount = Number((m[2] ?? m[3] ?? '').replace(/,/g, ''));
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const before = t.slice(Math.max(0, m.index! - 40), m.index!);
+    if (NOT_THE_AMOUNT.test(before)) continue;
+    out.push({ amount, currency: cur, at: m.index! });
+  }
+  return out;
+}
+
+const MF = /\b(mutual fund|mutual funds|\bmf\b|folio|\bnav\b|units? (?:allotted|allocated|redeemed|purchased)|\bsip\b|systematic investment|cams|kfin|kfintech|\bamc\b|elss)/i;
+const MF_REGISTRAR = /\b(cams|kfin|kfintech|units? (?:allotted|allocated)|folio (?:no|number)|nav of|nav as on)\b/i;
 const num = (s: string) => Number(s.replace(/,/g, ''));
 const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -106,6 +133,7 @@ function counterpartyOf(t: string): { name: string | null; vpa: string | null } 
   const patterns: RegExp[] = [
     /UPI\/(?:P2[AM]|CR|DR)\/\d+\/([^/\n]+?)(?:\/|\n|$)/i, // UPI/P2M/4269…/NETFLIX
     /\bInfo:?\s*(?:UPI\/)?([A-Za-z][^\n.;]{1,40}?)(?:\.(?=\s|$)|;|\n|$)/i,
+    /\bon\s+\d{1,2}[-\s/]?[A-Za-z]{3}[-\s/]?\d{2,4}\s+(?:on|at)\s+([A-Za-z0-9][A-Za-z0-9 &'._*-]{1,40}?)(?:\.(?=\s|$)|\n|$)/i, // ICICI: "on 26-Sep-26 on AMAZON US."
     /\bat\s+([A-Za-z0-9][A-Za-z0-9 &'._*-]{1,40}?)\s+(?:on|dated|via|using|at\s+\d|\.(?=\s|$)|Avl|Bal)\b/i,
     /\bat\s+([A-Za-z0-9][A-Za-z0-9 &'._*-]{1,40}?)(?:\.(?=\s|$)|\n|$)/i,
     /;\s*([A-Za-z][A-Za-z0-9 &'._-]{1,40}?)\s+credited\b/i, // ICICI: "…; SWIGGY credited."
@@ -136,10 +164,21 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
   if (/\b(is due|due on|due date|minimum amount due|total amount due|statement (?:generated|for)|bill (?:of|for) .* (?:generated|is))\b/.test(lower) && !/\b(debited|credited|spent|received|paid)\b/.test(lower)) return { kind: 'skip', reason: 'bill' };
   if (/\b(will be debited|mandate|autopay (?:request|set)|e-?mandate|si (?:registered|request)|standing instruction)\b/.test(lower) && !/\b(has been debited|was debited|is debited|got debited)\b/.test(lower)) return { kind: 'skip', reason: 'mandate' };
 
-  const am = AMOUNT.exec(t) ?? /\b(?:debited|credited)\s+(?:by|with|for)\s+([\d,]+(?:\.\d{1,2})?)\b/i.exec(t);
-  if (!am) return { kind: 'skip', reason: 'info' };
-  const amount = num(am[1]!);
-  if (!Number.isFinite(amount) || amount <= 0) return { kind: 'skip', reason: 'info' };
+  // Mutual funds: the registrar's "units allotted / folio" confirmation repeats the bank debit — skip it; the debit is the investment.
+  const mf = MF.test(t);
+  const hasAccount = /(?:a\/?c|acct|account)\s*(?:no\.?)?\s*[:\s]*[xX*]+\s*\d{3,6}/i.test(t);
+  if (mf && MF_REGISTRAR.test(t) && !hasAccount) return { kind: 'skip', reason: 'investment-confirmation' };
+
+  const mentions = moneyMentions(t);
+  const fallback = /\b(?:debited|credited)\s+(?:by|with|for)\s+([\d,]+(?:\.\d{1,2})?)\b/i.exec(t);
+  if (!mentions.length && !fallback) return { kind: 'skip', reason: 'info' };
+  // A foreign spend often comes with its rupee amount ("USD 45.00 (INR 3,760.12)"): keep both.
+  const foreign = mentions.find((m) => m.currency !== 'INR');
+  const inr = mentions.find((m) => m.currency === 'INR');
+  const main = foreign ?? inr ?? { amount: num(fallback![1]!), currency: 'INR', at: fallback!.index };
+  const amount = main.amount;
+  const currency = main.currency;
+  const inrAmount = foreign && inr && inr.at > foreign.at && inr.at - foreign.at < 60 ? inr.amount : null;
 
   const creditWords = /\b(credited|received|deposited|refund(?:ed)?|reversed|cashback (?:of|credited)|added to|payment (?:of .* )?received)\b/i;
   const debitWords = /\b(debited|spent|withdrawn|sent|paid|purchase|charged|debit(?:ed)?|txn of|transferred to|used for|made a (?:payment|transaction))\b/i;
@@ -152,7 +191,8 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
   const isCard = /\b(credit card|debit card|card (?:no\.?|ending|xx|x+|\*+)|card\s*[x*]{0,4}\d{4}|using (?:your )?(?:\w+ )?card|on (?:your )?(?:\w+ )?card|amex card)\b/i.test(t);
   const last4 =
     /(?:a\/?c|acct|account|card|ac)(?:\s*(?:no\.?|number|ending(?:\s+in)?|with))?\s*[:\s]*(?:[xX*]+|\.\.)?\s*(\d{3,6})\b/i.exec(t)?.[1]?.slice(-4) ??
-    /\b[xX*]{2,}(\d{3,6})\b/.exec(t)?.[1]?.slice(-4) ??
+    // A bare "XX1234" is an account — unless it's a mutual fund folio number.
+    (mf ? null : /\b[xX*]{2,}(\d{3,6})\b/.exec(t)?.[1]?.slice(-4)) ??
     null;
   const upi = /\bupi\b|@[a-z]{2,}\b|\bvpa\b/i.test(t);
   const channel: TxnChannel = /\batm\b|withdrawn/i.test(t) ? 'atm' : upi ? 'upi' : isCard ? 'card' : /\b(neft|imps|rtgs|net ?banking|ib)\b/i.test(t) ? 'netbanking' : /\bemi\b/i.test(t) ? 'emi' : /wallet/i.test(t) ? 'wallet' : 'other';
@@ -160,12 +200,16 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
   const ref = /(?:upi\s*ref(?:\s*no)?|ref(?:erence)?\s*(?:no|number)?|utr|rrn|txn\s*(?:id|no)|upi)[:\s#.]*\b([A-Z0-9]{8,})\b/i.exec(t)?.[1] ?? null;
   const { name, vpa } = counterpartyOf(t);
   const transfer = direction === 'credit' && isCard && /\b(payment|received towards|thank you for (?:your )?payment)\b/i.test(t);
+  const fund = mf ? (/\b(?:in|of|for|towards|to)\s+([A-Z][A-Za-z0-9&.' -]{2,50}?(?:Mutual Fund|Fund|MF|Scheme))\b/i.exec(t)?.[1]?.trim() ?? /\b([A-Z][A-Za-z&]+(?:\s[A-Z][A-Za-z&]+){0,3})\s+(?:Mutual Fund|MF)\b/.exec(t)?.[1]?.trim() ?? null) : null;
   return {
     kind: 'txn',
     txn: {
       amount,
       direction,
-      currency: 'INR',
+      currency,
+      inrAmount,
+      investment: mf,
+      fund,
       bank: bankOf(sender, t),
       channel,
       last4,
@@ -208,7 +252,7 @@ export function parsePaymentNotification(pkg: string, title: string, text: strin
     const direction = /received/.test(verb) || /\bfrom\b/i.test(m[0]) ? 'credit' : 'debit';
     return {
       kind: 'txn',
-      txn: { amount: num(m[2]!), direction, currency: 'INR', bank: null, channel: 'upi', last4: /[xX*]{2,}(\d{3,4})/.exec(both)?.[1] ?? null, isCard: false, counterparty: clean(m[4]!), vpa: /\b([a-z0-9._-]{2,}@[a-z]{2,})\b/i.exec(both)?.[1] ?? null, ref: null, balance: null, date: null, transfer: false },
+      txn: { amount: num(m[2]!), direction, currency: 'INR', inrAmount: null, investment: false, fund: null, bank: null, channel: 'upi', last4: /[xX*]{2,}(\d{3,4})/.exec(both)?.[1] ?? null, isCard: false, counterparty: clean(m[4]!), vpa: /\b([a-z0-9._-]{2,}@[a-z]{2,})\b/i.exec(both)?.[1] ?? null, ref: null, balance: null, date: null, transfer: false },
     };
   }
   // Bank apps post the same text as their SMS.

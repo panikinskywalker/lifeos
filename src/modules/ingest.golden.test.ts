@@ -112,3 +112,44 @@ describe('learning', () => {
     expect(txs().find((x) => x.data.amount === 500)!.data.category).toBe('shopping');
   });
 });
+
+describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
+  it('a USD card spend is stored in dollars and rupees at the day\'s rate; the limit is never the amount', async () => {
+    const { setFxRatesFromInrBase, applyPendingFx } = await import('@core/ingest/fx');
+    const body = 'USD 45.00 spent using ICICI Bank Card XX9012 on 26-Sep-26 on AMAZON US. Avl Limit: INR 1,20,000.00.';
+    // No rate yet: filed in dollars, flagged, converted when rates arrive.
+    ingestMessage(os, { source: 'sms', from: 'AX-ICICIB', body, receivedAt: at });
+    expect(txs()[0]!.data).toMatchObject({ amount: 45, originalAmount: 45, originalCurrency: 'USD' });
+    expect(os.dumps.toCheck()[0]!.flag).toMatch(/No USD rate yet/);
+    setFxRatesFromInrBase(os, '2026-09-26', { USD: 1 / 84, GBP: 1 / 110, JPY: 1 / 0.56, AED: 1 / 22.9 });
+    expect(applyPendingFx(os)).toBe(1);
+    expect(txs()[0]!.data).toMatchObject({ amount: 3780, fxRate: 84 });
+    // With a rate on file: converted at once. When the SMS gives the rupee figure, that wins.
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent USD 10.00 (INR 861.50) on HDFC Bank Card 5678 at OPENAI On 2026-09-26', receivedAt: at + 3_600_000 });
+    expect(txs().find((t) => t.data.merchant === 'OPENAI')!.data).toMatchObject({ amount: 861.5, originalAmount: 10, originalCurrency: 'USD' });
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent AED 150.00 On HDFC Bank Card 5678 At DUBAI MALL On 2026-09-26', receivedAt: at + 7_200_000 });
+    expect(txs().find((t) => t.data.merchant === 'DUBAI MALL')!.data.amount).toBeCloseTo(3435, 0);
+  });
+
+  it('a mutual fund SIP is an investment transfer into the fund; the registrar\'s confirmation is skipped; no fake bank account', () => {
+    const r = ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.5,000.00 debited from A/c XX1234 on 05-09-26 towards Parag Parikh Flexi Cap Fund SIP. Avl Bal Rs.40,000', receivedAt: at });
+    expect(r.status).toBe('confirmed');
+    const t = txs()[0]!;
+    expect(t.data).toMatchObject({ amount: 5000, kind: 'transfer', category: 'investment' });
+    const fund = os.entities.get(t.data.toAccountId as string)!;
+    expect(fund).toMatchObject({ title: 'Parag Parikh Flexi Cap Fund', data: { kind: 'investment' } });
+    expect(ingestMessage(os, { source: 'sms', from: 'CP-CAMSPM', body: 'Dear Investor, units allotted in Folio No XX7788 for Rs 5000 under Parag Parikh Flexi Cap Fund at NAV 78.12. CAMS', receivedAt: at + 86_400_000 })).toMatchObject({ status: 'dismissed' });
+    expect(os.entities.query('account').map((a) => a.title).sort()).toEqual(['HDFC Bank ••1234', 'Parag Parikh Flexi Cap Fund']);
+    expect(os.dumps.toCheck().map((x) => x.label)).toContain('Invested ₹5,000 · Parag Parikh Flexi Cap Fund');
+  });
+
+  it('your keyword rules win: ZOMATO → food, a word in the message text too', async () => {
+    const { setCategoryRules, categoryFor } = await import('@core/ingest/ingest');
+    setCategoryRules(os, [{ keyword: 'guru tailors', category: 'shopping' }, { keyword: 'rent', category: 'housing' }]);
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.300.00 From HDFC Bank A/C *1234 To GURU TAILORS On 26/09/26', receivedAt: at });
+    expect(txs()[0]!.data.category).toBe('shopping');
+    expect(categoryFor(os, 'Suresh K', 'Rs 25000 sent to Suresh K for September rent')).toBe('housing');
+    expect(categoryFor(os, 'ZOMATO LTD')).toBe('food');
+    expect(categoryFor(os, 'Parent')).toBe('other'); // "rent" inside "Parent" is not the word rent
+  });
+});
