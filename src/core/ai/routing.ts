@@ -39,6 +39,13 @@ export function providerTokensThisMonth(os: LifeOSContext, provider: string, now
   return os.db.get<{ n: number }>(`SELECT COALESCE(SUM(input_tokens + output_tokens), 0) n FROM ai_usage WHERE provider = ? AND at >= ?`, [provider, monthStart(now)])?.n ?? 0;
 }
 
+/** Tokens this provider used today (local day). */
+export function providerTokensToday(os: LifeOSContext, provider: string, now = Date.now()): number {
+  const d = new Date(now);
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return os.db.get<{ n: number }>(`SELECT COALESCE(SUM(input_tokens + output_tokens), 0) n FROM ai_usage WHERE provider = ? AND at >= ?`, [provider, start])?.n ?? 0;
+}
+
 export class UsageCapError extends Error {
   constructor(public readonly provider: string, public readonly cap: number) {
     super(`${provider}: monthly cap of ${cap.toLocaleString('en-IN')} tokens reached`);

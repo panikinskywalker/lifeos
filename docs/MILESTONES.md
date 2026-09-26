@@ -126,7 +126,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Resume, don't restart: filing progress per chunk, so a dump cut off halfway continues from the next chunk; the model is told what's already filed.
 - [x] Parser inside dumps: the everyday sentences in a longer dump are filed on the phone right away; the model files the rest later without doubling them.
 - [x] Questions without a model: an on-phone answer (search + connections + dates, no model) straight away, and the full answer queued and shown when it lands.
-- [ ] Budget: per-provider daily usage in You › Agent; when a free budget runs low, new dumps go first and the older backlog waits.
+- [x] Budget: per-provider daily usage in You › Agent; when a free budget runs low, new dumps go first and the older backlog waits. *(Today's tokens vs Groq's ~200k free allowance, a Resting-until note with Try now; queue goes newest-first at ≥ 80% or resting. Groq defaults moved to openai/gpt-oss-120b / -20b.)*
 
 ### M4.2 — Data sources
 - [ ] **Health Connect** (`react-native-health-connect`): permissions screen; daily sync of steps, sleep sessions, heart rate, workouts, weight into `measurements`/`workouts` with source = health_connect; backfill 90 days on first grant; hourly refresh via background task.

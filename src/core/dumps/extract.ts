@@ -222,9 +222,16 @@ async function runLogged(os: LifeOSContext, dump: Dump, name: string, input: Rec
 }
 
 /** Everything still waiting, oldest first; one at a time so free tiers aren't flooded. */
-export async function extractPending(os: LifeOSContext, provider?: LLMProvider | null, opts: { max?: number } = {}): Promise<ExtractResult[]> {
+export async function extractPending(os: LifeOSContext, provider?: LLMProvider | null, opts: { max?: number; newestFirst?: boolean } = {}): Promise<ExtractResult[]> {
   const out: ExtractResult[] = [];
-  for (const d of os.dumps.pending().slice(0, opts.max ?? 10)) out.push(await extractDump(os, d.id, provider));
+  // Low on free budget: what was just said matters most; the older backlog waits.
+  const due = os.dumps.pending();
+  if (opts.newestFirst) due.reverse();
+  for (const d of due.slice(0, opts.max ?? 10)) {
+    const r = await extractDump(os, d.id, provider);
+    out.push(r);
+    if (r.status === 'waiting') break; // every provider is resting: the rest would wait too
+  }
   return out;
 }
 

@@ -134,7 +134,7 @@ describe('buildAgentProviders', () => {
     });
     expect(main.id).toBe('chain(groq>gemini)');
     expect(small.id).toBe('chain(groq>gemini)');
-    expect(roles).toEqual(['groq:main:llama-3.3-70b-versatile', 'gemini:main:gemini-flash-latest', 'groq:small:llama-3.1-8b-instant', 'gemini:small:gemini-flash-lite-latest']);
+    expect(roles).toEqual(['groq:main:openai/gpt-oss-120b', 'gemini:main:gemini-flash-latest', 'groq:small:openai/gpt-oss-20b', 'gemini:small:gemini-flash-lite-latest']);
   });
 
   it('refuses a keyed provider without a key', () => {

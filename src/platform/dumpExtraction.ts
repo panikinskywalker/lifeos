@@ -2,6 +2,9 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { DumpSource } from '@core/repo/dumpRepo';
 import { extractPending } from '@core/dumps/extract';
 import { answerQueued } from '@core/ai/questionQueue';
+import { budgetLow, providerLimits } from '@core/ai/limits';
+import { providerTokensToday } from '@core/ai/routing';
+import { PROVIDER_PRESETS } from '@core/ai/providers';
 import { buildAgentFromSettings } from './agentProvider';
 
 /**
@@ -39,7 +42,9 @@ export function runDumpExtraction(os: LifeOSContext): Promise<void> {
         const agent = await buildAgentFromSettings(os).catch(() => null);
         // Questions first: someone is waiting on those. Then filing (a tool loop: the main chain).
         if (questionsDue) await answerQueued(os, agent?.main, { smart: agent?.smart });
-        const results = dumpsDue ? await extractPending(os, agent?.main ?? null) : [];
+        const first = agent?.active[0]?.kind;
+        const low = first ? budgetLow(providerTokensToday(os, first), PROVIDER_PRESETS[first].freeDailyTokens, !!providerLimits(os).get(first)) : false;
+        const results = dumpsDue ? await extractPending(os, agent?.main ?? null, { newestFirst: low }) : [];
         const failed = results.some((r) => r.status === 'failed');
         failures = failed ? failures + 1 : 0;
         if (retry) clearTimeout(retry);

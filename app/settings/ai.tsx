@@ -3,8 +3,10 @@ import { Linking, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { PROVIDER_PRESETS, type ProviderConfig, type ProviderKind } from '@core/ai/providers';
 import { listModels, pickModel } from '@core/ai/openaiCompat';
-import { providerTokensThisMonth, usageSummary } from '@core/ai/routing';
-import { useLive, useSettings } from '@ui/hooks';
+import { providerTokensThisMonth, providerTokensToday, usageSummary } from '@core/ai/routing';
+import { providerLimits } from '@core/ai/limits';
+import { format } from 'date-fns';
+import { useOS, useLive, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Card, Chip, ChipRow, FilterChip, IconButton, NumberField, ProgressBar, Screen, Section, Sparkline, StatTrio, SwitchField, Text, TextField, useToast } from '@ui/kit';
 import { getProviderKey, setProviderKey } from '../../src/platform/boot';
@@ -97,6 +99,9 @@ function ProviderCard({ cfg, first, last, onChange, onMove, cap, onCap }: { cfg:
   const [key, setKey] = useState('');
   const [stored, setStored] = useState<string | null>(null);
   const used = useLive((o) => providerTokensThisMonth(o, cfg.kind), [cfg.kind]);
+  const today = useLive((o) => providerTokensToday(o, cfg.kind), [cfg.kind]);
+  const os = useOS();
+  const rest = useLive((o) => providerLimits(o).get(cfg.kind), [cfg.kind]);
   const [models, setModels] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
   const loadModels = async () => {
@@ -164,6 +169,18 @@ function ProviderCard({ cfg, first, last, onChange, onMove, cap, onCap }: { cfg:
           <Text variant="caption" color="secondary">
             {k(used)} tokens this month{cap ? ` of ${k(cap)}` : ''}
           </Text>
+          <Text variant="caption" color="secondary">
+            Today: {k(today)} tokens{preset.freeDailyTokens ? ` of about ${k(preset.freeDailyTokens)} free` : ''}
+          </Text>
+          {preset.freeDailyTokens ? <ProgressBar value={Math.min(1, today / preset.freeDailyTokens)} color={today >= 0.8 * preset.freeDailyTokens ? t.c.alert.coral : t.tints.memory.ink} height={6} accessibilityLabel={`${k(today)} of about ${k(preset.freeDailyTokens)} free tokens used today`} /> : null}
+          {rest ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text variant="caption" color={t.c.accent.gold} style={{ flex: 1 }}>
+                Resting until {format(rest.until, 'h:mm a')} · {rest.reason}. Waiting things file after that.
+              </Text>
+              <Chip label="Try now" icon="refresh" small onPress={() => { providerLimits(os).clear(cfg.kind); toast.show({ message: `${preset.label} will be tried again`, icon: 'refresh' }); }} />
+            </View>
+          ) : null}
         </>
       ) : null}
     </View>

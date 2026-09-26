@@ -234,6 +234,18 @@ describe('filing mechanics', () => {
     expect(os.entities.query('transaction')).toHaveLength(1);
   });
 
+  it('low on free budget: the newest dump is filed first, the older backlog waits', async () => {
+    const { budgetLow } = await import('@core/ai/limits');
+    os.dumps.add({ body: 'older thing about Asha', createdAt: Date.now() - 60_000 });
+    os.dumps.add({ body: 'newest thing about Kendal' });
+    const m = model();
+    await extractPending(os, m, { newestFirst: true, max: 1 });
+    expect(m.seen[0]!.first).toBe('newest thing about Kendal');
+    expect(budgetLow(170_000, 200_000, false)).toBe(true);
+    expect(budgetLow(20_000, 200_000, false)).toBe(false);
+    expect(budgetLow(0, undefined, true)).toBe(true);
+  });
+
   it('a bad tool call goes back to the model as an error instead of failing the dump', async () => {
     const m = model([{ name: 'teleport', input: {} }, { name: 'create_task', input: { title: 'x' } }]);
     const { r } = await say('something', m);

@@ -1,5 +1,6 @@
 import type { LifeOSContext } from '../registry/context';
 import { UsageCapError } from './routing';
+import { bus } from '../events/bus';
 
 /**
  * Remembered provider limits (M4.1c): when a provider says "try again in 7
@@ -27,13 +28,19 @@ export function providerLimits(os: Pick<LifeOSContext, 'settings'>, now: () => n
   };
   return {
     get: (p) => read()[p],
-    set: (p, rest) => os.settings.set(KEY, { ...read(), [p]: rest }),
+    set: (p, rest) => {
+      os.settings.set(KEY, { ...read(), [p]: rest });
+      bus.emit('data.changed', { table: 'settings', id: KEY });
+    },
     all: read,
     earliest: () => {
       const u = Object.values(read()).map((r) => r.until);
       return u.length ? Math.min(...u) : null;
     },
-    clear: (p) => os.settings.set(KEY, p ? Object.fromEntries(Object.entries(read()).filter(([k]) => k !== p)) : {}),
+    clear: (p) => {
+      os.settings.set(KEY, p ? Object.fromEntries(Object.entries(read()).filter(([k]) => k !== p)) : {});
+      bus.emit('data.changed', { table: 'settings', id: KEY });
+    },
   };
 }
 
@@ -65,4 +72,10 @@ export function classifyFailure(e: unknown, now = Date.now()): Failure {
   if (status === 0 || status === 408 || /network|fetch|timed? ?out|offline|ENOTFOUND|ECONNRE/i.test(msg)) return { kind: 'wait', until: now + 60_000, reason: 'No connection' };
   if (status === 401 || status === 403) return { kind: 'wait', until: now + 6 * 60 * 60_000, reason: `${name} rejected the API key — check You › Agent` };
   return { kind: 'fail', reason: msg.slice(0, 200) };
+}
+
+/** Is today's free budget running low (≥ 80% of a known daily allowance, or resting) on the first provider in use? */
+export function budgetLow(used: number, dailyAllowance: number | undefined, resting: boolean): boolean {
+  if (resting) return true;
+  return !!dailyAllowance && used >= 0.8 * dailyAllowance;
 }

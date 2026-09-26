@@ -19,6 +19,8 @@ export interface ProviderPreset {
   needsKey: boolean;
   keyUrl?: string;
   note: string;
+  /** Roughly how many tokens a day the free tier allows (for the budget bar), when known. */
+  freeDailyTokens?: number;
 }
 
 export const PROVIDER_PRESETS: Record<ProviderKind, ProviderPreset> = {
@@ -26,11 +28,12 @@ export const PROVIDER_PRESETS: Record<ProviderKind, ProviderPreset> = {
     kind: 'groq',
     label: 'Groq',
     baseUrl: 'https://api.groq.com/openai/v1',
-    defaultModel: 'llama-3.3-70b-versatile',
-    smallModel: 'llama-3.1-8b-instant',
+    defaultModel: 'openai/gpt-oss-120b',
+    smallModel: 'openai/gpt-oss-20b',
     needsKey: true,
     keyUrl: 'https://console.groq.com/keys',
-    note: 'Free tier, very fast. Open models. Check per-model token limits.',
+    note: 'Free tier, very fast. Open models. About 200k tokens a day and 8k a minute per model.',
+    freeDailyTokens: 200_000,
   },
   gemini: {
     kind: 'gemini',
