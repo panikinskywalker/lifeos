@@ -34,6 +34,7 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
     <Screen title="Finance" right={<IconButton icon="plus" bg color={FINANCE_COLOR} onPress={() => router.push('/entity/transaction/new')} />}>
       <View style={{ gap: 16 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+          <Chip label="Spend" icon="chart.pie" color={FINANCE_COLOR} onPress={() => router.push('/spend' as never)} />
           <Chip label="Transactions" icon="arrow.up.arrow.down" color={FINANCE_COLOR} onPress={() => router.push('/entity/transaction')} />
           <Chip label="Accounts" icon="creditcard" color={FINANCE_COLOR} onPress={() => router.push('/entity/account')} />
           <Chip label="Budgets" icon="chart.pie" color={FINANCE_COLOR} onPress={() => router.push('/entity/budget')} />
@@ -69,7 +70,7 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
               {data.byCat.map((c, i) => {
                 const cat = categoryOf(c.category);
                 return (
-                  <Row key={c.category} title={cat.label} subtitle={`${c.count} transaction${c.count === 1 ? '' : 's'}`} icon={cat.icon} iconColor={cat.color} value={ctx.format.currency(c.total)} last={i === data.byCat.length - 1} onPress={() => router.push({ pathname: '/entity/[type]', params: { type: 'transaction', category: c.category, from: m.start, to: m.end } })} />
+                  <Row key={c.category} title={cat.label} subtitle={`${c.count} transaction${c.count === 1 ? '' : 's'}`} icon={cat.icon} iconColor={cat.color} value={ctx.format.currency(c.total)} last={i === data.byCat.length - 1} onPress={() => router.push({ pathname: '/spend', params: { category: c.category, period: offset === 0 ? 'month' : 'last_month' } } as never)} />
                 );
               })}
             </Card>

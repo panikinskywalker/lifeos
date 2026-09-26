@@ -81,6 +81,9 @@ export interface TransactionData {
   date: string;
   note?: string;
   currency?: string;
+  originalAmount?: number;
+  originalCurrency?: string;
+  fxRate?: number;
   tripId?: string;
   personIds?: string[];
   projectId?: string;

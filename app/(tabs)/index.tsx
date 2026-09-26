@@ -193,7 +193,7 @@ function SpendTile() {
   const diff = p.usualByToday != null ? p.spent - p.usualByToday : null;
   const series = [{ label: 'This month', color: t.tints.finance.ink, values: p.thisMonth }, ...(p.usual.length ? [{ label: 'Usual', color: t.c.fg.tertiary, values: p.usual.slice(0, 31), dashed: true }] : [])];
   return (
-    <Tile size="2x1" tint="finance" icon="wallet" label="Spend this month" meta={format(new Date(), 'MMM')} onPress={() => router.push('/metric/spend' as never)}>
+    <Tile size="2x1" tint="finance" icon="wallet" label="Spend this month" meta={format(new Date(), 'MMM')} onPress={() => router.push('/spend' as never)}>
       {p.spent || p.usual.length ? (
         <View style={{ gap: 8 }}>
           <Stat value={os.format.currency(p.spent)} size="count" caption={diff == null ? 'Your usual month shows after a month of data' : `${os.format.currency(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'} than usual by today${p.usualMonth ? ` · usual month ${os.format.currency(p.usualMonth)}` : ''}`} tone={diff != null && diff > 0 ? 'alert' : undefined} />
