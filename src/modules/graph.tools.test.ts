@@ -101,7 +101,13 @@ describe('graph tools', () => {
     expect(resolveNode(os, s, { name: 'Kendal Rao', type: 'person' })).toMatchObject({ confidence: 0.95 });
     expect(resolveNode(os, s, { name: 'Kendal Rao', type: 'person' }).flag).toBeUndefined();
     expect(resolveNode(os, s, { name: 'Kendal', type: 'person' }).flag).toMatch(/Guessed “Kendal” is Kendal Rao/);
-    expect(resolveNode(os, s, { name: 'Kendal Rao', type: 'person' }, { isNew: true })).toMatchObject({ id: null, flag: 'Possible duplicate of Kendal Rao' });
+    // Models mark everything "new": an exact name is reused; flagged only when the user really said "new".
+    const rao = os.entities.query('person')[0]!.id;
+    expect(resolveNode(os, s, { name: 'Kendal Rao', type: 'person' }, { isNew: true })).toMatchObject({ id: rao, flag: undefined });
+    const said = newSession(os.dumps.add({ body: 'made a new friend, Kendal Rao' }).id, { saidNew: true });
+    expect(resolveNode(os, said, { name: 'Kendal Rao', type: 'person' }, { isNew: true })).toMatchObject({ id: rao, flag: expect.stringContaining('existing Kendal Rao') });
+    expect(resolveNode(os, s, { name: 'Asha', type: 'person' }, { isNew: true })).toMatchObject({ id: null });
+    expect(await call(s, 'upsert_node', { name: 'User', type: 'person' })).toEqual({ skipped: 'that is the user' });
     expect(await call(s, 'link', { from: 'I', to: 'Kendal Rao', kind: 'knows' })).toEqual({ skipped: 'that is the user' });
   });
 

@@ -231,3 +231,32 @@ describe('tool calls that small models fumble', () => {
     expect(r.content[0]).toEqual({ type: 'text', text: 'from gemini' });
   });
 });
+
+describe('Gemini specifics', () => {
+  it('sends each tool call’s thought_signature back on the next turn', async () => {
+    const bodies: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+    mockFetch((_url, body) => {
+      bodies.push(body);
+      return bodies.length === 1
+        ? { json: { choices: [{ message: { content: null, tool_calls: [{ id: 'c1', function: { name: 'connections', arguments: '{"name":"Kendal"}' }, extra_content: { google: { thought_signature: 'sig-123' } } }] }, finish_reason: 'tool_calls' }] } }
+        : { json: { choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] } };
+    });
+    const p = createOpenAICompatProvider({ id: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: 'k', model: 'gemini-3.8-flash' });
+    const r1 = await p.complete({ system: '', messages: [{ role: 'user', content: 'when did I see Kendal' }], tools: [] });
+    await p.complete({ system: '', messages: [{ role: 'user', content: 'when did I see Kendal' }, { role: 'assistant', content: r1.content }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'c1', content: '{}' }] }], tools: [] });
+    expect(bodies[1].messages.find((m: any) => m.role === 'assistant').tool_calls[0].extra_content).toEqual({ google: { thought_signature: 'sig-123' } }); // eslint-disable-line @typescript-eslint/no-explicit-any
+  });
+
+  it('an overloaded or out-of-quota model hands over to another model on the same host', async () => {
+    const seen: string[] = [];
+    mockFetch((url, body) => {
+      if (url.endsWith('/models')) return { json: { data: [{ id: 'models/gemini-flash-latest' }, { id: 'models/gemini-3.8-flash' }, { id: 'models/gemini-3.5-flash-lite' }] } };
+      seen.push(body.model);
+      return body.model === 'gemini-flash-latest' ? { status: 429, text: 'You exceeded your current quota' } : { json: { choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] } };
+    });
+    const p = createOpenAICompatProvider({ id: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: 'k', model: 'gemini-flash-latest' });
+    await p.complete({ system: '', messages: [{ role: 'user', content: 'hi' }], tools: [] });
+    expect(seen).toEqual(['gemini-flash-latest', 'gemini-3.8-flash']);
+    expect(p.model).toBe('gemini-3.8-flash');
+  });
+});

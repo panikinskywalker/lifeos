@@ -40,13 +40,13 @@ export function filingPrompt(os: LifeOSContext, subject?: { type: string; title:
     .join('\n');
   const day = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   return `You file what the user said into their personal life graph, using the tools. Today is ${day}.
-${subject ? `The user is on the page of ${subject.type} "${subject.title}": "this", "she", "he", "it" mean it.\n` : ''}Break what they said into:
-- things mentioned → upsert_node (put details in attributes)
+${subject ? `The user is on the page of ${subject.type} "${subject.title}": "this", "she", "he", "it" mean it.\n` : ''}Go through it sentence by sentence and file everything:
+- each thing that happened (flight, dinner, meeting, visit, call…) → its own record_event with kind, when, and roles (with / at / from / to). The people and places in roles are created for you — don't upsert them first.
+- people or things mentioned outside an event → upsert_node (details in attributes; "new friend / colleague / neighbour" sets relationship)
 - more details about a thing → set_attributes (known fields; anything else goes to its notes)
-- something that happened → record_event with kind, when, and roles (with / at / from / to)
-- relationships → link (works_at, family_of, friend_of, knows, lives_in, owns…)
-- to-dos → create_task · money → log_spend · a chore or service done on something they own → log_done
-Rules: never ask questions. File only what was said; never invent people, dates or amounts. Feelings and opinions alone are not filed. "I"/"me" is the user — never a record. Keep dates as said ("8 Sept", "yesterday"). When everything is filed, reply "done".
+- relationships ("her brother Mike", "works at Zomato") → link (family_of, friend_of, works_at, knows, lives_in, owns…)
+- every amount spent or received → log_spend (the card or bank goes in account) · to-dos → create_task · a chore or service done on something they own → log_done
+Rules: never ask questions. File only what was said; never invent people, dates or amounts. Feelings and opinions alone are not filed. "I"/"me" is the user — never a record, never linked. Keep dates as said ("8 Sept", "yesterday"). Reply "done" only after every sentence is filed.
 Record types (type: fields):
 ${types}`;
 }
@@ -77,7 +77,7 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
   const dump = os.dumps.get(dumpId);
   if (!dump) throw new Error('dump not found');
   if (dump.status === 'done' || dump.status === 'skipped') return { status: 'done', via: 'none', items: os.dumps.extractions(dumpId).length };
-  const session = newSession(dump.id, { source: dump.subjectId ? 'record-voice' : 'dump', subjectId: dump.subjectId });
+  const session = newSession(dump.id, { source: dump.subjectId ? 'record-voice' : 'dump', subjectId: dump.subjectId, saidNew: /\bnew\b/i.test(dump.body) });
 
   // Parser first: one everyday sentence ("did laundry", "spent 450 on lunch"), filed offline.
   const oneLine = dump.body.trim().replace(/\s+/g, ' ');
@@ -129,11 +129,21 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
 
 async function fileChunk(os: LifeOSContext, provider: LLMProvider, system: string, specs: ReturnType<typeof toolSpec>[], byName: Map<string, AiToolDef>, text: string) {
   const messages: ChatMessage[] = [{ role: 'user', content: text }];
+  let nudged = false;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const r = await provider.complete({ system, messages, tools: specs, maxTokens: 1200 });
     messages.push({ role: 'assistant', content: r.content });
     const calls = r.content.filter((b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use');
-    if (!calls.length) return;
+    if (!calls.length) {
+      // Some models answer in prose the first time ("Got it, Karan works at…"). One nudge, then accept it
+      // (a rant with nothing to file is a legitimate empty answer).
+      if (round === 0 && !nudged) {
+        nudged = true;
+        messages.push({ role: 'user', content: 'Nothing was filed. File what I said now by calling the tools — do not reply in text. If there is truly nothing to file, reply "done".' });
+        continue;
+      }
+      return;
+    }
     const results: ContentBlock[] = [];
     for (const c of calls) {
       const def = byName.get(c.name);

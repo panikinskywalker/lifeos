@@ -38,6 +38,10 @@ export class ProviderError extends Error {
       )
     );
   }
+  /** This model can't serve now but others on the host may: overloaded, or rate-limited for longer than a short wait (a daily quota). */
+  get isModelBusy() {
+    return this.status === 503 || (this.status === 429 && (this.retryAfterMs === undefined || this.retryAfterMs > 20_000));
+  }
   /** The host rejected the model's own tool call (Groq: "tool_use_failed" / "Tool call validation failed"). */
   get isBadToolCall() {
     return this.status === 400 && /tool_use_failed|tool call validation failed|failed to call a function|invalid tool call/i.test(this.message);
@@ -153,6 +157,7 @@ type OAIMessage =
         id: string;
         type: "function";
         function: { name: string; arguments: string };
+        extra_content?: Record<string, unknown>;
       }[];
     }
   | { role: "tool"; tool_call_id: string; content: string };
@@ -190,6 +195,8 @@ function toOpenAIMessages(
                 name: c.name,
                 arguments: JSON.stringify(c.input ?? {}),
               },
+              // Gemini 3 refuses a follow-up unless each call's thought_signature comes back with it.
+              ...(c.extra ? { extra_content: c.extra } : {}),
             }))
           : undefined,
       });
@@ -252,6 +259,9 @@ export function createOpenAICompatProvider(
 ): LLMProvider {
   const baseUrl = opts.baseUrl.replace(/\/$/, "");
   let model = opts.model;
+  // Models found busy this session, and the host list (fetched once, on first need).
+  const exhausted = new Set<string>();
+  let models: string[] | undefined;
   const provider: LLMProvider = {
     id: opts.id,
     model,
@@ -261,6 +271,35 @@ export function createOpenAICompatProvider(
       } catch (e) {
         // The model fumbled a tool call: ask once more (it's sampled, a retry usually lands); then let the chain move on.
         if (e instanceof ProviderError && e.isBadToolCall) return once({ ...args, retry: true });
+        // This model is overloaded or out of quota for a while, but the host has others with their own limits.
+        if (e instanceof ProviderError && e.isModelBusy && opts.autoPickModel !== false) {
+          // "High demand" spikes pass in seconds: one short wait on the same model first.
+          if (e.status === 503) {
+            await new Promise((r) => setTimeout(r, 1500));
+            try {
+              return await once(args);
+            } catch (again) {
+              if (!(again instanceof ProviderError) || !again.isModelBusy) throw again;
+            }
+          }
+          exhausted.add(model);
+          models ??= await listModels(baseUrl, opts.apiKey).catch(() => []);
+          const small = SMALL_MODEL.test(model);
+          // Up to three other models; ones the host says are gone or also busy are skipped.
+          for (let hop = 0; hop < 3; hop++) {
+            const alt = pickModel(models.filter((m) => !exhausted.has(m)), small);
+            if (!alt) break;
+            model = alt; // for this session only; settings keep the chosen model
+            provider.model = alt;
+            try {
+              return await once(args);
+            } catch (next) {
+              if (!(next instanceof ProviderError) || !(next.isModelBusy || next.isModelMissing)) throw next;
+              exhausted.add(alt);
+            }
+          }
+          throw e;
+        }
         if (
           !(e instanceof ProviderError) ||
           !e.isModelMissing ||
@@ -325,11 +364,15 @@ export function createOpenAICompatProvider(
     if (!res.ok) {
       const text = await res.text();
       const ra = res.headers.get("retry-after");
-      const retryAfterMs = ra
-        ? Number.isFinite(Number(ra))
-          ? Number(ra) * 1000
-          : Math.max(0, Date.parse(ra) - Date.now())
-        : undefined;
+      // Groq also says it in words: "Please try again in 315ms" / "in 16.245s" / "in 1m2.5s".
+      const said = /try again in (?:(\d+)m)?([\d.]+)(ms|s)\b/i.exec(text);
+      const retryAfterMs = said
+        ? Number(said[1] ?? 0) * 60_000 + Number(said[2]) * (said[3] === "ms" ? 1 : 1000)
+        : ra
+          ? Number.isFinite(Number(ra))
+            ? Number(ra) * 1000
+            : Math.max(0, Date.parse(ra) - Date.now())
+          : undefined;
       throw new ProviderError(
         `${opts.id} ${res.status}: ${text.slice(0, 300)}`,
         opts.id,
@@ -344,6 +387,7 @@ export function createOpenAICompatProvider(
           tool_calls?: {
             id: string;
             function: { name: string; arguments: string };
+            extra_content?: Record<string, unknown>;
           }[];
         };
         finish_reason: string;
@@ -360,6 +404,7 @@ export function createOpenAICompatProvider(
         id: c.id,
         name: c.function.name,
         input: parseArgs(c.function.arguments),
+        ...(c.extra_content ? { extra: c.extra_content } : {}),
       });
     const hasCalls = (choice?.message.tool_calls?.length ?? 0) > 0;
     const stopReason = hasCalls

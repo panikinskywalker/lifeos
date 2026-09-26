@@ -34,10 +34,12 @@ export interface GraphSession {
   /** Why a node was a guess ("Guessed Kendal Rao"), carried onto every write that touches it. */
   flags: Map<string, string>;
   writes: number;
+  /** The words said "new" ("a new friend"): a reused record gets flagged. */
+  saidNew: boolean;
 }
 
-export function newSession(dumpId: string, opts: { source?: GraphSession['source']; subjectId?: string | null } = {}): GraphSession {
-  return { dumpId, source: opts.source ?? 'dump', subjectId: opts.subjectId ?? null, seen: new Map(), flags: new Map(), writes: 0 };
+export function newSession(dumpId: string, opts: { source?: GraphSession['source']; subjectId?: string | null; saidNew?: boolean } = {}): GraphSession {
+  return { dumpId, source: opts.source ?? 'dump', subjectId: opts.subjectId ?? null, seen: new Map(), flags: new Map(), writes: 0, saidNew: !!opts.saidNew };
 }
 
 function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['dumps']['addExtraction']>[0] extends infer T ? Omit<T & object, 'dumpId'> : never) {
@@ -55,7 +57,7 @@ function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['du
 const prov = (s: GraphSession, confidence = 1): Provenance => ({ source: s.source, sourceId: s.dumpId, confidence });
 const norm = (t: string) => t.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 const titleCase = (t: string) => t.trim().replace(/\s+/g, ' ').replace(/(^|\s)(\p{L})/gu, (m) => m.toUpperCase());
-const SELF = /^(i|me|myself|self|we|us|you)$/i;
+const SELF = /^(i|me|myself|self|we|us|you|user|the user|owner|the owner)$/i;
 const THIS = /^(she|he|her|him|they|them|it|this|this one|that|here|same)$/i;
 
 /* ------------------------------------------------------------------ */
@@ -82,14 +84,20 @@ export function resolveNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, op
   if (s.subjectId && (THIS.test(name) || norm(name) === norm(os.entities.get(s.subjectId)?.title ?? '\0'))) return { id: s.subjectId, confidence: 1, name };
   const seen = s.seen.get(`${type ?? ''}:${norm(name)}`) ?? s.seen.get(norm(name));
   if (seen) return { id: seen, confidence: 1, name };
-  if (opts.isNew) {
-    // "Made a new friend, Kendal" — create, but say so if a Kendal already exists.
-    const dup = resolveCandidates(os, name, type ? [type] : undefined).find((c) => c.score >= 0.95);
-    return { id: null, confidence: 1, flag: dup ? `Possible duplicate of ${dup.title}` : undefined, type, name };
-  }
   const cands = resolveCandidates(os, name, type && os.registry.entityTypes.has(type) ? [type] : undefined).filter((c) => c.why !== `a ${c.type}`);
   const [a, b] = cands;
+  if (opts.isNew) {
+    // Models mark almost everything "new". An exact name already here is that record; only when the
+    // user actually said "new" do we flag it, so two different Kendals can be split from To check.
+    if (a && a.score >= 0.95) return { id: a.id, confidence: 0.9, flag: s.saidNew ? `Used your existing ${a.title} — cancel if this is someone new` : undefined, type: a.type, name };
+    return { id: null, confidence: 1, type, name };
+  }
   if (a && a.score >= 0.95 && (!b || a.score - b.score >= 0.1)) return { id: a.id, confidence: a.score, type: a.type, name };
+  // The exact name as another kind of record ("HDFC card" is an account, not a person): use it.
+  if (type && (!a || a.score < 0.8)) {
+    const any = resolveCandidates(os, name).find((c) => c.score >= 0.95 && c.why !== `a ${c.type}`);
+    if (any) return { id: any.id, confidence: 0.9, type: any.type, name };
+  }
   if (a && a.score >= 0.8) {
     const other = b && b.score >= 0.8 ? ` (also ${b.title})` : '';
     return { id: a.id, confidence: a.score, flag: `Guessed “${name}” is ${a.title}${other}`, type: a.type, name };
@@ -157,6 +165,11 @@ const KEY_SYNONYMS: Record<string, string[]> = {
   role: ['role', 'job', 'title', 'job title', 'position', 'works as'],
   city: ['city', 'lives in', 'home town', 'hometown', 'based in'],
   relationship: ['relationship', 'relation', 'is my'],
+  warrantyUntil: ['warranty', 'warranty until', 'warranty till', 'warranty ends', 'guarantee', 'under warranty until'],
+  purchasePrice: ['price', 'cost', 'bought for', 'paid', 'purchase price'],
+  purchaseDate: ['bought on', 'purchased on', 'purchase date', 'bought'],
+  startDate: ['start', 'starts', 'from'],
+  endDate: ['end', 'ends', 'until', 'till'],
 };
 
 function fieldFor(def: EntityTypeDef, key: string): FieldDef | undefined {
@@ -187,6 +200,11 @@ export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, at
       continue;
     }
     const v = coerce(f, raw);
+    // A fixed-choice field only takes one of its options; anything else is kept as a note.
+    if (f.type === 'select' && f.options?.length && !f.options.some((o) => o.value === v)) {
+      notes.push([f.label, shown(raw)]);
+      continue;
+    }
     const ok = def.schema.safeParse({ ...data, ...patch, [f.key]: v });
     if (!ok.success) {
       notes.push([f.label, shown(raw)]);
@@ -245,12 +263,23 @@ export function link(os: LifeOSContext, s: GraphSession, fromId: string, toId: s
   const existing = os.relations.forEntity(a, kind).find((x) => x.other.id === b && x.direction === 'out');
   if (existing) return null;
   const r = os.relations.link(a, b, kind, {}, 'assistant', prov(s, confidence));
-  const ta = os.entities.get(a)?.title ?? 'record';
-  const tb = os.entities.get(b)?.title ?? 'record';
+  const ta = nodeLabel(os, a);
+  const tb = nodeLabel(os, b);
   const word = EDGE_WORDS[kind]?.out.toLowerCase() ?? kind.replace(/_/g, ' ');
   const flag = s.flags.get(a) ?? s.flags.get(b);
   log(os, s, { kind: 'link', action: 'created', relationId: r.id, entityId: a, label: `${ta} — ${word} — ${tb}`, flag });
   return r.id;
+}
+
+/** How a node reads in a To check line: an expense by its amount, anything else by its title. */
+function nodeLabel(os: LifeOSContext, id: string): string {
+  const e = os.entities.get(id);
+  if (!e) return 'record';
+  if (e.type === 'transaction') {
+    const d = e.data as { amount?: number; merchant?: string };
+    return `${d.amount ? os.format.currency(d.amount) : 'Expense'}${d.merchant ? ` · ${d.merchant}` : ''}`;
+  }
+  return e.title;
 }
 
 const TRAVEL_KINDS = /^(flight|train|bus|drive|road trip|ferry|cruise|stay|hotel|check.?in|check.?out)$/i;
@@ -301,7 +330,9 @@ export function recordEvent(os: LifeOSContext, s: GraphSession, i: EventInput): 
   };
   const to = placeName('to');
   const at = placeName('at');
-  const title = i.title?.trim() || (kind === 'flight' && to ? `Flight to ${titleCase(to)}` : `${titleCase(kind)}${at ? ` at ${titleCase(at)}` : to ? ` to ${titleCase(to)}` : ''}`);
+  const withNames = roles.filter((r) => r.role === 'with').map((r) => titleCase(typeof r.node === 'string' ? r.node : r.node.name)).filter((n) => !SELF.test(n));
+  const people = withNames.length ? ` with ${withNames.length > 2 ? `${withNames.slice(0, 2).join(', ')} +${withNames.length - 2}` : withNames.join(' and ')}` : '';
+  const title = i.title?.trim() || (kind === 'flight' && to ? `Flight to ${titleCase(to)}` : `${titleCase(kind)}${at ? ` at ${titleCase(at)}` : to ? ` to ${titleCase(to)}` : people}`);
   const cost = typeof i.cost === 'string' ? (parseAmount(i.cost) ?? undefined) : i.cost;
   const details = Object.fromEntries(Object.entries(i.details ?? {}).filter(([k]) => ['airline', 'flightNo', 'location', 'notes'].includes(k)).map(([k, v]) => [k, String(v)]));
   const ev = os.entities.create({ type: 'event', title, data: { kind, startAt, allDay: !hasTime, ...(i.end ? { endAt: dayStart(parseDateish(i.end) ?? day) } : {}), ...(cost ? { cost } : {}), ...details } }, 'assistant');
@@ -362,8 +393,8 @@ export function graphTools(s: GraphSession): AiToolDef[] {
   return [
     {
       name: 'upsert_node',
-      description: 'A person, place, organisation, trip, thing or other record mentioned. Finds the existing one or creates it; optional details go on it. Set is_new when the user says it is new ("made a new friend Kendal").',
-      input: z.object({ name: z.string(), type: z.string().optional().describe('person | place | org | trip | vehicle | asset | … (see record types)'), is_new: z.boolean().optional(), attributes: Attr.optional() }),
+      description: 'A person, place, organisation, trip, thing or other record mentioned. Finds the existing one or creates it; optional details go on it. Not needed for people/places inside record_event roles — those are created there.',
+      input: z.object({ name: z.string(), type: z.string().optional().describe('person | place | org | trip | vehicle | asset | … (see record types)'), is_new: z.boolean().optional().describe('only if the user said it is new'), attributes: Attr.optional() }),
       run: async (input, os) => {
         const i = input as { name: string; type?: string; is_new?: boolean; attributes?: Record<string, unknown> };
         const n = upsertNode(os, s, { name: i.name, type: i.type }, { isNew: i.is_new, attributes: i.attributes });
@@ -467,6 +498,13 @@ export function graphTools(s: GraphSession): AiToolDef[] {
           if (n) link(os, s, tx.id, n.id, 'paid_for');
         }
         for (const w of i.with ?? []) {
+          const r = resolveNode(os, s, w, { type: 'person' });
+          const hit = r.id ? os.entities.get(r.id) : undefined;
+          // "…on the HDFC card" said as "with": it's how it was paid, not who was there.
+          if (hit?.type === 'account') {
+            if (!data.accountId) os.entities.update(tx.id, { data: { accountId: hit.id } }, 'assistant');
+            continue;
+          }
           const n = upsertNode(os, s, w, { type: 'person' });
           if (n) link(os, s, tx.id, n.id, 'with');
         }

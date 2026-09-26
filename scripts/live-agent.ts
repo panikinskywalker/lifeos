@@ -58,7 +58,18 @@ async function main() {
   const os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules, registry: new Registry() });
   os.entities.create({ type: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
   let fellBack = '';
-  const { main } = buildAgentProviders({ chain, events: { onFallback: (a, b, e) => (fellBack += ` [${a}→${b}: ${e.message.slice(0, 120)}]`) } });
+  const built = buildAgentProviders({ chain, events: { onFallback: (a, b, e) => (fellBack += ` [${a}→${b}: ${e.message.slice(0, 120)}]`) } });
+  // LIVE_DEBUG=1 prints every tool call the model makes and what came back.
+  const main: typeof built.main = env.LIVE_DEBUG
+    ? { ...built.main, complete: async (args) => {
+        const r = await built.main.complete(args);
+        for (const b of r.content) if (b.type === 'tool_use') console.log(`      → ${b.name} ${JSON.stringify(b.input)}`);
+        if (!r.content.some((b) => b.type === 'tool_use')) console.log(`      ✎ [${built.main.model ?? '?'}] ${r.content.map((b) => (b.type === 'text' ? b.text : '')).join(' ').replace(/\s+/g, ' ').slice(0, 160)}`);
+        const last = args.messages[args.messages.length - 1]!;
+        if (Array.isArray(last.content)) for (const b of last.content) if (b.type === 'tool_result' && b.is_error) console.log(`      ← error ${b.content.slice(0, 200)}`);
+        return r;
+      } }
+    : built.main;
   console.log(`Chain: ${chain.map((c) => c.kind).join(' → ')}\n`);
   let failures = 0;
   const file1 = async (body: string, subjectId?: string) => {
