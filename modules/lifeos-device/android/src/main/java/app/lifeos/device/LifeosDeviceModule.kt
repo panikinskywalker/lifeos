@@ -15,6 +15,8 @@ import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Health Connect's permission screen as an Expo activity-result contract (input must be Serializable). */
 private class HealthPermissionContract : AppContextActivityResultContract<HashSet<String>, Set<String>> {
@@ -101,6 +103,13 @@ class LifeosDeviceModule : Module() {
     }
 
     /* ---------------- Call log ---------------- */
+
+    // Gmail over IMAP (app password) — read-only; see MailReader.
+    AsyncFunction("mailCheck") Coroutine { email: String, password: String -> withContext(Dispatchers.IO) { MailReader.check(email, password) } }
+    AsyncFunction("mailHeaders") Coroutine { email: String, password: String, sinceMs: Double, afterUid: Double, uidValidity: Double, max: Int ->
+      withContext(Dispatchers.IO) { MailReader.headers(email, password, sinceMs.toLong(), afterUid.toLong(), uidValidity.toLong(), max) }
+    }
+    AsyncFunction("mailBodies") Coroutine { email: String, password: String, uids: List<Double> -> withContext(Dispatchers.IO) { MailReader.bodies(email, password, uids) } }
 
     AsyncFunction("readCallLog") { sinceMs: Double, limit: Int ->
       val out = ArrayList<Map<String, Any?>>()

@@ -141,10 +141,10 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [ ] Contacts: match People by name/phone and fill phone, email, birthday; never bulk-create.
 - [ ] Calendar (on-device): events with their people and places linked; deduped on re-sync.
 - [ ] Call log (dev build): updates each person's last contact and keep-in-touch cycle.
-- [ ] Google sign-in (OAuth, testing mode, token in SecureStore) — Rutvij sets up the Google Cloud client once.
+- [x] ~~Google sign-in (OAuth, testing mode, token in SecureStore) — Rutvij sets up the Google Cloud client once.~~ Gmail accounts by app password instead (decided 26 Sep: no Cloud project, no weekly re-sign-in, any number of accounts). *(IMAP read-only on the phone (`MailReader.kt`, JavaMail); You › Data sources › Gmail adds / syncs / removes accounts; passwords in SecureStore; last 90 days on first sync, then only new mail; synced with the other sources. Needs the new build; phone check pending.)*
 - [x] Gmail: receipts, tickets and bookings only; known senders parsed on the phone (airlines, Uber, Swiggy, Amazon…), the rest via the queue → flights in trips, expenses linked. *(`src/core/ingest/mail.ts` + `ingestMail`: picked from headers alone (promos, statements, people skipped, never downloaded); bank alert mails read like their SMS; receipts → expenses (final total, brand, subscriptions), matched to the SMS for the same payment either way; shipping → deliveries; tickets → a flight in its trip (check-in mails update it); hotel bookings → a stay across its nights. Every record names the mailbox it came from (note, timeline, To check). Mail with no known shape is skipped for now, not sent to the model queue. Phone check pending.)*
-- [ ] Google Calendar: same as the phone calendar, deduped against it.
-- [ ] Drive: titles and text searchable; linked when they mention a person or trip.
+- [x] Google Calendar: same as the phone calendar, deduped against it. *(Decided 26 Sep: not a separate connector — the phone's calendar already syncs every Google account, and the Calendar source reads and dedupes it.)*
+- [ ] Drive: titles and text searchable; linked when they mention a person or trip. *(Not now — 26 Sep.)*
 
 ### M4.2c — Feedback round 1 (26 Sep, from using it on the S22)
 Decisions: foreign spends stored in their currency and converted at that day's rate (INR totals); mutual funds are investments, never spend or bank accounts; 60-day clean-up of ignored messages, raw text of filed messages, per-app screen time and past calendar events; To check auto-approves after 15 days; deliveries are records that update; Health is one page per metric.

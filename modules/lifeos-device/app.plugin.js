@@ -6,9 +6,29 @@
  * (Permissions, the SMS receiver and the notification listener come from the
  * module's own AndroidManifest.)
  */
-const { withAndroidManifest, AndroidConfig } = require('@expo/config-plugins');
+const { withAndroidManifest, withAppBuildGradle, AndroidConfig } = require('@expo/config-plugins');
+
+/** JavaMail's two jars (Gmail over IMAP) both carry the same licence files; keep one. */
+function withMailPackaging(config) {
+  return withAppBuildGradle(config, (cfg) => {
+    if (!cfg.modResults.contents.includes('lifeos-mail-packaging')) {
+      cfg.modResults.contents += `
+// lifeos-mail-packaging
+android {
+    packagingOptions {
+        resources {
+            pickFirsts += ['META-INF/LICENSE.md', 'META-INF/NOTICE.md', 'META-INF/LICENSE.txt', 'META-INF/NOTICE.txt', 'META-INF/mimetypes.default', 'META-INF/mailcap.default', 'META-INF/javamail.providers', 'META-INF/javamail.default.providers', 'META-INF/javamail.default.address.map', 'META-INF/javamail.charset.map']
+        }
+    }
+}
+`;
+    }
+    return cfg;
+  });
+}
 
 module.exports = function withLifeosDevice(config) {
+  config = withMailPackaging(config);
   return withAndroidManifest(config, (cfg) => {
     const app = AndroidConfig.Manifest.getMainApplicationOrThrow(cfg.modResults);
     const main = AndroidConfig.Manifest.getMainActivityOrThrow(cfg.modResults);

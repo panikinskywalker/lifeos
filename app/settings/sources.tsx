@@ -9,6 +9,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Card, Chip, Icon, Screen, Text, useToast } from '@ui/kit';
 import { SOURCES, access, importSmsHistory, requestAccess, syncSources, type Access, type SourceId } from '../../src/platform/sources';
 import { deviceAvailable } from '../../modules/lifeos-device';
+import { mailAccounts, mailAvailable } from '../../src/platform/email';
 
 /**
  * You › Data sources (M4.2): what feeds LifeOS automatically — bank SMS,
@@ -25,6 +26,7 @@ export default function SourcesScreen() {
   const [busy, setBusy] = useState<SourceId | null>(null);
   const [syncing, setSyncing] = useState(false);
   const info = useLive((o) => Object.fromEntries(SOURCES.map((s) => [s.id, sourceState(o, s.id)])), []);
+  const gmail = useLive((o) => mailAccounts(o), []);
   const proposed = useLive((o) => o.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ingest_queue WHERE status='proposed'`)?.n ?? 0, []);
 
   const refresh = useCallback(async () => {
@@ -133,6 +135,28 @@ export default function SourcesScreen() {
             </View>
           );
         })}
+        <View style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Icon name="inbox" size={18} color={gmail.length ? t.c.ok.sageText : t.c.fg.secondary} />
+            <Text variant="rowTitle" style={{ flex: 1 }}>
+              Gmail
+            </Text>
+            <Text variant="labelMicro" color={gmail.length ? t.c.ok.sageText : t.c.fg.secondary} style={{ textTransform: 'uppercase' }}>
+              {!mailAvailable ? 'Needs build' : gmail.length ? `${gmail.length} account${gmail.length === 1 ? '' : 's'}` : 'Off'}
+            </Text>
+          </View>
+          <Text variant="caption" color="secondary">
+            Receipts, tickets, hotel bookings, shipping and bank alerts from your mailboxes — each record says which mailbox it came from. Nothing else is read.
+          </Text>
+          {gmail.length ? (
+            <Text variant="caption" color="secondary">
+              {gmail.map((g) => `${g.email}${g.error ? ' — needs attention' : ''}`).join(' · ')}
+            </Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button title={gmail.length ? 'Accounts' : 'Add a Gmail account'} size="sm" variant={gmail.length ? 'secondary' : 'primary'} icon={gmail.length ? 'list' : 'plus'} disabled={!mailAvailable} onPress={() => router.push('/settings/email' as never)} />
+          </View>
+        </View>
       </View>
     </Screen>
   );

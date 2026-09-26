@@ -7,6 +7,7 @@ import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@core/ingest/fx'
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
 import type { RawMessage } from '@core/ingest/ingest';
+import { syncMail } from './email';
 import { calendarGranted, callLogGranted, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
 
 /**
@@ -199,6 +200,8 @@ export function syncSources(os: LifeOSContext): Promise<void> {
         setSourceState(os, id, { error: (e as Error).message.slice(0, 200) });
       }
     }
+    // Gmail last: a receipt then matches the SMS already filed for it (and the other way round).
+    await syncMail(os).catch(() => {});
   })().finally(() => {
     running = null;
   });
