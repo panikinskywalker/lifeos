@@ -8,7 +8,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, ColumnChart, DeltaChip, EmptyState, HeatMap, RowItem, RowList, Screen, Section, Segmented, Stat, Text } from '@ui/kit';
 
 const PERIOD_WORD: Record<Period, string> = { day: 'yesterday', week: 'the week before', month: 'the 30 days before', year: 'the year before' };
-const TINT = { steps: 'health', sleep: 'memory', screen: 'tasks', spend: 'finance', resting_hr: 'health', weight: 'health' } as const;
+const TINT = { steps: 'health', sleep: 'memory', screen: 'tasks', spend: 'finance', resting_hr: 'health', heart_rate: 'health', weight: 'health' } as const;
 
 /**
  * One metric full screen (M4.3): day / week / month / year, the change vs

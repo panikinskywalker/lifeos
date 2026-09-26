@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useLive, useOS } from '@ui/hooks';
 import { tintForModule } from '@ui/theme/moduleTint';
 import { EmptyState, RowItem, RowList, Screen } from '@ui/kit';
+import { HealthHome } from '../../../src/screens/HealthHome';
 
 /** A module's page: its overview (when it has one) and every record type with a count. */
 export default function ModuleRoute() {
@@ -19,6 +20,8 @@ export default function ModuleRoute() {
       </Screen>
     );
   }
+  // Health is its metrics, one section each — not a list of record types.
+  if (m.id === 'health') return <HealthHome />;
   const tint = tintForModule(m.id);
   const types = os.registry.typesForModule(m.id).filter((x) => !x.hidden);
   const hasHome = m.screens?.some((s) => s.key === 'index');

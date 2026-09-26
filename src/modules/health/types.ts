@@ -27,6 +27,8 @@ export const workoutType: EntityTypeDef<WorkoutData> = {
 export interface MeasurementData { metric: string; value: number; unit?: string; date: string; notes?: string; source?: string; sourceKey?: string }
 export const measurementType: EntityTypeDef<MeasurementData> = {
   type: 'measurement', module: 'health', label: 'Measurement', labelPlural: 'Measurements', icon: 'scalemass',
+  // Shown as its metrics (Steps, Sleep, Weight…) on the Health page, not as a category of its own.
+  hidden: true,
   schema: z.object({ metric: z.string(), value: z.coerce.number(), unit: z.string().optional(), date: z.string(), notes: z.string().optional(), source: z.string().optional(), sourceKey: z.string().optional() }),
   fields: [
     { key: 'metric', label: 'Metric', type: 'select', required: true, summary: true, options: [{ value: 'weight', label: 'Weight' }, { value: 'sleep', label: 'Sleep (hours)' }, { value: 'steps', label: 'Steps' }, { value: 'resting_hr', label: 'Resting heart rate' }, { value: 'heart_rate', label: 'Heart rate (avg)' }, { value: 'water', label: 'Water (L)' }, { value: 'mood', label: 'Mood (1-5)' }, { value: 'other', label: 'Other' }] },

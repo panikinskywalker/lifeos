@@ -9,7 +9,7 @@ import { upkeep } from '../cycles/upkeep';
  * made-up number.
  */
 
-export type MetricId = 'steps' | 'sleep' | 'screen' | 'spend' | 'resting_hr' | 'weight';
+export type MetricId = 'steps' | 'sleep' | 'screen' | 'spend' | 'resting_hr' | 'heart_rate' | 'weight';
 export type Period = 'day' | 'week' | 'month' | 'year';
 
 export interface MetricDef {
@@ -31,6 +31,7 @@ export const METRICS: Record<MetricId, MetricDef> = {
   screen: { id: 'screen', label: 'Screen time', unit: 'h', agg: 'avg', source: 'usage', better: 'down', decimals: 1 },
   spend: { id: 'spend', label: 'Spend', unit: '₹', agg: 'sum', source: 'money', better: 'down', decimals: 0 },
   resting_hr: { id: 'resting_hr', label: 'Resting heart rate', unit: 'bpm', agg: 'avg', source: 'health', better: 'down', decimals: 0 },
+  heart_rate: { id: 'heart_rate', label: 'Heart rate', unit: 'bpm', agg: 'avg', source: 'health', better: 'none', decimals: 0 },
   weight: { id: 'weight', label: 'Weight', unit: 'kg', agg: 'last', source: 'health', better: 'none', decimals: 1 },
 };
 
