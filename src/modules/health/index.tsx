@@ -10,42 +10,9 @@ import { Card, SectionHeader, Stat, Text } from '@ui/components/primitives';
 import { Bars, Sparkline } from '@ui/components/charts';
 
 export const HEALTH_COLOR = palette.red;
+import { measurementType, workoutType, type MeasurementData, type WorkoutData } from './types';
+export { measurementType, workoutType, type MeasurementData, type WorkoutData };
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-export interface WorkoutData { kind: string; durationMin: number; date: string; distanceKm?: number; calories?: number; intensity?: string; notes?: string }
-export const workoutType: EntityTypeDef<WorkoutData> = {
-  type: 'workout', module: 'health', label: 'Workout', labelPlural: 'Workouts', icon: 'figure.run',
-  schema: z.object({ kind: z.string(), durationMin: z.coerce.number().positive(), date: z.string(), distanceKm: z.coerce.number().optional(), calories: z.coerce.number().optional(), intensity: z.string().optional(), notes: z.string().optional() }),
-  fields: [
-    { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [{ value: 'run', label: 'Run' }, { value: 'walk', label: 'Walk' }, { value: 'cycle', label: 'Cycling' }, { value: 'strength', label: 'Strength' }, { value: 'yoga', label: 'Yoga' }, { value: 'swim', label: 'Swim' }, { value: 'sport', label: 'Sport' }, { value: 'other', label: 'Other' }] },
-    { key: 'durationMin', label: 'Duration (min)', type: 'number', required: true, summary: true },
-    { key: 'date', label: 'Date', type: 'date', required: true, defaultValue: () => iso(new Date()) },
-    { key: 'distanceKm', label: 'Distance (km)', type: 'number', section: 'Details' },
-    { key: 'calories', label: 'Calories', type: 'number', section: 'Details' },
-    { key: 'intensity', label: 'Intensity', type: 'select', section: 'Details', options: [{ value: 'easy', label: 'Easy' }, { value: 'moderate', label: 'Moderate' }, { value: 'hard', label: 'Hard' }] },
-    { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
-  ],
-  indexed: ['date', 'kind'], occurredAtField: 'date',
-  computeTitle: (d) => ({ run: 'Run', walk: 'Walk', cycle: 'Cycling', strength: 'Strength', yoga: 'Yoga', swim: 'Swim', sport: 'Sport', other: 'Workout' })[d.kind] ?? 'Workout',
-  computeSubtitle: (d) => `${d.durationMin} min${d.distanceKm ? ` · ${d.distanceKm} km` : ''}`,
-};
-
-export interface MeasurementData { metric: string; value: number; unit?: string; date: string; notes?: string }
-export const measurementType: EntityTypeDef<MeasurementData> = {
-  type: 'measurement', module: 'health', label: 'Measurement', labelPlural: 'Measurements', icon: 'scalemass',
-  schema: z.object({ metric: z.string(), value: z.coerce.number(), unit: z.string().optional(), date: z.string(), notes: z.string().optional() }),
-  fields: [
-    { key: 'metric', label: 'Metric', type: 'select', required: true, summary: true, options: [{ value: 'weight', label: 'Weight' }, { value: 'sleep', label: 'Sleep (hours)' }, { value: 'steps', label: 'Steps' }, { value: 'resting_hr', label: 'Resting heart rate' }, { value: 'water', label: 'Water (L)' }, { value: 'mood', label: 'Mood (1-5)' }, { value: 'other', label: 'Other' }] },
-    { key: 'value', label: 'Value', type: 'number', required: true },
-    { key: 'unit', label: 'Unit', type: 'text' },
-    { key: 'date', label: 'Date', type: 'date', required: true, defaultValue: () => iso(new Date()) },
-    { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
-  ],
-  indexed: ['metric', 'date'], occurredAtField: 'date',
-  computeTitle: (d) => ({ weight: 'Weight', sleep: 'Sleep', steps: 'Steps', resting_hr: 'Resting HR', water: 'Water', mood: 'Mood', other: 'Measurement' })[d.metric] ?? d.metric,
-  computeSubtitle: (d) => `${d.value}${d.unit ? ` ${d.unit}` : ''}`,
-};
-
 function ActivityWidget({ size }: WidgetProps) {
   const router = useRouter();
   const weeks = useLive((os) => {

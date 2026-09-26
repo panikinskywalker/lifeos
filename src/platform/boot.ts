@@ -10,6 +10,7 @@ import { notifications } from './notifications';
 import { openDatabase } from './openDatabase';
 import { cycleNudges } from '@core/cycles/nudges';
 import { runDumpExtraction } from './dumpExtraction';
+import { listenLive, syncSources } from './sources';
 
 let instance: LifeOSContext | null = null;
 let navigateRef: (path: string) => void = () => {};
@@ -87,11 +88,15 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   bus.on('app.foreground', resync);
   // Dumps saved offline or before a key was added get extracted now.
   bus.on('app.foreground', () => void runDumpExtraction(os));
+  // Phone data (bank SMS, payment notifications, screen time, Health Connect): on every foreground and live.
+  bus.on('app.foreground', () => void syncSources(os));
+  listenLive(os);
 
   // Run any due scheduled jobs now, then hand off to the background task.
   await os.scheduler.tick();
   registerBackgroundTick(os);
   void runDumpExtraction(os);
+  void syncSources(os);
 
   instance = os;
   return os;

@@ -3,6 +3,7 @@ import * as TaskManager from 'expo-task-manager';
 import * as BackgroundTask from 'expo-background-task';
 import type { LifeOSContext } from '@core/registry/context';
 import { runDumpExtraction } from './dumpExtraction';
+import { syncSources } from './sources';
 
 const TASK = 'lifeos-scheduler-tick';
 let osRef: LifeOSContext | null = null;
@@ -12,6 +13,7 @@ TaskManager.defineTask(TASK, async () => {
   try {
     if (osRef) {
       await osRef.scheduler.tick();
+      await syncSources(osRef);
       await runDumpExtraction(osRef);
     }
     return BackgroundTask.BackgroundTaskResult.Success;
