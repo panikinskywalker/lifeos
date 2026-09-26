@@ -120,6 +120,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 
 ### M4.1c — Never lose a thing: the filing queue (26 Sep)
 **Why:** free tiers run out (Groq 200k tokens/day, Gemini per-minute and daily quotas, 503 spikes). Today a dump that can't be filed is retried for ~20 minutes then marked failed; a half-filed dump stays half-filed; a question just errors. Decisions (26 Sep): on-phone answer + queued full answer for questions; the parser files what it can right away; queued filings surface only through the bell.
+- [ ] Search covers everything: record Notes (comments), tags and attachment names go into the same index; existing ones backfilled once.
 - [ ] Waiting ≠ failed: rate limits, quota, 503 and offline put a dump in *Waiting to file* (with why and roughly when) and never count toward giving up; only bad model output does. Dumps never end up failed for lack of a provider.
 - [ ] Provider limits remembered: "try again in 7h" / daily quota / cooldowns stored per provider (and per model); the queue skips a provider until then and wakes at the earliest free time (foreground, background task, timer).
 - [ ] Resume, don't restart: filing progress per chunk, so a dump cut off halfway continues from the next chunk; the model is told what's already filed.
@@ -133,6 +134,17 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [ ] **SMS reader** (native module, `READ_SMS` + `RECEIVE_SMS`): sender discovery (DLT-style headers, bank/card keywords) → You › Data sources › SMS with tick-boxes; parsers per bank (HDFC, ICICI, SBI, Axis, Kotak, Amex, plus generic) with fixtures in tests; every parse stores raw text + parsed fields; first-run **history import** with review screen and bulk confirm; live `RECEIVE_SMS` → transaction within seconds; dedupe with notifications by amount + 10-min window.
 - [ ] **Notification listener** (from old M5) as the second source; same ingest queue and review UI.
 - [ ] You › Data sources: one screen showing each source, its permission state, last sync, count today.
+
+### M4.2b — Connectors: phone + Google (26 Sep)
+**Why:** Jarvis should know what your phone and Google already know. Every source plugs into one framework (source → filing queue → identity resolution → graph → To check); deterministic parsers first, free models through the queue for the rest.
+- [ ] Connector framework: a `Connector` contract (id, permissions, sync(since) → items), per-source state (enabled, last sync, count, error) and You › Connected sources.
+- [ ] Contacts: match People by name/phone and fill phone, email, birthday; never bulk-create.
+- [ ] Calendar (on-device): events with their people and places linked; deduped on re-sync.
+- [ ] Call log (dev build): updates each person's last contact and keep-in-touch cycle.
+- [ ] Google sign-in (OAuth, testing mode, token in SecureStore) — Rutvij sets up the Google Cloud client once.
+- [ ] Gmail: receipts, tickets and bookings only; known senders parsed on the phone (airlines, Uber, Swiggy, Amazon…), the rest via the queue → flights in trips, expenses linked.
+- [ ] Google Calendar: same as the phone calendar, deduped against it.
+- [ ] Drive: titles and text searchable; linked when they mention a person or trip.
 
 ### M4.3 — Today as a dashboard
 - [ ] Chart components on the design tokens: Sparkline, Bars (daily/weekly), Ring, StackedBar (exists), HeatMap (habits/steps), Comparison ("vs. yesterday" delta chip). Built with react-native-svg; no chart library that pulls in web deps.
