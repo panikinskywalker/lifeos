@@ -197,6 +197,10 @@ export interface Relation {
   kind: string;
   meta: Record<string, unknown>;
   createdAt: number;
+  /** Where the link came from (docs/GRAPH.md): dump, record-voice, manual, sms, assistant. */
+  source?: string | null;
+  sourceId?: string | null;
+  confidence?: number;
 }
 
 export interface TimelineEvent {

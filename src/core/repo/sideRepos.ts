@@ -6,6 +6,7 @@ import { safeJson } from './entityRepo';
 import { TimelineRepo } from './timelineRepo';
 import { ChangeLog } from '../sync/changeLog';
 import { nextOccurrence } from '../automation/recurrence';
+import type { Provenance } from '../graph/edges';
 
 /* ------------------------------------------------------------------ */
 /* Relations — typed, bidirectional edges between any two entities     */
@@ -14,21 +15,22 @@ import { nextOccurrence } from '../automation/recurrence';
 export class RelationRepo {
   constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
 
-  link(fromId: string, toId: string, kind: string, meta: Record<string, unknown> = {}, actor: Actor = 'user'): Relation {
+  link(fromId: string, toId: string, kind: string, meta: Record<string, unknown> = {}, actor: Actor = 'user', prov: Provenance = {}): Relation {
     const now = Date.now();
     const existing = this.db.get<Row>(`SELECT * FROM relations WHERE from_id=? AND to_id=? AND kind=?`, [fromId, toId, kind]);
     if (existing && !existing.deleted_at) return toRelation(existing);
     const id = existing ? (existing.id as string) : newId(now);
     this.db.transaction(() => {
-      if (existing) this.db.run(`UPDATE relations SET deleted_at=NULL, meta=?, version=version+1 WHERE id=?`, [JSON.stringify(meta), id]);
-      else this.db.run(`INSERT INTO relations(id,from_id,to_id,kind,meta,created_at) VALUES (?,?,?,?,?,?)`, [id, fromId, toId, kind, JSON.stringify(meta), now]);
+      const p = [prov.source ?? (actor === 'assistant' ? 'assistant' : 'manual'), prov.sourceId ?? null, prov.confidence ?? 1, prov.validFrom ?? null, prov.validTo ?? null];
+      if (existing) this.db.run(`UPDATE relations SET deleted_at=NULL, meta=?, source=?, source_id=?, confidence=?, valid_from=?, valid_to=?, version=version+1 WHERE id=?`, [JSON.stringify(meta), ...p, id]);
+      else this.db.run(`INSERT INTO relations(id,from_id,to_id,kind,meta,created_at,source,source_id,confidence,valid_from,valid_to) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, [id, fromId, toId, kind, JSON.stringify(meta), now, ...p]);
       this.changes.record('relations', id, existing ? 'update' : 'insert', 1);
       const to = this.db.get<{ title: string }>(`SELECT title FROM entities WHERE id=?`, [toId]);
       const from = this.db.get<{ title: string }>(`SELECT title FROM entities WHERE id=?`, [fromId]);
       this.timeline.add({ entityId: fromId, kind: 'relation', title: `Linked to ${to?.title ?? 'record'}`, actor, occurredAt: now, meta: { kind, toId } });
       this.timeline.add({ entityId: toId, kind: 'relation', title: `Linked from ${from?.title ?? 'record'}`, actor, occurredAt: now, meta: { kind, fromId } });
     });
-    const rel: Relation = { id, fromId, toId, kind, meta, createdAt: now };
+    const rel: Relation = { id, fromId, toId, kind, meta, createdAt: now, source: prov.source ?? null, sourceId: prov.sourceId ?? null, confidence: prov.confidence ?? 1 };
     bus.emit('relation.added', { relation: rel, actor });
     return rel;
   }
@@ -55,6 +57,20 @@ export class RelationRepo {
   }
 
   /** Ids of entities linked from `id` with a given kind (e.g. transaction → account). */
+  get(id: string): Relation | null {
+    const r = this.db.get<Row>(`SELECT * FROM relations WHERE id=?`, [id]);
+    return r ? toRelation(r) : null;
+  }
+
+  /** Remove one edge by id (cancelling an agent's link). */
+  remove(id: string, actor: Actor = 'user') {
+    const r = this.db.get<Row>(`SELECT * FROM relations WHERE id=? AND deleted_at IS NULL`, [id]);
+    if (!r) return;
+    this.db.run(`UPDATE relations SET deleted_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
+    this.changes.record('relations', id, 'delete', 1);
+    bus.emit('relation.removed', { relation: toRelation(r), actor });
+  }
+
   targets(id: string, kind: string): string[] {
     return this.db.all<{ to_id: string }>(`SELECT to_id FROM relations WHERE from_id=? AND kind=? AND deleted_at IS NULL`, [id, kind]).map((r) => r.to_id);
   }
@@ -64,7 +80,7 @@ export class RelationRepo {
 }
 
 function toRelation(r: Row): Relation {
-  return { id: r.id as string, fromId: r.from_id as string, toId: r.to_id as string, kind: r.kind as string, meta: safeJson(r.meta as string), createdAt: r.created_at as number };
+  return { id: r.id as string, fromId: r.from_id as string, toId: r.to_id as string, kind: r.kind as string, meta: safeJson(r.meta as string), createdAt: r.created_at as number, source: (r.source as string | null) ?? null, sourceId: (r.source_id as string | null) ?? null, confidence: (r.confidence as number | undefined) ?? 1 };
 }
 
 /* ------------------------------------------------------------------ */

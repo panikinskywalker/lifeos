@@ -13,6 +13,7 @@ const MODULE_TINT: Record<string, TintKey> = {
   knowledge: 'memory',
   travel: 'travel',
   documents: 'documents',
+  places: 'travel',
 };
 
 export function tintForModule(moduleId: string | undefined): TintKey {
@@ -28,6 +29,7 @@ const MODULE_SHORT: Record<string, string> = {
   knowledge: 'Notes',
   assets: 'Things',
   inventory: 'Inventory',
+  places: 'Places',
 };
 
 export function shortNameForModule(moduleId: string, fallback: string): string {

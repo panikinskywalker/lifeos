@@ -100,6 +100,8 @@ export const goalType: EntityTypeDef<GoalData> = {
 };
 
 export interface EventData {
+  /** Free label: flight, dinner, meeting, concert, hike… (docs/GRAPH.md — any activity is an event with a kind). */
+  kind?: string;
   startAt: number;
   endAt?: number;
   location?: string;
@@ -107,6 +109,9 @@ export interface EventData {
   allDay?: boolean;
   personIds?: string[];
   tripId?: string;
+  airline?: string;
+  flightNo?: string;
+  cost?: number;
 }
 
 export const eventType: EntityTypeDef<EventData> = {
@@ -116,19 +121,24 @@ export const eventType: EntityTypeDef<EventData> = {
   labelPlural: 'Events',
   icon: 'calendar',
   color: palette.red,
-  schema: z.object({ startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), tripId: z.string().optional() }),
+  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), tripId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional() }),
   fields: [
+    { key: 'kind', label: 'Kind', type: 'text', summary: true, placeholder: 'flight, dinner, meeting, concert…' },
     { key: 'startAt', label: 'Starts', type: 'datetime', required: true, defaultValue: () => Date.now() + 3600000 },
     { key: 'endAt', label: 'Ends', type: 'datetime' },
     { key: 'allDay', label: 'All day', type: 'boolean' },
     { key: 'location', label: 'Location', type: 'text', summary: true },
     { key: 'personIds', label: 'People', type: 'relation', relationTo: 'person', relationKind: 'person', section: 'Links', defaultValue: [] },
     { key: 'tripId', label: 'Trip', type: 'relation', relationTo: 'trip', relationKind: 'trip', section: 'Links' },
+    { key: 'airline', label: 'Airline', type: 'text', section: 'Travel' },
+    { key: 'flightNo', label: 'Flight no.', type: 'text', section: 'Travel' },
+    { key: 'cost', label: 'Cost', type: 'currency', section: 'Details' },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
+  computeSubtitle: (d) => [d.kind && d.kind !== 'event' ? d.kind.charAt(0).toUpperCase() + d.kind.slice(1) : null, d.airline, d.flightNo, d.location].filter(Boolean).join(' · ') || undefined,
   occurredAtField: 'startAt',
   indexed: ['startAt'],
-  searchText: (d) => [d.location, d.notes].filter(Boolean).join(' '),
+  searchText: (d) => [d.kind, d.location, d.airline, d.flightNo, d.notes].filter(Boolean).join(' '),
   defaultViews: [{ name: 'Upcoming', definition: { filter: { and: [{ field: 'occurredAt', op: 'gte', value: '__TODAY__' }] }, sort: [{ field: 'occurredAt', dir: 'asc' }], groupBy: 'day' } }],
 };
 

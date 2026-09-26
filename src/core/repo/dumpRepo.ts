@@ -15,6 +15,8 @@ export interface Dump {
   attempts: number;
   extractedAt: number | null;
   error: string | null;
+  /** Said on a record's page: files into this record. */
+  subjectId: string | null;
 }
 
 export interface Extraction {
@@ -28,6 +30,13 @@ export interface Extraction {
   label: string;
   undone: boolean;
   createdAt: number;
+  relationId: string | null;
+  /** What this write replaced ({ field: old value } / { notes: old text }) — cancel restores it. */
+  before: Record<string, unknown> | null;
+  confidence: number;
+  /** Why it needs a look ("guessed which Kendal", "possible duplicate"). */
+  flag: string | null;
+  checked: boolean;
 }
 
 const toDump = (r: Row): Dump => ({
@@ -39,6 +48,7 @@ const toDump = (r: Row): Dump => ({
   attempts: r.attempts as number,
   extractedAt: (r.extracted_at as number | null) ?? null,
   error: (r.error as string | null) ?? null,
+  subjectId: (r.subject_id as string | null) ?? null,
 });
 
 const toExtraction = (r: Row): Extraction => ({
@@ -51,6 +61,11 @@ const toExtraction = (r: Row): Extraction => ({
   label: r.label as string,
   undone: r.undone === 1,
   createdAt: r.created_at as number,
+  relationId: (r.relation_id as string | null) ?? null,
+  before: r.before ? (JSON.parse(r.before as string) as Record<string, unknown>) : null,
+  confidence: (r.confidence as number | undefined) ?? 1,
+  flag: (r.flag as string | null) ?? null,
+  checked: r.checked === 1,
 });
 
 /**
@@ -61,12 +76,12 @@ const toExtraction = (r: Row): Extraction => ({
 export class DumpRepo {
   constructor(private db: DatabaseAdapter, private changes: ChangeLog) {}
 
-  add(d: { body: string; source?: DumpSource; createdAt?: number }): Dump {
+  add(d: { body: string; source?: DumpSource; createdAt?: number; subjectId?: string | null }): Dump {
     if (!d.body.trim()) throw new Error('A dump needs some text');
     const now = d.createdAt ?? Date.now();
     const id = newId(now);
     this.db.transaction(() => {
-      this.db.run(`INSERT INTO dumps(id,body,source,created_at) VALUES (?,?,?,?)`, [id, d.body, d.source ?? 'typed', now]);
+      this.db.run(`INSERT INTO dumps(id,body,source,created_at,subject_id) VALUES (?,?,?,?,?)`, [id, d.body, d.source ?? 'typed', now, d.subjectId ?? null]);
       this.changes.record('dumps', id, 'insert', 1);
       this.index(id, d.body);
     });
@@ -110,20 +125,42 @@ export class DumpRepo {
     bus.emit('data.changed', { table: 'dumps', id });
   }
 
-  addExtraction(x: { dumpId: string; kind: string; action?: Extraction['action']; entityId?: string | null; factId?: string | null; label: string }): Extraction {
+  addExtraction(x: { dumpId: string; kind: string; action?: Extraction['action']; entityId?: string | null; factId?: string | null; relationId?: string | null; label: string; before?: Record<string, unknown> | null; confidence?: number; flag?: string | null }): Extraction {
     const id = newId();
-    this.db.run(`INSERT INTO dump_extractions(id,dump_id,kind,action,entity_id,fact_id,label,created_at) VALUES (?,?,?,?,?,?,?,?)`, [
+    this.db.run(`INSERT INTO dump_extractions(id,dump_id,kind,action,entity_id,fact_id,relation_id,label,before,confidence,flag,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, [
       id,
       x.dumpId,
       x.kind,
       x.action ?? 'created',
       x.entityId ?? null,
       x.factId ?? null,
+      x.relationId ?? null,
       x.label,
+      x.before ? JSON.stringify(x.before) : null,
+      x.confidence ?? 1,
+      x.flag ?? null,
       Date.now(),
     ]);
     bus.emit('data.changed', { table: 'dumps', id: x.dumpId });
     return this.extraction(id)!;
+  }
+
+  /** The To check list: everything filed and not yet ticked or cancelled, flagged guesses first. */
+  toCheck(limit = 200): Extraction[] {
+    return this.db
+      .all<Row>(`SELECT * FROM dump_extractions WHERE checked=0 AND undone=0 ORDER BY (flag IS NULL), created_at DESC, rowid DESC LIMIT ?`, [limit])
+      .map(toExtraction);
+  }
+
+  toCheckCount(): number {
+    return this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM dump_extractions WHERE checked=0 AND undone=0`)?.n ?? 0;
+  }
+
+  setChecked(ids: string | string[], checked = true) {
+    const list = Array.isArray(ids) ? ids : [ids];
+    if (!list.length) return;
+    this.db.run(`UPDATE dump_extractions SET checked=? WHERE id IN (${list.map(() => '?').join(',')})`, [checked ? 1 : 0, ...list]);
+    bus.emit('data.changed', { table: 'dumps', id: list[0]! });
   }
 
   extraction(id: string): Extraction | null {

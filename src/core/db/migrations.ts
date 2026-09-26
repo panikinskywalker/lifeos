@@ -498,5 +498,30 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_facts_key ON facts(subject_key, active)`,
       `CREATE INDEX IF NOT EXISTS idx_facts_recent ON facts(active, stated_at DESC)`,
     ],
+  },  {
+    version: 7,
+    name: 'life-graph',
+    up: [
+      // Links become the graph's edges (docs/GRAPH.md): where each came from
+      // (a dump, a record page, SMS, you), how sure the agent was, and when
+      // it holds ("worked at Zomato until 2025").
+      `ALTER TABLE relations ADD COLUMN source TEXT`,
+      `ALTER TABLE relations ADD COLUMN source_id TEXT`,
+      `ALTER TABLE relations ADD COLUMN confidence REAL NOT NULL DEFAULT 1`,
+      `ALTER TABLE relations ADD COLUMN valid_from INTEGER`,
+      `ALTER TABLE relations ADD COLUMN valid_to INTEGER`,
+      `CREATE INDEX IF NOT EXISTS idx_relations_source ON relations(source_id)`,
+      // Speaking on a record's page files into that record.
+      `ALTER TABLE dumps ADD COLUMN subject_id TEXT`,
+      // The To check log: every write the agent made from a dump, with what it
+      // replaced (so cancel reverses exactly that, even after a restart), how
+      // sure it was, and whether you've ticked it.
+      `ALTER TABLE dump_extractions ADD COLUMN relation_id TEXT`,
+      `ALTER TABLE dump_extractions ADD COLUMN before TEXT`,
+      `ALTER TABLE dump_extractions ADD COLUMN confidence REAL NOT NULL DEFAULT 1`,
+      `ALTER TABLE dump_extractions ADD COLUMN flag TEXT`,
+      `ALTER TABLE dump_extractions ADD COLUMN checked INTEGER NOT NULL DEFAULT 0`,
+      `CREATE INDEX IF NOT EXISTS idx_dump_extractions_check ON dump_extractions(checked, undone, created_at DESC)`,
+    ],
   },
 ];
