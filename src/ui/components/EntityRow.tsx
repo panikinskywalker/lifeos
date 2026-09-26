@@ -2,7 +2,8 @@ import React from 'react';
 import { useRouter } from 'expo-router';
 import type { Entity } from '@core/domain/types';
 import { useOS } from '../hooks';
-import { RowItem } from '../kit';
+import { RowItem, useToast } from '../kit';
+import { SwipeToDelete } from './SwipeToDelete';
 import { tintForModule } from '../theme/moduleTint';
 
 /**
@@ -10,9 +11,10 @@ import { tintForModule } from '../theme/moduleTint';
  * from summary fields, amount on the right when the type has a currency
  * field, and a status chip when the record is past its first status.
  */
-export function EntityRow({ entity, onPress, showType, value, subtitle }: { entity: Entity; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null }) {
+export function EntityRow({ entity, onPress, showType, value, subtitle, swipe = true }: { entity: Entity; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null; /** Swipe left to delete (with Undo). */ swipe?: boolean }) {
   const os = useOS();
   const router = useRouter();
+  const toast = useToast();
   const def = os.registry.entityTypes.get(entity.type);
   const tint = tintForModule(def?.module);
   const currencyField = def?.fields.find((f) => f.type === 'currency');
@@ -42,7 +44,7 @@ export function EntityRow({ entity, onPress, showType, value, subtitle }: { enti
   const money = amount != null ? os.format.currency(amount, (entity.data.currency as string) || undefined) : null;
   const shownValue = value !== undefined ? value : money != null ? `${kind === 'expense' ? '−' : kind === 'income' ? '+' : ''}${money}` : undefined;
   const status = statusDef && def?.statuses && def.statuses.length > 1 && statusDef.value !== def.statuses[0]!.value ? statusDef.label : null;
-  return (
+  const row = (
     <RowItem
       title={entity.title}
       subtitle={[showType ? def?.label : null, status, sub].filter(Boolean).join(' · ') || null}
@@ -56,4 +58,10 @@ export function EntityRow({ entity, onPress, showType, value, subtitle }: { enti
       onPress={onPress ?? (() => router.push(`/entity/${entity.type}/${entity.id}`))}
     />
   );
+  if (!swipe) return row;
+  const remove = () => {
+    os.entities.delete(entity.id);
+    toast.show({ message: `Deleted ${entity.title}`, icon: 'trash', undo: () => os.entities.restore(entity.id) });
+  };
+  return <SwipeToDelete onDelete={remove}>{row}</SwipeToDelete>;
 }

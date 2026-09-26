@@ -44,12 +44,25 @@ describe('calendar and call log', () => {
   it('calendar events are saved once, updated in place, linked to people already in LifeOS', () => {
     importContacts(os, [kendalContact]);
     const ev = { id: 'e1', title: 'Dinner', start: Date.parse('2026-09-28T20:00:00'), location: 'Toit', attendees: [{ email: 'KENDAL@example.com' }, { name: 'Stranger' }] };
-    expect(saveCalendarEvents(os, [ev])).toEqual({ created: 1, updated: 0 });
-    expect(saveCalendarEvents(os, [{ ...ev, title: 'Dinner with Kendal' }])).toEqual({ created: 0, updated: 1 });
+    expect(saveCalendarEvents(os, [ev])).toEqual({ created: 1, updated: 0, merged: 0 });
+    expect(saveCalendarEvents(os, [{ ...ev, location: 'Toit, Indiranagar' }])).toEqual({ created: 0, updated: 1, merged: 0 });
     const [e] = os.entities.query('event');
-    expect(e).toMatchObject({ title: 'Dinner with Kendal', data: { location: 'Toit', source: 'calendar' } });
+    expect(e).toMatchObject({ title: 'Dinner', data: { location: 'Toit, Indiranagar', source: 'calendar' } });
     expect(os.relations.forEntity(e!.id).map((r) => r.other.title)).toEqual(['Kendal Rao']);
     expect(os.entities.query('person')).toHaveLength(1);
+  });
+
+  it('the same event in 4 calendars (4 accounts) is one event; duplicates already synced are merged', () => {
+    importContacts(os, [kendalContact]);
+    const start = Date.parse('2026-09-28T20:00:00');
+    const copies = ['personal', 'work', 'family', 'shared'].map((acc, i) => ({ id: `${acc}-1`, title: i % 2 ? 'Dinner  with Kendal' : 'dinner with kendal', start, end: start + 7_200_000, attendees: i === 3 ? [{ email: 'kendal@example.com' }] : [] }));
+    expect(saveCalendarEvents(os, copies)).toMatchObject({ created: 1 });
+    const [e] = os.entities.query('event');
+    expect(os.relations.forEntity(e!.id).map((r) => r.other.title)).toEqual(['Kendal Rao']);
+    // Duplicates from before this fix (one per calendar, old keys) are merged on the next sync.
+    for (const i of [1, 2, 3]) os.entities.create({ type: 'event', title: 'Standup', data: { kind: 'event', startAt: start + 86_400_000, endAt: start + 86_400_000 + 900_000, source: 'calendar', sourceKey: `cal:old-${i}` } });
+    expect(saveCalendarEvents(os, [])).toMatchObject({ merged: 2 });
+    expect(os.entities.query('event').filter((x) => x.title === 'Standup')).toHaveLength(1);
   });
 
   it('a call moves last contact (missed calls and strangers don\'t)', () => {
