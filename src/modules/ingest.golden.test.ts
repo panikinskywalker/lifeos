@@ -360,4 +360,32 @@ describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox
     expect(os.entities.query('event')).toHaveLength(1);
     expect(os.entities.query('trip')).toHaveLength(1);
   });
+
+  it('learning: by payee (any name the bank uses), offers to fix the earlier ones, never learns a person; dumps use it too', async () => {
+    const { recategorise } = await import('@core/ingest/ingest');
+    os.registry.entityTypes.set('org', (await import('./places/types')).orgType as never);
+    const learned: Array<{ payee: string; others: string[] }> = [];
+    const off = bus.on('category.learned', (e) => void learned.push({ payee: e.payee, others: e.others }));
+    const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: at + dt });
+    send('Sent Rs.180.00 From HDFC Bank A/C *1234 To SHARMA GENERAL STORES On 20/09/26', 0);
+    send('Sent Rs.220.00 From HDFC Bank A/C *1234 To SHARMA GENERAL STORES On 21/09/26', 86_400_000);
+    const first = txs().find((t) => t.data.amount === 180)!;
+    // You set one to Groceries: learned for the payee, and the other one is offered.
+    os.entities.update(first.id, { data: { category: 'groceries' } }, 'user');
+    expect(learned).toHaveLength(1);
+    expect(learned[0]!.others).toHaveLength(1);
+    expect(recategorise(os, learned[0]!.others, 'groceries')).toHaveLength(1);
+    // The bank names it differently next time ("CANOE"): same payee record, so Groceries.
+    send('Sent Rs.90.00 From HDFC Bank A/C *1234 To SHARMA GENERAL On 25/09/26', 5 * 86_400_000);
+    expect(txs().find((t) => t.data.amount === 90)!.data.category).toBe('groceries');
+    // A person: recategorising Arjun's money doesn't make all his money that category.
+    const arjun = os.entities.create({ type: 'person', title: 'Arjun Mehta', data: { upi: 'arjun.m@okaxis' } });
+    void arjun;
+    send('Rs.500.00 credited to HDFC Bank A/c XX1234 on 22-09-26 from VPA arjun.m@okaxis (UPI 426912345601)', 2 * 86_400_000);
+    const fromArjun = txs().find((t) => t.data.amount === 500)!;
+    os.entities.update(fromArjun.id, { data: { category: 'gifts' } }, 'user');
+    send('Rs.700.00 credited to HDFC Bank A/c XX1234 on 26-09-26 from VPA arjun.m@okaxis (UPI 426912345602)', 6 * 86_400_000);
+    expect(txs().find((t) => t.data.amount === 700)!.data.category).not.toBe('gifts');
+    off();
+  });
 });

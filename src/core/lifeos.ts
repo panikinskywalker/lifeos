@@ -19,7 +19,7 @@ import { bus } from './events/bus';
 import { coreModule } from './coreModule';
 import type { Entity } from './domain/types';
 import { resolveLink, syncMentions } from './links';
-import { learnCategory } from './ingest/ingest';
+import { learnCategory, payeeOf } from './ingest/ingest';
 import { linkMissingPayees } from './ingest/payee';
 
 export interface LifeOSOptions {
@@ -110,7 +110,8 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
       if (f.type !== 'relation' || !f.relationKind) continue;
       const raw = (entity.data as Record<string, unknown>)[f.key];
       const want = new Set((Array.isArray(raw) ? raw : raw ? [raw] : []).map(String).filter(Boolean));
-      const have = new Set(ctx.relations.targets(entity.id, f.relationKind));
+      // Only links the field made: a payment's payer (linked from the SMS, with what it called them) isn't the field's to remove.
+      const have = new Set(ctx.relations.forEntity(entity.id, f.relationKind).filter((r) => r.direction === 'out' && !('as' in r.relation.meta)).map((r) => r.other.id));
       for (const id of want) if (!have.has(id)) ctx.relations.link(entity.id, id, f.relationKind, {}, actor);
       for (const id of have) if (!want.has(id)) ctx.relations.unlink(entity.id, id, f.relationKind, actor);
     }
@@ -250,7 +251,10 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   bus.on('entity.updated', ({ entity, previous, actor }) => {
     if (actor !== 'user' || entity.type !== 'transaction') return;
     const d = entity.data as { category?: string; merchant?: string };
-    if (d.merchant && d.category && d.category !== (previous.data as { category?: string }).category) learnCategory(ctx, d.merchant, d.category);
+    if (!d.category || d.category === (previous.data as { category?: string }).category) return;
+    const others = learnCategory(ctx, d.merchant, d.category, entity.id);
+    const payee = payeeOf(ctx, entity.id)?.title ?? d.merchant;
+    if (others.length && payee) bus.emit('category.learned', { entityId: entity.id, category: d.category, payee, others });
   });
   // One-time backfill: records indexed before notes, tags and attachment names were searchable.
   if (!settings.get<boolean>('search.indexV2', false)) {
@@ -258,9 +262,11 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     settings.set('search.indexV2', true);
   }
   // Once: payments filed before payees existed join their payee.
-  if (!settings.get<boolean>('payees.backfilled', false)) {
+  // Again once (v2): editing a payment used to drop the link to the person who paid — put those back.
+  if (!settings.get<boolean>('payees.backfilledV2', false)) {
     linkMissingPayees(ctx);
     settings.set('payees.backfilled', true);
+    settings.set('payees.backfilledV2', true);
   }
   for (const m of all) await m.onStart?.(ctx);
   return ctx;

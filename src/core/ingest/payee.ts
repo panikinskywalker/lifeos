@@ -115,9 +115,12 @@ export function linkMissingPayees(os: LifeOSContext): number {
   for (const t of os.entities.query<{ merchant?: string; kind?: string; category?: string }>('transaction', {}, { limit: 20000 })) {
     if (!t.data.merchant || t.data.category === 'investment' || t.data.kind === 'transfer') continue;
     if (os.relations.forEntity(t.id).some((r) => r.relation.kind === 'payee' || r.relation.kind === 'person')) continue;
-    const m = payeeFor(os, t.data.merchant, null);
+    // The message it came from knows the UPI ID, which finds the right person for sure.
+    const parsed = os.db.get<{ parsed: string | null }>(`SELECT parsed FROM ingest_queue WHERE entity_id=? AND parsed IS NOT NULL LIMIT 1`, [t.id])?.parsed;
+    const vpa = parsed ? ((JSON.parse(parsed) as { txn?: { vpa?: string | null } }).txn?.vpa ?? null) : null;
+    const m = payeeFor(os, t.data.merchant, vpa);
     if (!m) continue;
-    linkPayee(os, t.id, m, t.data.merchant, null, 'assistant');
+    linkPayee(os, t.id, m, t.data.merchant, vpa, 'assistant');
     n++;
   }
   return n;

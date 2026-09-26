@@ -229,7 +229,8 @@ export function ruleCategory(os: LifeOSContext, merchant: string | null | undefi
  * already taught LifeOS what this payer's money is.
  */
 export function rangeRule(os: LifeOSContext, p: { amount: number; direction: 'debit' | 'credit'; payerId?: string | null; merchant?: string | null; at: number }): { category: string; sure: boolean; why: string } | null {
-  const learned = p.merchant ? os.settings.get<Record<string, string>>('merchantCategories', {})[norm(p.merchant)] : undefined;
+  const taught = os.settings.get<Record<string, string>>('merchantCategories', {});
+  const learned = (p.payerId ? taught[`person:${p.payerId}`] : undefined) ?? (p.merchant ? taught[norm(p.merchant)] : undefined);
   for (const r of categoryRules(os).filter(isRange)) {
     const d = r.direction ?? 'received';
     if (d !== 'any' && d !== (p.direction === 'credit' ? 'received' : 'spent')) continue;
@@ -263,9 +264,8 @@ export function categoryFor(os: LifeOSContext, merchant: string | null | undefin
   const byRule = ruleCategory(os, merchant, text, amount, direction);
   if (byRule) return byRule;
   if (merchant) {
-    const learned = os.settings.get<Record<string, string>>('merchantCategories', {});
-    const key = norm(merchant);
-    if (learned[key]) return learned[key]!;
+    const taught = learnedCategory(os, merchant);
+    if (taught) return taught;
     const brand = knownMerchant(merchant);
     if (brand) return brand.category;
     const hit = KNOWN.find(([re]) => re.test(merchant));
@@ -274,10 +274,58 @@ export function categoryFor(os: LifeOSContext, merchant: string | null | undefin
   return text ? (KNOWN.find(([re]) => re.test(text))?.[1] ?? 'other') : 'other';
 }
 
-/** You changed a merchant's category on a transaction: remember it for next time. */
-export function learnCategory(os: LifeOSContext, merchant: string, category: string) {
+/** Who a transaction was paid to / by: its linked payee (a shop / payee record, or a person). */
+export function payeeOf(os: LifeOSContext, txId: string): { id: string; type: string; title: string } | null {
+  const r = os.relations.forEntity(txId).find((x) => x.direction === 'out' && (x.relation.kind === 'payee' || x.relation.kind === 'person'));
+  return r ? { id: r.other.id, type: r.other.type, title: r.other.title } : null;
+}
+
+/**
+ * You changed a transaction's category: remember it for next time. A shop or
+ * payee is learned by its record (so every name the bank uses for it counts)
+ * and by the name; a person isn't — a friend's money isn't always the same
+ * thing (rules like "₹100–200 from the Football group" handle people) — but
+ * their in-range payments stop being guessed. Returns the earlier payments
+ * from the same payee that still have another category.
+ */
+export function learnCategory(os: LifeOSContext, merchant: string | null | undefined, category: string, txId?: string): string[] {
   const learned = os.settings.get<Record<string, string>>('merchantCategories', {});
-  os.settings.set('merchantCategories', { ...learned, [norm(merchant)]: category });
+  const payee = txId ? payeeOf(os, txId) : null;
+  const next = { ...learned };
+  if (payee?.type === 'person') next[`person:${payee.id}`] = category;
+  else {
+    if (merchant) next[norm(merchant)] = category;
+    if (payee) next[`payee:${payee.id}`] = category;
+  }
+  os.settings.set('merchantCategories', next);
+  if (!txId || payee?.type === 'person') return [];
+  // The others: same payee record, else the same merchant name.
+  const ids = payee
+    ? os.relations.forEntity(payee.id).filter((r) => r.direction === 'in' && r.other.type === 'transaction').map((r) => r.other.id)
+    : merchant
+      ? os.db.all<{ id: string }>(`SELECT id FROM entities WHERE type='transaction' AND deleted_at IS NULL AND lower(json_extract(data,'$.merchant'))=? LIMIT 500`, [merchant.toLowerCase()]).map((r) => r.id)
+      : [];
+  return ids.filter((id) => id !== txId && (os.entities.get<{ category?: string; kind?: string }>(id)?.data.category ?? category) !== category && os.entities.get<{ kind?: string }>(id)?.data.kind !== 'transfer');
+}
+
+/** What you taught it for a payee record (by its id) or a name. */
+export function learnedCategory(os: LifeOSContext, merchant: string | null | undefined, payeeId?: string | null): string | null {
+  const learned = os.settings.get<Record<string, string>>('merchantCategories', {});
+  return (payeeId ? learned[`payee:${payeeId}`] : undefined) ?? (merchant ? learned[norm(merchant)] : undefined) ?? null;
+}
+
+/** "Change the others too": give these transactions the category (Undo returns each one's own). */
+export function recategorise(os: LifeOSContext, ids: string[], category: string): Array<{ id: string; was: string }> {
+  const out: Array<{ id: string; was: string }> = [];
+  os.db.transaction(() => {
+    for (const id of ids) {
+      const e = os.entities.get<{ category?: string }>(id);
+      if (!e || e.data.category === category) continue;
+      out.push({ id, was: e.data.category ?? 'other' });
+      os.entities.update(id, { data: { category } }, 'system');
+    }
+  });
+  return out;
 }
 
 /** The account a message moved money on: by last digits (+ bank), or a new one named for it. */
@@ -503,8 +551,15 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
       if (pm.created) created.push(pm.id);
     }
   }
+  // What you taught it for this payee (any name the bank uses for them) beats the name match and the built-in list.
+  const byPayee = !t.investment && !t.transfer && t.channel !== 'atm' && !ruleCategory(os, data.merchant as string | undefined, item.text, amount, t.direction) ? learnedCategory(os, null, payeeOf(os, e.id)?.id) : null;
+  if (byPayee && byPayee !== data.category) {
+    os.entities.update(e.id, { data: { category: byPayee } }, 'assistant');
+    data.category = byPayee;
+    if (flag?.startsWith('Category unknown')) flag = null;
+  }
   // A range rule ("₹100–200 received → Football") needs the payer, so it's checked once they're linked.
-  if (!t.investment && !t.transfer && t.channel !== 'atm' && !ruleCategory(os, data.merchant as string | undefined, item.text, amount, t.direction)) {
+  if (!byPayee && !t.investment && !t.transfer && t.channel !== 'atm' && !ruleCategory(os, data.merchant as string | undefined, item.text, amount, t.direction)) {
     const payerId = os.relations.forEntity(e.id).find((r) => r.relation.kind === 'person' && r.direction === 'out')?.other.id ?? null;
     const rr = rangeRule(os, { amount, direction: t.direction, payerId, merchant: data.merchant as string | undefined, at: item.receivedAt });
     if (rr && rr.category !== data.category) {

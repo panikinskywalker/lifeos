@@ -22,6 +22,8 @@ export type CoreEvents = {
   'schedule.tick': { at: number };
   'app.foreground': { at: number };
   'module.installed': { moduleId: string };
+  /** You recategorised a payment: the payee / merchant now means that category; `others` earlier payments from them still say something else. */
+  'category.learned': { entityId: string; category: string; payee: string; others: string[] };
   /** Any other stored change (removals, snoozes, views, dashboards) so live queries refresh. */
   'data.changed': { table: string; id: string };
 };
