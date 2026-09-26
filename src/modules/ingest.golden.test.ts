@@ -15,9 +15,11 @@ import { undoExtraction } from '@core/dumps/extract';
 import { accountType, transactionType } from './finance/types';
 import { financeAiTools } from './finance/aiTools';
 import { personType } from './crm/types';
+import { deliveryType } from './deliveries/types';
 
 const modules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [personType] },
+  { id: 'deliveries', name: 'Deliveries', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [deliveryType] },
   { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [accountType, transactionType], aiTools: financeAiTools },
 ];
 
@@ -151,5 +153,29 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
     expect(categoryFor(os, 'Suresh K', 'Rs 25000 sent to Suresh K for September rent')).toBe('housing');
     expect(categoryFor(os, 'ZOMATO LTD')).toBe('food');
     expect(categoryFor(os, 'Parent')).toBe('other'); // "rent" inside "Parent" is not the word rent
+  });
+});
+
+describe('deliveries from shipping texts', () => {
+  it('one record per order, moved along by each text (never backwards), in Upcoming until delivered', async () => {
+    const { upcoming } = await import('@core/dashboard/metrics');
+    const t0 = Date.parse('2026-09-26T10:00:00');
+    const send = (body: string, dt: number, from = 'AX-AMAZON') => ingestMessage(os, { source: 'sms', from, body, receivedAt: t0 + dt });
+    send('Shipped: boAt Rockerz 255 Pro will be delivered by Tue, 29 Sep. Order 402-1234567-7654321', 0);
+    const [d] = os.entities.query('delivery');
+    expect(d).toMatchObject({ title: 'boAt Rockerz 255 Pro', data: { shop: 'Amazon', status: 'shipped', expectedDate: '2026-09-29', orderId: '402-1234567-7654321' } });
+    expect(upcoming(os, 5, t0).map((u) => u.title)).toContain('boAt Rockerz 255 Pro');
+    send('Out for delivery: boAt Rockerz 255 Pro. Arriving today. Order 402-1234567-7654321', 3 * 86_400_000);
+    send('Your order with boAt Rockerz 255 Pro has been shipped', 3 * 86_400_000 + 60_000); // late, out-of-order text
+    expect(os.entities.get(d!.id)!.data).toMatchObject({ status: 'out_for_delivery', expectedDate: '2026-09-29' });
+    send('Delivered: Your package with boAt Rockerz 255 Pro has been delivered. Order 402-1234567-7654321', 3 * 86_400_000 + 3_600_000);
+    expect(os.entities.query('delivery')).toHaveLength(1);
+    expect(os.entities.get(d!.id)!.data).toMatchObject({ status: 'delivered', deliveredOn: '2026-09-29' });
+    expect(upcoming(os, 5, t0).map((u) => u.title)).not.toContain('boAt Rockerz 255 Pro');
+    // A courier text for a different order is a new record; food delivery is ignored.
+    send('Your shipment AWB 1234567890123 from Myntra is out for delivery today. Delhivery', 0, 'VM-DLHVRY');
+    send('Your Swiggy order is out for delivery!', 0, 'AX-SWIGGY');
+    expect(os.entities.query('delivery').map((x) => x.data.shop).sort()).toEqual(['Amazon', 'Myntra']);
+    expect(os.dumps.toCheck().filter((x) => x.kind === 'delivery').length).toBeGreaterThanOrEqual(3);
   });
 });

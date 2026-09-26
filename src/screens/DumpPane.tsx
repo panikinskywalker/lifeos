@@ -10,7 +10,7 @@ import { Chip, Icon, IconButton, Text, useToast } from '@ui/kit';
 import type { IconName } from '@ui/icons';
 import { runDumpExtraction } from '../platform/dumpExtraction';
 
-const KIND_ICON: Record<string, IconName> = { link: 'link', place: 'location', org: 'briefcase', person: 'user', fact: 'sparkle', task: 'check-circle', transaction: 'rupee', asset: 'box', vehicle: 'car', cycle: 'repeat', routine: 'repeat', reminder: 'bell', subscription: 'card', note: 'file', trip: 'plane', event: 'calendar' };
+const KIND_ICON: Record<string, IconName> = { delivery: 'box', account: 'bank', link: 'link', place: 'location', org: 'briefcase', person: 'user', fact: 'sparkle', task: 'check-circle', transaction: 'rupee', asset: 'box', vehicle: 'car', cycle: 'repeat', routine: 'repeat', reminder: 'bell', subscription: 'card', note: 'file', trip: 'plane', event: 'calendar' };
 export const kindIcon = (k: string): IconName => KIND_ICON[k] ?? 'file';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

@@ -151,7 +151,7 @@ Decisions: foreign spends stored in their currency and converted at that day's r
 - [x] SMS amounts: limits / balances / dues never taken as the amount; tighter debit vs credit; USD / GBP / JPY / AED (+ INR) with the day's rate; mutual funds as investment transfers (registrar confirmations skipped); ATM = cash transfer. *(Rates from open.er-api.com once a day; merchant matching is whole-word now.)*
 - [x] Category keywords in settings (e.g. ZOMATO → Food), checked before the built-in list and what you've taught it. *(You › Categories; "Apply to past transactions".)*
 - [x] Spend: sort (date, amount) and filters (category, account, kind, date range); spend by category. *(`app/spend.tsx` + `src/modules/finance/spend.ts`; from Today's spend tile and Finance.)*
-- [ ] Deliveries from shipping SMS: one record per order (shop, carrier, tracking, expected date, status) updated by later texts; in Upcoming until delivered.
+- [x] Deliveries from shipping SMS: one record per order (shop, carrier, tracking, expected date, status) updated by later texts; in Upcoming until delivered. *(`src/core/ingest/delivery.ts`, `src/modules/deliveries`; shops + couriers; food / quick commerce skipped.)*
 - [ ] Health: one page per metric (Steps, Sleep, Heart rate, Weight, Workouts); "Measurements" no longer shown as a category.
 - [ ] To check: untouched items auto-approve after 15 days.
 - [ ] 60-day clean-up job.

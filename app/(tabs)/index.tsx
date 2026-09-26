@@ -214,7 +214,7 @@ function UpcomingTile() {
       {items.length ? (
         <RowList>
           {items.map((i) => (
-            <RowItem key={i.id} icon={i.kind === 'event' ? 'calendar' : 'repeat'} tint={i.kind === 'event' ? 'tasks' : 'upkeep'} title={i.title} value={i.overdue ? 'Late' : relDay(i.at)} valueTone={i.overdue ? 'alert' : 'secondary'} onPress={() => router.push(`/entity/${i.type}/${i.entityId}` as never)} />
+            <RowItem key={i.id} icon={i.kind === 'event' ? 'calendar' : i.kind === 'delivery' ? 'box' : 'repeat'} tint={i.kind === 'event' ? 'tasks' : 'upkeep'} title={i.title} value={i.overdue ? 'Late' : relDay(i.at)} valueTone={i.overdue ? 'alert' : 'secondary'} onPress={() => router.push(`/entity/${i.type}/${i.entityId}` as never)} />
           ))}
         </RowList>
       ) : (

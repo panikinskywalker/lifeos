@@ -2,6 +2,7 @@ import type { LifeOSContext } from '../registry/context';
 import type { Row } from '../db/adapter';
 import { bus } from '../events/bus';
 import { toInr } from './fx';
+import { parseDeliverySms, type ParsedDelivery } from './delivery';
 import { parseBankSms, parsePaymentNotification, looksLikeBankSender, bankOf, BANK_NAMES, PAYMENT_APPS, type ParsedTxn, type SmsKind } from './bankSms';
 
 /**
@@ -265,6 +266,13 @@ export function ingestMessage(os: LifeOSContext, m: RawMessage, opts: { mode?: '
 
   if (m.source === 'sms') {
     const s = seeSender(os, m);
+    // Shops and couriers aren't money senders: a shipping text becomes (or moves) a delivery.
+    const del = !s.trusted || !bankOf(m.from) ? parseDeliverySms(m.body, m.from, m.receivedAt) : null;
+    if (del && os.registry.entityTypes.has('delivery')) {
+      const entityId = fileDelivery(os, id, del, m);
+      setItem(os, id, { status: 'confirmed', entityId, note: 'delivery' });
+      return { id, status: 'confirmed', entityId };
+    }
     if (!s.trusted) {
       setItem(os, id, { status: 'dismissed', note: 'sender not trusted' });
       return { id, status: 'dismissed', reason: 'sender not trusted' };
@@ -369,6 +377,53 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
   for (const a of created) os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: 'account', entityId: a, label: `Account: ${os.entities.get(a)?.title ?? 'new account'}` });
   os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: 'transaction', entityId: e.id, label, flag });
   return { id, status: 'confirmed', entityId: e.id };
+}
+
+const STAGE: Record<string, number> = { ordered: 0, shipped: 1, out_for_delivery: 2, delivered: 3, cancelled: 4, returned: 4 };
+const STATUS_WORD: Record<string, string> = { ordered: 'Ordered', shipped: 'Shipped', out_for_delivery: 'Out for delivery', delivered: 'Delivered', cancelled: 'Cancelled', returned: 'Returned' };
+
+/** One delivery per order: found by tracking / order number, or the same shop's open order from the last month. Status only moves forward. */
+function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m: RawMessage): string {
+  type D = { shop?: string; item?: string; carrier?: string; tracking?: string; orderId?: string; status: string; expectedDate?: string; deliveredOn?: string };
+  const recent = os.entities.query<D>('delivery', { sort: [{ field: 'createdAt', dir: 'desc' }] }, { limit: 300 });
+  const norm2 = (x?: string | null) => (x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const hit =
+    recent.find((e) => (d.tracking && e.data.tracking === d.tracking) || (d.orderId && e.data.orderId === d.orderId)) ??
+    recent.find(
+      (e) =>
+        STAGE[e.data.status]! < 3 &&
+        m.receivedAt - e.createdAt < 30 * 86_400_000 &&
+        ((d.shop && e.data.shop === d.shop) || (d.carrier && e.data.carrier === d.carrier)) &&
+        (!d.item || !e.data.item || norm2(e.data.item).includes(norm2(d.item).split(' ')[0]!) || norm2(d.item).includes(norm2(e.data.item).split(' ')[0]!)),
+    );
+  const day = iso(m.receivedAt);
+  if (!hit) {
+    const e = os.entities.create({ type: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
+    os.entities.timeline.add({ entityId: e.id, kind: 'sms', title: STATUS_WORD[d.status]!, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
+    os.dumps.addExtraction({ source: 'sms', sourceRef: ingestId, kind: 'delivery', entityId: e.id, label: `Delivery: ${e.title} · ${STATUS_WORD[d.status]}${d.expected && d.status !== 'delivered' ? ` · by ${d.expected.slice(8)}/${d.expected.slice(5, 7)}` : ''}` });
+    return e.id;
+  }
+  const patch: Record<string, unknown> = {};
+  const before: Record<string, unknown> = {};
+  const set = (k: keyof D, v: unknown) => {
+    if (v == null || v === '' || hit.data[k] === v) return;
+    patch[k] = v;
+    before[k] = hit.data[k] ?? null;
+  };
+  if (STAGE[d.status]! >= STAGE[hit.data.status]!) set('status', d.status);
+  if (d.status === 'delivered') set('deliveredOn', day);
+  else if (d.expected) set('expectedDate', d.expected);
+  if (!hit.data.item) set('item', d.item);
+  if (!hit.data.carrier) set('carrier', d.carrier);
+  if (!hit.data.tracking) set('tracking', d.tracking);
+  if (!hit.data.orderId) set('orderId', d.orderId);
+  if (!hit.data.shop) set('shop', d.shop);
+  if (Object.keys(patch).length) {
+    os.entities.update(hit.id, { data: patch }, 'assistant');
+    os.dumps.addExtraction({ source: 'sms', sourceRef: ingestId, kind: 'delivery', action: 'updated', entityId: hit.id, label: `${os.entities.get(hit.id)?.title ?? 'Delivery'} · ${STATUS_WORD[(patch.status as string) ?? hit.data.status]}`, before });
+  }
+  os.entities.timeline.add({ entityId: hit.id, kind: 'sms', title: STATUS_WORD[d.status]!, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
+  return hit.id;
 }
 
 /** First-run review: file the proposals you kept; the rest are dismissed. */
