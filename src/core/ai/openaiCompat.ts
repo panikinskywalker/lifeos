@@ -38,6 +38,10 @@ export class ProviderError extends Error {
       )
     );
   }
+  /** The host rejected the model's own tool call (Groq: "tool_use_failed" / "Tool call validation failed"). */
+  get isBadToolCall() {
+    return this.status === 400 && /tool_use_failed|tool call validation failed|failed to call a function|invalid tool call/i.test(this.message);
+  }
   /** Errors another provider could plausibly succeed on. */
   get isRetryable() {
     return (
@@ -48,7 +52,8 @@ export class ProviderError extends Error {
       this.status === 413 ||
       this.status === 429 ||
       this.status >= 500 ||
-      this.isModelMissing
+      this.isModelMissing ||
+      this.isBadToolCall
     );
   }
 }
@@ -254,6 +259,8 @@ export function createOpenAICompatProvider(
       try {
         return await once(args);
       } catch (e) {
+        // The model fumbled a tool call: ask once more (it's sampled, a retry usually lands); then let the chain move on.
+        if (e instanceof ProviderError && e.isBadToolCall) return once({ ...args, retry: true });
         if (
           !(e instanceof ProviderError) ||
           !e.isModelMissing ||
@@ -284,12 +291,14 @@ export function createOpenAICompatProvider(
     tools,
     maxTokens = 2048,
     signal,
-  }: Parameters<LLMProvider["complete"]>[0]): Promise<CompletionResult> {
+    retry,
+  }: Parameters<LLMProvider["complete"]>[0] & { retry?: boolean }): Promise<CompletionResult> {
     const body: Record<string, unknown> = {
       model,
       messages: toOpenAIMessages(system, messages),
       max_tokens: maxTokens,
-      temperature: opts.temperature ?? 0.2,
+      // A retry after a fumbled tool call samples a little wider so it doesn't repeat itself.
+      temperature: retry ? 0.6 : (opts.temperature ?? 0.2),
     };
     if (tools.length) body.tools = toOpenAITools(tools);
 

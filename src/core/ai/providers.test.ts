@@ -200,3 +200,34 @@ describe('retired models', () => {
     expect(r.content[0]).toEqual({ type: 'text', text: 'from gemini' });
   });
 });
+
+describe('tool calls that small models fumble', () => {
+  it('schemas sent to models allow null, extra keys and flatten name-or-object unions', async () => {
+    const { toolSpec, stripNulls } = await import('./assistant');
+    const { graphTools, newSession } = await import('../graph/tools');
+    const spec = toolSpec(graphTools(newSession('d')).find((t) => t.name === 'record_event')!).input_schema as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const json = JSON.stringify(spec);
+    expect(json).not.toContain('additionalProperties');
+    expect(json).not.toContain('anyOf');
+    expect(spec.properties.when.type).toEqual(['string', 'null']);
+    expect(spec.properties.kind.type).toBe('string');
+    expect(spec.properties.roles.items.properties.node.type).toBe('string');
+    expect(stripNulls({ a: 1, b: null, c: [{ d: null, e: 'x' }] })).toEqual({ a: 1, c: [{ e: 'x' }] });
+  });
+
+  it('Groq "tool call validation failed" is retried once, then falls through the chain', async () => {
+    let calls = 0;
+    mockFetch((url) => {
+      if (url.includes('groq')) {
+        calls++;
+        return { status: 400, text: '{"error":{"message":"tool call validation failed: parameters for tool record_event did not match schema","type":"invalid_request_error","code":"tool_use_failed"}}' };
+      }
+      return { json: { choices: [{ message: { content: 'from gemini' }, finish_reason: 'stop' }] } };
+    });
+    const groq = createOpenAICompatProvider({ id: 'groq', baseUrl: 'https://api.groq.com/openai/v1', apiKey: 'g', model: 'm' });
+    const gemini = createOpenAICompatProvider({ id: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: 'k', model: 'gemini-flash-latest' });
+    const r = await createChainProvider([groq, gemini]).complete({ system: '', messages: [{ role: 'user', content: 'hi' }], tools: [] });
+    expect(calls).toBe(2);
+    expect(r.content[0]).toEqual({ type: 'text', text: 'from gemini' });
+  });
+});

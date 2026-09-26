@@ -353,6 +353,8 @@ export function reverseWrite(os: LifeOSContext, extractionId: string): boolean {
 /* ------------------------------------------------------------------ */
 
 const Attr = z.record(z.string(), z.unknown());
+/** A name plus an optional separate type hint (models handle flat strings far better than unions). */
+const withType = (r: NodeRef, type?: string): NodeRef => (typeof r === 'string' && type ? { name: r, type } : r);
 const nameOf = (r: NodeRef) => (typeof r === 'string' ? r : r.name);
 
 /** Graph tools bound to one filing session (a dump). */
@@ -373,10 +375,10 @@ export function graphTools(s: GraphSession): AiToolDef[] {
     {
       name: 'set_attributes',
       description: 'Details about a record: {"birthday": "8 Sept", "company": "Zomato", "favourite colour": "pink"}. Known fields are filled; anything else becomes a line in its Notes. Use "this" as the node on a record page.',
-      input: z.object({ node: NodeRef, attributes: Attr }),
+      input: z.object({ node: NodeRef.describe('the name (or "this" on a record page)'), node_type: z.string().optional(), attributes: Attr }),
       run: async (input, os) => {
-        const i = input as { node: NodeRef; attributes: Record<string, unknown> };
-        const n = upsertNode(os, s, i.node);
+        const i = input as { node: NodeRef; node_type?: string; attributes: Record<string, unknown> };
+        const n = upsertNode(os, s, withType(i.node, i.node_type));
         if (!n) return { skipped: 'that is the user' };
         return { id: n.id, ...setAttributes(os, s, n.id, i.attributes) };
       },
@@ -390,23 +392,23 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         when: z.string().optional(),
         end: z.string().optional(),
         cost: z.union([z.number(), z.string()]).optional(),
-        roles: z.array(z.object({ role: z.string(), node: NodeRef })).optional(),
-        part_of: NodeRef.optional(),
+        roles: z.array(z.object({ role: z.string().describe('with | at | from | to'), node: NodeRef.describe('a name'), type: z.string().optional().describe('person | place | org') })).optional(),
+        part_of: NodeRef.optional().describe('a trip name, if said'),
         details: Attr.optional().describe('airline, flightNo, notes'),
       }),
       run: async (input, os) => {
-        const i = input as { kind: string; title?: string; when?: string; end?: string; cost?: number | string; roles?: Array<{ role: string; node: NodeRef }>; part_of?: NodeRef; details?: Record<string, unknown> };
-        return recordEvent(os, s, { ...i, partOf: i.part_of });
+        const i = input as { kind: string; title?: string; when?: string; end?: string; cost?: number | string; roles?: Array<{ role: string; node: NodeRef; type?: string }>; part_of?: NodeRef; details?: Record<string, unknown> };
+        return recordEvent(os, s, { ...i, roles: i.roles?.map((r) => ({ role: r.role, node: withType(r.node, r.type) })), partOf: i.part_of });
       },
     },
     {
       name: 'link',
       description: `A relationship between two things: "Kendal is Priya's sister" → family_of; "works at Zomato" → works_at. Words: ${Object.keys(EDGE_WORDS).join(', ')} (others allowed).`,
-      input: z.object({ from: NodeRef, to: NodeRef, kind: z.string() }),
+      input: z.object({ from: NodeRef.describe('a name'), to: NodeRef.describe('a name'), kind: z.string(), from_type: z.string().optional(), to_type: z.string().optional() }),
       run: async (input, os) => {
-        const i = input as { from: NodeRef; to: NodeRef; kind: string };
-        const a = upsertNode(os, s, i.from);
-        const b = upsertNode(os, s, i.to, { type: i.kind === 'works_at' ? 'org' : i.kind === 'lives_in' || i.kind === 'located_in' ? 'place' : undefined });
+        const i = input as { from: NodeRef; to: NodeRef; kind: string; from_type?: string; to_type?: string };
+        const a = upsertNode(os, s, withType(i.from, i.from_type));
+        const b = upsertNode(os, s, withType(i.to, i.to_type), { type: i.kind === 'works_at' ? 'org' : i.kind === 'lives_in' || i.kind === 'located_in' ? 'place' : undefined });
         if (!a || !b) return { skipped: 'that is the user' };
         const kind = i.kind.toLowerCase().replace(/\s+/g, '_');
         return { linked: !!link(os, s, a.id, b.id, kind), from: nameOf(i.from), to: nameOf(i.to), kind };

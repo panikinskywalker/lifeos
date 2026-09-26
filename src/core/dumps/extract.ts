@@ -2,7 +2,7 @@ import type { LifeOSContext } from '../registry/context';
 import type { AiToolDef } from '../registry/types';
 import type { ChatMessage, ContentBlock, LLMProvider } from '../ai/provider';
 import { parseMessage } from '../ai/parser';
-import { toolSpec } from '../ai/assistant';
+import { stripNulls, toolSpec } from '../ai/assistant';
 import { extrasOf } from '../ai/cards';
 import { exactUndo, graphTools, newSession, reverseWrite } from '../graph/tools';
 import type { Dump } from '../repo/dumpRepo';
@@ -141,7 +141,7 @@ async function fileChunk(os: LifeOSContext, provider: LLMProvider, system: strin
       let isError = false;
       try {
         if (!def) throw new Error(`unknown tool ${c.name}`);
-        out = await def.run(def.input.parse(c.input), os);
+        out = await def.run(def.input.parse(stripNulls(c.input)), os);
         isError = !!(out as { error?: unknown })?.error;
       } catch (e) {
         out = { error: (e as Error).message.slice(0, 300) };

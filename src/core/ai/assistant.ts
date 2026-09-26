@@ -54,9 +54,47 @@ export interface AssistantOptions {
 }
 
 export function toolSpec(t: AiToolDef): ToolSpec {
-  const schema = z.toJSONSchema(t.input, { target: 'draft-7' }) as Record<string, unknown>;
+  const schema = loosenSchema(z.toJSONSchema(t.input, { target: 'draft-7' }) as Record<string, unknown>) as Record<string, unknown>;
   delete schema.$schema;
   return { name: t.name, description: t.description, input_schema: schema };
+}
+
+/**
+ * The schema a model sees, made forgiving: hosts like Groq reject the whole
+ * reply when a tool call doesn't validate, and small open models send
+ * `null` for things they skip, add stray keys and trip over unions. So:
+ * optional fields also accept null, extra keys are allowed, a
+ * string-or-object union becomes the string, and propertyNames goes.
+ * Inputs are still checked by the tool's own zod schema (nulls stripped).
+ */
+export function loosenSchema(node: unknown, required = true): unknown {
+  if (Array.isArray(node)) return node.map((n) => loosenSchema(n));
+  if (!node || typeof node !== 'object') return node;
+  const s = { ...(node as Record<string, unknown>) };
+  delete s.additionalProperties;
+  delete s.propertyNames;
+  if (Array.isArray(s.anyOf)) {
+    const str = (s.anyOf as Array<Record<string, unknown>>).find((x) => x.type === 'string');
+    if (str) {
+      const { anyOf: _drop, ...rest } = s;
+      return loosenSchema({ ...rest, ...str, description: s.description ?? str.description }, required);
+    }
+    s.anyOf = (s.anyOf as unknown[]).map((x) => loosenSchema(x));
+  }
+  if (s.properties && typeof s.properties === 'object') {
+    const req = new Set((s.required as string[] | undefined) ?? []);
+    s.properties = Object.fromEntries(Object.entries(s.properties as Record<string, unknown>).map(([k, v]) => [k, loosenSchema(v, req.has(k))]));
+  }
+  if (s.items) s.items = loosenSchema(s.items);
+  if (!required && s.type && s.type !== 'null') s.type = [...new Set([...(Array.isArray(s.type) ? s.type : [s.type]), 'null'])];
+  return s;
+}
+
+/** Models send null for "not given"; the tools' schemas mean undefined. */
+export function stripNulls<T>(v: T): T {
+  if (Array.isArray(v)) return v.filter((x) => x !== null).map(stripNulls) as T;
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([, x]) => x !== null).map(([k, x]) => [k, stripNulls(x)])) as T;
+  return v;
 }
 
 /**
@@ -211,7 +249,7 @@ Guidelines:
       isError = true;
     } else {
       try {
-        const parsed = def.input.parse(input);
+        const parsed = def.input.parse(stripNulls(input));
         const ask = typeof def.confirm === 'function' ? def.confirm(parsed, this.os) : !!def.confirm;
         if (ask && this.opts.confirm && !(await this.opts.confirm(def, parsed, confirmSummary(def, parsed, this.os)))) {
           output = { error: 'User declined this action.' };
