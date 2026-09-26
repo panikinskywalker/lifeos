@@ -118,6 +118,15 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [x] Record pages: mic to speak updates into this record; Connections section grouped by edge word. *("Tell me about …" bar (`src/screens/SayCard.tsx`) files a dump with this record as its subject; the Related card became Connections, grouped by link word, events dated with who/where.)*
 - [x] Graph view around a record: a small force-directed network (react-native-svg + d3-force) centred on the record, 1–2 hops, tinted by module, edge words on the lines; tap a node to re-centre, long-press to open it. On record pages and from the Almanac. *(`src/ui/components/GraphView.tsx` + `egoGraph` in `src/core/graph/read.ts`; a Graph card on record pages opens `/graph/[id]` (direct / two steps out); in the component gallery. Almanac entry point comes with M4.4.)*
 
+### M4.1c — Never lose a thing: the filing queue (26 Sep)
+**Why:** free tiers run out (Groq 200k tokens/day, Gemini per-minute and daily quotas, 503 spikes). Today a dump that can't be filed is retried for ~20 minutes then marked failed; a half-filed dump stays half-filed; a question just errors. Decisions (26 Sep): on-phone answer + queued full answer for questions; the parser files what it can right away; queued filings surface only through the bell.
+- [ ] Waiting ≠ failed: rate limits, quota, 503 and offline put a dump in *Waiting to file* (with why and roughly when) and never count toward giving up; only bad model output does. Dumps never end up failed for lack of a provider.
+- [ ] Provider limits remembered: "try again in 7h" / daily quota / cooldowns stored per provider (and per model); the queue skips a provider until then and wakes at the earliest free time (foreground, background task, timer).
+- [ ] Resume, don't restart: filing progress per chunk, so a dump cut off halfway continues from the next chunk; the model is told what's already filed.
+- [ ] Parser inside dumps: the everyday sentences in a longer dump are filed on the phone right away; the model files the rest later without doubling them.
+- [ ] Questions without a model: an on-phone answer (search + connections + dates, no model) straight away, and the full answer queued and shown when it lands.
+- [ ] Budget: per-provider daily usage in You › Agent; when a free budget runs low, new dumps go first and the older backlog waits.
+
 ### M4.2 — Data sources
 - [ ] **Health Connect** (`react-native-health-connect`): permissions screen; daily sync of steps, sleep sessions, heart rate, workouts, weight into `measurements`/`workouts` with source = health_connect; backfill 90 days on first grant; hourly refresh via background task.
 - [ ] **UsageStats** (native module + `PACKAGE_USAGE_STATS` onboarding): per-app foreground time, pickups, first unlock, last use, per day; app icons + labels cached; `usage_daily` and `usage_app_daily` tables.
