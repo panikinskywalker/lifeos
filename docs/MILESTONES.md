@@ -155,6 +155,7 @@ Decisions: foreign spends stored in their currency and converted at that day's r
 - [x] Health: one page per metric (Steps, Sleep, Heart rate, Weight, Workouts); "Measurements" no longer shown as a category. *(`src/screens/HealthHome.tsx`; heart rate added as a metric; sleep: Samsung Health must share Sleep with Health Connect.)*
 - [x] To check: untouched items auto-approve after 15 days.
 - [x] 60-day clean-up job. *(`src/core/sources/retention.ts`, once a day.)*
+- [x] Payees: one record per person / shop you pay or get paid by; every payment links to it (a Person when the name or UPI ID matches someone in People — a guess is flagged in To check and on the payment with Yes / Not them); a payee's page shows its payments and total. *(`src/core/ingest/payee.ts`; past payments linked once on start.)*
 - [ ] Speed: measure and fix the slow screens.
 
 ### M4.3 — Today as a dashboard

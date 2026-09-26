@@ -2,6 +2,7 @@ import type { LifeOSContext } from '../registry/context';
 import type { Row } from '../db/adapter';
 import { bus } from '../events/bus';
 import { toInr } from './fx';
+import { linkPayee, payeeFor } from './payee';
 import { parseDeliverySms, type ParsedDelivery } from './delivery';
 import { parseBankSms, parsePaymentNotification, looksLikeBankSender, bankOf, BANK_NAMES, PAYMENT_APPS, type ParsedTxn, type SmsKind } from './bankSms';
 
@@ -372,9 +373,21 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
     if (t.currency !== 'INR' && !fx.fxRate) flag = `No ${t.currency} rate yet — converted to rupees when the app is next online`;
   }
   const e = os.entities.create({ type: 'transaction', data }, 'assistant');
+  // Everyone you pay or get paid by is one record; this payment joins theirs.
+  if (!t.investment && !t.transfer && t.channel !== 'atm' && (t.counterparty || t.vpa)) {
+    const pm = payeeFor(os, t.counterparty, t.vpa, { business: data.category !== 'other' && data.category !== 'transfer' ? true : undefined });
+    if (pm) {
+      linkPayee(os, e.id, pm, t.counterparty, t.vpa, item.source);
+      if (pm.guess) flag = pm.guess;
+      if (pm.created) created.push(pm.id);
+    }
+  }
   os.entities.timeline.add({ entityId: e.id, kind: item.source, title: `From ${sourceLabel(item)}`, body: item.text.slice(0, 300), actor: 'system', occurredAt: item.receivedAt, meta: { ingestId: id } });
   setItem(os, id, { status: 'confirmed', entityId: e.id });
-  for (const a of created) os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: 'account', entityId: a, label: `Account: ${os.entities.get(a)?.title ?? 'new account'}` });
+  for (const a of created) {
+    const ce = os.entities.get(a);
+    os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: ce?.type === 'org' ? 'org' : 'account', entityId: a, label: ce?.type === 'org' ? `Payee: ${ce.title}` : `Account: ${ce?.title ?? 'new account'}` });
+  }
   os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: 'transaction', entityId: e.id, label, flag });
   return { id, status: 'confirmed', entityId: e.id };
 }

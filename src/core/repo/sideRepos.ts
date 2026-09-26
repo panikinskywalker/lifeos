@@ -62,6 +62,12 @@ export class RelationRepo {
     return r ? toRelation(r) : null;
   }
 
+  /** A guessed link you confirmed (or corrected). */
+  setConfidence(id: string, confidence: number) {
+    this.db.run(`UPDATE relations SET confidence=?, version=version+1 WHERE id=?`, [confidence, id]);
+    this.changes.record('relations', id, 'update', 1);
+  }
+
   /** Remove one edge by id (cancelling an agent's link). */
   remove(id: string, actor: Actor = 'user') {
     const r = this.db.get<Row>(`SELECT * FROM relations WHERE id=? AND deleted_at IS NULL`, [id]);

@@ -35,7 +35,7 @@ export default function ToCheckScreen() {
   };
   const edit = (x: Extraction) => {
     const e = x.entityId ? os.entities.get(x.entityId) : undefined;
-    if (e) router.push(`/entity/${e.type}/${e.id}${x.kind === 'link' ? '' : '/edit'}` as never);
+    if (e) router.push(`/entity/${e.type}/${e.id}${x.kind === 'link' || x.flag ? '' : '/edit'}` as never);
     else if (x.factId) router.push('/memory');
     os.dumps.setChecked(x.id);
   };

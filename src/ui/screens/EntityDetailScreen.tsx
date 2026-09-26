@@ -11,13 +11,14 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
 import type { TintKey } from '../theme/tokens';
-import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, Field, FilterChip, IconButton, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
+import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, Field, FilterChip, Icon, IconButton, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
 import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 import { CyclesSection, MeterSheet } from '../components/cycles';
 import { backlinks } from '@core/links';
 import { egoGraph, neighbours } from '@core/graph/read';
+import { confirmPayee, rejectPayee } from '@core/ingest/payee';
 import { GraphView } from '../components/GraphView';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
@@ -93,6 +94,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
             );
           })}
 
+          <GuessBanner entity={entity} />
           <DetailsCard entity={entity} fields={def.fields} />
           {sections.filter((s) => s.placement !== 'top').map((s) => {
             const C = s.component;
@@ -281,6 +283,7 @@ function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void 
           <View key={g.label} style={{ gap: 6 }}>
             <Text variant="labelMicro" color="secondary" style={{ textTransform: 'uppercase' }}>
               {g.label}
+              {g.items.every((n) => n.type === 'transaction') && g.items.length > 1 ? ` · ${g.items.length} · ${os.format.currency(g.items.reduce((sum, n) => sum + ((os.entities.get(n.id)?.data as { amount?: number })?.amount ?? 0), 0))}` : ''}
             </Text>
             {g.items.some((n) => n.at) ? (
               <RowList>
@@ -290,8 +293,9 @@ function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void 
                     icon={os.registry.entityTypes.get(n.type)?.icon}
                     tint={tintForModule(os.registry.entityTypes.get(n.type)?.module)}
                     title={n.title}
-                    subtitle={n.context}
-                    meta={n.at ? os.format.date(n.at) : undefined}
+                    subtitle={n.type === 'transaction' ? (n.at ? os.format.date(n.at) : null) : n.context}
+                    meta={n.type === 'transaction' ? undefined : n.at ? os.format.date(n.at) : undefined}
+                    value={n.type === 'transaction' ? txAmount(os, n.id) : undefined}
                     onPress={() => router.push(`/entity/${n.type}/${n.id}`)}
                     onLongPress={() => unlink(n)}
                   />
@@ -311,6 +315,37 @@ function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void 
         Long-press to unlink.
       </Text>
     </Section>
+  );
+}
+
+function txAmount(os: LifeOSContext, id: string): string | undefined {
+  const d = os.entities.get(id)?.data as { amount?: number; kind?: string } | undefined;
+  if (d?.amount == null) return undefined;
+  return `${d.kind === 'income' ? '+' : d.kind === 'expense' ? '−' : ''}${os.format.currency(d.amount)}`;
+}
+
+/** A link the app guessed ("We think JOHN D is John Doe"): confirm it, or say it's someone else. */
+function GuessBanner({ entity }: { entity: Entity }) {
+  const os = useOS();
+  const t = useTheme();
+  const toast = useToast();
+  const guesses = useLive((o) => o.relations.forEntity(entity.id).filter((r) => r.direction === 'out' && (r.relation.confidence ?? 1) < 1 && r.relation.meta.guess), [entity.id]);
+  if (!guesses.length) return null;
+  return (
+    <View style={{ gap: 8 }}>
+      {guesses.map((g) => (
+        <View key={g.relation.id} style={{ backgroundColor: t.c.accent.mustardSoft, borderRadius: 18, padding: 12, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Icon name="people" size={16} color={t.c.accent.gold} />
+            <Text variant="label" style={{ flex: 1 }}>{String(g.relation.meta.guess)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button title={`Yes, ${g.other.title}`} size="sm" icon="check" onPress={() => { confirmPayee(os, g.relation.id); toast.show({ message: `Linked to ${g.other.title} — next time it’s automatic`, icon: 'check' }); }} style={{ flex: 1 }} />
+            <Button title="Not them" size="sm" variant="secondary" icon="x" onPress={() => { rejectPayee(os, g.relation.id); toast.show({ message: 'Kept as a separate payee', icon: 'people' }); }} style={{ flex: 1 }} />
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 

@@ -197,3 +197,38 @@ describe('60-day clean-up', () => {
     expect(os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM usage_daily`)!.n).toBe(1); // the day's total stays
   });
 });
+
+describe('payees: one record per person or shop you pay', () => {
+  it('two payments to John land on your John; "JOHN D" is a flagged guess until you confirm; shops become one payee each', async () => {
+    const { confirmPayee, rejectPayee } = await import('@core/ingest/payee');
+    const { placeType, orgType } = await import('./places/types');
+    void placeType;
+    os.registry.entityTypes.set('org', orgType as never);
+    const john = os.entities.create({ type: 'person', title: 'John Doe', data: {} });
+    const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: at + dt });
+    const payeeOf = (txId: string) => os.relations.forEntity(txId).find((r) => r.relation.kind === 'person' || r.relation.kind === 'payee');
+    send('Sent Rs.1,300.00 From HDFC Bank A/C *1234 To JOHN D On 26/09/26', 0);
+    const t1 = txs()[0]!;
+    const r1 = payeeOf(t1.id)!;
+    expect(r1.other.id).toBe(john.id);
+    expect(r1.relation.confidence).toBeCloseTo(0.85);
+    expect(os.dumps.toCheck().find((x) => x.kind === 'transaction')!.flag).toBe('We think “JOHN D” is John Doe');
+    // Yes → certain, and "JOHN D" + the UPI ID now mean John.
+    confirmPayee(os, r1.relation.id);
+    send('Sent Rs.500.00 From HDFC Bank A/C *1234 To JOHN D On 27/09/26', 86_400_000);
+    const t2 = txs().find((t) => t.data.amount === 500)!;
+    expect(payeeOf(t2.id)).toMatchObject({ other: { id: john.id }, relation: { confidence: 1 } });
+    expect(os.relations.forEntity(john.id).filter((r) => r.other.type === 'transaction')).toHaveLength(2);
+    // A shop: one payee record however many times you pay it.
+    send('Sent Rs.180.00 From HDFC Bank A/C *1234 To CANOE CAFE On 26/09/26', 2 * 86_400_000);
+    send('Sent Rs.220.00 From HDFC Bank A/C *1234 To CANOE CAFE On 28/09/26', 3 * 86_400_000);
+    expect(os.entities.query('org').map((o) => [o.title, (o.data as { kind: string }).kind])).toEqual([['Canoe Cafe', 'shop']]);
+    // Not them → the payment gets its own payee under the name the SMS used.
+    send('Sent Rs.90.00 From HDFC Bank A/C *1234 To JOHN On 29/09/26', 4 * 86_400_000);
+    const t4 = txs().find((t) => t.data.amount === 90)!;
+    expect(payeeOf(t4.id)!.relation.confidence).toBeLessThan(1);
+    rejectPayee(os, payeeOf(t4.id)!.relation.id);
+    expect(payeeOf(t4.id)!.other.title).toBe('John');
+    expect(payeeOf(t4.id)!.other.type).toBe('org');
+  });
+});

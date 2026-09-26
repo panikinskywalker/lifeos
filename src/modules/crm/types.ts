@@ -18,6 +18,8 @@ export interface PersonData {
   lastContactAt?: string;
   /** The phone contact this person was imported from (re-syncs fill gaps). */
   contactId?: string;
+  /** Their UPI ID(s), comma-separated — how payments are matched to them. */
+  upi?: string;
 }
 
 export const personType: EntityTypeDef<PersonData> = {
@@ -26,7 +28,7 @@ export const personType: EntityTypeDef<PersonData> = {
   label: 'Person',
   labelPlural: 'People',
   icon: 'person',
-  schema: z.object({ relationship: z.string().optional(), phone: z.string().optional(), email: z.string().optional(), birthday: z.string().optional(), company: z.string().optional(), role: z.string().optional(), city: z.string().optional(), notes: z.string().optional(), contactEvery: z.coerce.number().optional(), lastContactAt: z.string().optional(), contactId: z.string().optional() }),
+  schema: z.object({ relationship: z.string().optional(), phone: z.string().optional(), email: z.string().optional(), birthday: z.string().optional(), company: z.string().optional(), role: z.string().optional(), city: z.string().optional(), notes: z.string().optional(), contactEvery: z.coerce.number().optional(), lastContactAt: z.string().optional(), contactId: z.string().optional(), upi: z.string().optional() }),
   cycleFields: { 'person.contact': { lastDoneAt: 'lastContactAt' } },
   cycleTemplates: (d) => [
     ...(d.contactEvery ? [{ template: 'person.contact', name: 'Keep in touch', kind: 'interval' as const, everyN: d.contactEvery, everyUnit: 'day' as const, lastDoneAt: dateField(d.lastContactAt) ?? Date.now() }] : []),
@@ -36,6 +38,7 @@ export const personType: EntityTypeDef<PersonData> = {
     { key: 'relationship', label: 'Relationship', type: 'select', summary: true, options: [{ value: 'family', label: 'Family', color: palette.red }, { value: 'friend', label: 'Friend', color: palette.orange }, { value: 'partner', label: 'Partner', color: palette.pink }, { value: 'colleague', label: 'Colleague', color: palette.blue }, { value: 'client', label: 'Client', color: palette.indigo }, { value: 'vendor', label: 'Vendor / Service', color: palette.teal }, { value: 'acquaintance', label: 'Acquaintance', color: palette.gray }] },
     { key: 'phone', label: 'Phone', type: 'text', section: 'Contact' },
     { key: 'email', label: 'Email', type: 'text', section: 'Contact' },
+    { key: 'upi', label: 'UPI ID', type: 'text', section: 'Contact' },
     { key: 'city', label: 'City', type: 'text', section: 'Contact', summary: true },
     { key: 'company', label: 'Company', type: 'text', section: 'Work' },
     { key: 'role', label: 'Role', type: 'text', section: 'Work' },

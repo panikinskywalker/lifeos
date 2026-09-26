@@ -21,13 +21,15 @@ export const placeType: EntityTypeDef<PlaceData> = {
   ],
 };
 
-export interface OrgData { kind: string; website?: string; notes?: string }
+export interface OrgData { kind: string; website?: string; notes?: string; /** UPI IDs this payee has paid or been paid from. */ upi?: string }
 export const orgType: EntityTypeDef<OrgData> = {
   type: 'org', module: 'places', label: 'Organisation', labelPlural: 'Organisations', icon: 'briefcase', color: palette.indigo,
-  schema: z.object({ kind: z.string().default('other'), website: z.string().optional(), notes: z.string().optional() }),
+  schema: z.object({ kind: z.string().default('other'), website: z.string().optional(), notes: z.string().optional(), upi: z.string().optional() }),
   fields: [
-    { key: 'kind', label: 'Kind', type: 'select', summary: true, options: [{ value: 'company', label: 'Company' }, { value: 'shop', label: 'Shop / brand' }, { value: 'restaurant', label: 'Restaurant' }, { value: 'airline', label: 'Airline' }, { value: 'bank', label: 'Bank' }, { value: 'school', label: 'School / college' }, { value: 'club', label: 'Club / gym' }, { value: 'other', label: 'Other' }] },
+    { key: 'kind', label: 'Kind', type: 'select', summary: true, options: [{ value: 'payee', label: 'Payee' }, { value: 'company', label: 'Company' }, { value: 'shop', label: 'Shop / brand' }, { value: 'restaurant', label: 'Restaurant' }, { value: 'airline', label: 'Airline' }, { value: 'bank', label: 'Bank' }, { value: 'school', label: 'School / college' }, { value: 'club', label: 'Club / gym' }, { value: 'other', label: 'Other' }] },
     { key: 'website', label: 'Website', type: 'text', section: 'Details' },
+    { key: 'upi', label: 'UPI ID', type: 'text', section: 'Details' },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
+  relations: [{ kind: 'payee', label: 'Payments', to: 'transaction', cardinality: 'many' }],
 };

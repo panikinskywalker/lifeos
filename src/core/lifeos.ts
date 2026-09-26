@@ -20,6 +20,7 @@ import { coreModule } from './coreModule';
 import type { Entity } from './domain/types';
 import { resolveLink, syncMentions } from './links';
 import { learnCategory } from './ingest/ingest';
+import { linkMissingPayees } from './ingest/payee';
 
 export interface LifeOSOptions {
   db: DatabaseAdapter;
@@ -255,6 +256,11 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   if (!settings.get<boolean>('search.indexV2', false)) {
     for (const e of entities.query(null, { includeArchived: true }, { limit: 100000 })) reindex(e.id);
     settings.set('search.indexV2', true);
+  }
+  // Once: payments filed before payees existed join their payee.
+  if (!settings.get<boolean>('payees.backfilled', false)) {
+    linkMissingPayees(ctx);
+    settings.set('payees.backfilled', true);
   }
   for (const m of all) await m.onStart?.(ctx);
   return ctx;

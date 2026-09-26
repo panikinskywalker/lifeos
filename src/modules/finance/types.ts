@@ -139,6 +139,7 @@ export const transactionType: EntityTypeDef<TransactionData> = {
     { kind: 'account', label: 'Account', to: 'account', cardinality: 'one' },
     { kind: 'trip', label: 'Trip', to: 'trip', cardinality: 'one' },
     { kind: 'person', label: 'People', to: 'person', cardinality: 'many' },
+    { kind: 'payee', label: 'Paid to / from', to: ['person', 'org'], cardinality: 'one' },
     { kind: 'project', label: 'Project', to: 'project', cardinality: 'one' },
   ],
   defaultViews: [
