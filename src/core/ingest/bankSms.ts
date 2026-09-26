@@ -198,7 +198,7 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
   const inrAmount = foreign && inr && inr.at > foreign.at && inr.at - foreign.at < 60 ? inr.amount : null;
 
   const creditWords = /\b(credited|received|deposited|refund(?:ed)?|reversed|reversal of|cashback (?:of|credited)|added to|payment (?:of .* )?received)\b/i;
-  const debitWords = /\b(debited|spent|withdrawn|sent|paid|purchase|charged|debit(?:ed)?|deducted|txn of|txn (?:rs|inr)|transferred to|used (?:for|at)|made a (?:payment|transaction)|txn initiated|transaction initiated|payment of [^\n]{0,30}?from (?:your )?a\/c|mandate of .* (?:redeemed|executed|processed))\b|\bDr\b/i;
+  const debitWords = /\b(debited|spent|withdrawn|sent|paid|purchase|charged|debit(?:ed)?|deducted|txn of|txn (?:rs|inr)|transferred to|used (?:for|at)|made a (?:payment|transaction)|txn initiated|transaction initiated|thank you for using|payment of [^\n]{0,30}?from (?:your )?a\/c|mandate of .* (?:redeemed|executed|processed))\b|\bDr\b/i;
   const ci = t.search(creditWords);
   const di = t.search(debitWords);
   // Paying off a card ("payment of Rs 12,345 for your … Credit Card was successful") credits the card.

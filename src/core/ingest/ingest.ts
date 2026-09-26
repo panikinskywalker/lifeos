@@ -5,6 +5,7 @@ import { toInr } from './fx';
 import { linkPayee, payeeFor } from './payee';
 import { knownMerchant } from './merchants';
 import { parseDeliverySms, type ParsedDelivery } from './delivery';
+import { AIRPORTS, parseMail, type Mail, type ParsedFlight, type ParsedStay } from './mail';
 import { parseBankSms, parsePaymentNotification, looksLikeBankSender, bankOf, BANK_NAMES, PAYMENT_APPS, type ParsedTxn, type SmsKind } from './bankSms';
 
 /**
@@ -16,9 +17,11 @@ import { parseBankSms, parsePaymentNotification, looksLikeBankSender, bankOf, BA
  */
 
 export interface RawMessage {
-  source: 'sms' | 'notification';
-  /** SMS sender ("VM-HDFCBK") or the app's package name. */
+  source: 'sms' | 'notification' | 'email';
+  /** SMS sender ("VM-HDFCBK"), the app's package name, or the email's sender address. */
   from: string;
+  /** Email only: the mailbox it was read from ("rutvij@gmail.com") — named on everything it files. */
+  account?: string | null;
   title?: string | null;
   body: string;
   receivedAt: number;
@@ -35,6 +38,8 @@ export interface IngestItem {
   status: 'pending' | 'proposed' | 'confirmed' | 'dismissed' | 'duplicate' | 'failed';
   entityId: string | null;
   note: string | null;
+  /** Email only: the mailbox it came from. */
+  account: string | null;
 }
 
 const toItem = (r: Row): IngestItem => ({
@@ -48,6 +53,7 @@ const toItem = (r: Row): IngestItem => ({
   status: r.status as IngestItem['status'],
   entityId: (r.entity_id as string | null) ?? null,
   note: (r.error as string | null) ?? null,
+  account: (r.raw_extra ? ((JSON.parse(r.raw_extra as string) as { account?: string }).account ?? null) : null),
 });
 
 /** Stable id: the same message imported twice (history re-scan) is one row. */
@@ -248,7 +254,7 @@ function findDuplicate(os: LifeOSContext, itemId: string, t: ParsedTxn, at: numb
   const tx = os.db.get<{ id: string }>(
     `SELECT e.id FROM entities e WHERE e.type='transaction' AND e.deleted_at IS NULL
        AND json_extract(e.data,'$.date') IN (?, ?) AND json_extract(e.data,'$.kind')=? AND json_extract(e.data,'$.amount')=?
-       AND NOT EXISTS (SELECT 1 FROM ingest_queue q WHERE q.entity_id = e.id) LIMIT 1`,
+       AND NOT EXISTS (SELECT 1 FROM ingest_queue q WHERE q.entity_id = e.id AND q.source <> 'email') LIMIT 1`,
     [day, prev, kind, t.amount],
   );
   return tx ? { entityId: tx.id } : null;
@@ -317,7 +323,8 @@ export function ingestMessage(os: LifeOSContext, m: RawMessage, opts: { mode?: '
   return fileItem(os, id);
 }
 
-function sourceLabel(m: { source: string; from: string }): string {
+function sourceLabel(m: { source: string; from: string; account?: string | null }): string {
+  if (m.source === 'email') return `Email · ${m.account ?? 'Gmail'}`;
   if (m.source === 'notification') return PAYMENT_APPS[m.from] ?? m.from;
   const b = bankOf(m.from);
   return b ? `${BANK_NAMES[b]} SMS` : `SMS from ${m.from}`;
@@ -376,11 +383,13 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
     let category = t.channel === 'atm' || t.transfer ? 'transfer' : categoryFor(os, merchant, item.text);
     // An autopay / e-mandate / SI charge from somewhere we don't know is still a subscription.
     if (category === 'other' && kind === 'expense' && t.recurring) category = 'subscriptions';
-    data = { amount, kind, category, merchant, date, accountId: accountId ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined, ...fx };
+    const note = [item.source === 'email' ? `From ${item.account ?? 'email'}` : null, t.ref ? `Ref ${t.ref}` : null].filter(Boolean).join(' · ');
+    data = { amount, kind, category, merchant, date, accountId: accountId ?? undefined, note: note || undefined, ...fx };
     const shown = t.currency !== 'INR' ? `${t.currency} ${t.amount.toLocaleString('en-IN')}${fx.fxRate ? ` (${os.format.currency(amount)})` : ''}` : os.format.currency(amount);
     label = `${kind === 'income' ? 'Received' : kind === 'transfer' ? (t.channel === 'atm' ? 'Cash' : 'Transfer') : 'Spent'} ${shown}${merchant ? ` · ${merchant}` : ''}${t.last4 ? ` · ••${t.last4}` : ''}`;
     if (category === 'other' && kind === 'expense') flag = 'Category unknown — set it once and it’s learned (or add a keyword rule)';
     if (t.currency !== 'INR' && !fx.fxRate) flag = `No ${t.currency} rate yet — converted to rupees when the app is next online`;
+    if (item.source === 'email') label += ` · from ${item.account ?? 'email'}`;
   }
   const e = os.entities.create({ type: 'transaction', data }, 'assistant');
   // Everyone you pay or get paid by is one record; this payment joins theirs.
@@ -393,9 +402,9 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
     }
   }
   if (!t.investment && !t.transfer && t.direction === 'debit' && data.category === 'subscriptions' && typeof data.merchant === 'string') {
-    linkSubscription(os, e.id, data.merchant, amount, date, (data.accountId as string | undefined) ?? undefined, created);
+    linkSubscription(os, e.id, data.merchant, amount, date, (data.accountId as string | undefined) ?? undefined, created, item.source as 'sms' | 'notification' | 'email');
   }
-  os.entities.timeline.add({ entityId: e.id, kind: item.source, title: `From ${sourceLabel(item)}`, body: item.text.slice(0, 300), actor: 'system', occurredAt: item.receivedAt, meta: { ingestId: id } });
+  os.entities.timeline.add({ entityId: e.id, kind: item.source, title: `From ${sourceLabel(item)}`, body: (item.source === 'email' ? `${item.title ?? ''}\n${item.text}` : item.text).slice(0, 300), actor: 'system', occurredAt: item.receivedAt, meta: { ingestId: id } });
   setItem(os, id, { status: 'confirmed', entityId: e.id });
   for (const a of created) {
     const ce = os.entities.get(a);
@@ -422,18 +431,18 @@ const cycleMonths = (rrule = '') => (/YEARLY/.test(rrule) ? 12 : /MONTHLY/.test(
  * bring each renewal), kept current after. When an auto-posted bill for the
  * same renewal already exists, the real charge replaces it.
  */
-function linkSubscription(os: LifeOSContext, txId: string, name: string, amount: number, date: string, accountId: string | undefined, created: string[]) {
+function linkSubscription(os: LifeOSContext, txId: string, name: string, amount: number, date: string, accountId: string | undefined, created: string[], via: 'sms' | 'notification' | 'email' = 'sms') {
   if (!os.registry.entityTypes.has('subscription')) return;
   const key = norm(name);
   const subs = os.entities.query<{ name: string; amount: number; nextBillingAt: string; rrule?: string; accountId?: string }>('subscription', {}, { limit: 500 });
   const sub = subs.find((s) => s.status !== 'cancelled' && (norm(s.data.name) === key || norm(s.data.name).startsWith(`${key} `) || key.startsWith(`${norm(s.data.name)} `)));
   if (!sub) {
     const s = os.entities.create({ type: 'subscription', data: { name, amount, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: addMonths(date), category: 'subscriptions', accountId, autoPost: false } }, 'assistant');
-    os.relations.link(txId, s.id, 'subscription', {}, 'assistant', { source: 'sms' });
+    os.relations.link(txId, s.id, 'subscription', {}, 'assistant', { source: via });
     created.push(s.id);
     return;
   }
-  os.relations.link(txId, sub.id, 'subscription', {}, 'assistant', { source: 'sms' });
+  os.relations.link(txId, sub.id, 'subscription', {}, 'assistant', { source: via });
   const at = new Date(`${date}T12:00:00`).getTime();
   // An auto-posted bill for this renewal (within five days) was a placeholder for this charge.
   for (const r of os.relations.forEntity(sub.id, 'subscription')) {
@@ -467,10 +476,11 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
         (!d.item || !e.data.item || norm2(e.data.item).includes(norm2(d.item).split(' ')[0]!) || norm2(d.item).includes(norm2(e.data.item).split(' ')[0]!)),
     );
   const day = iso(m.receivedAt);
+  const via = m.source === 'email' ? ` · from ${m.account ?? 'email'}` : '';
   if (!hit) {
     const e = os.entities.create({ type: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
-    os.entities.timeline.add({ entityId: e.id, kind: 'sms', title: STATUS_WORD[d.status]!, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
-    os.dumps.addExtraction({ source: 'sms', sourceRef: ingestId, kind: 'delivery', entityId: e.id, label: `Delivery: ${e.title} · ${STATUS_WORD[d.status]}${d.expected && d.status !== 'delivered' ? ` · by ${d.expected.slice(8)}/${d.expected.slice(5, 7)}` : ''}` });
+    os.entities.timeline.add({ entityId: e.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
+    os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', entityId: e.id, label: `Delivery: ${e.title} · ${STATUS_WORD[d.status]}${d.expected && d.status !== 'delivered' ? ` · by ${d.expected.slice(8)}/${d.expected.slice(5, 7)}` : ''}${via}` });
     return e.id;
   }
   const patch: Record<string, unknown> = {};
@@ -490,9 +500,9 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
   if (!hit.data.shop) set('shop', d.shop);
   if (Object.keys(patch).length) {
     os.entities.update(hit.id, { data: patch }, 'assistant');
-    os.dumps.addExtraction({ source: 'sms', sourceRef: ingestId, kind: 'delivery', action: 'updated', entityId: hit.id, label: `${os.entities.get(hit.id)?.title ?? 'Delivery'} · ${STATUS_WORD[(patch.status as string) ?? hit.data.status]}`, before });
+    os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', action: 'updated', entityId: hit.id, label: `${os.entities.get(hit.id)?.title ?? 'Delivery'} · ${STATUS_WORD[(patch.status as string) ?? hit.data.status]}${via}`, before });
   }
-  os.entities.timeline.add({ entityId: hit.id, kind: 'sms', title: STATUS_WORD[d.status]!, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
+  os.entities.timeline.add({ entityId: hit.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
   return hit.id;
 }
 
@@ -508,3 +518,142 @@ export function confirmProposed(os: LifeOSContext, keep: string[], dismiss: stri
 }
 
 export { sourceLabel };
+
+/* ------------------------------------------------------------------ */
+/* Email (M4.2b)                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Take in one email from a connected mailbox. Money becomes a transaction
+ * (or confirms one the SMS already filed), shipping a delivery, a ticket a
+ * flight in its trip, a booking a stay. Every record it touches says which
+ * mailbox it came from — in its note, on its timeline, and in To check.
+ */
+export function ingestMail(os: LifeOSContext, mail: Mail, account: string): IngestResult {
+  const text = mail.text.slice(0, 6000);
+  const m: RawMessage = { source: 'email', from: mail.from, account, title: mail.subject, body: text, receivedAt: mail.date };
+  const id = messageId({ ...m, body: `${account}|${mail.uid}|${mail.subject}` });
+  const existing = ingestItem(os, id);
+  if (existing) return { id, status: existing.status, entityId: existing.entityId, reason: 'seen before' };
+  const now = Date.now();
+  os.db.run(
+    `INSERT INTO ingest_queue(id,source,package,received_at,raw_title,raw_text,raw_extra,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'pending',?,?)`,
+    [id, 'email', mail.from, mail.date, mail.subject, text, JSON.stringify({ account, fromName: mail.fromName, uid: mail.uid }), now, now],
+  );
+  const parsed = parseMail({ ...mail, text });
+  if (parsed.kind === 'skip') {
+    setItem(os, id, { status: 'dismissed', note: parsed.reason });
+    return { id, status: 'dismissed', reason: parsed.reason };
+  }
+  if (parsed.kind === 'delivery') {
+    if (!os.registry.entityTypes.has('delivery')) return (setItem(os, id, { status: 'dismissed', note: 'deliveries not installed' }), { id, status: 'dismissed' });
+    const entityId = fileDelivery(os, id, parsed.delivery, { ...m, body: `${mail.subject}\n${text}` });
+    setItem(os, id, { status: 'confirmed', entityId, note: 'delivery' });
+    return { id, status: 'confirmed', entityId };
+  }
+  let travelId: string | null = null;
+  let tripId: string | null = null;
+  if (parsed.kind === 'flight' || parsed.kind === 'stay') {
+    const r = parsed.kind === 'flight' ? fileFlight(os, id, parsed.flight, mail, account) : fileStay(os, id, parsed.stay, mail, account);
+    travelId = r.eventId;
+    tripId = r.tripId;
+  }
+  const t = parsed.kind === 'txn' ? parsed.txn : parsed.txn;
+  if (!t) {
+    setItem(os, id, { status: travelId ? 'confirmed' : 'dismissed', entityId: travelId, note: parsed.kind });
+    return { id, status: travelId ? 'confirmed' : 'dismissed', entityId: travelId };
+  }
+  setItem(os, id, { parsed: { kind: 'txn', txn: t } });
+  os.db.run(`UPDATE ingest_queue SET dedupe_key=? WHERE id=?`, [`${t.direction}:${t.amount.toFixed(2)}`, id]);
+  // The bank SMS (or you) may have filed this payment already: confirm it instead of counting it twice.
+  const same = sameMoney(os, t.amount, t.direction === 'credit' ? 'income' : 'expense', t.date ?? iso(mail.date));
+  let entityId: string | null | undefined;
+  if (same) {
+    enrich(os, same, t, m);
+    const e = os.entities.get<{ merchant?: string }>(same)!;
+    // The mail knows who it was ("Adobe"), where the bank only had a code.
+    if (t.counterparty && (!e.data.merchant || /\d{4,}|\*/.test(e.data.merchant))) os.entities.update(same, { data: { merchant: t.counterparty } }, 'assistant');
+    setItem(os, id, { status: 'duplicate', entityId: same, note: 'same payment as a filed transaction' });
+    os.dumps.addExtraction({ source: 'email', sourceRef: id, kind: 'transaction', action: 'updated', entityId: same, label: `Matched ${os.entities.get(same)?.title ?? 'a payment'} · ${os.format.currency(t.amount)} to an email from ${account}` });
+    entityId = same;
+  } else {
+    entityId = fileItem(os, id).entityId;
+  }
+  if (entityId && tripId) os.relations.link(entityId, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: id });
+  if (travelId && entityId) os.relations.link(entityId, travelId, 'paid_for', {}, 'assistant', { source: 'email', sourceId: id });
+  return { id, status: same ? 'duplicate' : 'confirmed', entityId: travelId ?? entityId };
+}
+
+/** A transaction for this amount within a day either side (from any source). */
+function sameMoney(os: LifeOSContext, amount: number, kind: string, day: string): string | null {
+  if (!os.registry.entityTypes.has('transaction')) return null;
+  const d = new Date(`${day}T12:00:00`).getTime();
+  return (
+    os.db.get<{ id: string }>(
+      `SELECT id FROM entities WHERE type='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')=? AND ABS(json_extract(data,'$.amount') - ?) < 0.5
+         AND json_extract(data,'$.date') BETWEEN ? AND ? ORDER BY ABS(julianday(json_extract(data,'$.date')) - julianday(?)) LIMIT 1`,
+      [kind, amount, iso(d - DAY), iso(d + DAY), day],
+    )?.id ?? null
+  );
+}
+
+const cityOf = (code: string | null) => (code ? (AIRPORTS[code] ?? code) : null);
+
+/** The trip covering this day (or two weeks from an open one's start), else a new "Trip to X". */
+function tripOn(os: LifeOSContext, day: string, destination: string | null, ingestId: string, account: string, end?: string | null): string | null {
+  if (!os.registry.entityTypes.has('trip')) return null;
+  const trips = os.entities.query<{ destination?: string; startDate?: string; endDate?: string }>('trip', {}, { limit: 300 });
+  const openEnd = (start: string) => iso(new Date(`${start}T12:00:00`).getTime() + 14 * DAY);
+  const hit = trips.find((t) => t.data.startDate && t.data.startDate <= day && (t.data.endDate ?? openEnd(t.data.startDate)) >= day);
+  if (hit) {
+    if (end && hit.data.endDate && end > hit.data.endDate) os.entities.update(hit.id, { data: { endDate: end } }, 'assistant');
+    return hit.id;
+  }
+  if (!destination) return null;
+  const t = os.entities.create({ type: 'trip', title: `Trip to ${destination}`, data: { destination, startDate: day, ...(end ? { endDate: end } : {}) } }, 'assistant');
+  os.entities.timeline.add({ entityId: t.id, kind: 'email', title: `From Email · ${account}`, body: null, actor: 'system', occurredAt: Date.now(), meta: { ingestId } });
+  os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'trip', entityId: t.id, label: `Trip: Trip to ${destination} · from ${account}` });
+  return t.id;
+}
+
+/** A ticket → one flight event (re-sent tickets and check-in mails update it), in its trip. */
+function fileFlight(os: LifeOSContext, ingestId: string, f: ParsedFlight, mail: Mail, account: string): { eventId: string | null; tripId: string | null } {
+  if (!os.registry.entityTypes.has('event')) return { eventId: null, tripId: null };
+  const startAt = f.time ? new Date(`${f.date}T${f.time}:00`).getTime() : new Date(`${f.date}T12:00:00`).getTime();
+  const route = f.from && f.to ? `${cityOf(f.from)} → ${cityOf(f.to)}` : null;
+  const title = route ? `Flight ${route}` : `Flight ${f.flightNo}`;
+  const notes = [f.pnr ? `PNR ${f.pnr}` : null, `From ${account}: “${mail.subject}”`].filter(Boolean).join('\n');
+  const flights = os.entities.query<{ kind?: string; flightNo?: string; startAt?: number; notes?: string }>('event', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'flight' }] } }, { limit: 500 });
+  const same = flights.find((e) => (f.pnr && e.data.notes?.includes(`PNR ${f.pnr}`) && (!f.flightNo || !e.data.flightNo || e.data.flightNo === f.flightNo)) || (f.flightNo && e.data.flightNo === f.flightNo && e.data.startAt && iso(e.data.startAt) === f.date));
+  const data = { kind: 'flight', startAt, allDay: !f.time, airline: f.airline ?? undefined, flightNo: f.flightNo ?? undefined, location: f.from && f.to ? `${f.from} → ${f.to}` : undefined, notes };
+  let id: string;
+  if (same) {
+    id = same.id;
+    os.entities.update(id, { data: { startAt, ...(f.time ? { allDay: false } : {}) } }, 'assistant');
+  } else {
+    id = os.entities.create({ type: 'event', title, data }, 'assistant').id;
+    os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Flight: ${route ?? f.flightNo} · ${f.date.slice(8)}/${f.date.slice(5, 7)}${f.flightNo ? ` · ${f.flightNo}` : ''} · from ${account}` });
+  }
+  os.entities.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
+  const tripId = tripOn(os, f.date, cityOf(f.to), ingestId, account);
+  if (tripId && !os.relations.forEntity(id, 'part_of').some((r) => r.other.id === tripId)) os.relations.link(id, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: ingestId });
+  return { eventId: id, tripId };
+}
+
+/** A hotel / stay booking → a stay event across its nights, in its trip. */
+function fileStay(os: LifeOSContext, ingestId: string, st: ParsedStay, mail: Mail, account: string): { eventId: string | null; tripId: string | null } {
+  if (!os.registry.entityTypes.has('event')) return { eventId: null, tripId: null };
+  const startAt = new Date(`${st.checkIn}T14:00:00`).getTime();
+  const stays = os.entities.query<{ kind?: string; startAt?: number }>('event', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'stay' }] } }, { limit: 500 });
+  const same = stays.find((e) => e.title === `Stay · ${st.name}` && e.data.startAt && iso(e.data.startAt) === st.checkIn);
+  let id: string;
+  if (same) id = same.id;
+  else {
+    id = os.entities.create({ type: 'event', title: `Stay · ${st.name}`, data: { kind: 'stay', startAt, allDay: true, ...(st.checkOut ? { endAt: new Date(`${st.checkOut}T11:00:00`).getTime() } : {}), location: st.place ?? undefined, notes: `From ${account}: “${mail.subject}”` } }, 'assistant').id;
+    os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Stay: ${st.name} · ${st.checkIn.slice(8)}/${st.checkIn.slice(5, 7)}${st.checkOut ? `–${st.checkOut.slice(8)}/${st.checkOut.slice(5, 7)}` : ''} · from ${account}` });
+  }
+  os.entities.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
+  const tripId = tripOn(os, st.checkIn, st.place, ingestId, account, st.checkOut);
+  if (tripId && !os.relations.forEntity(id, 'part_of').some((r) => r.other.id === tripId)) os.relations.link(id, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: ingestId });
+  return { eventId: id, tripId };
+}

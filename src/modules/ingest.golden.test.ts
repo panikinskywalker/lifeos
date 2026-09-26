@@ -16,6 +16,8 @@ import { accountType, subscriptionType, transactionType } from './finance/types'
 import { financeAiTools } from './finance/aiTools';
 import { personType } from './crm/types';
 import { deliveryType } from './deliveries/types';
+import { eventType } from './projects/types';
+import { tripType } from './travel/types';
 
 const modules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [personType] },
@@ -249,5 +251,52 @@ describe('payees: one record per person or shop you pay', () => {
     // An unknown e-mandate charge is still a subscription.
     send('Rs.499.00 debited from A/c XX1234 on 14-09-26 for UPI AutoPay to FITPASS SERVICES. UPI Ref 426912345696', 33 * 86_400_000);
     expect(txs().find((t) => t.data.amount === 499)!.data).toMatchObject({ merchant: 'FITPASS SERVICES', category: 'subscriptions' });
+  });
+});
+
+describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox', () => {
+  const mail = (from: string, fromName: string, subject: string, text: string, date: string, uid = 1) => ({ uid, from, fromName, subject, text, date: Date.parse(date) });
+  it('a receipt files an expense that says which mailbox it came from; the bank SMS for it confirms, never doubles', async () => {
+    const { ingestMail } = await import('@core/ingest/ingest');
+    const r = ingestMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Friday evening trip with Uber', 'Total ₹312.45\nPaid with UPI', '2026-09-25T21:10:00'), 'rutvij@gmail.com');
+    expect(r.status).toBe('confirmed');
+    const [t] = txs();
+    expect(t!.data).toMatchObject({ amount: 312.45, merchant: 'Uber', category: 'transport', note: 'From rutvij@gmail.com' });
+    expect(os.entities.timeline.forEntity(t!.id).some((e) => e.title === 'From Email · rutvij@gmail.com')).toBe(true);
+    expect(os.dumps.toCheck()[0]!.label).toContain('from rutvij@gmail.com');
+    // The same ride in the bank SMS a minute later: matched, not a second expense.
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.312.45 From HDFC Bank A/C *1234 To UBER INDIA On 25/09/26', receivedAt: Date.parse('2026-09-25T21:11:00') });
+    expect(txs()).toHaveLength(1);
+    // A second mailbox, the same kind of mail: its own record, naming that mailbox.
+    ingestMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Saturday trip with Uber', 'Total ₹150.00', '2026-09-26T10:00:00', 2), 'work@acme.in');
+    expect(txs().find((x) => x.data.amount === 150)!.data.note).toBe('From work@acme.in');
+    // Seen twice (a re-sync): nothing new.
+    expect(ingestMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Saturday trip with Uber', 'Total ₹150.00', '2026-09-26T10:00:00', 2), 'work@acme.in').reason).toBe('seen before');
+  });
+
+  it('an emailed bank alert after the SMS confirms the same payment; the mail names the merchant the bank coded', async () => {
+    const { ingestMail } = await import('@core/ingest/ingest');
+    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent Rs.1,675.60 On HDFC Bank Card 5678 At PYU*00412 On 2026-09-12', receivedAt: Date.parse('2026-09-12T10:00:00') });
+    ingestMail(os, mail('message@adobe.com', 'Adobe', 'Your Adobe invoice is ready', 'Total amount: ₹1,675.60\nCharged to Visa ending 5678', '2026-09-12T10:05:00'), 'rutvij@gmail.com');
+    expect(txs()).toHaveLength(1);
+    expect(txs()[0]!.data.merchant).toBe('Adobe');
+    expect(os.entities.timeline.forEntity(txs()[0]!.id).some((e) => e.title === 'Seen in Email · rutvij@gmail.com')).toBe(true);
+  });
+
+  it('a ticket → a flight in a trip, with its fare; the web check-in mail updates the same flight', async () => {
+    const { ingestMail } = await import('@core/ingest/ingest');
+    os.registry.entityTypes.set('event', eventType as never);
+    os.registry.entityTypes.set('trip', tripType as never);
+    ingestMail(os, mail('reservations@customer.goindigo.in', 'IndiGo', 'Your IndiGo Itinerary - PNR K7XQ2M', 'PNR: K7XQ2M\nFlight 6E 2134\nBLR → GOI\nDeparture: Sat, 10 Oct 2026, 06:15 hrs\nTotal fare: ₹5,842', '2026-09-20T09:00:00'), 'rutvij@gmail.com');
+    const [flight] = os.entities.query<{ kind: string; flightNo: string; notes: string }>('event');
+    expect(flight).toMatchObject({ title: 'Flight Bengaluru → Goa', data: { kind: 'flight', flightNo: '6E 2134' } });
+    expect(flight!.data.notes).toContain('From rutvij@gmail.com');
+    const [trip] = os.entities.query('trip');
+    expect(trip).toMatchObject({ title: 'Trip to Goa', data: { startDate: '2026-10-10' } });
+    expect(os.relations.forEntity(flight!.id, 'part_of')[0]!.other.id).toBe(trip!.id);
+    expect(txs()[0]!.data).toMatchObject({ amount: 5842, merchant: 'IndiGo', category: 'travel' });
+    ingestMail(os, mail('reservations@customer.goindigo.in', 'IndiGo', 'Web check-in is open for PNR K7XQ2M', 'Flight 6E 2134 BLR → GOI on 10 Oct 2026 06:15', '2026-10-08T06:15:00', 9), 'rutvij@gmail.com');
+    expect(os.entities.query('event')).toHaveLength(1);
+    expect(os.entities.query('trip')).toHaveLength(1);
   });
 });

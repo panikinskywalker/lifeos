@@ -142,7 +142,7 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [ ] Calendar (on-device): events with their people and places linked; deduped on re-sync.
 - [ ] Call log (dev build): updates each person's last contact and keep-in-touch cycle.
 - [ ] Google sign-in (OAuth, testing mode, token in SecureStore) — Rutvij sets up the Google Cloud client once.
-- [ ] Gmail: receipts, tickets and bookings only; known senders parsed on the phone (airlines, Uber, Swiggy, Amazon…), the rest via the queue → flights in trips, expenses linked.
+- [x] Gmail: receipts, tickets and bookings only; known senders parsed on the phone (airlines, Uber, Swiggy, Amazon…), the rest via the queue → flights in trips, expenses linked. *(`src/core/ingest/mail.ts` + `ingestMail`: picked from headers alone (promos, statements, people skipped, never downloaded); bank alert mails read like their SMS; receipts → expenses (final total, brand, subscriptions), matched to the SMS for the same payment either way; shipping → deliveries; tickets → a flight in its trip (check-in mails update it); hotel bookings → a stay across its nights. Every record names the mailbox it came from (note, timeline, To check). Mail with no known shape is skipped for now, not sent to the model queue. Phone check pending.)*
 - [ ] Google Calendar: same as the phone calendar, deduped against it.
 - [ ] Drive: titles and text searchable; linked when they mention a person or trip.
 

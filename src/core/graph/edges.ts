@@ -41,7 +41,7 @@ export function edgeLabel(kind: string, direction: 'out' | 'in'): string {
 }
 
 export interface Provenance {
-  source?: 'dump' | 'record-voice' | 'manual' | 'sms' | 'notification' | 'assistant';
+  source?: 'dump' | 'record-voice' | 'manual' | 'sms' | 'notification' | 'email' | 'assistant';
   sourceId?: string | null;
   confidence?: number;
   validFrom?: number | null;
