@@ -169,3 +169,66 @@ export function ChartLegend({ items }: { items: Array<{ label: string; color: st
     </View>
   );
 }
+
+/** Tile bars: no axes, one bar per bucket, today's in full colour, missing days as a faint stub (not zero). */
+export function MiniBars({ values, height = 44, color, accessibilityLabel }: { values: Array<number | null>; height?: number; color?: string; accessibilityLabel?: string }) {
+  const t = useTheme();
+  const [w, onLayout] = useWidth();
+  const c = color ?? t.c.accent.gold;
+  const max = Math.max(...values.map((v) => v ?? 0), 1);
+  const n = values.length;
+  const gap = n > 14 ? 2 : 4;
+  const barW = n ? Math.max(2, (w - gap * (n - 1)) / n) : 0;
+  return (
+    <View onLayout={onLayout} style={{ height }} accessibilityRole="image" accessibilityLabel={accessibilityLabel}>
+      {w > 0 ? (
+        <Svg width={w} height={height}>
+          {values.map((v, i) => {
+            const h = v == null ? 2 : Math.max(3, (v / max) * (height - 2));
+            return <Rect key={i} x={i * (barW + gap)} y={height - h} width={barW} height={h} rx={Math.min(3, barW / 2)} fill={v == null ? t.c.line : i === n - 1 ? c : `${c}66`} />;
+          })}
+        </Svg>
+      ) : null}
+    </View>
+  );
+}
+
+/** "+12% vs last week" — green when the change is good for this metric, coral when not, grey when neutral. */
+export function DeltaChip({ change, better, vs }: { change: number | null; better: 'up' | 'down' | 'none'; vs: string }) {
+  const t = useTheme();
+  if (change == null || !Number.isFinite(change)) return null;
+  const pct = Math.round(change * 100);
+  const good = better === 'none' || pct === 0 ? null : better === 'up' ? pct > 0 : pct < 0;
+  const fg = good == null ? t.c.fg.secondary : good ? t.c.ok.sageText : t.c.alert.coralText;
+  return (
+    <Text variant="label" color={fg} numberOfLines={1}>
+      {pct > 0 ? '▲' : pct < 0 ? '▼' : '='} {Math.abs(pct)}% <Text variant="caption" color="secondary">{vs}</Text>
+    </Text>
+  );
+}
+
+/** Calendar heat map: columns are weeks (oldest left), rows Mon–Sun; darker = more. */
+export function HeatMap({ days, color, accessibilityLabel }: { days: Array<{ day: string; value: number | null }>; color?: string; accessibilityLabel?: string }) {
+  const t = useTheme();
+  const [w, onLayout] = useWidth();
+  const c = color ?? t.tints.health.ink;
+  const max = Math.max(...days.map((d) => d.value ?? 0), 1);
+  const first = days[0] ? (new Date(`${days[0].day}T12:00:00`).getDay() + 6) % 7 : 0;
+  const cols = Math.ceil((days.length + first) / 7);
+  const cell = cols ? Math.min(14, (w - (cols - 1) * 3) / cols) : 0;
+  const height = cell * 7 + 12;
+  return (
+    <View onLayout={onLayout} style={{ height: w ? height : 110 }} accessibilityRole="image" accessibilityLabel={accessibilityLabel}>
+      {w > 0 ? (
+        <Svg width={w} height={height}>
+          {days.map((d, i) => {
+            const k = i + first;
+            const x = Math.floor(k / 7) * (cell + 3);
+            const a = d.value == null ? 0 : 0.18 + 0.82 * (d.value / max);
+            return <Rect key={d.day} x={x} y={(k % 7) * (cell + 2)} width={cell} height={cell} rx={3} fill={d.value == null ? t.c.line : c} opacity={d.value == null ? 1 : a} />;
+          })}
+        </Svg>
+      ) : null}
+    </View>
+  );
+}

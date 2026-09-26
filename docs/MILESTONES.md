@@ -147,11 +147,11 @@ Phase D1 ships in the next build; D2+ land alongside the milestone that brings t
 - [ ] Drive: titles and text searchable; linked when they mention a person or trip.
 
 ### M4.3 — Today as a dashboard
-- [ ] Chart components on the design tokens: Sparkline, Bars (daily/weekly), Ring, StackedBar (exists), HeatMap (habits/steps), Comparison ("vs. yesterday" delta chip). Built with react-native-svg; no chart library that pulls in web deps.
-- [ ] Today tiles, all live from real data: Steps (today vs. yesterday + 7-day bars), Sleep (last night + 7-day), Screen time (today total + top 3 apps + 7-day), Spend this month (pace line vs. usual month), Upcoming (next 5 dues/events), Streaks, People to call, Brief (one line from the agent, optional).
-- [ ] Every tile → full-screen chart: period switcher day/week/month/year, previous-period comparison, list of underlying records below.
-- [ ] Tile layout persisted; add/remove/reorder.
-- [ ] Empty states that say which permission to grant, with a button to You › Data sources.
+- [x] Chart components on the design tokens: Sparkline, Bars (daily/weekly), Ring, StackedBar (exists), HeatMap (habits/steps), Comparison ("vs. yesterday" delta chip). Built with react-native-svg; no chart library that pulls in web deps. *(MiniBars, DeltaChip (good/bad per metric), HeatMap added; Sparkline, LineChart, ColumnChart, Ring, StackedBar already existed. All in the gallery.)*
+- [x] Today tiles, all live from real data: Steps (today vs. yesterday + 7-day bars), Sleep (last night + 7-day), Screen time (today total + top 3 apps + 7-day), Spend this month (pace line vs. usual month), Upcoming (next 5 dues/events), Streaks, People to call, Brief (one line from the agent, optional). *(Steps, Sleep, Screen time (+ top 3 apps), Spend pace vs usual month, Upcoming, People to call, Overdue. Streaks wait for habit check-ins (M5); the Brief comes with M5's morning brief.)*
+- [x] Every tile → full-screen chart: period switcher day/week/month/year, previous-period comparison, list of underlying records below. *(`app/metric/[id].tsx`: day/week/month/year, change vs previous period, heat map for the year, the records underneath.)*
+- [x] Tile layout persisted; add/remove/reorder. *(Edit tiles sheet; saved in settings.)*
+- [x] Empty states that say which permission to grant, with a button to You › Data sources. *(Each metric names its source and opens You › Data sources.)*
 
 ### M4.4 — Almanac (replaces Browse)
 - [ ] Almanac tab: search field; sections *People · Things · Money · Body · Mind · Places · Time*; each a list of types with counts.

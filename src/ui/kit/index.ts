@@ -25,5 +25,5 @@ export { AgentCard, ChatBubble } from './AgentCard';
 export { Composer } from './Composer';
 export { Surface, useSurface, useControlFill } from './Surface';
 export { ProgressBar } from './ProgressBar';
-export { ChartLegend, ColumnChart, LineChart, Sparkline, niceMax, type ChartSeries } from './Charts';
+export { ChartLegend, ColumnChart, DeltaChip, HeatMap, LineChart, MiniBars, Sparkline, niceMax, type ChartSeries } from './Charts';
 export { AttentionCard, DayTimeline, QuickActions, StatTrio, type TimelineLane, type TrioStat } from './Insight';

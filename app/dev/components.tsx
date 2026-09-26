@@ -62,6 +62,9 @@ import {
   ToastProvider,
   useToast,
   WeekStrip,
+  DeltaChip,
+  HeatMap,
+  MiniBars,
 } from '@ui/kit';
 
 /**
@@ -628,11 +631,34 @@ const DEMO_GRAPH = {
     { from: 'd', to: 'm', kind: 'with' },
   ],
 };
+function TodayChartsDemo() {
+  const t = useTheme();
+  const days = Array.from({ length: 120 }, (_, i) => { const d = new Date(Date.now() - (119 - i) * 86_400_000); return { day: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, value: i % 9 === 0 ? null : 3000 + ((i * 7919) % 9000) }; });
+  return (
+    <View style={{ gap: 14 }}>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flex: 1, gap: 6 }}>
+          <Text variant="stat">8,240</Text>
+          <DeltaChip change={0.18} better="up" vs="vs yesterday" />
+          <MiniBars values={[6100, 4000, null, 7200, 5400, 6900, 8240]} color={t.tints.health.ink} accessibilityLabel="Steps, 7 days" />
+        </View>
+        <View style={{ flex: 1, gap: 6 }}>
+          <Text variant="stat">4h 12m</Text>
+          <DeltaChip change={0.25} better="down" vs="vs yesterday" />
+          <MiniBars values={[3.1, 2.8, 4.4, 3.9, 2.2, 3.4, 4.2]} color={t.tints.tasks.ink} accessibilityLabel="Screen time, 7 days" />
+        </View>
+      </View>
+      <HeatMap days={days} color={t.tints.health.ink} accessibilityLabel="Steps heat map" />
+    </View>
+  );
+}
+
 function GraphDemo() {
   return <GraphView nodes={DEMO_GRAPH.nodes} edges={DEMO_GRAPH.edges} height={340} />;
 }
 
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
+  ['Today charts', 'mini bars · delta chip (good/bad by metric) · heat map', TodayChartsDemo],
   ['Graph view', 'around a record · 2 hops · module tints · link words (d3-force)', GraphDemo],
   ['Progress bar', '8 tall · pill · optional target tick', Progress],
   ['Charts', 'sparkline · line · columns · legend (Stitch)', ChartsDemo],

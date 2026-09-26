@@ -46,8 +46,8 @@ const addDays = (iso: string, n: number) => {
 const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTH = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
-/** One value per day in [from, to] (0 / null-free map; days without data are absent). */
-function daily(os: LifeOSContext, id: MetricId, from: string, to: string): Map<string, number> {
+/** One value per day in [from, to] (days without data are absent, never zero). */
+export function daily(os: LifeOSContext, id: MetricId, from: string, to: string): Map<string, number> {
   const out = new Map<string, number>();
   if (id === 'screen') for (const d of usageDays(os, from, to)) out.set(d.day, d.totalMs / 3_600_000);
   else if (id === 'spend') {
@@ -221,4 +221,25 @@ export function peopleToCall(os: LifeOSContext, limit = 4, now = Date.now()): Ar
     else if (i.cycle.template === 'person.contact' && days <= 7) out.push({ entityId: i.entity.id, title: i.entity.title, why: days < 0 ? `${-days} d overdue` : days === 0 ? 'Today' : `In ${days} d`, late: days < 0, at: i.cycle.nextDueAt });
   }
   return out.sort((a, b) => a.at - b.at).slice(0, limit).map(({ at: _at, ...r }) => r);
+}
+
+/** Every day of the last `days` days (for the heat map); days without data are null. */
+export function dailyRange(os: LifeOSContext, id: MetricId, days = 365, now = Date.now()): Array<{ day: string; value: number | null }> {
+  const today = isoDay(now);
+  const from = addDays(today, -(days - 1));
+  const m = daily(os, id, from, today);
+  return Array.from({ length: days }, (_, i) => {
+    const key = addDays(from, i);
+    return { day: key, value: m.get(key) ?? null };
+  });
+}
+
+const fmtHours = (h: number) => `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}m`;
+
+/** "8,240" · "7h 12m" · "₹1,240" · "58 bpm". */
+export function formatMetric(id: MetricId, v: number, currency: (n: number) => string): string {
+  if (id === 'spend') return currency(v);
+  if (id === 'sleep' || id === 'screen') return fmtHours(v);
+  if (id === 'steps') return Math.round(v).toLocaleString('en-IN');
+  return `${v.toFixed(METRICS[id].decimals)} ${METRICS[id].unit}`;
 }
