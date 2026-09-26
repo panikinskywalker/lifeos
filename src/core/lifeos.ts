@@ -19,7 +19,7 @@ import { bus } from './events/bus';
 import { coreModule } from './coreModule';
 import type { Entity } from './domain/types';
 import { resolveLink, syncMentions } from './links';
-import { learnCategory, payeeOf } from './ingest/ingest';
+import { backfillDeliveries, learnCategory, payeeOf } from './ingest/ingest';
 import { linkMissingPayees } from './ingest/payee';
 
 export interface LifeOSOptions {
@@ -267,6 +267,11 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     linkMissingPayees(ctx);
     settings.set('payees.backfilled', true);
     settings.set('payees.backfilledV2', true);
+  }
+  // Once: shipping texts that arrived before deliveries were tracked.
+  if (!settings.get<boolean>('deliveries.backfilled', false)) {
+    backfillDeliveries(ctx);
+    settings.set('deliveries.backfilled', true);
   }
   for (const m of all) await m.onStart?.(ctx);
   return ctx;

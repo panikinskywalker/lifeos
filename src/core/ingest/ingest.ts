@@ -632,7 +632,7 @@ const STATUS_WORD: Record<string, string> = { ordered: 'Ordered', shipped: 'Ship
 
 /** One delivery per order: found by tracking / order number, or the same shop's open order from the last month. Status only moves forward. */
 function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m: RawMessage): string {
-  type D = { shop?: string; item?: string; carrier?: string; tracking?: string; orderId?: string; status: string; expectedDate?: string; deliveredOn?: string };
+  type D = { shop?: string; item?: string; carrier?: string; tracking?: string; orderId?: string; status: string; expectedDate?: string; deliveredOn?: string; trackingUrl?: string; otp?: string; otpAt?: number };
   const recent = os.entities.query<D>('delivery', { sort: [{ field: 'createdAt', dir: 'desc' }] }, { limit: 300 });
   const norm2 = (x?: string | null) => (x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const hit =
@@ -647,7 +647,7 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
   const day = iso(m.receivedAt);
   const via = m.source === 'email' ? ` · from ${m.account ?? 'email'}` : '';
   if (!hit) {
-    const e = os.entities.create({ type: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
+    const e = os.entities.create({ type: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, trackingUrl: d.link ?? undefined, otp: d.otp ?? undefined, otpAt: d.otp ? m.receivedAt : undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
     os.entities.timeline.add({ entityId: e.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
     os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', entityId: e.id, label: `Delivery: ${e.title} · ${STATUS_WORD[d.status]}${d.expected && d.status !== 'delivered' ? ` · by ${d.expected.slice(8)}/${d.expected.slice(5, 7)}` : ''}${via}` });
     return e.id;
@@ -667,12 +667,45 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
   if (!hit.data.tracking) set('tracking', d.tracking);
   if (!hit.data.orderId) set('orderId', d.orderId);
   if (!hit.data.shop) set('shop', d.shop);
+  if (!hit.data.trackingUrl) set('trackingUrl', d.link);
+  // A new code replaces the old one; once it's delivered the code is no use.
+  if (d.otp) (set('otp', d.otp), set('otpAt', m.receivedAt));
+  if (d.status === 'delivered' && hit.data.otp) (patch.otp = undefined, before.otp = hit.data.otp);
   if (Object.keys(patch).length) {
     os.entities.update(hit.id, { data: patch }, 'assistant');
     os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', action: 'updated', entityId: hit.id, label: `${os.entities.get(hit.id)?.title ?? 'Delivery'} · ${STATUS_WORD[(patch.status as string) ?? hit.data.status]}${via}`, before });
   }
   os.entities.timeline.add({ entityId: hit.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
   return hit.id;
+}
+
+/**
+ * Once: texts read before delivery tracking existed (set aside as "not a
+ * bank") are read again for shipping updates, oldest first so each order
+ * moves forward. An order with no word for 10 days is taken as delivered —
+ * flagged in To check so you can say otherwise.
+ */
+export function backfillDeliveries(os: LifeOSContext, now = Date.now(), days = 45): number {
+  if (!os.registry.entityTypes.has('delivery')) return 0;
+  const rows = os.db.all<Row>(`SELECT * FROM ingest_queue WHERE source='sms' AND status='dismissed' AND received_at >= ? ORDER BY received_at`, [now - days * DAY]);
+  // Each order and when its last text came.
+  const touched = new Map<string, number>();
+  for (const r of rows) {
+    const item = toItem(r);
+    const d = parseDeliverySms(item.text, item.from, item.receivedAt);
+    if (!d) continue;
+    const id = fileDelivery(os, item.id, d, { source: 'sms', from: item.from, body: item.text, receivedAt: item.receivedAt });
+    setItem(os, item.id, { status: 'confirmed', entityId: id, note: 'delivery' });
+    touched.set(id, item.receivedAt);
+  }
+  for (const [id, last] of touched) {
+    const e = os.entities.get<{ status: string }>(id);
+    if (!e || STAGE[e.data.status]! >= 3) continue;
+    if (now - last < 10 * DAY) continue;
+    os.entities.update(id, { data: { status: 'delivered', deliveredOn: iso(last) } }, 'assistant');
+    os.dumps.addExtraction({ source: 'sms', kind: 'delivery', action: 'updated', entityId: id, label: `${e.title} · Delivered`, before: { status: e.data.status }, flag: `Assumed delivered — no update since ${iso(last).slice(8)}/${iso(last).slice(5, 7)}` });
+  }
+  return touched.size;
 }
 
 /** First-run review: file the proposals you kept; the rest are dismissed. */

@@ -12,6 +12,11 @@ export interface DeliveryData {
   status: 'ordered' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'returned';
   expectedDate?: string;
   deliveredOn?: string;
+  /** The tracking page from the shop's / courier's text. */
+  trackingUrl?: string;
+  /** Code for the delivery agent, and when it came (codes go stale). */
+  otp?: string;
+  otpAt?: number;
   notes?: string;
 }
 
@@ -40,6 +45,9 @@ export const deliveryType: EntityTypeDef<DeliveryData> = {
     status: z.enum(['ordered', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned']).default('ordered'),
     expectedDate: z.string().optional(),
     deliveredOn: z.string().optional(),
+    trackingUrl: z.string().optional(),
+    otp: z.string().optional(),
+    otpAt: z.number().optional(),
     notes: z.string().optional(),
   }),
   fields: [
@@ -47,6 +55,8 @@ export const deliveryType: EntityTypeDef<DeliveryData> = {
     { key: 'item', label: 'Item', type: 'text' },
     { key: 'shop', label: 'From', type: 'text', summary: true },
     { key: 'expectedDate', label: 'Expected', type: 'date', summary: true },
+    { key: 'otp', label: 'Delivery OTP', type: 'text', summary: true },
+    { key: 'trackingUrl', label: 'Tracking link', type: 'text', section: 'Tracking' },
     { key: 'carrier', label: 'Carrier', type: 'text', section: 'Tracking' },
     { key: 'tracking', label: 'Tracking number', type: 'text', section: 'Tracking' },
     { key: 'orderId', label: 'Order ID', type: 'text', section: 'Tracking' },

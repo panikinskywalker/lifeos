@@ -15,6 +15,22 @@ describe('shipping texts', () => {
     expect(parseDeliverySms('Your Nykaa order has been cancelled. Refund of Rs 899 will be processed.', 'AX-NYKAA', AT)).toMatchObject({ shop: 'Nykaa', status: 'cancelled' });
   });
 
+  it('tracking link and delivery OTP', () => {
+    expect(parseDeliverySms('Shipped: boAt Rockerz 255 Pro will be delivered by Tue, 29 Sep. Track: amzn.in/d/abc12 Order 402-1234567-7654321', 'AX-AMAZON', AT)).toMatchObject({ link: 'https://amzn.in/d/abc12', otp: null });
+    expect(parseDeliverySms('Your Myntra shipment is out for delivery. Share OTP 4821 with the agent. Track https://myntr.it/xYz9.', 'VM-MYNTRA', AT)).toMatchObject({ status: 'out_for_delivery', otp: '4821', link: 'https://myntr.it/xYz9' });
+    expect(parseDeliverySms('739204 is the OTP for your Flipkart order delivery. Do not share it before receiving the package.', 'VM-FLPKRT', AT)).toMatchObject({ shop: 'Flipkart', status: 'out_for_delivery', otp: '739204' });
+    expect(parseDeliverySms('Delivered: Your package with boAt Rockerz 255 Pro has been delivered. OTP 4821 used.', 'AX-AMAZON', AT)).toMatchObject({ status: 'delivered', otp: null });
+    expect(parseDeliverySms('Your Amazon.in order has been shipped.', 'AX-AMAZON', AT)!.link).toBeNull();
+  });
+
+  it('more real shapes: arriving today, dispatched, courier OTP texts, order confirmed', () => {
+    expect(parseDeliverySms('Arriving today: Your Amazon package with Philips Trimmer BT3221. Track: amzn.in/d/x1', 'JD-AMAZON', AT)).toMatchObject({ shop: 'Amazon', status: 'out_for_delivery', expected: '2026-09-26' });
+    expect(parseDeliverySms('Your Meesho order for Cotton Kurta Set has been dispatched and will reach you by 30 Sep.', 'VM-MEESHO', AT)).toMatchObject({ shop: 'Meesho', status: 'shipped', expected: '2026-09-30' });
+    expect(parseDeliverySms('Ekart: Your Flipkart shipment FMPP1234567890 will be delivered today. Share OTP 4821 with the delivery agent only on receiving it.', 'VM-EKARTL', AT)).toMatchObject({ carrier: 'Ekart', shop: 'Flipkart', status: 'out_for_delivery', tracking: 'FMPP1234567890' });
+    expect(parseDeliverySms('XpressBees: Shipment 13579246801357 from AJIO is out for delivery. Agent: 98XXXXXX12', 'VM-XPRESB', AT)).toMatchObject({ carrier: 'XpressBees', shop: 'AJIO', status: 'out_for_delivery' });
+    expect(parseDeliverySms('Order Confirmed: Your order for Lenskart Vincent Chase frames has been placed. Order ID 1234567890.', 'VM-LNSKRT', AT)).toMatchObject({ shop: 'Lenskart', status: 'ordered' });
+  });
+
   it('not parcels: food and quick commerce, bank texts, chit-chat', () => {
     expect(parseDeliverySms('Your Swiggy order is out for delivery!', 'AX-SWIGGY', AT)).toBeNull();
     expect(parseDeliverySms('Blinkit: your order will arrive in 9 minutes', 'VM-BLINKT', AT)).toBeNull();

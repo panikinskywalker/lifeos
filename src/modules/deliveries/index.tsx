@@ -1,5 +1,6 @@
 import type { ModuleManifest } from '@core/registry/types';
 import { deliveryType } from './types';
+import { DeliveryHero } from './hero';
 
 export * from './types';
 
@@ -11,4 +12,5 @@ export const deliveriesModule: ModuleManifest = {
   icon: 'box',
   color: deliveryType.color!,
   entityTypes: [deliveryType],
+  detailSections: [{ entityType: 'delivery', key: 'deliveries.hero', title: 'On its way', component: DeliveryHero, order: 10, placement: 'top' }],
 };

@@ -389,3 +389,35 @@ describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox
     off();
   });
 });
+
+describe('deliveries from texts read before tracking existed', () => {
+  it('re-reads set-aside texts once: orders move forward in order; a stale one is assumed delivered, flagged', async () => {
+    const { backfillDeliveries } = await import('@core/ingest/ingest');
+    const now = Date.parse('2026-09-26T12:00:00');
+    const day = 86_400_000;
+    // Stored as they were before: set aside, not parsed.
+    const put = (id: string, from: string, body: string, at: number) =>
+      os.db.run(`INSERT INTO ingest_queue(id,source,package,received_at,raw_text,status,error,created_at,updated_at) VALUES (?,?,?,?,?,'dismissed','sender not trusted',?,?)`, [id, 'sms', from, at, body, at, at]);
+    put('a1', 'AX-AMAZON', 'Shipped: boAt Rockerz 255 Pro will be delivered by Tue, 22 Sep. Order 402-1234567-7654321', now - 6 * day);
+    put('a2', 'AX-AMAZON', 'Delivered: Your package with boAt Rockerz 255 Pro has been delivered. Order 402-1234567-7654321', now - 4 * day);
+    put('b1', 'VM-FLPKRT', 'Your Flipkart order for Nike Revolution 6 has been shipped. Order ID OD128765432109876', now - 20 * day);
+    put('c1', 'VM-HDFCBK', 'Rs.450 debited from A/c XX1234 to SWIGGY', now - 3 * day);
+    put('old', 'AX-AMAZON', 'Shipped: Something ancient. Order 402-0000000-0000000', now - 90 * day);
+    expect(backfillDeliveries(os, now)).toBe(2);
+    const ds = os.entities.query<{ status: string; item?: string; shop?: string }>('delivery');
+    expect(ds.map((d) => [d.data.shop, d.data.status]).sort()).toEqual([['Amazon', 'delivered'], ['Flipkart', 'delivered']]);
+    expect(os.dumps.toCheck().find((x) => x.flag?.startsWith('Assumed delivered'))!.label).toContain('Nike');
+  });
+
+  it('an order keeps its tracking link; the OTP text puts the code on it; delivery clears it', () => {
+    const at = Date.parse('2026-09-26T09:00:00');
+    const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-FLPKRT', body, receivedAt: at + dt });
+    send('Your Flipkart order for Nike Revolution 6 has been shipped. Track: fkrt.it/Ab12Cd Order ID OD128765432109876', 0);
+    send('739204 is the OTP for your Flipkart order OD128765432109876 delivery. Share it only on receiving the package.', 3_600_000);
+    const [d] = os.entities.query<{ status: string; otp?: string; trackingUrl?: string }>('delivery');
+    expect(d!.data).toMatchObject({ status: 'out_for_delivery', otp: '739204', trackingUrl: 'https://fkrt.it/Ab12Cd' });
+    send('Your Flipkart order OD128765432109876 has been delivered.', 7_200_000);
+    expect(os.entities.get<{ status: string; otp?: string }>(d!.id)!.data).toMatchObject({ status: 'delivered' });
+    expect(os.entities.get<{ otp?: string }>(d!.id)!.data.otp).toBeUndefined();
+  });
+});

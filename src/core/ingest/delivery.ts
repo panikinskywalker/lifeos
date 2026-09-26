@@ -16,6 +16,23 @@ export interface ParsedDelivery {
   status: DeliveryStatus;
   /** ISO day, when the text says when it arrives (or arrived). */
   expected: string | null;
+  /** The tracking page the text links to ("amzn.in/d/abc", "https://dlv.li/…"). */
+  link: string | null;
+  /** The code to give the delivery agent ("Share OTP 4821"). */
+  otp: string | null;
+}
+
+/** A link in a text: with a scheme, or a short domain with a path (not "Amazon.in" on its own). */
+function linkIn(t: string): string | null {
+  const m = /\b(https?:\/\/[^\s<>"')]+|(?:[a-z0-9-]+\.)+[a-z]{2,6}\/[^\s<>"')]+)/i.exec(t)?.[1];
+  if (!m) return null;
+  const url = m.replace(/[.,;:!]+$/, '');
+  return /^https?:/i.test(url) ? url : `https://${url}`;
+}
+
+/** The delivery code: "OTP 4821", "OTP is 4821", "4821 is the OTP / PIN / code for your delivery". */
+function otpIn(t: string): string | null {
+  return /\b(?:otp|pin|delivery code|security code|code)\b(?:\s*(?:is|:|-|of))*\s*(\d{4,6})\b/i.exec(t)?.[1] ?? /\b(\d{4,6})\s+is\s+(?:the|your)\s+(?:otp|pin|code|delivery code)\b/i.exec(t)?.[1] ?? null;
 }
 
 const SHOPS: Array<[RegExp, string]> = [
@@ -75,7 +92,9 @@ export function parseDeliverySms(text: string, sender = '', at = Date.now()): Pa
   const t = text.replace(/\s+/g, ' ').trim();
   if (QUICK.test(`${sender} ${t}`)) return null;
   if (/\b(otp|one time password)\b/i.test(t) && !/deliver/i.test(t)) return null;
-  const status = statusOf(t);
+  const otp = otpIn(t);
+  // "4821 is the OTP for your Flipkart delivery": the agent is on the way.
+  const status = statusOf(t) ?? (otp && /\b(deliver|order|shipment|package|parcel)/i.test(t) ? 'out_for_delivery' : null);
   if (!status) return null;
   const shop = SHOPS.find(([re]) => re.test(sender) || re.test(t))?.[1] ?? null;
   const carrier = CARRIERS.find(([re]) => re.test(sender) || re.test(t))?.[1] ?? null;
@@ -89,5 +108,5 @@ export function parseDeliverySms(text: string, sender = '', at = Date.now()): Pa
     null;
   if (item) item = item.replace(/\s*(?:\.{2,}|…).*$/, '').replace(/^(?:your|the)\s+/i, '').trim();
   if (item && /^(?:\d+ items?|items?|an? (?:item|order|package))$/i.test(item)) item = null;
-  return { shop, carrier, item: item || null, tracking, orderId, status, expected: whenIn(t, at) };
+  return { shop, carrier, item: item || null, tracking, orderId, status, expected: whenIn(t, at), link: linkIn(text), otp: status === 'delivered' || status === 'cancelled' || status === 'returned' ? null : otp };
 }

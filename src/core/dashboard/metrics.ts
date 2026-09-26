@@ -210,11 +210,11 @@ export function upcoming(os: LifeOSContext, limit = 5, now = Date.now(), days = 
     }
   }
   if (os.registry.entityTypes.has('delivery')) {
-    for (const d of os.entities.query<{ status: string; expectedDate?: string }>('delivery', { filter: { and: [{ field: 'data.status', op: 'in', value: ['ordered', 'shipped', 'out_for_delivery'] }] } }, { limit: 50 })) {
+    for (const d of os.entities.query<{ status: string; expectedDate?: string; otp?: string; otpAt?: number }>('delivery', { filter: { and: [{ field: 'data.status', op: 'in', value: ['ordered', 'shipped', 'out_for_delivery'] }] } }, { limit: 50 })) {
       if (!d.data.expectedDate) continue;
       const at = Date.parse(`${d.data.expectedDate}T12:00:00`);
       if (at > now + days * DAY) continue;
-      out.push({ id: d.id, entityId: d.id, type: 'delivery', title: `${d.title}${d.data.status === 'out_for_delivery' ? ' · out for delivery' : ''}`, at, kind: 'delivery', overdue: at < now - DAY });
+      out.push({ id: d.id, entityId: d.id, type: 'delivery', title: `${d.title}${d.data.status === 'out_for_delivery' ? ' · out for delivery' : ''}${d.data.otp && (!d.data.otpAt || now - d.data.otpAt < 3 * DAY) ? ` · OTP ${d.data.otp}` : ''}`, at, kind: 'delivery', overdue: at < now - DAY });
     }
   }
   return out.sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.at - b.at).slice(0, limit);
