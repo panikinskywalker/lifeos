@@ -54,7 +54,7 @@ export default function YouTab() {
         <RowList>
           <RowItem icon="moon" tint="memory" title="Appearance" subtitle={APPEARANCE[s.appearance]} onPress={() => setAppearanceOpen(true)} />
           <SwitchField icon="activity" label="Haptics" hint="A light tap on buttons and toggles" value={s.hapticsEnabled} onChange={(v) => s.set('hapticsEnabled', v)} />
-          <RowItem icon="share" tint="health" title="Backups" subtitle="Export everything on this phone as JSON" onPress={() => router.push('/settings/data')} />
+          <RowItem icon="share" tint="health" title="Lock & backup" subtitle="Fingerprint lock, encrypted backup and restore" onPress={() => router.push('/settings/data')} />
           <RowItem icon="info" tint="documents" title="About" subtitle={`LifeOS 0.1.0 · on this phone only · schema v${schema}`} chevron={false} />
         </RowList>
       </Section>

@@ -17,6 +17,7 @@ import { bus } from '@core/events/bus';
 import { OSProvider } from '@ui/hooks/useOS';
 import { ToastProvider } from '@ui/kit';
 import { CategoryLearnPrompt } from '../src/screens/CategoryLearnPrompt';
+import { LockGate } from '../src/screens/LockGate';
 import { ThemeProvider, useTheme } from '@ui/theme/ThemeProvider';
 import { Loading, Text } from '@ui/components/primitives';
 import { bootLifeOS, setNavigator } from '../src/platform/boot';
@@ -104,7 +105,9 @@ export default function RootLayout() {
           ) : (
             <OSProvider os={os}>
               <ToastProvider bottomOffset={74}>
-                <Navigator />
+                <LockGate>
+                  <Navigator />
+                </LockGate>
                 <CategoryLearnPrompt />
               </ToastProvider>
             </OSProvider>

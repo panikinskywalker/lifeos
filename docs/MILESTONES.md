@@ -180,7 +180,7 @@ Decisions: foreign spends stored in their currency and converted at that day's r
 
 ## M5 — Polish + proactive
 - [x] Morning brief notification (from real data: sleep, steps target, dues, spend pace). *(`src/core/notify/plan.ts`: last night's sleep vs goal, today's step goal, what's on (first three, with times), the month's spend vs your usual pace; one notification at the time you pick (You › Notifications, with a preview); rewritten on every sync so it carries the latest numbers; tap opens Today. All notifications now come from one plan.)*
-- [ ] Quiet hours; per-source notification toggles; biometric lock; encrypted backup export/import.
+- [x] Quiet hours; per-source notification toggles; biometric lock; encrypted backup export/import. *(You › Notifications: brief / reminders / upkeep switches, quiet hours (anything due inside waits until they end). You › Lock & backup: fingerprint / face lock (phone PIN as fallback) — on open and after 0 / 1 / 5 / 15 min away, covers the app in the switcher; backup sealed with AES-256-GCM under a scrypt key from your password (`src/core/backup/crypto.ts`, @noble), restore from a file (encrypted or plain), keys and Gmail passwords never included. The lock needs the new build.)*
 - [ ] Habits: check-in, streaks, heat map.
 - [ ] Performance pass: Today < 1 s cold, lists virtualised, charts memoised.
 
