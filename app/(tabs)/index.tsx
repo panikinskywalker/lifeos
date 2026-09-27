@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { InteractionManager, Pressable, View } from 'react-native';
+import { InteractionManager, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { upkeep, type Upkeep } from '@core/cycles/upkeep';
@@ -414,18 +414,45 @@ function ProgressTile() {
   );
 }
 
-/** Activity: each tracker's last 18 weeks as a grid of days, like GitHub's. */
+/** Activity: one tracker at a time (swipe for the next), its last 18 weeks as a grid of days like GitHub's; tap for all of them. */
 function ActivityTile() {
   const router = useRouter();
-  const rows = useLive((o) => trackers(o).filter((t) => !t.hidden).map((t) => trackerSummary(o, t)), []);
+  const t = useTheme();
+  const rows = useLive((o) => trackers(o).filter((x) => !x.hidden).map((x) => trackerSummary(o, x)), []);
+  const [width, setWidth] = useState(0);
+  const [page, setPage] = useState(0);
+  const open = () => router.push('/activity' as never);
   return (
-    <Tile size="2x1" tint="tasks" icon="grid" label="Activity" meta="Manage" onPress={() => router.push('/activity' as never)}>
-      <View style={{ gap: 18 }}>
-        {rows.map((s) => (
-          <ActivityRow key={s.tracker.id} s={s} onPress={() => router.push(`/activity/${s.tracker.id}` as never)} />
-        ))}
-        {!rows.length ? <Text variant="caption" color="secondary">No trackers — add one in Manage.</Text> : null}
-      </View>
+    <Tile size="2x1" tint="tasks" icon="grid" label="Activity" meta={rows.length > 1 ? `${page + 1} of ${rows.length}` : undefined} onPress={open}>
+      {rows.length ? (
+        <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ gap: 10 }}>
+          {width > 0 ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
+              onScroll={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
+              scrollEventThrottle={64}
+            >
+              {rows.map((s) => (
+                <View key={s.tracker.id} style={{ width }}>
+                  <ActivityRow s={s} onPress={open} />
+                </View>
+              ))}
+            </ScrollView>
+          ) : null}
+          {rows.length > 1 ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }} accessibilityRole="adjustable" accessibilityLabel={`Tracker ${page + 1} of ${rows.length}`}>
+              {rows.map((s, k) => (
+                <View key={s.tracker.id} style={{ width: k === page ? 16 : 6, height: 6, borderRadius: 3, backgroundColor: k === page ? t.c.fg.primary : t.c.fg.tertiary }} />
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <Text variant="caption" color="secondary">No trackers — tap to add one.</Text>
+      )}
     </Tile>
   );
 }
