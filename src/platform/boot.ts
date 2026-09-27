@@ -7,8 +7,8 @@ import { installedModules } from '@modules/index';
 import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
 import { registerBackgroundTick } from './background';
 import { notifications } from './notifications';
+import { notificationPlan } from '@core/notify/plan';
 import { openDatabase } from './openDatabase';
-import { cycleNudges } from '@core/cycles/nudges';
 import { runDumpExtraction } from './dumpExtraction';
 import { listenLive, syncSources } from './sources';
 
@@ -81,7 +81,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     pending = setTimeout(() => void syncReminderNotifications(os), 1500);
   };
   bus.on('data.changed', ({ table }) => {
-    if (table === 'cycles' || table === 'meter_readings') resync();
+    if (table === 'cycles' || table === 'meter_readings' || table === 'settings') resync();
   });
   bus.on('entity.updated', resync);
   bus.on('entity.deleted', resync);
@@ -106,35 +106,29 @@ export function getOS(): LifeOSContext | null {
   return instance;
 }
 
-async function syncReminderNotifications(os: LifeOSContext) {
+/**
+ * Put the notification plan on the phone: reminders, upkeep nudges and the
+ * morning brief, switched per kind and kept out of quiet hours (core/notify).
+ * Re-run on every change, foreground and background sync, so the brief
+ * carries the latest numbers.
+ */
+export async function syncReminderNotifications(os: LifeOSContext) {
   const Notifications = notifications();
   if (!Notifications) return;
   try {
     const perm = await Notifications.getPermissionsAsync();
     if (!perm.granted) return;
-    const upcoming = os.reminders.upcoming(64).filter((r) => (r.snoozedUntil ?? r.nextAt ?? r.dueAt) > Date.now());
-    // Reminders and cycle nudges share Android's alarm budget: the soonest 60 across both.
-    const nudges = cycleNudges(os);
-    const cutoff = [...upcoming.map((r) => r.snoozedUntil ?? r.nextAt ?? r.dueAt), ...nudges.map((n) => n.at)].sort((a, b) => a - b)[59] ?? Infinity;
+    const plan = notificationPlan(os);
     await Notifications.cancelAllScheduledNotificationsAsync();
-    for (const n of nudges.filter((x) => x.at <= cutoff)) {
-      const entity = os.entities.get(n.entityId);
-      await Notifications.scheduleNotificationAsync({
-        content: { title: n.title, body: n.body, data: { cycleId: n.cycleId, entityId: n.entityId, entityType: entity?.type } },
+    for (const n of plan) {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: { title: n.title, body: n.body, data: n.data },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(n.at) },
       });
-    }
-    for (const r of upcoming.filter((x) => (x.snoozedUntil ?? x.nextAt ?? x.dueAt) <= cutoff)) {
-      const at = r.snoozedUntil ?? r.nextAt ?? r.dueAt;
-      const entity = r.entityId ? os.entities.get(r.entityId) : undefined;
-      const id = await Notifications.scheduleNotificationAsync({
-        content: { title: r.title, body: r.body ?? entity?.title ?? undefined, data: { reminderId: r.id, entityId: r.entityId, entityType: entity?.type } },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(at) },
-      });
-      os.reminders.setNotificationId(r.id, id);
+      if (n.kind === 'reminder' && n.data.reminderId) os.reminders.setNotificationId(n.data.reminderId, id);
     }
   } catch (e) {
-    console.warn('reminder notification sync failed', e);
+    console.warn('notification sync failed', e);
   }
 }
 

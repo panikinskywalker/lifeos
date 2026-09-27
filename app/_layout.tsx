@@ -80,8 +80,9 @@ export default function RootLayout() {
     const Notifications = notifications();
     if (Notifications) {
       nsub = Notifications.addNotificationResponseReceivedListener((r) => {
-        const d = r.notification.request.content.data as { entityId?: string; entityType?: string } | undefined;
-        if (d?.entityId && d.entityType) router.push(`/entity/${d.entityType}/${d.entityId}` as never);
+        const d = r.notification.request.content.data as { entityId?: string; entityType?: string; route?: string } | undefined;
+        if (d?.route) router.navigate(d.route as never);
+        else if (d?.entityId && d.entityType) router.push(`/entity/${d.entityType}/${d.entityId}` as never);
         else router.push('/reminders' as never);
       });
       Notifications.requestPermissionsAsync().catch(() => {});

@@ -179,7 +179,7 @@ Decisions: foreign spends stored in their currency and converted at that day's r
 **Demo:** fresh install → grant Health Connect, Usage access, SMS → Today fills with real steps/sleep/screen time and months of spend → dump "made a new friend today, Karan…" → Karan appears under Almanac › People with the fact → Almanac › Time › last month shows the whole month.
 
 ## M5 — Polish + proactive
-- [ ] Morning brief notification (from real data: sleep, steps target, dues, spend pace).
+- [x] Morning brief notification (from real data: sleep, steps target, dues, spend pace). *(`src/core/notify/plan.ts`: last night's sleep vs goal, today's step goal, what's on (first three, with times), the month's spend vs your usual pace; one notification at the time you pick (You › Notifications, with a preview); rewritten on every sync so it carries the latest numbers; tap opens Today. All notifications now come from one plan.)*
 - [ ] Quiet hours; per-source notification toggles; biometric lock; encrypted backup export/import.
 - [ ] Habits: check-in, streaks, heat map.
 - [ ] Performance pass: Today < 1 s cold, lists virtualised, charts memoised.

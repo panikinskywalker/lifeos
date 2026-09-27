@@ -62,11 +62,10 @@ describe('Today at a glance', () => {
     os.entities.create({ type: 'transaction', data: { amount: 900, kind: 'expense', category: 'food', date: day(-1) } });
     os.entities.create({ type: 'transaction', data: { amount: 147, kind: 'income', category: 'other', date: day(0) } });
     os.entities.create({ type: 'workout', data: { kind: 'run', durationMin: 30, date: day(0) } });
-    os.entities.create({ type: 'task', title: 'Done thing', status: 'done', data: { completedAt: Date.now() } });
-    const d = doneToday(os, Date.now());
+    os.entities.create({ type: 'task', title: 'Done thing', status: 'done', data: { completedAt: NOW - 3_600_000 } });
+    const d = doneToday(os, NOW);
     expect(d).toMatchObject({ payments: 2, workouts: 1, workoutMin: 30, tasksDone: 1 });
-    const t = doneToday(os, NOW);
-    expect([t.spent, t.received]).toEqual([500, 147]);
+    expect([d.spent, d.received]).toEqual([500, 147]);
   });
 
   it('goals from your own last 30 days, a little better; yours win; defaults until there is history', () => {

@@ -43,6 +43,7 @@ export default function YouTab() {
           <RowItem icon="grid" tint="tasks" title="Modules" subtitle={`${modules.length} on · ${modules.map((m) => os.registry.modules.get(m.id)?.name).filter(Boolean).slice(0, 3).join(', ')}…`} onPress={() => router.push('/browse')} />
           <RowItem icon="sparkle" iconTone="accent" title="Agent" subtitle={`On the phone · then ${s.aiChain.filter((c) => c.enabled !== false).map((c) => PROVIDER_PRESETS[c.kind].label).join(' → ') || 'no providers'}`} onPress={() => router.push('/settings/ai')} />
           <RowItem icon="signal" tint="health" title="Data sources" subtitle="Bank SMS, payment apps, screen time, Health Connect" onPress={() => router.push('/settings/sources' as never)} />
+          <RowItem icon="bell" tint="tasks" title="Notifications" subtitle="Morning brief, reminders, quiet hours" onPress={() => router.push('/settings/notifications' as never)} />
           <RowItem icon="home" tint="tasks" title="Home screen" subtitle="What Today shows, and in what order" onPress={() => router.push('/settings/home' as never)} />
           <RowItem icon="tag" tint="finance" title="Categories" subtitle="Your categories, and rules by keyword or amount" onPress={() => router.push('/settings/categories' as never)} />
           <RowItem icon="cash" tint="finance" title="Currency & dates" subtitle={`${s.locale.currency} · ${s.locale.dateFormat}`} onPress={() => router.push('/settings/locale')} />
