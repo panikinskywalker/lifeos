@@ -7,3 +7,4 @@
 - Routes live in `app/`; `src/platform` is app-shell glue (do not name a folder `src/app` — expo-router would treat it as routes).
 - Verify with `npm run typecheck`, `npm test`, and `npx expo export --platform web`.
 - Product, scope, milestones and design system live in `docs/PRODUCT.md`, `docs/SCOPE.md`, `docs/MILESTONES.md`, `docs/DESIGN.md`; start from `docs/HANDOFF.md`. UI: inline SVG icons only (no icon fonts), tokens from `docs/DESIGN.md`.
+- Parked ideas live in `docs/ADHOC.md`: add to it as they come up; don't build from it until the user picks items to push together.
