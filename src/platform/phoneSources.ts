@@ -68,10 +68,11 @@ async function syncCalendar(os: LifeOSContext) {
   if (!cals.length) return;
   const now = Date.now();
   const events = await Calendar.getEventsAsync(cals.map((c) => c.id), new Date(now - W.calendarPastDays * W.day), new Date(now + W.calendarFutureDays * W.day));
+  const calName = new Map(cals.map((c) => [c.id, [c.title, c.source?.name && c.source.name !== c.title ? c.source.name : null].filter(Boolean).join(' · ')]));
   const out = [];
   for (const e of events.slice(0, 600)) {
     const attendees = await Calendar.getAttendeesForEventAsync(e.id).catch(() => []);
-    out.push({ id: e.id, title: e.title, start: new Date(e.startDate).getTime(), end: e.endDate ? new Date(e.endDate).getTime() : null, allDay: e.allDay, location: e.location, notes: e.notes, attendees: attendees.map((a) => ({ name: a.name, email: a.email })) });
+    out.push({ id: e.id, title: e.title, start: new Date(e.startDate).getTime(), end: e.endDate ? new Date(e.endDate).getTime() : null, allDay: e.allDay, location: e.location, notes: e.notes, attendees: attendees.map((a) => ({ name: a.name, email: a.email })), calendars: calName.get(e.calendarId) ? [calName.get(e.calendarId)!] : [] });
   }
   const r = saveCalendarEvents(os, out);
   setSourceState(os, 'calendar', { enabled: true, lastSync: now, addTotal: r.created, error: null });

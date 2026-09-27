@@ -110,6 +110,8 @@ export interface CalendarEvent {
   location?: string | null;
   notes?: string | null;
   attendees?: Array<{ name?: string | null; email?: string | null }>;
+  /** Which calendar(s) it's on ("Work · you@company.com"). */
+  calendars?: string[];
 }
 
 /**
@@ -161,16 +163,16 @@ export function saveCalendarEvents(os: LifeOSContext, events: CalendarEvent[]): 
     if (!ev.title?.trim()) continue;
     const k = calendarKey(ev);
     const prev = byKey.get(k);
-    byKey.set(k, prev ? { ...prev, location: prev.location || ev.location, notes: prev.notes || ev.notes, attendees: [...(prev.attendees ?? []), ...(ev.attendees ?? [])] } : ev);
+    byKey.set(k, prev ? { ...prev, location: prev.location || ev.location, notes: prev.notes || ev.notes, attendees: [...(prev.attendees ?? []), ...(ev.attendees ?? [])], calendars: [...new Set([...(prev.calendars ?? []), ...(ev.calendars ?? [])])] } : ev);
   }
   os.db.transaction(() => {
     for (const [key, ev] of byKey) {
-      const data = { kind: 'event', startAt: ev.start, endAt: ev.end ?? undefined, allDay: !!ev.allDay, location: ev.location || undefined, notes: ev.notes?.slice(0, 2000) || undefined, source: 'calendar', sourceKey: key };
+      const data = { kind: 'event', startAt: ev.start, endAt: ev.end ?? undefined, allDay: !!ev.allDay, location: ev.location || undefined, notes: ev.notes?.slice(0, 2000) || undefined, source: 'calendar', sourceKey: key, calendars: ev.calendars?.length ? [...ev.calendars].sort() : undefined };
       const [hit] = os.entities.query<Record<string, unknown>>('event', { filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 1 });
       let id: string;
       if (hit) {
         id = hit.id;
-        if (hit.data.location !== data.location || hit.data.notes !== data.notes) {
+        if (hit.data.location !== data.location || hit.data.notes !== data.notes || JSON.stringify(hit.data.calendars ?? null) !== JSON.stringify(data.calendars ?? null)) {
           os.entities.update(id, { data }, 'system');
           updated++;
         }

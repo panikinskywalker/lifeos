@@ -186,5 +186,8 @@ Decisions: foreign spends stored in their currency and converted at that day's r
 
 ---
 
+### M5b — Activity (27 Sep)
+- [x] Activity on Today: GitHub-style grids, a square per day for the last 18 weeks, this week and streak beside each — Days worked (30+ min in work apps, or an event on your work calendar), Workouts, Steps goal met, Ordered food (a Zomato / Swiggy text, notification, email or payment). Your own trackers from a rule builder — a day counts when any rule matches: a message mentioning words, a payment (words / category / in or out), a record, a health number (or your goal), time in apps, a calendar event (calendar or title words), a habit ticked. Tracker page: 26 weeks, this week / month, streak, longest; show / hide / reorder on Today. No goals yet. *(`src/core/activity/trackers.ts`, `app/activity/`; calendar events now remember which calendar they're on.)*
+
 ## After phase 1 (backlog, in rough order)
 Whole-life graph view with filters (people only · this year · around a trip) · Supabase sync + web client (iPhone) · Mac screen time helper · Android home-screen widgets · semantic search / embeddings · weekly review & nudges · Developer Mode · calendar/gallery/timeline layouts · OCR · CSV import · photo memory.

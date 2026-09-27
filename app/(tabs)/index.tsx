@@ -15,6 +15,8 @@ import { TILES, homeLayout, homeAreas, type TileId } from '../../src/screens/hom
 import { doneToday, myDay, progress, setGoal, type DayItem, type GoalId, type Progress } from '@core/dashboard/day';
 import { tintForModule } from '@ui/theme/moduleTint';
 import { activeHabits } from '@core/habits/habits';
+import { trackerSummary, trackers } from '@core/activity/trackers';
+import { ActivityRow } from '../../src/screens/ActivityGrid';
 import { HabitChecklist } from '@modules/habits';
 
 function greeting(d = new Date()) {
@@ -110,6 +112,8 @@ function TodayTile({ id, u }: { id: TileId; u: Upkeep }) {
       return <AreasTile />;
     case 'habits':
       return <HabitsTile />;
+    case 'activity':
+      return <ActivityTile />;
   }
 }
 
@@ -406,6 +410,22 @@ function ProgressTile() {
           </View>
         ) : null}
       </Sheet>
+    </Tile>
+  );
+}
+
+/** Activity: each tracker's last 18 weeks as a grid of days, like GitHub's. */
+function ActivityTile() {
+  const router = useRouter();
+  const rows = useLive((o) => trackers(o).filter((t) => !t.hidden).map((t) => trackerSummary(o, t)), []);
+  return (
+    <Tile size="2x1" tint="tasks" icon="grid" label="Activity" meta="Manage" onPress={() => router.push('/activity' as never)}>
+      <View style={{ gap: 18 }}>
+        {rows.map((s) => (
+          <ActivityRow key={s.tracker.id} s={s} onPress={() => router.push(`/activity/${s.tracker.id}` as never)} />
+        ))}
+        {!rows.length ? <Text variant="caption" color="secondary">No trackers — add one in Manage.</Text> : null}
+      </View>
     </Tile>
   );
 }
