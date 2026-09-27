@@ -18,6 +18,76 @@ import { habitLogType, habitType, type HabitData } from './types';
 const today = () => isoOf(Date.now());
 const DAY = 86_400_000;
 
+/**
+ * This week, Monday to Sunday: a row per habit, a circle per day — ticked
+ * when done, joined to the next when you kept it going, faint on days it
+ * isn't due, empty for days still to come. Tap any past day to fix it.
+ */
+export function HabitWeek({ limit = 8 }: { limit?: number }) {
+  const os = useOS();
+  const t = useTheme();
+  const now = Date.now();
+  const monday = (() => {
+    const d = new Date(now);
+    d.setHours(12, 0, 0, 0);
+    return d.getTime() - ((d.getDay() + 6) % 7) * DAY;
+  })();
+  const week = Array.from({ length: 7 }, (_, i) => isoOf(monday + i * DAY));
+  const rows = useLive((o) => activeHabits(o).map((h) => ({ h, done: doneDays(o, h.id, week[0]!) })), []);
+  if (!rows.length) return <Text variant="caption" color="secondary">No habits yet — add one in Browse › Habits.</Text>;
+  const size = 24;
+  const gap = 4;
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const short = (t: number) => `${new Date(t).getDate()} ${MON[new Date(t).getMonth()]}`;
+  return (
+    <View style={{ gap: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text variant="caption" color="secondary" style={{ flex: 1 }} numberOfLines={1}>
+          {short(monday)} – {short(monday + 6 * DAY)}
+        </Text>
+        <View style={{ flexDirection: 'row' }}>
+          {week.map((d, i) => (
+            <View key={d} style={{ flexDirection: 'row' }}>
+              <Text variant="labelMicro" color={d === today() ? 'primary' : 'secondary'} style={{ width: size, textAlign: 'center' }}>
+                {new Date(`${d}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'narrow' })}
+              </Text>
+              {i < 6 ? <View style={{ width: gap }} /> : null}
+            </View>
+          ))}
+        </View>
+      </View>
+      {rows.slice(0, limit).map(({ h, done }) => (
+        <View key={h.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text variant="label" style={{ flex: 1 }} numberOfLines={1}>{h.title}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {week.map((d, i) => {
+              const on = done.has(d);
+              const future = d > today();
+              const due = dueOn(h, d);
+              const joined = on && i < 6 && done.has(week[i + 1]!);
+              return (
+                <View key={d} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on, disabled: future }}
+                    accessibilityLabel={`${h.title}, ${d}`}
+                    disabled={future}
+                    onPress={() => toggleCheckIn(os, h.id, d)}
+                    style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? HABITS_COLOR : future ? 'transparent' : t.tints.health.fill, borderWidth: future ? 1.5 : 0, borderColor: t.c.fg.tertiary, opacity: due || on ? 1 : 0.4 }}
+                  >
+                    {on ? <Icon name="check" size={14} color="#fff" /> : null}
+                  </Pressable>
+                  {i < 6 ? <View style={{ width: gap, height: 3, backgroundColor: joined ? HABITS_COLOR : 'transparent' }} /> : null}
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /** Habits due today, each a tap to tick, with its streak (the dashboard widget and Today's tile). */
 export function HabitChecklist({ limit = 8 }: { limit?: number }) {
   const os = useOS();

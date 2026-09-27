@@ -413,6 +413,8 @@ export class SettingsRepo {
   }
   set(key: string, value: unknown) {
     this.db.run(`INSERT INTO settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`, [key, JSON.stringify(value), Date.now()]);
+    // Screens showing a setting (Today's layout, goals, styles…) refresh.
+    bus.emit('data.changed', { table: 'settings', id: key });
   }
   all(): Record<string, unknown> {
     const out: Record<string, unknown> = {};

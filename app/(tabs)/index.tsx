@@ -11,13 +11,13 @@ import type { IconName } from '@ui/icons';
 import { BentoGrid, Button, DeltaChip, Icon, IconButton, LineChart, MiniBars, NumberField, Ring, RowItem, RowList, Screen, Sheet, Stat, Text, Tile } from '@ui/kit';
 import type { TintKey } from '@ui/theme/tokens';
 import { ToCheckBell } from '../../src/screens/ToCheckBell';
-import { TILES, homeLayout, homeAreas, type TileId } from '../../src/screens/homeLayout';
+import { TILES, homeLayout, homeAreas, tileStyle, type TileId } from '../../src/screens/homeLayout';
 import { doneToday, myDay, progress, setGoal, type DayItem, type GoalId, type Progress } from '@core/dashboard/day';
 import { tintForModule } from '@ui/theme/moduleTint';
 import { activeHabits } from '@core/habits/habits';
 import { trackerSummary, trackers } from '@core/activity/trackers';
 import { ActivityRow } from '../../src/screens/ActivityGrid';
-import { HabitChecklist } from '@modules/habits';
+import { HabitChecklist, HabitWeek } from '@modules/habits';
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -373,9 +373,33 @@ function ProgressTile() {
   const [editing, setEditing] = useState<Progress | null>(null);
   const [value, setValue] = useState<number | undefined>(undefined);
   const fmt = (p: Progress, v: number) => (p.id === 'spend' ? os.format.currency(v) : p.unit === 'h' ? fmtHours(v) : Math.round(v).toLocaleString('en-IN'));
+  const style = useLive((o) => tileStyle(o, 'progress'), []);
   if (!rings.length) return null;
+  const tap = (p: Progress) => {
+    const look = RING_LOOK[p.id];
+    if (look?.route) router.push(look.route as never);
+    else (setEditing(p), setValue(p.target ?? undefined));
+  };
   return (
     <Tile size="2x1" tint="health" icon="target" label="Progress" meta="vs your goals">
+      {style === 'rings' ? (
+        // Rings side by side; more than fit scroll sideways, so there are never gaps.
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingRight: 4 }}>
+          {rings.map((p) => {
+            const look = RING_LOOK[p.id] ?? { icon: 'target', tint: 'tasks' as TintKey };
+            const color = p.better === 'down' && (p.ratio ?? 0) > 1 ? t.c.alert.coral : t.tints[look.tint].ink;
+            return (
+              <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`${p.label}: ${p.value != null ? fmt(p, p.value) : 'no data'}`} onPress={() => tap(p)} style={{ alignItems: 'center', gap: 6, width: 76 }}>
+                <Ring progress={Math.min(1, p.ratio ?? 0)} size={68} stroke={8} color={color}>
+                  <Icon name={look.icon} size={18} color={color} />
+                </Ring>
+                <Text variant="label" numberOfLines={1}>{p.value != null ? fmt(p, p.value) : '—'}</Text>
+                <Text variant="caption" color="secondary" numberOfLines={1}>{p.label === 'Tasks this week' ? 'Tasks' : p.label === 'Spend this month' ? 'Spend' : p.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : (
       <View style={{ gap: 14 }}>
         {rings.map((p) => {
           const look = RING_LOOK[p.id] ?? { icon: 'target', tint: 'tasks' as TintKey };
@@ -387,7 +411,7 @@ function ProgressTile() {
               key={p.id}
               accessibilityRole="button"
               accessibilityLabel={`${p.label}: ${p.value != null ? fmt(p, p.value) : 'no data'} ${of}`}
-              onPress={() => (look.route ? router.push(look.route as never) : (setEditing(p), setValue(p.target ?? undefined)))}
+              onPress={() => tap(p)}
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, opacity: pressed ? 0.8 : 1 })}
             >
               <Ring progress={Math.min(1, p.ratio ?? 0)} size={46} stroke={6} color={color}>
@@ -408,6 +432,7 @@ function ProgressTile() {
           );
         })}
       </View>
+      )}
       <Sheet visible={!!editing} onClose={() => setEditing(null)} title={editing ? `${editing.label} goal` : ''}>
         {editing ? (
           <View style={{ gap: 12 }}>
@@ -431,7 +456,18 @@ function ActivityTile() {
   const rows = useLive((o) => trackers(o).filter((x) => !x.hidden).map((x) => trackerSummary(o, x, Date.now(), 26)), []);
   const [width, setWidth] = useState(0);
   const [page, setPage] = useState(0);
+  const style = useLive((o) => tileStyle(o, 'activity'), []);
   const open = () => router.push('/activity' as never);
+  if (style === 'all')
+    return (
+      <Tile size="2x1" tint="tasks" icon="grid" label="Activity" onPress={open}>
+        <View style={{ gap: 22 }}>
+          {rows.map((s) => (
+            <ActivityRow key={s.tracker.id} s={s} onPress={() => router.push(`/activity/${s.tracker.id}` as never)} />
+          ))}
+        </View>
+      </Tile>
+    );
   return (
     <Tile size="2x1" tint="tasks" icon="grid" label="Activity" meta={rows.length > 1 ? `${page + 1} of ${rows.length}` : undefined} onPress={open}>
       {rows.length ? (
@@ -471,10 +507,11 @@ function ActivityTile() {
 function HabitsTile() {
   const router = useRouter();
   const n = useLive((o) => activeHabits(o).length, []);
+  const style = useLive((o) => tileStyle(o, 'habits'), []);
   if (!n) return null;
   return (
-    <Tile size="2x1" tint="health" icon="flame" label="Habits" meta="today" onPress={() => router.push('/module/habits' as never)}>
-      <HabitChecklist />
+    <Tile size="2x1" tint="health" icon="flame" label="Habits" meta={style === 'week' ? 'this week' : 'today'} onPress={() => router.push('/module/habits' as never)}>
+      {style === 'week' ? <HabitWeek /> : <HabitChecklist />}
     </Tile>
   );
 }

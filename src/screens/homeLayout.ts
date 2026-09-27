@@ -54,3 +54,29 @@ export function homeAreas(os: LifeOSContext): string[] {
 export function setHomeAreas(os: LifeOSContext, ids: string[]) {
   os.settings.set('today.areas', ids);
 }
+
+/** Sections that come in more than one look (You › Home screen). The first is the default. */
+export const TILE_STYLES: Partial<Record<TileId, Array<{ value: string; label: string }>>> = {
+  habits: [
+    { value: 'list', label: 'Today list' },
+    { value: 'week', label: 'This week' },
+  ],
+  activity: [
+    { value: 'swipe', label: 'One at a time' },
+    { value: 'all', label: 'All stacked' },
+  ],
+  progress: [
+    { value: 'rows', label: 'Rows' },
+    { value: 'rings', label: 'Rings' },
+  ],
+};
+
+export function tileStyle(os: LifeOSContext, id: TileId): string {
+  const opts = TILE_STYLES[id];
+  const saved = os.settings.get<Partial<Record<TileId, string>>>('today.styles', {})[id];
+  return opts?.some((o) => o.value === saved) ? saved! : (opts?.[0]?.value ?? '');
+}
+
+export function setTileStyle(os: LifeOSContext, id: TileId, value: string) {
+  os.settings.set('today.styles', { ...os.settings.get<Partial<Record<TileId, string>>>('today.styles', {}), [id]: value });
+}
