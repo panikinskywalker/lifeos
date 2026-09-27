@@ -3,175 +3,99 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { z } from 'zod';
 import type { ModuleManifest, WidgetDef, WidgetProps } from '@core/registry/types';
-import type { Entity, EntityTypeDef } from '@core/domain/types';
+import type { Entity } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { useLive, useOS } from '@ui/hooks';
-import { Card, Icon, SectionHeader, Stat, Text } from '@ui/components/primitives';
-import { HeatGrid, ProgressRing } from '@ui/components/charts';
+import { Button, HeatMap, Icon, Ring, Section, StatTrio, Text, Tile } from '@ui/kit';
+import { activeHabits, checkIn, doneDays, dueOn, findHabit, isoOf, streakOf, toggleCheckIn, type Habit } from '@core/habits/habits';
 import { habitsOverview } from './overview';
 
 export const HABITS_COLOR = palette.orange;
-const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const today = () => iso(new Date());
+export * from './types';
+import { habitLogType, habitType, type HabitData } from './types';
+const today = () => isoOf(Date.now());
+const DAY = 86_400_000;
 
-export interface HabitData {
-  frequency: 'daily' | 'weekdays' | 'weekly';
-  targetPerWeek?: number;
-  icon?: string;
-  color?: string;
-  reminderTime?: string;
-  why?: string;
-}
-export interface HabitLogData {
-  habitId: string;
-  date: string;
-  value?: number;
-}
-
-export const habitType: EntityTypeDef<HabitData> = {
-  type: 'habit',
-  module: 'habits',
-  label: 'Habit',
-  labelPlural: 'Habits',
-  icon: 'flame',
-  schema: z.object({ frequency: z.enum(['daily', 'weekdays', 'weekly']).default('daily'), targetPerWeek: z.coerce.number().optional(), icon: z.string().optional(), color: z.string().optional(), reminderTime: z.string().optional(), why: z.string().optional() }),
-  fields: [
-    { key: 'frequency', label: 'Frequency', type: 'select', defaultValue: 'daily', summary: true, options: [{ value: 'daily', label: 'Every day' }, { value: 'weekdays', label: 'Weekdays' }, { value: 'weekly', label: 'Times per week' }] },
-    { key: 'targetPerWeek', label: 'Target per week', type: 'number', description: 'For "times per week" habits' },
-    { key: 'why', label: 'Why', type: 'longtext', section: 'Details' },
-  ],
-  statuses: [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused', color: palette.gray }],
-  relations: [{ kind: 'habit', label: 'Logs', to: 'habit_log', cardinality: 'many' }],
-};
-
-export const habitLogType: EntityTypeDef<HabitLogData> = {
-  type: 'habit_log',
-  module: 'habits',
-  label: 'Habit check-in',
-  labelPlural: 'Habit check-ins',
-  icon: 'checkmark',
-  hidden: true,
-  schema: z.object({ habitId: z.string(), date: z.string(), value: z.coerce.number().optional() }),
-  fields: [
-    { key: 'habitId', label: 'Habit', type: 'relation', relationTo: 'habit', relationKind: 'habit' },
-    { key: 'date', label: 'Date', type: 'date', required: true },
-    { key: 'value', label: 'Value', type: 'number' },
-  ],
-  indexed: ['habitId', 'date'],
-  occurredAtField: 'date',
-  computeTitle: (d) => `Check-in ${d.date}`,
-};
-
-export function habitLogs(os: LifeOSContext, habitId: string, days = 28): Set<string> {
-  const from = new Date();
-  from.setDate(from.getDate() - days);
-  return new Set(os.entities.query<HabitLogData>('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: habitId }, { field: 'data.date', op: 'gte', value: iso(from) }] } }, { limit: 400 }).map((l) => l.data.date));
-}
-
-export function toggleHabit(os: LifeOSContext, habitId: string, date = today()) {
-  const existing = os.entities.query<HabitLogData>('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: habitId }, { field: 'data.date', op: 'eq', value: date }] } }, { limit: 1 })[0];
-  if (existing) os.entities.delete(existing.id);
-  else os.entities.create<HabitLogData>({ type: 'habit_log', data: { habitId, date } });
-}
-
-export function streak(logs: Set<string>): number {
-  let n = 0;
-  const d = new Date();
-  if (!logs.has(iso(d))) d.setDate(d.getDate() - 1); // today not yet done doesn't break the streak
-  while (logs.has(iso(d))) {
-    n++;
-    d.setDate(d.getDate() - 1);
-  }
-  return n;
-}
-
-function lastNDays(n: number): string[] {
-  const out: string[] = [];
-  const d = new Date();
-  d.setDate(d.getDate() - n + 1);
-  for (let i = 0; i < n; i++) {
-    out.push(iso(d));
-    d.setDate(d.getDate() + 1);
-  }
-  return out;
-}
-
-function HabitsWidget({ size }: WidgetProps) {
+/** Habits due today, each a tap to tick, with its streak (the dashboard widget and Today's tile). */
+export function HabitChecklist({ limit = 8 }: { limit?: number }) {
   const os = useOS();
   const t = useTheme();
-  const router = useRouter();
-  const habits = useLive((o) => o.entities.query<HabitData>('habit', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }).map((h) => ({ h, logs: habitLogs(o, h.id, 35) })), []);
-  const doneToday = habits.filter((x) => x.logs.has(today())).length;
+  const rows = useLive(
+    (o) =>
+      activeHabits(o)
+        .filter((h) => dueOn(h, today()))
+        .map((h) => {
+          const done = doneDays(o, h.id, isoOf(Date.now() - 400 * DAY));
+          return { h, doneToday: done.has(today()), streak: streakOf(h, done) };
+        }),
+    [],
+  );
+  if (!rows.length) return <Text variant="caption" color="secondary">No habits yet — add one in Browse › Habits.</Text>;
   return (
-    <Card onPress={() => router.push('/entity/habit')}>
-      <SectionHeader title="Habits" icon="flame" color={HABITS_COLOR} action="All" />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-        <ProgressRing progress={habits.length ? doneToday / habits.length : 0} size={64} stroke={8} color={HABITS_COLOR}>
-          <Text variant="caption" style={{ fontWeight: '700' }}>
-            {doneToday}/{habits.length}
-          </Text>
-        </ProgressRing>
-        <View style={{ flex: 1, gap: 6 }}>
-          {habits.length === 0 ? (
-            <Text color="tertiary">Add a habit to start a streak.</Text>
-          ) : (
-            habits.slice(0, size === 'small' ? 2 : 5).map(({ h, logs }) => {
-              const done = logs.has(today());
-              return (
-                <Pressable key={h.id} onPress={() => toggleHabit(os, h.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Icon name={done ? 'checkmark.circle' : 'circle'} size={22} color={done ? HABITS_COLOR : t.colors.textTertiary} />
-                  <Text variant="subhead" style={{ flex: 1, textDecorationLine: done ? 'line-through' : 'none' }} numberOfLines={1}>
-                    {h.title}
-                  </Text>
-                  <Text variant="caption" color="secondary">
-                    🔥 {streak(logs)}
-                  </Text>
-                </Pressable>
-              );
-            })
-          )}
-        </View>
-      </View>
-    </Card>
+    <View style={{ gap: 4 }}>
+      {rows.slice(0, limit).map(({ h, doneToday, streak }) => (
+        <Pressable key={h.id} accessibilityRole="checkbox" accessibilityState={{ checked: doneToday }} accessibilityLabel={`${h.title}, ${streak.count} ${streak.unit} streak`} onPress={() => toggleCheckIn(os, h.id, today())} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}>
+          <Icon name={doneToday ? 'check-circle' : 'circle'} size={24} color={doneToday ? HABITS_COLOR : t.c.fg.tertiary} />
+          <Text variant="label" style={{ flex: 1, textDecorationLine: doneToday ? 'line-through' : 'none' }} numberOfLines={1}>{h.title}</Text>
+          {streak.count ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Icon name="flame" size={14} color={HABITS_COLOR} />
+              <Text variant="caption" color="secondary">{streak.count}{streak.unit === 'week' ? ' wk' : ''}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
+function HabitsWidget(_: WidgetProps) {
+  const router = useRouter();
+  const n = useLive((o) => activeHabits(o).filter((h) => dueOn(h, today())), []);
+  const done = useLive((o) => n.filter((h) => doneDays(o, h.id, today()).has(today())).length, [n.length]);
+  return (
+    <Tile size="2x1" tint="health" icon="flame" label="Habits" meta={n.length ? `${done}/${n.length} today` : undefined} onPress={() => router.push('/module/habits' as never)}>
+      <HabitChecklist limit={5} />
+    </Tile>
+  );
+}
+
+/** A habit's page: the streak, a big check-in, the last week (tap a day to fix it), 13 weeks as a heat map. */
 function HabitSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
   const os = useOS();
-  const logs = useLive((o) => habitLogs(o, entity.id, 91), [entity.id]);
-  const days = lastNDays(91);
-  const done = logs.has(today());
-  const total = useLive((o) => o.entities.count('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: entity.id }] } }), [entity.id]);
-  const last30 = lastNDays(30).filter((d) => logs.has(d)).length;
+  const h: Habit = useLive((o) => activeHabits(o).find((x) => x.id === entity.id) ?? { id: entity.id, title: entity.title, frequency: (entity.data as HabitData).frequency ?? 'daily', perWeek: (entity.data as HabitData).targetPerWeek ?? 7 }, [entity.id, entity.updatedAt]);
+  const done = useLive((o) => doneDays(o, entity.id, isoOf(Date.now() - 400 * DAY)), [entity.id]);
+  const s = streakOf(h, done);
+  const last30 = Array.from({ length: 30 }, (_, i) => isoOf(Date.now() - i * DAY)).filter((d) => dueOn(h, d));
+  const rate = last30.length ? last30.filter((d) => done.has(d)).length / last30.length : 0;
+  const week = Array.from({ length: 7 }, (_, i) => isoOf(Date.now() - (6 - i) * DAY));
+  const doneToday = done.has(today());
   return (
     <View style={{ gap: 16 }}>
-      <Card style={{ gap: 12 }}>
-        <View style={{ flexDirection: 'row', gap: 16 }}>
-          <View style={{ flex: 1 }}>
-            <Stat value={`${streak(logs)}`} unit="day streak" small color={HABITS_COLOR} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Stat value={`${Math.round((last30 / 30) * 100)}%`} label="Last 30 days" small />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Stat value={`${total}`} label="All time" small />
-          </View>
+      <StatTrio stats={[{ label: 'Streak', value: `${s.count} ${s.unit === 'week' ? 'wk' : 'd'}`, tone: s.count ? 'ok' : undefined }, { label: 'Last 30 days', value: `${Math.round(rate * 100)}%` }, { label: 'All time', value: String(done.size) }]} />
+      <Button title={doneToday ? 'Done today — tap to undo' : 'Done today'} icon={doneToday ? 'check-circle' : 'check'} variant={doneToday ? 'secondary' : 'primary'} onPress={() => toggleCheckIn(os, entity.id, today())} />
+      <Section title="This week">
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          {week.map((d) => {
+            const on = done.has(d);
+            const due = dueOn(h, d);
+            return (
+              <Pressable key={d} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={d} onPress={() => toggleCheckIn(os, entity.id, d)} style={{ alignItems: 'center', gap: 6, opacity: due ? 1 : 0.4 }}>
+                <Text variant="caption" color="secondary">{new Date(`${d}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'narrow' })}</Text>
+                <Ring progress={on ? 1 : 0} size={34} stroke={4} color={HABITS_COLOR}>
+                  {on ? <Icon name="check" size={14} color={HABITS_COLOR} /> : null}
+                </Ring>
+              </Pressable>
+            );
+          })}
         </View>
-        <Pressable onPress={() => toggleHabit(os, entity.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: done ? HABITS_COLOR : HABITS_COLOR + '22', padding: 14, borderRadius: 12 }}>
-          <Icon name={done ? 'checkmark.circle' : 'circle'} size={22} color={done ? '#fff' : HABITS_COLOR} />
-          <Text variant="headline" color={done ? '#fff' : HABITS_COLOR}>
-            {done ? 'Done today' : 'Mark done today'}
-          </Text>
-        </Pressable>
-      </Card>
-      <View>
-        <SectionHeader title="Last 13 weeks" icon="calendar" color={HABITS_COLOR} />
-        <Card style={{ alignItems: 'center' }}>
-          <HeatGrid cells={days.map((d) => ({ key: d, level: logs.has(d) ? 1 : 0 }))} color={HABITS_COLOR} columns={13} size={18} gap={4} />
-        </Card>
-      </View>
+      </Section>
+      <Section title="Last 13 weeks">
+        <HeatMap days={Array.from({ length: 91 }, (_, i) => { const d = isoOf(Date.now() - (90 - i) * DAY); return { day: d, value: done.has(d) ? 1 : dueOn(h, d) ? 0 : null }; })} color={HABITS_COLOR} accessibilityLabel={`${entity.title}, last 13 weeks`} />
+      </Section>
+      <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>Saying “did {entity.title.toLowerCase()}” in a dump ticks it too.</Text>
     </View>
   );
 }
@@ -196,14 +120,25 @@ export const habitsModule: ModuleManifest = {
       name: 'habits_status',
       description: 'Active habits with whether each is done today and its current streak.',
       input: z.object({}),
-      run: async (_i, os) => os.entities.query<HabitData>('habit', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }).map((h) => { const logs = habitLogs(os, h.id, 60); return { id: h.id, title: h.title, doneToday: logs.has(today()), streak: streak(logs) }; }),
+      run: async (_i, os) =>
+        activeHabits(os).map((h) => {
+          const done = doneDays(os, h.id, isoOf(Date.now() - 400 * DAY));
+          const s = streakOf(h, done);
+          return { id: h.id, title: h.title, doneToday: done.has(today()), streak: `${s.count} ${s.unit}${s.count === 1 ? '' : 's'}` };
+        }),
     },
     {
-      name: 'log_habit',
-      description: 'Mark a habit done (or undo) for a date (default today).',
-      input: z.object({ habitId: z.string(), date: z.string().optional() }),
-      confirm: true,
-      run: async (i, os) => { const x = i as { habitId: string; date?: string }; toggleHabit(os, x.habitId, x.date ?? today()); return { ok: true }; },
+      name: 'habit_check_in',
+      description: 'Tick a habit the user tracks as done for a day (default today). Name it as they said it.',
+      input: z.object({ habit: z.string(), date: z.string().optional(), entityId: z.string().optional() }),
+      run: async (i, os) => {
+        const x = i as { habit: string; date?: string; entityId?: string };
+        const h = x.entityId ? activeHabits(os).find((y) => y.id === x.entityId) : findHabit(os, x.habit);
+        if (!h) return { error: `no habit called ${x.habit}` };
+        const date = x.date ?? today();
+        const logId = checkIn(os, h.id, date);
+        return { logged: `${h.title} ✓ ${date === today() ? 'today' : date.slice(8) + '/' + date.slice(5, 7)}`, entityId: h.id, logId, already: !logId };
+      },
     },
   ],
 };

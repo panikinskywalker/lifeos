@@ -14,6 +14,8 @@ import { ToCheckBell } from '../../src/screens/ToCheckBell';
 import { TILES, homeLayout, homeAreas, type TileId } from '../../src/screens/homeLayout';
 import { doneToday, myDay, progress, setGoal, type DayItem, type GoalId, type Progress } from '@core/dashboard/day';
 import { tintForModule } from '@ui/theme/moduleTint';
+import { activeHabits } from '@core/habits/habits';
+import { HabitChecklist } from '@modules/habits';
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -100,6 +102,8 @@ function TodayTile({ id, u }: { id: TileId; u: Upkeep }) {
       return <ProgressTile />;
     case 'areas':
       return <AreasTile />;
+    case 'habits':
+      return <HabitsTile />;
   }
 }
 
@@ -396,6 +400,18 @@ function ProgressTile() {
           </View>
         ) : null}
       </Sheet>
+    </Tile>
+  );
+}
+
+/** Today's habits: tap to tick; only when you track some. */
+function HabitsTile() {
+  const router = useRouter();
+  const n = useLive((o) => activeHabits(o).length, []);
+  if (!n) return null;
+  return (
+    <Tile size="2x1" tint="health" icon="flame" label="Habits" meta="today" onPress={() => router.push('/module/habits' as never)}>
+      <HabitChecklist />
     </Tile>
   );
 }

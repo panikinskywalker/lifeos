@@ -490,6 +490,21 @@ export function graphTools(s: GraphSession): AiToolDef[] {
       },
     },
     {
+      name: 'check_in',
+      description: 'A habit the user tracks was done ("did yoga", "read 20 pages", "went for a run"). Ticks it for the day.',
+      input: z.object({ habit: z.string(), date: z.string().optional() }),
+      run: async (input, os) => {
+        const i = input as { habit: string; date?: string };
+        const tool = os.registry.aiTools.get('habit_check_in');
+        if (!tool) return { error: 'habits not available' };
+        const out = (await tool.run(tool.input.parse({ habit: i.habit, date: parseDateish(i.date ?? 'today') }), os)) as Record<string, unknown>;
+        if (out?.error || !out.entityId) return out;
+        const row = log(os, s, { kind: 'habit', action: 'logged', entityId: String(out.entityId), label: String(out.logged) });
+        if (out.logId) exactUndo.set(row.id, () => os.entities.delete(String(out.logId), 'user'));
+        return { done: out.logged };
+      },
+    },
+    {
       name: 'log_spend',
       description: 'Money spent or received: amount, merchant, what it was for (a record, e.g. the Dyson just bought), who with, which card/account, date.',
       input: z.object({ amount: z.union([z.number(), z.string()]), kind: z.enum(['expense', 'income']).optional(), merchant: z.string().optional(), category: z.string().optional(), date: z.string().optional(), for: NodeRef.optional(), with: z.array(NodeRef).optional(), account: z.string().optional(), note: z.string().optional() }),

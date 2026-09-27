@@ -1,3 +1,4 @@
+import { activeHabits, habitSaid } from '../habits/habits';
 import type { LifeOSContext } from '../registry/context';
 import type { AiToolDef } from '../registry/types';
 import type { ChatMessage, ContentBlock, LLMProvider } from '../ai/provider';
@@ -47,10 +48,15 @@ ${subject ? `The user is on the page of ${subject.type} "${subject.title}": "thi
 - people or things mentioned outside an event → upsert_node (details in attributes; "new friend / colleague / neighbour" sets relationship)
 - more details about a thing → set_attributes (known fields; anything else goes to its notes)
 - relationships ("her brother Mike", "works at Zomato") → link (family_of, friend_of, works_at, knows, lives_in, owns…)
-- every amount spent or received → log_spend (the card or bank goes in account) · to-dos → create_task · a chore or service done on something they own → log_done
+- every amount spent or received → log_spend (the card or bank goes in account) · to-dos → create_task · a chore or service done on something they own → log_done${habitLine(os)}
 Rules: never ask questions. File only what was said; never invent people, dates or amounts. Feelings and opinions alone are not filed. "I"/"me" is the user — never a record, never linked. Keep dates as said ("8 Sept", "yesterday"). Reply "done" only after every sentence is filed.
 Record types (type: fields):
 ${types}`;
+}
+
+function habitLine(os: LifeOSContext): string {
+  const hs = activeHabits(os);
+  return hs.length ? `\n- a habit they track done (${hs.map((h) => h.title).slice(0, 12).join(', ')}) → check_in` : '';
 }
 
 /** Split a long dump at paragraph / sentence boundaries so each request stays small. */
@@ -141,6 +147,12 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
 async function parserPass(os: LifeOSContext, dump: Dump): Promise<string> {
   const left: string[] = [];
   for (const sentence of sentences(dump.body)) {
+    // "did yoga", "went for a run": tick the habit, on the phone.
+    const h = sentence.length <= 200 ? habitSaid(os, sentence, dump.createdAt) : null;
+    if (h && os.registry.aiTools.has('habit_check_in')) {
+      const out = (await runLogged(os, dump, 'habit_check_in', { habit: h.habit.title, date: h.date, entityId: h.habit.id })) as { error?: unknown };
+      if (!out?.error) continue;
+    }
     const plan = sentence.length <= 200 ? parseMessage(os, sentence.replace(/[.!]+$/, '')) : null;
     if (!plan || !WRITE_INTENTS.has(plan.intent)) {
       left.push(sentence);

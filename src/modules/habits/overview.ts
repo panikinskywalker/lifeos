@@ -1,5 +1,6 @@
 import type { LifeOSContext } from '@core/registry/context';
 import { DAY_MS, isoOf, type ModuleOverview, type OverviewBlock } from '@core/dashboard/overview';
+import { activeHabits, streakOf } from '@core/habits/habits';
 
 /** Habits at a glance: done today, streaks, the last 12 weeks as a heat map, this week per habit. */
 export function habitsOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
@@ -13,13 +14,13 @@ export function habitsOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
   }
   const today = isoOf(now);
   const doneToday = byDay.get(today)?.size ?? 0;
+  // Streaks respect how often each habit is meant to happen (weekdays skip weekends; weekly ones count weeks).
+  const byId = new Map(activeHabits(os).map((h) => [h.id, h]));
   const streak = (id: string) => {
-    let n = 0;
-    for (let d = byDay.get(today)?.has(id) ? 0 : 1; d < 84; d++) {
-      if (byDay.get(isoOf(now - d * DAY_MS))?.has(id)) n++;
-      else break;
-    }
-    return n;
+    const h = byId.get(id);
+    if (!h) return 0;
+    const done = new Set([...byDay.entries()].filter(([, set]) => set.has(id)).map(([d]) => d));
+    return streakOf(h, done, now).count;
   };
   const streaks = habits.map((h) => ({ h, s: streak(h.id) })).sort((a, b) => b.s - a.s);
   const heat = Array.from({ length: 84 }, (_, i) => {
