@@ -12,8 +12,26 @@ function useWidth(): [number, (e: LayoutChangeEvent) => void] {
   return [w, (e) => setW(Math.round(e.nativeEvent.layout.width))];
 }
 
+/** Charts redraw only when what they show changes (functions like formatY are compared by their text). */
+function sameChartProps(a: object, b: object): boolean {
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  for (const k of ka) {
+    const x = (a as Record<string, unknown>)[k];
+    const y = (b as Record<string, unknown>)[k];
+    if (x === y) continue;
+    if (typeof x === 'function' && typeof y === 'function') {
+      if (x.toString() !== y.toString()) return false;
+      continue;
+    }
+    if (k === 'children' || typeof x !== 'object' || typeof y !== 'object' || x === null || y === null) return false;
+    if (JSON.stringify(x) !== JSON.stringify(y)) return false;
+  }
+  return true;
+}
+
 /** Stitch sparkline: 2px line, round joins, a dot on the latest value. */
-export function Sparkline({ values, height = 32, color, accessibilityLabel }: { values: number[]; height?: number; color?: string; accessibilityLabel?: string }) {
+function SparklineImpl({ values, height = 32, color, accessibilityLabel }: { values: number[]; height?: number; color?: string; accessibilityLabel?: string }) {
   const t = useTheme();
   const [w, onLayout] = useWidth();
   const c = color ?? t.c.ok.sageText;
@@ -43,7 +61,7 @@ export interface ChartSeries {
  * Stitch line chart: dotted horizontal gridlines, y labels on the right,
  * x labels under, 2px series with a dot on each point. Sits on a nested slab.
  */
-export function LineChart({ series, labels, height = 140, formatY = (n) => String(Math.round(n)), minZero = false, accessibilityLabel }: { series: ChartSeries[]; labels: string[]; height?: number; formatY?: (n: number) => string; minZero?: boolean; accessibilityLabel?: string }) {
+function LineChartImpl({ series, labels, height = 140, formatY = (n) => String(Math.round(n)), minZero = false, accessibilityLabel }: { series: ChartSeries[]; labels: string[]; height?: number; formatY?: (n: number) => string; minZero?: boolean; accessibilityLabel?: string }) {
   const t = useTheme();
   const [w, onLayout] = useWidth();
   const all = series.flatMap((s) => s.values);
@@ -91,7 +109,7 @@ export function LineChart({ series, labels, height = 140, formatY = (n) => Strin
  * rounded tops, dotted gridlines, y labels on the right. `highlight` darkens
  * one column's label (today).
  */
-export function ColumnChart({ series, labels, height = 140, formatY = (n) => String(Math.round(n)), highlight, labelEvery = 1, accessibilityLabel }: { series: ChartSeries[]; labels: string[]; height?: number; formatY?: (n: number) => string; highlight?: number; labelEvery?: number; accessibilityLabel?: string }) {
+function ColumnChartImpl({ series, labels, height = 140, formatY = (n) => String(Math.round(n)), highlight, labelEvery = 1, accessibilityLabel }: { series: ChartSeries[]; labels: string[]; height?: number; formatY?: (n: number) => string; highlight?: number; labelEvery?: number; accessibilityLabel?: string }) {
   const t = useTheme();
   const [w, onLayout] = useWidth();
   const n = labels.length;
@@ -171,7 +189,7 @@ export function ChartLegend({ items }: { items: Array<{ label: string; color: st
 }
 
 /** Tile bars: no axes, one bar per bucket, today's in full colour, missing days as a faint stub (not zero). */
-export function MiniBars({ values, height = 44, color, accessibilityLabel }: { values: Array<number | null>; height?: number; color?: string; accessibilityLabel?: string }) {
+function MiniBarsImpl({ values, height = 44, color, accessibilityLabel }: { values: Array<number | null>; height?: number; color?: string; accessibilityLabel?: string }) {
   const t = useTheme();
   const [w, onLayout] = useWidth();
   const c = color ?? t.c.accent.gold;
@@ -208,7 +226,7 @@ export function DeltaChip({ change, better, vs }: { change: number | null; bette
 }
 
 /** Calendar heat map: columns are weeks (oldest left), rows Mon–Sun; darker = more. */
-export function HeatMap({ days, color, accessibilityLabel }: { days: Array<{ day: string; value: number | null }>; color?: string; accessibilityLabel?: string }) {
+function HeatMapImpl({ days, color, accessibilityLabel }: { days: Array<{ day: string; value: number | null }>; color?: string; accessibilityLabel?: string }) {
   const t = useTheme();
   const [w, onLayout] = useWidth();
   const c = color ?? t.tints.health.ink;
@@ -232,3 +250,13 @@ export function HeatMap({ days, color, accessibilityLabel }: { days: Array<{ day
     </View>
   );
 }
+
+export const Sparkline = React.memo(SparklineImpl, sameChartProps);
+
+export const LineChart = React.memo(LineChartImpl, sameChartProps);
+
+export const ColumnChart = React.memo(ColumnChartImpl, sameChartProps);
+
+export const MiniBars = React.memo(MiniBarsImpl, sameChartProps);
+
+export const HeatMap = React.memo(HeatMapImpl, sameChartProps);

@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import type { Entity, FilterClause, FilterGroup, ViewDefinition } from '@core/domain/types';
 import type { SavedView } from '@core/repo/sideRepos';
 import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
-import { Button, ChipRow, EmptyState, FilterChip, IconButton, ListGroup, RowList, Screen, Sheet, Text, TextField } from '../kit';
+import { Button, ChipRow, EmptyState, FilterChip, IconButton, ListGroup, RowList, ScreenHeader, Sheet, Text, TextField } from '../kit';
 import { EntityRow } from '../components/EntityRow';
 import { FilterEditor, describeFilter } from '../components/FilterEditor';
 import { useLive, useOS } from '../hooks';
@@ -19,6 +20,7 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const def = os.registry.type(type);
   const tint = tintForModule(def.module);
   const currencyKey = def.fields.find((f) => f.type === 'currency')?.key;
@@ -54,7 +56,7 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
     setSaveName('');
   };
 
-  const body = (
+  const controls = (
     <>
       <ChipRow>
         <FilterChip label="All" selected={!activeViewId && !override} onPress={() => { setActiveViewId(null); setOverride(null); }} />
@@ -75,32 +77,42 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
           <IconButton icon="x" accessibilityLabel="Clear filter" onPress={() => setOverride(null)} />
         </View>
       ) : null}
-      {entities.length === 0 ? (
+    </>
+  );
+  // The rows, a day's (or 40 rows') card at a time, so long lists only draw what's on screen.
+  const chunks = useMemo(() => {
+    const out: Array<{ key: string; label: string | null; meta: string | null; items: Entity[] }> = [];
+    for (const g of groups) {
+      const meta = g.totals ? [g.totals.out ? `${os.format.currency(g.totals.out)} out` : null, g.totals.in ? `${os.format.currency(g.totals.in)} in` : null].filter(Boolean).join(' · ') : null;
+      for (let i = 0; i < g.items.length; i += 40) out.push({ key: `${g.key ?? '_'}:${i}`, label: i === 0 ? (g.label ?? null) : null, meta: i === 0 ? meta : null, items: g.items.slice(i, i + 40) });
+    }
+    return out;
+  }, [groups, os]);
+  const renderChunk = (c: (typeof chunks)[number]) =>
+    c.label ? (
+      <ListGroup key={c.key} title={c.label} meta={c.meta}>
+        {c.items.map((e) => (
+          <EntityRow key={e.id} entity={e} />
+        ))}
+      </ListGroup>
+    ) : (
+      <RowList key={c.key}>
+        {c.items.map((e) => (
+          <EntityRow key={e.id} entity={e} />
+        ))}
+      </RowList>
+    );
+  const board = layout === 'board' && def.statuses?.length;
+  const empty =
+    entities.length === 0 ? (
         total === 0 ? (
           <EmptyState icon={def.icon} tint={tint} title={`No ${def.labelPlural.toLowerCase()} yet`} line={`Tell your agent about one, or add it here.`} action={`Add ${def.label.toLowerCase()}`} onAction={() => router.push(newHref as never)} />
         ) : (
           <EmptyState icon="search" tint={tint} title="Nothing matches" line="Try clearing the search or the filter." action="Clear" actionIcon="x" onAction={() => { setSearch(''); setOverride(null); setActiveViewId(null); }} />
         )
-      ) : layout === 'board' && def.statuses?.length ? (
-        <Board entities={entities} statuses={def.statuses} />
-      ) : (
-        groups.map((g) =>
-          g.label ? (
-            <ListGroup key={g.key ?? '_'} title={g.label} meta={g.totals ? [g.totals.out ? `${os.format.currency(g.totals.out)} out` : null, g.totals.in ? `${os.format.currency(g.totals.in)} in` : null].filter(Boolean).join(' · ') : null}>
-              {g.items.map((e) => (
-                <EntityRow key={e.id} entity={e} />
-              ))}
-            </ListGroup>
-          ) : (
-            <RowList key="_">
-              {g.items.map((e) => (
-                <EntityRow key={e.id} entity={e} />
-              ))}
-            </RowList>
-          ),
-        )
-      )}
-
+    ) : null;
+  const sheets = (
+    <>
       <Sheet visible={showFilter} onClose={() => setShowFilter(false)} title="Filter & sort" footer={<Button title="Done" block onPress={() => setShowFilter(false)} />}>
         <FilterEditor type={type} value={view} onChange={(v) => setOverride({ ...v, search: undefined })} />
       </Sheet>
@@ -110,21 +122,47 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
     </>
   );
 
-  if (embedded) return <View style={{ gap: 16 }}>{body}</View>;
+  if (embedded)
+    return (
+      <View style={{ gap: 16 }}>
+        {controls}
+        {empty ?? (board ? <Board entities={entities} statuses={def.statuses!} /> : chunks.map(renderChunk))}
+        {sheets}
+      </View>
+    );
   return (
-    <Screen
-      title={title ?? def.labelPlural}
-      subtitle={subtitle}
-      onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}
-      right={
-        <>
-          <IconButton icon="filter" accessibilityLabel="Filter and sort" filled onPress={() => setShowFilter(true)} />
-          <IconButton icon="plus" accessibilityLabel={`Add ${def.label}`} filled={t.c.accent.mustard} color={t.c.accent.mustardInk} onPress={() => router.push(newHref as never)} />
-        </>
-      }
-    >
-      {body}
-    </Screen>
+    <View style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
+      <FlatList
+        data={empty || board ? [] : chunks}
+        keyExtractor={(c) => c.key}
+        renderItem={({ item }) => renderChunk(item)}
+        ItemSeparatorComponent={Gap}
+        ListHeaderComponent={
+          <View style={{ gap: 18, paddingBottom: empty || board ? 0 : 18 }}>
+            <ScreenHeader
+              title={title ?? def.labelPlural}
+              subtitle={subtitle}
+              onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}
+              right={
+                <>
+                  <IconButton icon="filter" accessibilityLabel="Filter and sort" filled onPress={() => setShowFilter(true)} />
+                  <IconButton icon="plus" accessibilityLabel={`Add ${def.label}`} filled={t.c.accent.mustard} color={t.c.accent.mustardInk} onPress={() => router.push(newHref as never)} />
+                </>
+              }
+            />
+            {controls}
+            {empty}
+            {board ? <Board entities={entities} statuses={def.statuses!} /> : null}
+          </View>
+        }
+        contentContainerStyle={{ paddingHorizontal: t.layout.gutter, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={6}
+        windowSize={9}
+        removeClippedSubviews
+      />
+      {sheets}
+    </View>
   );
 }
 
@@ -221,6 +259,8 @@ function dayLabel(ts: number): string {
   if (same(d, y)) return 'Yesterday';
   return format(d, d.getFullYear() !== today.getFullYear() ? 'EEE d MMM yyyy' : 'EEE d MMM');
 }
+
+const Gap = () => <View style={{ height: 18 }} />;
 
 function countClauses(g?: FilterGroup): number {
   if (!g) return 0;

@@ -13,7 +13,7 @@ export interface StackedBarPart {
 }
 
 /** Canvas: 14 tall, radius 7, 3px gaps, 6px minimum; legend in two columns (dot · label · value). */
-export function StackedBar({ parts, height = 14, legend = true, track }: { parts: StackedBarPart[]; height?: number; legend?: boolean; track?: string }) {
+function StackedBarImpl({ parts, height = 14, legend = true, track }: { parts: StackedBarPart[]; height?: number; legend?: boolean; track?: string }) {
   const t = useTheme();
   const [width, setWidth] = useState(0);
   const segs = stackSegments(parts.map((p) => p.value), width, 3, 6);
@@ -47,3 +47,6 @@ export function StackedBar({ parts, height = 14, legend = true, track }: { parts
     </View>
   );
 }
+
+/** Redraw only when the parts change. */
+export const StackedBar = React.memo(StackedBarImpl, (a, b) => a.height === b.height && a.legend === b.legend && a.track === b.track && JSON.stringify(a.parts) === JSON.stringify(b.parts));

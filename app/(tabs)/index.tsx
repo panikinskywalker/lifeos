@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { InteractionManager, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { upkeep, type Upkeep } from '@core/cycles/upkeep';
@@ -43,6 +43,12 @@ export default function TodayTab() {
   const os = useOS();
   // Your layout (You › Home screen); re-read whenever settings change.
   const layout = useLive((o) => homeLayout(o), []);
+  // Cold start: the first screenful now, the rest once it's on screen.
+  const [rest, setRest] = useState(false);
+  useEffect(() => {
+    const h = InteractionManager.runAfterInteractions(() => setRest(true));
+    return () => h.cancel();
+  }, []);
   const shown = layout.filter((x) => !x.hidden);
   // One upkeep pass for every tile that needs it (Upcoming, People, Overdue).
   const u = useLive((o) => upkeep(o), []);
@@ -68,7 +74,7 @@ export default function TodayTab() {
         </View>
       }
     >
-      {rows.map((r) => (r.length === 2 ? <BentoGrid key={r.join()}>{r.map((id) => <TodayTile key={id} id={id} u={u} />)}</BentoGrid> : <TodayTile key={r[0]} id={r[0]!} u={u} />))}
+      {(rest ? rows : rows.slice(0, 3)).map((r) => (r.length === 2 ? <BentoGrid key={r.join()}>{r.map((id) => <TodayTile key={id} id={id} u={u} />)}</BentoGrid> : <TodayTile key={r[0]} id={r[0]!} u={u} />))}
       <Pressable accessibilityRole="button" onPress={() => router.push('/settings/home' as never)} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10 }}>
         <Icon name="edit" size={14} />
         <Text variant="caption" color="secondary">Choose what’s on Today</Text>
@@ -426,7 +432,7 @@ function AreasTile() {
       homeAreas(o)
         .map((id) => {
           const m = o.registry.modules.get(id);
-          const card = m?.overview?.(o).card;
+          const card = m?.overview?.(o, Date.now(), { cardOnly: true }).card;
           return m && card ? { id, name: m.name, icon: m.icon, card } : null;
         })
         .filter((x): x is NonNullable<typeof x> => !!x),
