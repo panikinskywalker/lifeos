@@ -5,7 +5,8 @@ import { removeTracker, ruleText, trackerSummary, trackers } from '@core/activit
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import type { TintKey } from '@ui/theme/tokens';
-import { Button, EmptyState, HeatMap, IconButton, RowItem, RowList, Screen, Section, StatTrio, Text } from '@ui/kit';
+import { ActivityGrid } from '../../src/screens/ActivityGrid';
+import { Button, EmptyState, IconButton, RowItem, RowList, Screen, Section, StatTrio, Text } from '@ui/kit';
 
 /** One tracker: half a year of days, this week / month, streaks, and the rules that decide a day. */
 export default function TrackerScreen() {
@@ -29,7 +30,7 @@ export default function TrackerScreen() {
     <Screen title={s.tracker.name} subtitle={`${s.total} days in the last 6 months`} onBack={back} right={<IconButton icon="edit" accessibilityLabel="Edit tracker" filled onPress={() => router.push({ pathname: '/activity/edit', params: { id: s.tracker.id } } as never)} />}>
       <StatTrio stats={[{ label: 'This week', value: String(s.thisWeek) }, { label: 'This month', value: String(s.thisMonth) }, { label: 'Streak', value: `${s.streak} d`, caption: `longest ${s.longest} d`, tone: s.streak ? 'ok' : undefined }]} />
       <Section title="Last 26 weeks">
-        <HeatMap days={s.days} color={t.tints[tint].ink} accessibilityLabel={`${s.tracker.name}, last 26 weeks`} />
+        <ActivityGrid days={s.days} color={t.tints[tint].ink} accessibilityLabel={`${s.tracker.name}, last 26 weeks`} />
       </Section>
       <Section title="A day counts when any of these happen">
         <RowList>

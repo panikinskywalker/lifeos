@@ -376,24 +376,34 @@ function ProgressTile() {
   if (!rings.length) return null;
   return (
     <Tile size="2x1" tint="health" icon="target" label="Progress" meta="vs your goals">
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 }}>
+      <View style={{ gap: 14 }}>
         {rings.map((p) => {
           const look = RING_LOOK[p.id] ?? { icon: 'target', tint: 'tasks' as TintKey };
           const bad = p.better === 'down' && (p.ratio ?? 0) > 1;
           const color = bad ? t.c.alert.coral : t.tints[look.tint].ink;
+          const of = p.label === 'Tasks this week' ? `of ${p.target} tasks` : p.label === 'Habits' ? `of ${p.target} habits` : `of ${p.target != null ? fmt(p, p.target) : '—'}`;
           return (
             <Pressable
               key={p.id}
               accessibilityRole="button"
-              accessibilityLabel={`${p.label}: ${p.value != null ? fmt(p, p.value) : 'no data'} of ${p.target != null ? fmt(p, p.target) : '—'}`}
+              accessibilityLabel={`${p.label}: ${p.value != null ? fmt(p, p.value) : 'no data'} ${of}`}
               onPress={() => (look.route ? router.push(look.route as never) : (setEditing(p), setValue(p.target ?? undefined)))}
-              style={{ width: '33.33%', alignItems: 'center', gap: 6 }}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, opacity: pressed ? 0.8 : 1 })}
             >
-              <Ring progress={Math.min(1, p.ratio ?? 0)} size={70} stroke={8} color={color}>
-                <Icon name={look.icon} size={18} color={color} />
+              <Ring progress={Math.min(1, p.ratio ?? 0)} size={46} stroke={6} color={color}>
+                <Icon name={look.icon} size={16} color={color} />
               </Ring>
-              <Text variant="label" numberOfLines={1}>{p.value != null ? fmt(p, p.value) : '—'}</Text>
-              <Text variant="caption" color="secondary" numberOfLines={1}>{p.label === 'Tasks this week' ? `of ${p.target} tasks` : p.label === 'Habits' ? `of ${p.target} habits` : `of ${p.target != null ? fmt(p, p.target) : '—'}`}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="caption" color="secondary" numberOfLines={1}>{p.label}</Text>
+                <Text variant="rowTitle" numberOfLines={1}>
+                  {p.value != null ? fmt(p, p.value) : '—'} <Text variant="caption" color="secondary">{of}</Text>
+                </Text>
+              </View>
+              {p.week.some((v) => v != null && v > 0) ? (
+                <View style={{ width: 84 }}>
+                  <MiniBars values={p.week} height={30} color={color} accessibilityLabel={`${p.label}, last 7 days`} />
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
@@ -418,7 +428,7 @@ function ProgressTile() {
 function ActivityTile() {
   const router = useRouter();
   const t = useTheme();
-  const rows = useLive((o) => trackers(o).filter((x) => !x.hidden).map((x) => trackerSummary(o, x)), []);
+  const rows = useLive((o) => trackers(o).filter((x) => !x.hidden).map((x) => trackerSummary(o, x, Date.now(), 26)), []);
   const [width, setWidth] = useState(0);
   const [page, setPage] = useState(0);
   const open = () => router.push('/activity' as never);
