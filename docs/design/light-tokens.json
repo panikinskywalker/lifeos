@@ -1,0 +1,223 @@
+{
+  "theme": "Light (current LifeOS app — the values Abyss sits beside)",
+  "source": "src/ui/theme/tokens.ts, exported as-is",
+  "colors": {
+    "bg": {
+      "ground": "#FCF9F4",
+      "tile": "#EBE8E3",
+      "tileRaised": "#F6F3EE",
+      "lowest": "#FFFFFF",
+      "container": "#F0EDE8",
+      "dim": "#DCDAD5",
+      "bar": "#1C1C19",
+      "pressed": "#E5E2DD",
+      "scrim": "#1C1C1947",
+      "overlay": "#FFFFFFB3",
+      "pill": "#FFFFFF"
+    },
+    "fg": {
+      "primary": "#1C1C19",
+      "secondary": "#4D4635",
+      "tertiary": "#7F7663",
+      "onBar": "#B5B0A6",
+      "onBarActive": "#F3C84B",
+      "onBarText": "#F3F0EB"
+    },
+    "line": "#DCDAD5",
+    "ringTrack": "#DCDAD5",
+    "rail": "#D1C5AF",
+    "chart": [
+      "#6F9E88",
+      "#7F9BB0",
+      "#8C7FB0",
+      "#C89AA6",
+      "#8E9B70"
+    ],
+    "accent": {
+      "mustard": "#F3C84B",
+      "mustardInk": "#241A00",
+      "mustardSoft": "#FFE08F",
+      "gold": "#755B00"
+    },
+    "alert": {
+      "coral": "#E9635A",
+      "coralText": "#BA1A1A",
+      "coralInk": "#FFFFFF",
+      "coralFill": "#FFDAD6"
+    },
+    "ok": {
+      "sage": "#BFCC9E",
+      "sageText": "#57633D",
+      "sageInk": "#151F02",
+      "sageFill": "#D8E5B5"
+    }
+  },
+  "moduleTints": {
+    "finance": {
+      "fill": "#F7E7B4",
+      "ink": "#584400",
+      "note": "fill = tile / row background; ink = text & marks on it. Light has no fillStrong — Abyss adds it."
+    },
+    "upkeep": {
+      "fill": "#CFE2D8",
+      "ink": "#284938",
+      "note": "fill = tile / row background; ink = text & marks on it. Light has no fillStrong — Abyss adds it."
+    },
+    "people": {
+      "fill": "#F0DCE1",
+      "ink": "#7A3E4E",
+      "note": "fill = tile / row background; ink = text & marks on it. Light has no fillStrong — Abyss adds it."
+    },
+    "tasks": {
+      "fill": "#D3E3EF",
+      "ink": "#2E4A5C",
+      "note": "fill = tile / row background; ink = text & marks on it. Light has no fillStrong — Abyss adds it."
+    },
+    "health": {
+      "fill": "#D8E5B5",
+      "ink": "#404B27",
+      "note": "fill = tile / row background; ink = text & marks on it. Light has no fillStrong — Abyss adds it."
+    },
+    "memory": {
+      "fill": "#E1DCEF",
+      "ink": "#4B3F75",
+      "note": "fill = tile / row background; ink = text & marks on it. Light has no fillStrong — Abyss adds it."
+    },
+    "travel": {
+      "fill": "#F5DCCB",
+      "ink": "#7A4420",
+      "note": "fill = tile / row background; ink = text & marks on it. Light has no fillStrong — Abyss adds it."
+    },
+    "documents": {
+      "fill": "#E5E2DD",
+      "ink": "#4D4635",
+      "note": "fill = tile / row background; ink = text & marks on it. Light has no fillStrong — Abyss adds it."
+    }
+  },
+  "type": {
+    "fonts": {
+      "400": "PlusJakartaSans_400Regular",
+      "500": "PlusJakartaSans_500Medium",
+      "600": "PlusJakartaSans_600SemiBold",
+      "700": "PlusJakartaSans_700Bold",
+      "800": "PlusJakartaSans_800ExtraBold"
+    },
+    "styles": {
+      "display": {
+        "fontFamily": "PlusJakartaSans_700Bold",
+        "fontSize": 36,
+        "lineHeight": 42,
+        "letterSpacing": -0.9,
+        "fontVariant": [
+          "tabular-nums"
+        ]
+      },
+      "stat": {
+        "fontFamily": "PlusJakartaSans_600SemiBold",
+        "fontSize": 26,
+        "lineHeight": 32,
+        "letterSpacing": -0.39,
+        "fontVariant": [
+          "tabular-nums"
+        ]
+      },
+      "title": {
+        "fontFamily": "PlusJakartaSans_700Bold",
+        "fontSize": 30,
+        "lineHeight": 36,
+        "letterSpacing": -0.75
+      },
+      "heading": {
+        "fontFamily": "PlusJakartaSans_600SemiBold",
+        "fontSize": 19,
+        "lineHeight": 24,
+        "letterSpacing": -0.28
+      },
+      "rowTitle": {
+        "fontFamily": "PlusJakartaSans_600SemiBold",
+        "fontSize": 15,
+        "lineHeight": 20
+      },
+      "body": {
+        "fontFamily": "PlusJakartaSans_400Regular",
+        "fontSize": 15,
+        "lineHeight": 22,
+        "letterSpacing": -0.07
+      },
+      "tileTitle": {
+        "fontFamily": "PlusJakartaSans_600SemiBold",
+        "fontSize": 14,
+        "lineHeight": 18
+      },
+      "label": {
+        "fontFamily": "PlusJakartaSans_600SemiBold",
+        "fontSize": 13,
+        "lineHeight": 17
+      },
+      "caption": {
+        "fontFamily": "PlusJakartaSans_400Regular",
+        "fontSize": 13,
+        "lineHeight": 18
+      },
+      "labelCaps": {
+        "fontFamily": "PlusJakartaSans_600SemiBold",
+        "fontSize": 12,
+        "lineHeight": 16,
+        "letterSpacing": 0.72
+      },
+      "labelMicro": {
+        "fontFamily": "PlusJakartaSans_700Bold",
+        "fontSize": 10,
+        "lineHeight": 14,
+        "letterSpacing": 0.5
+      },
+      "nav": {
+        "fontFamily": "PlusJakartaSans_600SemiBold",
+        "fontSize": 11,
+        "lineHeight": 13
+      }
+    },
+    "note": "fontFamily names are Plus Jakarta Sans faces; letterSpacing in px; UPPERCASE for labelCaps / labelMicro is applied at the call site"
+  },
+  "radius": {
+    "tile": 24,
+    "card": 16,
+    "sheet": 24,
+    "band": 28,
+    "button": 14,
+    "input": 14,
+    "iconBox": 10,
+    "checkbox": 7,
+    "bar": 7,
+    "chip": 999
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 20,
+    "xxl": 24,
+    "xxxl": 32
+  },
+  "layout": {
+    "gutter": 20,
+    "gridGap": 12,
+    "bar": {
+      "height": 66,
+      "radius": 22,
+      "inset": 20
+    },
+    "iconBox": 32,
+    "touch": 48
+  },
+  "icon": {
+    "stroke": 2,
+    "strokeInBox": 2,
+    "size": 24,
+    "nav": 22,
+    "row": 18,
+    "tile": 16,
+    "chip": 14
+  }
+}

@@ -1,8 +1,8 @@
 # LifeOS · Abyss v2 — brief for Claude Design
 
 How to use this file: paste **Part 1** as your message to Claude Design, and
-attach this whole file plus the previous handoff (`lifeos-abyss-handoff.zip`)
-as reference. Parts 2–7 are the detail the prompt points at.
+attach this whole file, `light-tokens.json` (the app's current Light values)
+and the previous handoff (`lifeos-abyss-handoff.zip`) as reference. Parts 2–7 are the detail the prompt points at.
 
 ---
 
@@ -92,7 +92,7 @@ React Native 0.86 (Expo SDK 57) on Android. What's cheap and what isn't:
 
 ## Part 5 — tokens: map to the names the app uses
 
-The app reads colours from these names (Light values exist). Give the **Abyss value for every one**, plus the new frost values:
+The app reads colours from these names. **The current Light values are in `light-tokens.json`** (attached; exported straight from the app's code — use it as the Light column, don't use the v1 canvas palette). Give the **Abyss value for every one**, plus the new frost values. Which modules share a tint: `upkeep` = Upkeep, Things, Inventory, Deliveries · `health` = Health, Habits · `memory` = Notes, Memory · `travel` = Travel, Places · `tasks` = Tasks, Projects · `people` = People · `finance` = Money · `documents` = Documents.
 
 - `bg`: `ground` (and the backdrop), `tile`, `tileRaised`, `lowest`, `container`, `dim`, `bar`, `pressed`, `scrim`, `overlay`, `pill`
 - `fg`: `primary`, `secondary`, `tertiary`, `onBar`, `onBarActive`, `onBarText`
