@@ -364,6 +364,16 @@ function fundAccount(os: LifeOSContext, fund: string | null, created: string[]):
 /* Ingest                                                               */
 /* ------------------------------------------------------------------ */
 
+/** What the app did with one message: filed, set aside (and why), or never seen; and the record it made. */
+export function ingestOutcome(os: LifeOSContext, m: RawMessage): { status: string; note: string | null; record: Record<string, unknown> | null } | null {
+  const r = os.db.get<{ status: string; error: string | null; entity_id: string | null }>(`SELECT status, error, entity_id FROM ingest_queue WHERE id=?`, [messageId(m)]);
+  if (!r) return null;
+  const e = r.entity_id ? os.entities.get(r.entity_id) : null;
+  const d = (e?.data ?? {}) as Record<string, unknown>;
+  const record = e ? { type: e.type, title: e.title, ...Object.fromEntries(['amount', 'kind', 'category', 'merchant', 'date', 'status', 'shop', 'carrier'].filter((k) => d[k] !== undefined).map((k) => [k, d[k]])) } : r.entity_id ? { deleted: true } : null;
+  return { status: r.status, note: r.error, record };
+}
+
 export function ingestItem(os: LifeOSContext, id: string): IngestItem | null {
   const r = os.db.get<Row>(`SELECT * FROM ingest_queue WHERE id=?`, [id]);
   return r ? toItem(r) : null;
