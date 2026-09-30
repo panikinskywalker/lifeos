@@ -4,8 +4,7 @@ import * as BackgroundTask from 'expo-background-task';
 import type { LifeOSContext } from '@core/registry/context';
 import { runDumpExtraction } from './dumpExtraction';
 import { syncSources } from './sources';
-// boot imports this file too; the function is only called later, so the cycle is harmless.
-import { syncReminderNotifications } from './boot';
+import { syncReminderNotifications } from './notifySync';
 
 const TASK = 'lifeos-scheduler-tick';
 let osRef: LifeOSContext | null = null;
