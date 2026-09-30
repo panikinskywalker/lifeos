@@ -128,7 +128,7 @@ export async function importSmsHistory(os: LifeOSContext): Promise<number> {
 
 async function syncSms(os: LifeOSContext) {
   const st = sourceState(os, 'sms');
-  if (!Device || !st.enabled || (await access('sms')) !== 'granted') return;
+  if (!Device || !st.enabled || (await access('sms')) !== 'granted') return void console.log(`[sync] sms skipped: enabled ${st.enabled}, access ${await access('sms')}`);
   // Anything that arrived while the app was closed: the receiver's queue, then the inbox since the last sync.
   const since = Number(st.cursor ?? Date.now() - DAY);
   const queued = Device.drain('sms') as Array<{ from: string; body: string; at: number }>;
@@ -149,7 +149,7 @@ async function syncNotifications(os: LifeOSContext) {
 }
 
 async function syncUsage(os: LifeOSContext) {
-  if (!Device || !Device.usageAccess()) return;
+  if (!Device || !Device.usageAccess()) return void console.log('[sync] usage skipped: no Usage access');
   const st = sourceState(os, 'usage');
   const from = st.lastSync ? Math.min(st.lastSync, Date.now() - DAY) - DAY : Date.now() - HISTORY_USAGE_DAYS * DAY;
   const start = new Date(from);
@@ -160,7 +160,7 @@ async function syncUsage(os: LifeOSContext) {
 }
 
 async function syncHealth(os: LifeOSContext) {
-  if (!Device || Device.healthStatus() !== 'available' || !(await Device.healthGranted()).length) return;
+  if (!Device || Device.healthStatus() !== 'available' || !(await Device.healthGranted()).length) return void console.log(`[sync] health skipped: ${Device ? Device.healthStatus() : 'no module'}, permissions ${Device ? (await Device.healthGranted().catch(() => [])).length : 0}`);
   const st = sourceState(os, 'health');
   const from = st.lastSync ? Math.min(st.lastSync, Date.now() - DAY) - DAY : Date.now() - HISTORY_HEALTH_DAYS * DAY;
   const days = await Device.readHealth(from, Date.now());
@@ -183,29 +183,53 @@ export async function refreshFxRates(os: LifeOSContext) {
   applyPendingFx(os);
 }
 
-let running: Promise<void> | null = null;
+let running: { at: number; p: Promise<void> } | null = null;
 
-/** Sync every source that has access. Safe to call often; one run at a time. */
+/** A step that takes longer than this is given up on (it may still finish in the background) so the rest still run. */
+const STEP_LIMIT_MS = { fx: 10_000, phone: 90_000, device: 90_000, mail: 120_000 };
+
+function withLimit<T>(name: string, ms: number, work: () => Promise<T>): Promise<void> {
+  const t0 = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limit = new Promise<'timeout'>((r) => (timer = setTimeout(() => r('timeout'), ms)));
+  return Promise.race([work().then(() => 'ok' as const), limit])
+    .then((r) => console.log(`[sync] ${name} ${r} ${((Date.now() - t0) / 1000).toFixed(1)}s`))
+    .catch((e) => console.log(`[sync] ${name} error ${(e as Error)?.message ?? e}`))
+    .finally(() => clearTimeout(timer));
+}
+
+/**
+ * Sync every source that has access. Safe to call often; one run at a time.
+ * Each step is on its own: one that fails or hangs (a slow network, a phone
+ * service not answering) is logged and skipped, and never blocks the rest or
+ * the next sync.
+ */
 export function syncSources(os: LifeOSContext): Promise<void> {
   if (Platform.OS === 'web') return Promise.resolve();
-  if (running) return running;
-  running = (async () => {
-    await refreshFxRates(os);
-    await syncPhoneSources(os);
-    if (!deviceAvailable) return;
-    for (const [id, fn] of [['sms', syncSms], ['notifications', syncNotifications], ['usage', syncUsage], ['health', syncHealth]] as const) {
-      try {
-        await fn(os);
-      } catch (e) {
-        setSourceState(os, id, { error: (e as Error).message.slice(0, 200) });
+  // A run older than 5 minutes is stuck: start afresh.
+  if (running && Date.now() - running.at < 5 * 60_000) return running.p;
+  const p = (async () => {
+    await withLimit('fx', STEP_LIMIT_MS.fx, () => refreshFxRates(os));
+    await withLimit('phone (contacts, calendar, calls)', STEP_LIMIT_MS.phone, () => syncPhoneSources(os));
+    if (deviceAvailable) {
+      for (const [id, fn] of [['sms', syncSms], ['notifications', syncNotifications], ['usage', syncUsage], ['health', syncHealth]] as const) {
+        await withLimit(id, STEP_LIMIT_MS.device, async () => {
+          try {
+            await fn(os);
+          } catch (e) {
+            setSourceState(os, id, { error: (e as Error).message.slice(0, 200) });
+            throw e;
+          }
+        });
       }
     }
     // Gmail last: a receipt then matches the SMS already filed for it (and the other way round).
-    await syncMail(os).catch(() => {});
+    await withLimit('gmail', STEP_LIMIT_MS.mail, () => syncMail(os));
   })().finally(() => {
-    running = null;
+    if (running?.p === p) running = null;
   });
-  return running;
+  running = { at: Date.now(), p };
+  return p;
 }
 
 /** Live: a bank SMS or payment notification becomes a transaction within the second it arrives. */
