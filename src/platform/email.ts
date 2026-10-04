@@ -83,9 +83,11 @@ export async function removeMailAccount(os: LifeOSContext, email: string) {
 const running = new Map<string, Promise<void>>();
 
 /** Read new mail from every account (or one). Safe to call often; one run per account at a time. */
-export function syncMail(os: LifeOSContext, only?: string): Promise<void> {
-  if (!mailAvailable) return Promise.resolve();
+/** Sync every mailbox (or one); resolves to how many records were filed this run. */
+export function syncMail(os: LifeOSContext, only?: string): Promise<number> {
+  if (!mailAvailable) return Promise.resolve(0);
   const accounts = mailAccounts(os).filter((a) => !only || a.email === only);
+  const before = accounts.reduce((n, a) => n + a.filed, 0);
   return Promise.all(
     accounts.map((a) => {
       const cur = running.get(a.email);
@@ -94,7 +96,7 @@ export function syncMail(os: LifeOSContext, only?: string): Promise<void> {
       running.set(a.email, p);
       return p;
     }),
-  ).then(() => undefined);
+  ).then(() => Math.max(0, mailAccounts(os).filter((a) => !only || a.email === only).reduce((n, a) => n + a.filed, 0) - before));
 }
 
 async function syncOne(os: LifeOSContext, a: MailAccount) {

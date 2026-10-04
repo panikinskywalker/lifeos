@@ -1,12 +1,11 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import type { LifeOSContext } from '@core/registry/context';
-import { fileMessage } from '@core/filing/messages';
-import { PAYMENT_APPS } from '@modules/finance/filing/bankSms';
+import { importSource, runSource } from '@core/filing/sources';
+import type { DeviceBridge } from '@core/registry/context';
 import { saveHealthDays, saveUsageDays, setSourceState, sourceState } from '@core/sources/deviceData';
 import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance/filing/fx';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
-import type { RawMessage } from '@core/filing/messages';
 import { syncMail } from './email';
 import { calendarGranted, callLogGranted, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
 
@@ -95,57 +94,40 @@ export async function requestAccess(id: SourceId): Promise<boolean> {
 /* ------------------------------------------------------------------ */
 
 /**
- * Many messages at once (a history import, a backlog after days offline):
- * 200 per database transaction, a breath between batches so the app stays
- * responsive, and one screen refresh at the end.
+ * The phone as modules see it (docs/MODEL.md §4): finance's SMS, notification
+ * and Gmail sources read through this and never import platform code. Many
+ * messages at once are filed by core in batches with a breath between them.
  */
-async function ingestMany(os: LifeOSContext, msgs: RawMessage[], mode: 'live' | 'import'): Promise<{ confirmed: number; proposed: number }> {
-  const out = { confirmed: 0, proposed: 0 };
-  await quietly(async () => {
-    for (let i = 0; i < msgs.length; i += 200) {
-      os.db.transaction(() => {
-        for (const m of msgs.slice(i, i + 200)) {
-          const r = fileMessage(os, m, { mode });
-          if (r.status === 'confirmed') out.confirmed++;
-          if (r.status === 'proposed') out.proposed++;
-        }
-      });
-      await new Promise((r) => setTimeout(r, 16));
-    }
-  });
-  return out;
+export function deviceBridge(os: LifeOSContext): DeviceBridge {
+  if (!Device) return {};
+  return {
+    sms: {
+      access: () => access('sms'),
+      read: (since, limit) => Device!.readSms(since, limit).then((xs) => xs.map((m) => ({ from: m.from, body: m.body, at: m.at }))),
+      drain: () => Device!.drain('sms') as Array<{ from: string; body: string; at: number }>,
+    },
+    notifications: {
+      access: () => Device!.notificationAccess(),
+      setAllowlist: (pkgs) => Device!.setNotificationAllowlist(pkgs),
+      drain: () => Device!.drain('notifications') as Array<{ package: string; title: string; text: string; at: number }>,
+    },
+    mail: { sync: () => syncMail(os) },
+  };
 }
 
 /** First SMS sync: the last six months as proposals for the review screen. Returns how many were proposed. */
 export async function importSmsHistory(os: LifeOSContext): Promise<number> {
-  if (!Device || (await access('sms')) !== 'granted') return 0;
-  const since = Date.now() - HISTORY_SMS_DAYS * DAY;
-  const all = await Device.readSms(since, 5000);
-  const { proposed } = await ingestMany(os, all.reverse().map((m) => ({ source: 'sms' as const, from: m.from, body: m.body, receivedAt: m.at })), 'import');
-  setSourceState(os, 'sms', { enabled: true, lastSync: Date.now(), cursor: String(Date.now()), error: null });
-  return proposed;
+  const src = os.registry.sources.get('sms');
+  if (!src || (await access('sms')) !== 'granted') return 0;
+  return quietly(() => importSource(os, src, HISTORY_SMS_DAYS));
 }
 
-async function syncSms(os: LifeOSContext) {
-  const st = sourceState(os, 'sms');
-  if (!Device || !st.enabled || (await access('sms')) !== 'granted') return void console.log(`[sync] sms skipped: enabled ${st.enabled}, access ${await access('sms')}`);
-  // Anything that arrived while the app was closed: the receiver's queue, then the inbox since the last sync.
-  const since = Number(st.cursor ?? Date.now() - DAY);
-  const queued = Device.drain('sms') as Array<{ from: string; body: string; at: number }>;
-  const inbox = (await Device.readSms(since, 500)).reverse();
-  const n = (await ingestMany(os, [...queued, ...inbox].map((m) => ({ source: 'sms' as const, from: m.from, body: m.body, receivedAt: m.at })), 'live')).confirmed;
-  setSourceState(os, 'sms', { lastSync: Date.now(), cursor: String(Date.now()), addTotal: n, error: null });
-}
-
-async function syncNotifications(os: LifeOSContext) {
-  if (!Device) return;
-  Device.setNotificationAllowlist(Object.keys(PAYMENT_APPS));
-  if (!Device.notificationAccess()) return;
-  let n = 0;
-  for (const m of Device.drain('notifications') as Array<{ package: string; title: string; text: string; at: number }>) {
-    if (fileMessage(os, { source: 'notification', from: m.package, title: m.title, body: m.text, receivedAt: m.at }).status === 'confirmed') n++;
-  }
-  setSourceState(os, 'notifications', { enabled: true, lastSync: Date.now(), addTotal: n, error: null });
+/** A message source from the registry (sms, notifications, gmail), if it is usable now. */
+async function syncRegistered(os: LifeOSContext, id: string) {
+  const src = os.registry.sources.get(id);
+  if (!src) return;
+  if (id === 'sms' && !sourceState(os, id).enabled) return void console.log('[sync] sms skipped: not enabled');
+  await quietly(() => runSource(os, src));
 }
 
 async function syncUsage(os: LifeOSContext) {
@@ -212,7 +194,9 @@ export function syncSources(os: LifeOSContext): Promise<void> {
     await withLimit('fx', STEP_LIMIT_MS.fx, () => refreshFxRates(os));
     await withLimit('phone (contacts, calendar, calls)', STEP_LIMIT_MS.phone, () => syncPhoneSources(os));
     if (deviceAvailable) {
-      for (const [id, fn] of [['sms', syncSms], ['notifications', syncNotifications], ['usage', syncUsage], ['health', syncHealth]] as const) {
+      // Message sources are declared by their modules (finance: sms, notifications) and run through the registry.
+      for (const id of ['sms', 'notifications'] as const) await withLimit(id, STEP_LIMIT_MS.device, () => syncRegistered(os, id));
+      for (const [id, fn] of [['usage', syncUsage], ['health', syncHealth]] as const) {
         await withLimit(id, STEP_LIMIT_MS.device, async () => {
           try {
             await fn(os);
@@ -224,7 +208,7 @@ export function syncSources(os: LifeOSContext): Promise<void> {
       }
     }
     // Gmail last: a receipt then matches the SMS already filed for it (and the other way round).
-    await withLimit('gmail', STEP_LIMIT_MS.mail, () => syncMail(os));
+    await withLimit('gmail', STEP_LIMIT_MS.mail, () => syncRegistered(os, 'gmail'));
   })().finally(() => {
     if (running?.p === p) running = null;
   });
@@ -235,8 +219,8 @@ export function syncSources(os: LifeOSContext): Promise<void> {
 /** Live: a bank SMS or payment notification becomes a transaction within the second it arrives. */
 export function listenLive(os: LifeOSContext): () => void {
   if (!Device) return () => {};
-  const a = Device.addListener('onSms', () => void syncSms(os));
-  const b = Device.addListener('onNotification', () => void syncNotifications(os));
+  const a = Device.addListener('onSms', () => void syncRegistered(os, 'sms'));
+  const b = Device.addListener('onNotification', () => void syncRegistered(os, 'notifications'));
   return () => {
     a.remove();
     b.remove();

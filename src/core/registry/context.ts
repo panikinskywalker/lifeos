@@ -42,6 +42,12 @@ export interface LifeOSContext {
   /** Navigation is injected by the app shell; core stays UI-agnostic. */
   navigate: (path: string) => void;
   /** Notification bridge injected by the app shell (no-op in tests). */
+  /**
+   * The phone, as modules may use it (docs/MODEL.md §4, the Source contract):
+   * platform fills this at boot; absent on the web and in tests. A module's
+   * SourceDef.sync reads through it and never imports platform code.
+   */
+  device?: DeviceBridge;
   notify: (n: { title: string; body?: string; at?: number; data?: Record<string, unknown> }) => Promise<string | null>;
   cancelNotification: (id: string) => Promise<void>;
 }
@@ -53,4 +59,25 @@ export interface Formatters {
   time: (ts: number | string | Date) => string;
   dateTime: (ts: number | string | Date) => string;
   defaultCurrency: () => string;
+}
+
+export type Access = 'granted' | 'needed' | 'unavailable';
+
+export interface DeviceBridge {
+  sms?: {
+    access(): Promise<Access>;
+    /** Texts received since `since`, newest first. */
+    read(since: number, limit: number): Promise<Array<{ from: string; body: string; at: number }>>;
+    /** Texts the receiver queued while the app was closed. */
+    drain(): Array<{ from: string; body: string; at: number }>;
+  };
+  notifications?: {
+    access(): boolean;
+    setAllowlist(packages: string[]): void;
+    drain(): Array<{ package: string; title: string; text: string; at: number }>;
+  };
+  mail?: {
+    /** Runs the mailbox sync (IMAP, cursors, passwords live in platform); files through core; returns how many it filed. */
+    sync(): Promise<number>;
+  };
 }

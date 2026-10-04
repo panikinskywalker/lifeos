@@ -4,6 +4,7 @@ import { applyCategories, foldBudgetsIntoTargets, trackCategoryField } from './c
 import { foldInstitutions, postDueSubscriptions } from './lib';
 import { financeAiTools } from './aiTools';
 import { financeParsers } from './filing/parser';
+import { financeSources } from './sources';
 import { linkMissingPayees } from './filing/payee';
 import { learnCategory, payeeOf } from './filing/rules';
 import { bus } from '@core/events/bus';
@@ -46,6 +47,7 @@ export const financeModule: ModuleManifest = {
   ],
   aiTools: financeAiTools,
   filing: { parsers: financeParsers },
+  sources: financeSources,
   onStart: async (os) => {
     // Your own categories join the built-in list in every category picker.
     for (const def of [transactionType, subscriptionType]) trackCategoryField(def.fields.find((f) => f.key === 'category'));

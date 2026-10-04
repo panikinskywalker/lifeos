@@ -11,6 +11,7 @@ import { notifications } from './notifications';
 import { syncReminderNotifications } from './notifySync';
 export { syncReminderNotifications };
 import { openDatabase } from './openDatabase';
+import { deviceBridge } from './sources';
 import { runFiling } from './filing';
 import { listenLive, syncSources } from './sources';
 
@@ -54,6 +55,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
       await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
     },
   });
+  os.device = deviceBridge(os);
 
   // Settings: DB → zustand, and zustand → DB on change.
   const stored = os.settings.all();

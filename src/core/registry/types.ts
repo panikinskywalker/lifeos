@@ -167,10 +167,9 @@ export interface Reading {
 }
 
 export interface Message {
-  /** The source's own id for this message. */
-  id: string;
   /** Sender: a DLT header, a package name, a mail address. */
   from: string;
+  title?: string | null;
   text: string;
   at: number;
   /** Subject, title, attachments — whatever the source adds. */
@@ -185,8 +184,20 @@ export interface SourceDef {
   modules: string[];
   /** The permission the user must grant, in their words ("Health Connect", "Usage access"). */
   permission?: string;
-  /** Readings become records directly; messages go through the parsers (docs/MODEL.md §4). */
-  sync: (os: LifeOSContext, since: number | null) => Promise<{ readings?: Reading[]; messages?: Message[] }>;
+  /** Messages go through the parsers; readings become records directly (docs/MODEL.md §4). */
+  kind: 'messages' | 'readings';
+  /** For message sources: how the queue labels what came from here. */
+  messageSource?: 'sms' | 'notification' | 'email';
+  /** Can the source be asked for history (first run: the last months as proposals)? */
+  history?: boolean;
+  /** Is the source usable right now (permission granted, account added)? */
+  available?: (os: LifeOSContext) => Promise<boolean>;
+  /**
+   * Read what is new since the cursor. Message sources return messages (core
+   * files them through the parsers) or `filed` when they filed themselves
+   * (mail, whose IMAP bookkeeping lives in platform). Readings become records.
+   */
+  sync: (os: LifeOSContext, since: number | null, opts: { mode: 'live' | 'import' }) => Promise<{ readings?: Reading[]; messages?: Message[]; filed?: number; cursor?: string }>;
 }
 
 /* ------------------------------------------------------------------ */
