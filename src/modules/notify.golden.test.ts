@@ -14,16 +14,16 @@ let os: LifeOSContext;
 const AT = (s: string) => new Date(s).getTime();
 beforeEach(async () => {
   bus.clear();
-  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [measurementType, transactionType, eventType, taskType] }], registry: new Registry() });
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, transactionType, eventType, taskType] }], registry: new Registry() });
 });
 afterEach(() => os.db.close());
 
 describe('morning brief', () => {
   it('from real data: sleep vs goal, step goal, what is on with times, spend', () => {
     saveHealthDays(os, [{ day: '2026-09-27', sleepMin: 400 }]);
-    os.entities.create({ type: 'event', title: 'Dentist', data: { startAt: AT('2026-09-27T11:00:00') } });
-    os.entities.create({ type: 'task', title: 'Call bank', data: { dueDate: '2026-09-27' } });
-    os.entities.create({ type: 'transaction', data: { amount: 4200, kind: 'expense', category: 'food', date: '2026-09-05' } });
+    os.records.create({ type: 'event', title: 'Dentist', data: { startAt: AT('2026-09-27T11:00:00') } });
+    os.records.create({ type: 'task', title: 'Call bank', data: { dueDate: '2026-09-27' } });
+    os.records.create({ type: 'transaction', data: { amount: 4200, kind: 'expense', category: 'food', date: '2026-09-05' } });
     const b = morningBrief(os, AT('2026-09-27T08:00:00'));
     expect(b.title).toBe('Good morning — 2 things today');
     expect(b.lines[0]).toBe('Slept 6h 42m (goal 7h 00m)');

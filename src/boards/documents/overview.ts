@@ -3,7 +3,7 @@ import { daysUntil, inDays, isoOf, type ModuleOverview, type OverviewBlock } fro
 
 /** Papers at a glance: what expires soon (or has), by kind. */
 export function documentsOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
-  const docs = os.entities.query<{ kind?: string; expiresOn?: string }>('document', {}, { limit: 2000 });
+  const docs = os.records.query<{ kind?: string; expiresOn?: string }>('document', {}, { limit: 2000 });
   const today = isoOf(now);
   const expired = docs.filter((d) => d.data.expiresOn && d.data.expiresOn < today);
   const soon = docs.filter((d) => d.data.expiresOn && d.data.expiresOn >= today && daysUntil(d.data.expiresOn, now) <= 90).sort((a, b) => (a.data.expiresOn! < b.data.expiresOn! ? -1 : 1));

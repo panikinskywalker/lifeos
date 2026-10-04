@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 
 /** Trip record type (no React Native — unit-tested). */
 
@@ -16,7 +16,7 @@ export interface TripData {
   localCurrency?: string;
 }
 
-export const tripType: EntityTypeDef<TripData> = {
+export const tripType: ObjectDef<TripData> = {
   type: 'trip',
   module: 'travel',
   label: 'Trip',
@@ -38,7 +38,7 @@ export const tripType: EntityTypeDef<TripData> = {
   computeTitle: (d) => d.destination,
   computeSubtitle: (d) => (d.startDate ? `${d.startDate}${d.endDate ? ` → ${d.endDate}` : ''}` : undefined),
   searchText: (d) => [d.notes, d.purpose].filter(Boolean).join(' '),
-  relations: [
+  links: [
     { kind: 'trip', label: 'Expenses & events', to: ['transaction', 'event', 'document', 'note'], cardinality: 'many' },
     { kind: 'person', label: 'People', to: 'person', cardinality: 'many' },
   ],

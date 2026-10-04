@@ -235,22 +235,22 @@ export function rangeRule(os: LifeOSContext, p: { amount: number; direction: 'de
     const d = r.direction ?? 'received';
     if (d !== 'any' && d !== (p.direction === 'credit' ? 'received' : 'spent')) continue;
     if ((r.min != null && p.amount < r.min) || (r.max != null && p.amount > r.max)) continue;
-    const group = r.fromGroupId && p.payerId ? os.groups.groupsOf(p.payerId).includes(r.fromGroupId) || ((os.entities.get<{ memberIds?: string[] }>(r.fromGroupId)?.data.memberIds ?? []).includes(p.payerId)) : false;
-    if (group) return { category: r.category, sure: true, why: `from ${os.entities.get(r.fromGroupId!)?.title ?? 'the group'}` };
+    const group = r.fromGroupId && p.payerId ? os.groups.groupsOf(p.payerId).includes(r.fromGroupId) || ((os.records.get<{ memberIds?: string[] }>(r.fromGroupId)?.data.memberIds ?? []).includes(p.payerId)) : false;
+    if (group) return { category: r.category, sure: true, why: `from ${os.records.get(r.fromGroupId!)?.title ?? 'the group'}` };
     const k = r.afterKeyword?.trim();
     if (k) {
       const hours = r.withinHours ?? 48;
       const since = iso(p.at - hours * 3_600_000);
       const until = iso(p.at);
       const re = new RegExp(`(^|[^a-z0-9])${k.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`, 'i');
-      const paid = os.entities
+      const paid = os.records
         .query<{ merchant?: string; note?: string; kind?: string }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: since }, { field: 'data.date', op: 'lte', value: until }] } }, { limit: 200 })
         .find((t) => re.test(`${t.data.merchant ?? ''} ${t.data.note ?? ''}`));
       if (paid) return { category: r.category, sure: true, why: `after your ${paid.title} payment` };
     }
     // Only the amount fits: a guess — unless you've said what this payer's money is.
     if (learned) return null;
-    return { category: r.category, sure: false, why: `only the amount fits${r.fromGroupId ? ` — not from ${os.entities.get(r.fromGroupId)?.title ?? 'the group'}` : ''}` };
+    return { category: r.category, sure: false, why: `only the amount fits${r.fromGroupId ? ` — not from ${os.records.get(r.fromGroupId)?.title ?? 'the group'}` : ''}` };
   }
   return null;
 }
@@ -276,7 +276,7 @@ export function categoryFor(os: LifeOSContext, merchant: string | null | undefin
 
 /** Who a transaction was paid to / by: its linked payee (a shop / payee record, or a person). */
 export function payeeOf(os: LifeOSContext, txId: string): { id: string; type: string; title: string } | null {
-  const r = os.relations.forEntity(txId).find((x) => x.direction === 'out' && (x.relation.kind === 'payee' || x.relation.kind === 'person'));
+  const r = os.links.forEntity(txId).find((x) => x.direction === 'out' && (x.relation.kind === 'payee' || x.relation.kind === 'person'));
   return r ? { id: r.other.id, type: r.other.type, title: r.other.title } : null;
 }
 
@@ -301,11 +301,11 @@ export function learnCategory(os: LifeOSContext, merchant: string | null | undef
   if (!txId || payee?.type === 'person') return [];
   // The others: same payee record, else the same merchant name.
   const ids = payee
-    ? os.relations.forEntity(payee.id).filter((r) => r.direction === 'in' && r.other.type === 'transaction').map((r) => r.other.id)
+    ? os.links.forEntity(payee.id).filter((r) => r.direction === 'in' && r.other.type === 'transaction').map((r) => r.other.id)
     : merchant
       ? os.db.all<{ id: string }>(`SELECT id FROM entities WHERE type='transaction' AND deleted_at IS NULL AND lower(json_extract(data,'$.merchant'))=? LIMIT 500`, [merchant.toLowerCase()]).map((r) => r.id)
       : [];
-  return ids.filter((id) => id !== txId && (os.entities.get<{ category?: string; kind?: string }>(id)?.data.category ?? category) !== category && os.entities.get<{ kind?: string }>(id)?.data.kind !== 'transfer');
+  return ids.filter((id) => id !== txId && (os.records.get<{ category?: string; kind?: string }>(id)?.data.category ?? category) !== category && os.records.get<{ kind?: string }>(id)?.data.kind !== 'transfer');
 }
 
 /** What you taught it for a payee record (by its id) or a name. */
@@ -319,10 +319,10 @@ export function recategorise(os: LifeOSContext, ids: string[], category: string)
   const out: Array<{ id: string; was: string }> = [];
   os.db.transaction(() => {
     for (const id of ids) {
-      const e = os.entities.get<{ category?: string }>(id);
+      const e = os.records.get<{ category?: string }>(id);
       if (!e || e.data.category === category) continue;
       out.push({ id, was: e.data.category ?? 'other' });
-      os.entities.update(id, { data: { category } }, 'system');
+      os.records.update(id, { data: { category } }, 'system');
     }
   });
   return out;
@@ -330,8 +330,8 @@ export function recategorise(os: LifeOSContext, ids: string[], category: string)
 
 /** The account a message moved money on: by last digits (+ bank), or a new one named for it. */
 export function accountFor(os: LifeOSContext, t: ParsedTxn, from: string, created: string[] = []): string | null {
-  if (!os.registry.entityTypes.has('account')) return null;
-  const accounts = os.entities.query<{ last4?: string; institution?: string; kind?: string }>('account', {}, { limit: 500 });
+  if (!os.registry.objects.has('account')) return null;
+  const accounts = os.records.query<{ last4?: string; institution?: string; kind?: string }>('account', {}, { limit: 500 });
   const bankName = t.bank ? BANK_NAMES[t.bank] : null;
   if (t.last4) {
     const hits = accounts.filter((a) => a.data.last4 && (a.data.last4.endsWith(t.last4!) || t.last4!.endsWith(a.data.last4)));
@@ -344,18 +344,18 @@ export function accountFor(os: LifeOSContext, t: ParsedTxn, from: string, create
   const title = `${bankName ?? 'Bank'}${t.isCard ? ' card' : ''}${t.last4 ? ` ••${t.last4}` : ''}`;
   const existing = accounts.find((a) => a.title === title);
   if (existing) return existing.id;
-  const a = os.entities.create({ type: 'account', title, data: { kind, institution: bankName ?? undefined, last4: t.last4 ?? undefined, currency: 'INR', openingBalance: 0 } }, 'assistant');
+  const a = os.records.create({ type: 'account', title, data: { kind, institution: bankName ?? undefined, last4: t.last4 ?? undefined, currency: 'INR', openingBalance: 0 } }, 'assistant');
   created.push(a.id);
   return a.id;
 }
 
 /** The investment account a mutual fund lives in (one per fund, or "Mutual funds"). */
 function fundAccount(os: LifeOSContext, fund: string | null, created: string[]): string | null {
-  if (!os.registry.entityTypes.has('account')) return null;
+  if (!os.registry.objects.has('account')) return null;
   const title = fund ? fund.replace(/\s+(?:SIP|Direct|Growth|Plan)\b.*$/i, '').trim() : 'Mutual funds';
-  const hit = os.entities.query<{ kind?: string }>('account', {}, { limit: 500 }).find((a) => a.title.toLowerCase() === title.toLowerCase());
+  const hit = os.records.query<{ kind?: string }>('account', {}, { limit: 500 }).find((a) => a.title.toLowerCase() === title.toLowerCase());
   if (hit) return hit.id;
-  const a = os.entities.create({ type: 'account', title, data: { kind: 'investment', institution: 'Mutual fund', currency: 'INR', openingBalance: 0 } }, 'assistant');
+  const a = os.records.create({ type: 'account', title, data: { kind: 'investment', institution: 'Mutual fund', currency: 'INR', openingBalance: 0 } }, 'assistant');
   created.push(a.id);
   return a.id;
 }
@@ -368,7 +368,7 @@ function fundAccount(os: LifeOSContext, fund: string | null, created: string[]):
 export function ingestOutcome(os: LifeOSContext, m: RawMessage): { status: string; note: string | null; record: Record<string, unknown> | null } | null {
   const r = os.db.get<{ status: string; error: string | null; entity_id: string | null }>(`SELECT status, error, entity_id FROM ingest_queue WHERE id=?`, [messageId(m)]);
   if (!r) return null;
-  const e = r.entity_id ? os.entities.get(r.entity_id) : null;
+  const e = r.entity_id ? os.records.get(r.entity_id) : null;
   const d = (e?.data ?? {}) as Record<string, unknown>;
   const record = e ? { type: e.type, title: e.title, ...Object.fromEntries(['amount', 'kind', 'category', 'merchant', 'date', 'status', 'shop', 'carrier'].filter((k) => d[k] !== undefined).map((k) => [k, d[k]])) } : r.entity_id ? { deleted: true } : null;
   return { status: r.status, note: r.error, record };
@@ -405,7 +405,7 @@ function findDuplicate(os: LifeOSContext, itemId: string, t: ParsedTxn, at: numb
     [key, itemId, at - WINDOW, at + WINDOW],
   );
   if (twin) return { ingestId: twin.id, entityId: twin.entity_id ?? undefined };
-  if (!os.registry.entityTypes.has('transaction')) return null;
+  if (!os.registry.objects.has('transaction')) return null;
   // Said it before the SMS came ("spent 450 on lunch"): same amount, same kind, same or previous day, not from a message.
   const day = iso(at);
   const prev = iso(at - DAY);
@@ -443,7 +443,7 @@ export function ingestMessage(os: LifeOSContext, m: RawMessage, opts: { mode?: '
     const s = seeSender(os, m);
     // Shops and couriers aren't money senders: a shipping text becomes (or moves) a delivery.
     const del = !s.trusted || !bankOf(m.from) ? parseDeliverySms(m.body, m.from, m.receivedAt) : null;
-    if (del && os.registry.entityTypes.has('delivery')) {
+    if (del && os.registry.objects.has('delivery')) {
       const entityId = fileDelivery(os, id, del, m);
       setItem(os, id, { status: 'confirmed', entityId, note: 'delivery' });
       return { id, status: 'confirmed', entityId };
@@ -472,7 +472,7 @@ export function ingestMessage(os: LifeOSContext, m: RawMessage, opts: { mode?: '
     // You already said it: this message confirms it and fills in the account.
     enrich(os, dup.entityId, t, m);
     setItem(os, id, { status: 'confirmed', entityId: dup.entityId, note: 'matched a transaction you filed' });
-    const e = os.entities.get(dup.entityId)!;
+    const e = os.records.get(dup.entityId)!;
     os.dumps.addExtraction({ source: m.source, sourceRef: id, kind: 'transaction', action: 'updated', entityId: e.id, label: `Matched ${e.title} · ${os.format.currency(t.amount)} to ${sourceLabel(m)}` });
     return { id, status: 'confirmed', entityId: dup.entityId };
   }
@@ -492,7 +492,7 @@ function sourceLabel(m: { source: string; from: string; account?: string | null 
 
 /** Add what a later message knows to a transaction (account, reference), never overwriting. */
 function enrich(os: LifeOSContext, entityId: string, t: ParsedTxn, m: RawMessage) {
-  const e = os.entities.get<Record<string, unknown>>(entityId);
+  const e = os.records.get<Record<string, unknown>>(entityId);
   if (!e) return;
   const patch: Record<string, unknown> = {};
   if (!e.data.accountId) {
@@ -500,8 +500,8 @@ function enrich(os: LifeOSContext, entityId: string, t: ParsedTxn, m: RawMessage
     if (acc) patch.accountId = acc;
   }
   if (!e.data.merchant && t.counterparty) patch.merchant = t.counterparty;
-  if (Object.keys(patch).length) os.entities.update(entityId, { data: patch }, 'assistant');
-  os.entities.timeline.add({ entityId, kind: m.source, title: `Seen in ${sourceLabel(m)}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingest: true } });
+  if (Object.keys(patch).length) os.records.update(entityId, { data: patch }, 'assistant');
+  os.records.timeline.add({ entityId, kind: m.source, title: `Seen in ${sourceLabel(m)}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingest: true } });
 }
 
 /** File one parsed (or proposed) message as a transaction; logged in To check. */
@@ -509,7 +509,7 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
   const item = ingestItem(os, id);
   if (!item || item.parsed?.kind !== 'txn') return { id, status: item?.status ?? 'failed' };
   if (item.status === 'confirmed') return { id, status: 'confirmed', entityId: item.entityId };
-  if (!os.registry.entityTypes.has('transaction')) {
+  if (!os.registry.objects.has('transaction')) {
     setItem(os, id, { status: 'failed', note: 'finance module not installed' });
     return { id, status: 'failed' };
   }
@@ -551,7 +551,7 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
     if (t.currency !== 'INR' && !fx.fxRate) flag = `No ${t.currency} rate yet — converted to rupees when the app is next online`;
     if (item.source === 'email') label += ` · from ${item.account ?? 'email'}`;
   }
-  const e = os.entities.create({ type: 'transaction', data }, 'assistant');
+  const e = os.records.create({ type: 'transaction', data }, 'assistant');
   // Everyone you pay or get paid by is one record; this payment joins theirs.
   if (!t.investment && !t.transfer && t.channel !== 'atm' && (t.counterparty || t.vpa)) {
     const pm = payeeFor(os, t.counterparty, t.vpa, { business: data.category !== 'other' && data.category !== 'transfer' ? true : undefined });
@@ -564,18 +564,18 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
   // What you taught it for this payee (any name the bank uses for them) beats the name match and the built-in list.
   const byPayee = !t.investment && !t.transfer && t.channel !== 'atm' && !ruleCategory(os, data.merchant as string | undefined, item.text, amount, t.direction) ? learnedCategory(os, null, payeeOf(os, e.id)?.id) : null;
   if (byPayee && byPayee !== data.category) {
-    os.entities.update(e.id, { data: { category: byPayee } }, 'assistant');
+    os.records.update(e.id, { data: { category: byPayee } }, 'assistant');
     data.category = byPayee;
     if (flag?.startsWith('Category unknown')) flag = null;
   }
   // A range rule ("₹100–200 received → Football") needs the payer, so it's checked once they're linked.
   if (!byPayee && !t.investment && !t.transfer && t.channel !== 'atm' && !ruleCategory(os, data.merchant as string | undefined, item.text, amount, t.direction)) {
-    const payerId = os.relations.forEntity(e.id).find((r) => r.relation.kind === 'person' && r.direction === 'out')?.other.id ?? null;
+    const payerId = os.links.forEntity(e.id).find((r) => r.relation.kind === 'person' && r.direction === 'out')?.other.id ?? null;
     const rr = rangeRule(os, { amount, direction: t.direction, payerId, merchant: data.merchant as string | undefined, at: item.receivedAt });
     if (rr && rr.category !== data.category) {
-      os.entities.update(e.id, { data: { category: rr.category } }, 'assistant');
+      os.records.update(e.id, { data: { category: rr.category } }, 'assistant');
       data.category = rr.category;
-      const name = os.registry.entityTypes.get('transaction')?.fields.find((f) => f.key === 'category')?.options?.find((o) => o.value === rr.category)?.label ?? rr.category;
+      const name = os.registry.objects.get('transaction')?.fields.find((f) => f.key === 'category')?.options?.find((o) => o.value === rr.category)?.label ?? rr.category;
       label += ` · ${name}`;
       if (!rr.sure) flag = `Guessed ${name}: ${rr.why}. Change the category if not — it won’t guess for this payer again`;
     }
@@ -583,10 +583,10 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
   if (!t.investment && !t.transfer && t.direction === 'debit' && data.category === 'subscriptions' && typeof data.merchant === 'string') {
     linkSubscription(os, e.id, data.merchant, amount, date, (data.accountId as string | undefined) ?? undefined, created, item.source as 'sms' | 'notification' | 'email');
   }
-  os.entities.timeline.add({ entityId: e.id, kind: item.source, title: `From ${sourceLabel(item)}`, body: (item.source === 'email' ? `${item.title ?? ''}\n${item.text}` : item.text).slice(0, 300), actor: 'system', occurredAt: item.receivedAt, meta: { ingestId: id } });
+  os.records.timeline.add({ entityId: e.id, kind: item.source, title: `From ${sourceLabel(item)}`, body: (item.source === 'email' ? `${item.title ?? ''}\n${item.text}` : item.text).slice(0, 300), actor: 'system', occurredAt: item.receivedAt, meta: { ingestId: id } });
   setItem(os, id, { status: 'confirmed', entityId: e.id });
   for (const a of created) {
-    const ce = os.entities.get(a);
+    const ce = os.records.get(a);
     const kind = ce?.type === 'org' || ce?.type === 'subscription' ? ce.type : 'account';
     const label = kind === 'org' ? `Payee: ${ce!.title}` : kind === 'subscription' ? `Subscription: ${ce!.title} (monthly — change if yearly)` : `Account: ${ce?.title ?? 'new account'}`;
     os.dumps.addExtraction({ source: item.source, sourceRef: id, kind, entityId: a, label });
@@ -611,30 +611,30 @@ const cycleMonths = (rrule = '') => (/YEARLY/.test(rrule) ? 12 : /MONTHLY/.test(
  * same renewal already exists, the real charge replaces it.
  */
 function linkSubscription(os: LifeOSContext, txId: string, name: string, amount: number, date: string, accountId: string | undefined, created: string[], via: 'sms' | 'notification' | 'email' = 'sms') {
-  if (!os.registry.entityTypes.has('subscription')) return;
+  if (!os.registry.objects.has('subscription')) return;
   const key = norm(name);
-  const subs = os.entities.query<{ name: string; amount: number; nextBillingAt: string; rrule?: string; accountId?: string }>('subscription', {}, { limit: 500 });
+  const subs = os.records.query<{ name: string; amount: number; nextBillingAt: string; rrule?: string; accountId?: string }>('subscription', {}, { limit: 500 });
   const sub = subs.find((s) => s.status !== 'cancelled' && (norm(s.data.name) === key || norm(s.data.name).startsWith(`${key} `) || key.startsWith(`${norm(s.data.name)} `)));
   if (!sub) {
-    const s = os.entities.create({ type: 'subscription', data: { name, amount, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: addMonths(date), category: 'subscriptions', accountId, autoPost: false } }, 'assistant');
-    os.relations.link(txId, s.id, 'subscription', {}, 'assistant', { source: via });
+    const s = os.records.create({ type: 'subscription', data: { name, amount, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: addMonths(date), category: 'subscriptions', accountId, autoPost: false } }, 'assistant');
+    os.links.link(txId, s.id, 'subscription', {}, 'assistant', { source: via });
     created.push(s.id);
     return;
   }
-  os.relations.link(txId, sub.id, 'subscription', {}, 'assistant', { source: via });
+  os.links.link(txId, sub.id, 'subscription', {}, 'assistant', { source: via });
   const at = new Date(`${date}T12:00:00`).getTime();
   // An auto-posted bill for this renewal (within five days) was a placeholder for this charge.
-  for (const r of os.relations.forEntity(sub.id, 'subscription')) {
+  for (const r of os.links.forEntity(sub.id, 'subscription')) {
     if (r.direction !== 'in' || r.other.id === txId) continue;
-    const tx = os.entities.get<{ note?: string; date?: string }>(r.other.id);
-    if (tx?.data.note === 'Auto-posted subscription' && tx.data.date && Math.abs(new Date(`${tx.data.date}T12:00:00`).getTime() - at) <= 5 * DAY_MS) os.entities.delete(tx.id, 'assistant');
+    const tx = os.records.get<{ note?: string; date?: string }>(r.other.id);
+    if (tx?.data.note === 'Auto-posted subscription' && tx.data.date && Math.abs(new Date(`${tx.data.date}T12:00:00`).getTime() - at) <= 5 * DAY_MS) os.records.delete(tx.id, 'assistant');
   }
   const patch: Record<string, unknown> = {};
   if (sub.data.amount !== amount) patch.amount = amount;
   if (!sub.data.accountId && accountId) patch.accountId = accountId;
   // Billed now: the next renewal is a cycle on (only when this charge is the one that was due).
   if (sub.data.nextBillingAt <= iso(at + 5 * DAY_MS)) patch.nextBillingAt = addMonths(date, cycleMonths(sub.data.rrule));
-  if (Object.keys(patch).length) os.entities.update(sub.id, { data: patch }, 'assistant');
+  if (Object.keys(patch).length) os.records.update(sub.id, { data: patch }, 'assistant');
 }
 
 const STAGE: Record<string, number> = { ordered: 0, shipped: 1, out_for_delivery: 2, delivered: 3, cancelled: 4, returned: 4 };
@@ -643,7 +643,7 @@ const STATUS_WORD: Record<string, string> = { ordered: 'Ordered', shipped: 'Ship
 /** One delivery per order: found by tracking / order number, or the same shop's open order from the last month. Status only moves forward. */
 function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m: RawMessage): string {
   type D = { shop?: string; item?: string; carrier?: string; tracking?: string; orderId?: string; status: string; expectedDate?: string; deliveredOn?: string; trackingUrl?: string; otp?: string; otpAt?: number };
-  const recent = os.entities.query<D>('delivery', { sort: [{ field: 'createdAt', dir: 'desc' }] }, { limit: 300 });
+  const recent = os.records.query<D>('delivery', { sort: [{ field: 'createdAt', dir: 'desc' }] }, { limit: 300 });
   const norm2 = (x?: string | null) => (x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const hit =
     recent.find((e) => (d.tracking && e.data.tracking === d.tracking) || (d.orderId && e.data.orderId === d.orderId)) ??
@@ -657,8 +657,8 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
   const day = iso(m.receivedAt);
   const via = m.source === 'email' ? ` · from ${m.account ?? 'email'}` : '';
   if (!hit) {
-    const e = os.entities.create({ type: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, trackingUrl: d.link ?? undefined, otp: d.otp ?? undefined, otpAt: d.otp ? m.receivedAt : undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
-    os.entities.timeline.add({ entityId: e.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
+    const e = os.records.create({ type: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, trackingUrl: d.link ?? undefined, otp: d.otp ?? undefined, otpAt: d.otp ? m.receivedAt : undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
+    os.records.timeline.add({ entityId: e.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
     os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', entityId: e.id, label: `Delivery: ${e.title} · ${STATUS_WORD[d.status]}${d.expected && d.status !== 'delivered' ? ` · by ${d.expected.slice(8)}/${d.expected.slice(5, 7)}` : ''}${via}` });
     return e.id;
   }
@@ -682,10 +682,10 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
   if (d.otp) (set('otp', d.otp), set('otpAt', m.receivedAt));
   if (d.status === 'delivered' && hit.data.otp) (patch.otp = undefined, before.otp = hit.data.otp);
   if (Object.keys(patch).length) {
-    os.entities.update(hit.id, { data: patch }, 'assistant');
-    os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', action: 'updated', entityId: hit.id, label: `${os.entities.get(hit.id)?.title ?? 'Delivery'} · ${STATUS_WORD[(patch.status as string) ?? hit.data.status]}${via}`, before });
+    os.records.update(hit.id, { data: patch }, 'assistant');
+    os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', action: 'updated', entityId: hit.id, label: `${os.records.get(hit.id)?.title ?? 'Delivery'} · ${STATUS_WORD[(patch.status as string) ?? hit.data.status]}${via}`, before });
   }
-  os.entities.timeline.add({ entityId: hit.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
+  os.records.timeline.add({ entityId: hit.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
   return hit.id;
 }
 
@@ -696,7 +696,7 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
  * flagged in To check so you can say otherwise.
  */
 export function backfillDeliveries(os: LifeOSContext, now = Date.now(), days = 45): number {
-  if (!os.registry.entityTypes.has('delivery')) return 0;
+  if (!os.registry.objects.has('delivery')) return 0;
   const rows = os.db.all<Row>(`SELECT * FROM ingest_queue WHERE source='sms' AND status='dismissed' AND received_at >= ? ORDER BY received_at`, [now - days * DAY]);
   // Each order and when its last text came.
   const touched = new Map<string, number>();
@@ -709,10 +709,10 @@ export function backfillDeliveries(os: LifeOSContext, now = Date.now(), days = 4
     touched.set(id, item.receivedAt);
   }
   for (const [id, last] of touched) {
-    const e = os.entities.get<{ status: string }>(id);
+    const e = os.records.get<{ status: string }>(id);
     if (!e || STAGE[e.data.status]! >= 3) continue;
     if (now - last < 10 * DAY) continue;
-    os.entities.update(id, { data: { status: 'delivered', deliveredOn: iso(last) } }, 'assistant');
+    os.records.update(id, { data: { status: 'delivered', deliveredOn: iso(last) } }, 'assistant');
     os.dumps.addExtraction({ source: 'sms', kind: 'delivery', action: 'updated', entityId: id, label: `${e.title} · Delivered`, before: { status: e.data.status }, flag: `Assumed delivered — no update since ${iso(last).slice(8)}/${iso(last).slice(5, 7)}` });
   }
   return touched.size;
@@ -758,7 +758,7 @@ export function ingestMail(os: LifeOSContext, mail: Mail, account: string): Inge
     return { id, status: 'dismissed', reason: parsed.reason };
   }
   if (parsed.kind === 'delivery') {
-    if (!os.registry.entityTypes.has('delivery')) return (setItem(os, id, { status: 'dismissed', note: 'deliveries not installed' }), { id, status: 'dismissed' });
+    if (!os.registry.objects.has('delivery')) return (setItem(os, id, { status: 'dismissed', note: 'deliveries not installed' }), { id, status: 'dismissed' });
     const entityId = fileDelivery(os, id, parsed.delivery, { ...m, body: `${mail.subject}\n${text}` });
     setItem(os, id, { status: 'confirmed', entityId, note: 'delivery' });
     return { id, status: 'confirmed', entityId };
@@ -782,23 +782,23 @@ export function ingestMail(os: LifeOSContext, mail: Mail, account: string): Inge
   let entityId: string | null | undefined;
   if (same) {
     enrich(os, same, t, m);
-    const e = os.entities.get<{ merchant?: string }>(same)!;
+    const e = os.records.get<{ merchant?: string }>(same)!;
     // The mail knows who it was ("Adobe"), where the bank only had a code.
-    if (t.counterparty && (!e.data.merchant || /\d{4,}|\*/.test(e.data.merchant))) os.entities.update(same, { data: { merchant: t.counterparty } }, 'assistant');
+    if (t.counterparty && (!e.data.merchant || /\d{4,}|\*/.test(e.data.merchant))) os.records.update(same, { data: { merchant: t.counterparty } }, 'assistant');
     setItem(os, id, { status: 'duplicate', entityId: same, note: 'same payment as a filed transaction' });
-    os.dumps.addExtraction({ source: 'email', sourceRef: id, kind: 'transaction', action: 'updated', entityId: same, label: `Matched ${os.entities.get(same)?.title ?? 'a payment'} · ${os.format.currency(t.amount)} to an email from ${account}` });
+    os.dumps.addExtraction({ source: 'email', sourceRef: id, kind: 'transaction', action: 'updated', entityId: same, label: `Matched ${os.records.get(same)?.title ?? 'a payment'} · ${os.format.currency(t.amount)} to an email from ${account}` });
     entityId = same;
   } else {
     entityId = fileItem(os, id).entityId;
   }
-  if (entityId && tripId) os.relations.link(entityId, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: id });
-  if (travelId && entityId) os.relations.link(entityId, travelId, 'paid_for', {}, 'assistant', { source: 'email', sourceId: id });
+  if (entityId && tripId) os.links.link(entityId, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: id });
+  if (travelId && entityId) os.links.link(entityId, travelId, 'paid_for', {}, 'assistant', { source: 'email', sourceId: id });
   return { id, status: same ? 'duplicate' : 'confirmed', entityId: travelId ?? entityId };
 }
 
 /** A transaction for this amount within a day either side (from any source). */
 function sameMoney(os: LifeOSContext, amount: number, kind: string, day: string): string | null {
-  if (!os.registry.entityTypes.has('transaction')) return null;
+  if (!os.registry.objects.has('transaction')) return null;
   const d = new Date(`${day}T12:00:00`).getTime();
   return (
     os.db.get<{ id: string }>(
@@ -813,59 +813,59 @@ const cityOf = (code: string | null) => (code ? (AIRPORTS[code] ?? code) : null)
 
 /** The trip covering this day (or two weeks from an open one's start), else a new "Trip to X". */
 function tripOn(os: LifeOSContext, day: string, destination: string | null, ingestId: string, account: string, end?: string | null): string | null {
-  if (!os.registry.entityTypes.has('trip')) return null;
-  const trips = os.entities.query<{ destination?: string; startDate?: string; endDate?: string }>('trip', {}, { limit: 300 });
+  if (!os.registry.objects.has('trip')) return null;
+  const trips = os.records.query<{ destination?: string; startDate?: string; endDate?: string }>('trip', {}, { limit: 300 });
   const openEnd = (start: string) => iso(new Date(`${start}T12:00:00`).getTime() + 14 * DAY);
   const hit = trips.find((t) => t.data.startDate && t.data.startDate <= day && (t.data.endDate ?? openEnd(t.data.startDate)) >= day);
   if (hit) {
-    if (end && hit.data.endDate && end > hit.data.endDate) os.entities.update(hit.id, { data: { endDate: end } }, 'assistant');
+    if (end && hit.data.endDate && end > hit.data.endDate) os.records.update(hit.id, { data: { endDate: end } }, 'assistant');
     return hit.id;
   }
   if (!destination) return null;
-  const t = os.entities.create({ type: 'trip', title: `Trip to ${destination}`, data: { destination, startDate: day, ...(end ? { endDate: end } : {}) } }, 'assistant');
-  os.entities.timeline.add({ entityId: t.id, kind: 'email', title: `From Email · ${account}`, body: null, actor: 'system', occurredAt: Date.now(), meta: { ingestId } });
+  const t = os.records.create({ type: 'trip', title: `Trip to ${destination}`, data: { destination, startDate: day, ...(end ? { endDate: end } : {}) } }, 'assistant');
+  os.records.timeline.add({ entityId: t.id, kind: 'email', title: `From Email · ${account}`, body: null, actor: 'system', occurredAt: Date.now(), meta: { ingestId } });
   os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'trip', entityId: t.id, label: `Trip: Trip to ${destination} · from ${account}` });
   return t.id;
 }
 
 /** A ticket → one flight event (re-sent tickets and check-in mails update it), in its trip. */
 function fileFlight(os: LifeOSContext, ingestId: string, f: ParsedFlight, mail: Mail, account: string): { eventId: string | null; tripId: string | null } {
-  if (!os.registry.entityTypes.has('event')) return { eventId: null, tripId: null };
+  if (!os.registry.objects.has('event')) return { eventId: null, tripId: null };
   const startAt = f.time ? new Date(`${f.date}T${f.time}:00`).getTime() : new Date(`${f.date}T12:00:00`).getTime();
   const route = f.from && f.to ? `${cityOf(f.from)} → ${cityOf(f.to)}` : null;
   const title = route ? `Flight ${route}` : `Flight ${f.flightNo}`;
   const notes = [f.pnr ? `PNR ${f.pnr}` : null, `From ${account}: “${mail.subject}”`].filter(Boolean).join('\n');
-  const flights = os.entities.query<{ kind?: string; flightNo?: string; startAt?: number; notes?: string }>('event', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'flight' }] } }, { limit: 500 });
+  const flights = os.records.query<{ kind?: string; flightNo?: string; startAt?: number; notes?: string }>('event', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'flight' }] } }, { limit: 500 });
   const same = flights.find((e) => (f.pnr && e.data.notes?.includes(`PNR ${f.pnr}`) && (!f.flightNo || !e.data.flightNo || e.data.flightNo === f.flightNo)) || (f.flightNo && e.data.flightNo === f.flightNo && e.data.startAt && iso(e.data.startAt) === f.date));
   const data = { kind: 'flight', startAt, allDay: !f.time, airline: f.airline ?? undefined, flightNo: f.flightNo ?? undefined, location: f.from && f.to ? `${f.from} → ${f.to}` : undefined, notes };
   let id: string;
   if (same) {
     id = same.id;
-    os.entities.update(id, { data: { startAt, ...(f.time ? { allDay: false } : {}) } }, 'assistant');
+    os.records.update(id, { data: { startAt, ...(f.time ? { allDay: false } : {}) } }, 'assistant');
   } else {
-    id = os.entities.create({ type: 'event', title, data }, 'assistant').id;
+    id = os.records.create({ type: 'event', title, data }, 'assistant').id;
     os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Flight: ${route ?? f.flightNo} · ${f.date.slice(8)}/${f.date.slice(5, 7)}${f.flightNo ? ` · ${f.flightNo}` : ''} · from ${account}` });
   }
-  os.entities.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
+  os.records.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
   const tripId = tripOn(os, f.date, cityOf(f.to), ingestId, account);
-  if (tripId && !os.relations.forEntity(id, 'part_of').some((r) => r.other.id === tripId)) os.relations.link(id, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: ingestId });
+  if (tripId && !os.links.forEntity(id, 'part_of').some((r) => r.other.id === tripId)) os.links.link(id, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: ingestId });
   return { eventId: id, tripId };
 }
 
 /** A hotel / stay booking → a stay event across its nights, in its trip. */
 function fileStay(os: LifeOSContext, ingestId: string, st: ParsedStay, mail: Mail, account: string): { eventId: string | null; tripId: string | null } {
-  if (!os.registry.entityTypes.has('event')) return { eventId: null, tripId: null };
+  if (!os.registry.objects.has('event')) return { eventId: null, tripId: null };
   const startAt = new Date(`${st.checkIn}T14:00:00`).getTime();
-  const stays = os.entities.query<{ kind?: string; startAt?: number }>('event', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'stay' }] } }, { limit: 500 });
+  const stays = os.records.query<{ kind?: string; startAt?: number }>('event', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'stay' }] } }, { limit: 500 });
   const same = stays.find((e) => e.title === `Stay · ${st.name}` && e.data.startAt && iso(e.data.startAt) === st.checkIn);
   let id: string;
   if (same) id = same.id;
   else {
-    id = os.entities.create({ type: 'event', title: `Stay · ${st.name}`, data: { kind: 'stay', startAt, allDay: true, ...(st.checkOut ? { endAt: new Date(`${st.checkOut}T11:00:00`).getTime() } : {}), location: st.place ?? undefined, notes: `From ${account}: “${mail.subject}”` } }, 'assistant').id;
+    id = os.records.create({ type: 'event', title: `Stay · ${st.name}`, data: { kind: 'stay', startAt, allDay: true, ...(st.checkOut ? { endAt: new Date(`${st.checkOut}T11:00:00`).getTime() } : {}), location: st.place ?? undefined, notes: `From ${account}: “${mail.subject}”` } }, 'assistant').id;
     os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Stay: ${st.name} · ${st.checkIn.slice(8)}/${st.checkIn.slice(5, 7)}${st.checkOut ? `–${st.checkOut.slice(8)}/${st.checkOut.slice(5, 7)}` : ''} · from ${account}` });
   }
-  os.entities.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
+  os.records.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
   const tripId = tripOn(os, st.checkIn, st.place, ingestId, account, st.checkOut);
-  if (tripId && !os.relations.forEntity(id, 'part_of').some((r) => r.other.id === tripId)) os.relations.link(id, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: ingestId });
+  if (tripId && !os.links.forEntity(id, 'part_of').some((r) => r.other.id === tripId)) os.links.link(id, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: ingestId });
   return { eventId: id, tripId };
 }

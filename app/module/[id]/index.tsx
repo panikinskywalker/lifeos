@@ -11,7 +11,7 @@ export default function ModuleRoute() {
   const os = useOS();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const counts = useLive((o) => o.entities.countsByType(), []);
+  const counts = useLive((o) => o.records.countsByType(), []);
   const m = os.registry.modules.get(id ?? "");
   const board = os.registry.boardFor(id ?? "");
   const screens = board?.screens ?? [];
@@ -31,7 +31,7 @@ export default function ModuleRoute() {
   // Health is its metrics, one section each — not a list of record types.
   if (m.id === "health") return <HealthHome />;
   const tint = tintForModule(m.id);
-  const types = os.registry.typesForModule(m.id).filter((x) => !x.hidden);
+  const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
   const hasHome = screens.some((s) => s.key === "index");
   const total = types.reduce((n, ty) => n + (counts[ty.type] ?? 0), 0);
   return (

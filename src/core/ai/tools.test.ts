@@ -14,7 +14,7 @@ import { extrasOf } from './cards';
 const d = (s: string) => new Date(`${s}T10:00:00`).getTime();
 const mod: ModuleManifest = {
   id: 'things', name: 'Things', version: '1', description: '', icon: 'x', color: '#000',
-  entityTypes: [
+  objects: [
     { type: 'vehicle', module: 'things', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car', schema: z.object({ name: z.string(), odometerKm: z.number().optional() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name), meters: [{ meter: 'odometer', field: 'odometerKm', label: 'Odometer', unit: 'km' }] },
     { type: 'person', module: 'things', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
     { type: 'item', module: 'things', label: 'Item', labelPlural: 'Items', icon: 'box', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
@@ -30,9 +30,9 @@ afterEach(() => os.db.close());
 
 describe('resolve_entity', () => {
   it('"the car" is your only vehicle; ambiguous names come back as candidates', async () => {
-    const creta = os.entities.create({ type: 'vehicle', data: { name: 'Hyundai Creta' } });
-    os.entities.create({ type: 'person', data: { name: 'Priya Sharma' } });
-    os.entities.create({ type: 'person', data: { name: 'Priya Menon' } });
+    const creta = os.records.create({ type: 'vehicle', data: { name: 'Hyundai Creta' } });
+    os.records.create({ type: 'person', data: { name: 'Priya Sharma' } });
+    os.records.create({ type: 'person', data: { name: 'Priya Menon' } });
     expect(clearMatch(resolveCandidates(os, 'the car'))?.id).toBe(creta.id);
     expect(clearMatch(resolveCandidates(os, 'creta'))?.id).toBe(creta.id);
     const r = (await tool('resolve_entity').run({ text: 'Priya' }, os)) as { match?: unknown; candidates?: Array<{ title: string }> };
@@ -43,7 +43,7 @@ describe('resolve_entity', () => {
 
 describe('cycle tools', () => {
   it('log_event rolls the matching cycle with cost + odometer, and undo puts it back', async () => {
-    const car = os.entities.create({ type: 'vehicle', data: { name: 'Creta' } });
+    const car = os.records.create({ type: 'vehicle', data: { name: 'Creta' } });
     const svc = os.cycles.create({ entityId: car.id, name: 'Service', kind: 'either', everyN: 6, everyUnit: 'month', meterEvery: 10000, nextDueAt: d('2026-10-01') });
     os.cycles.create({ entityId: car.id, name: 'Insurance renewal', kind: 'fixed', everyN: 1, everyUnit: 'year', nextDueAt: d('2026-12-01') });
     expect(tool('log_event').confirm).toBeTypeOf('function');
@@ -60,17 +60,17 @@ describe('cycle tools', () => {
   });
 
   it('a phrase that matches no cycle is just an event — "washed the car" never rolls the service', async () => {
-    const car = os.entities.create({ type: 'vehicle', data: { name: 'Creta' } });
+    const car = os.records.create({ type: 'vehicle', data: { name: 'Creta' } });
     const svc = os.cycles.create({ entityId: car.id, name: 'Service', kind: 'interval', everyN: 6, everyUnit: 'month', nextDueAt: d('2026-10-01') });
     expect(pickCycle(os, car.id, 'wash')).toBeNull();
     const out = await tool('log_event').run({ entityId: car.id, what: 'Wash' }, os);
     expect(out).toMatchObject({ cycleRolled: false });
     expect(os.cycles.get(svc.id)!.nextDueAt).toBe(d('2026-10-01'));
-    expect(os.entities.timeline.forEntity(car.id).some((e) => e.kind === 'event' && e.title === 'Wash')).toBe(true);
+    expect(os.records.timeline.forEntity(car.id).some((e) => e.kind === 'event' && e.title === 'Wash')).toBe(true);
   });
 
   it('mark_cycle_done, set_next_due and log_meter each undo cleanly', async () => {
-    const car = os.entities.create({ type: 'vehicle', data: { name: 'Creta' } });
+    const car = os.records.create({ type: 'vehicle', data: { name: 'Creta' } });
     const c = os.cycles.create({ entityId: car.id, name: 'Wash', kind: 'interval', everyN: 3, everyUnit: 'week', nextDueAt: d('2026-09-20') });
     const done = await tool('mark_cycle_done').run({ entityId: car.id, date: '2026-09-21' }, os);
     expect(os.cycles.stats(c.id).count).toBe(1);
@@ -81,7 +81,7 @@ describe('cycle tools', () => {
     extrasOf(set).undo!();
     expect(os.cycles.get(c.id)!.nextDueAt).toBe(d('2026-09-20'));
     const m = await tool('log_meter').run({ entityId: car.id, value: 30100 }, os);
-    expect(os.entities.get<{ odometerKm: number }>(car.id)!.data.odometerKm).toBe(30100);
+    expect(os.records.get<{ odometerKm: number }>(car.id)!.data.odometerKm).toBe(30100);
     extrasOf(m).undo!();
     expect(os.cycles.latestMeter(car.id)).toBeNull();
   });
@@ -89,7 +89,7 @@ describe('cycle tools', () => {
 
 describe('assistant loop', () => {
   it('lifts cards and undo onto tool turns; the model never sees them', async () => {
-    const car = os.entities.create({ type: 'vehicle', data: { name: 'Creta' } });
+    const car = os.records.create({ type: 'vehicle', data: { name: 'Creta' } });
     const sent: string[] = [];
     const script: CompletionResult[] = [
       { content: [{ type: 'tool_use', id: 't1', name: 'log_meter', input: { entityId: car.id, value: 31000 } }], stopReason: 'tool_use' },
@@ -123,30 +123,30 @@ describe('confirmation policy', () => {
     const turns: AssistantTurn[] = [];
     await new Assistant(os, { provider, onTurn: (t) => turns.push(t), confirm: async (_d, _i, summary) => { summaries.push(summary); return false; } }).send('add Suresh and my umbrella');
     expect(summaries).toEqual(['Add person: Suresh']);
-    expect(os.entities.query('person')).toHaveLength(0);
+    expect(os.records.query('person')).toHaveLength(0);
     const tools = turns.filter((t) => t.role === 'tool');
     expect(tools[0]).toMatchObject({ isError: true });
     expect(tools[1]!.undo).toBeTypeOf('function');
-    expect(os.entities.query('item')).toHaveLength(1);
+    expect(os.records.query('item')).toHaveLength(1);
     tools[1]!.undo!();
-    expect(os.entities.query('item')).toHaveLength(0);
+    expect(os.records.query('item')).toHaveLength(0);
   });
 
   it('update undo restores the previous values and only the tags it added', async () => {
-    const e = os.entities.create({ type: 'item', data: { name: 'Umbrella' } });
+    const e = os.records.create({ type: 'item', data: { name: 'Umbrella' } });
     os.tags.apply(e.id, 'rain');
     const out = await os.registry.aiTools.get('update_entity')!.run({ id: e.id, data: { name: 'Big umbrella' }, addTags: ['car'] }, os);
-    expect(os.entities.get(e.id)!.title).toBe('Big umbrella');
+    expect(os.records.get(e.id)!.title).toBe('Big umbrella');
     extrasOf(out).undo!();
-    expect(os.entities.get(e.id)!.title).toBe('Umbrella');
+    expect(os.records.get(e.id)!.title).toBe('Umbrella');
     expect(os.tags.forEntity(e.id).map((t) => t.name)).toEqual(['rain']);
   });
 });
 
 describe('learned aliases', () => {
   it('after the user picks one, the alias resolves straight to it; forgetting undoes it', async () => {
-    const city = os.entities.create({ type: 'vehicle', data: { name: 'Honda City' } });
-    os.entities.create({ type: 'vehicle', data: { name: 'Hyundai Creta' } });
+    const city = os.records.create({ type: 'vehicle', data: { name: 'Honda City' } });
+    os.records.create({ type: 'vehicle', data: { name: 'Hyundai Creta' } });
     expect(clearMatch(resolveCandidates(os, 'the car'))).toBeNull(); // two vehicles: ambiguous
     const out = await tool('remember_alias').run({ alias: 'the car', entityId: city.id }, os);
     const r = (await tool('resolve_entity').run({ text: 'serviced the car today' }, os)) as { match?: { id: string; why: string } };
@@ -157,18 +157,18 @@ describe('learned aliases', () => {
   });
 
   it('learning the same alias again counts uses instead of duplicating', () => {
-    const dad = os.entities.create({ type: 'person', data: { name: 'Ramesh Rao' } });
+    const dad = os.records.create({ type: 'person', data: { name: 'Ramesh Rao' } });
     os.aliases.learn('Dad', dad.id);
     os.aliases.learn('dad!', dad.id);
     expect(os.aliases.forEntity(dad.id)).toEqual([expect.objectContaining({ uses: 2 })]);
-    os.entities.delete(dad.id);
+    os.records.delete(dad.id);
     expect(os.aliases.lookup('call dad')).toEqual([]);
   });
 });
 
 describe('shared files', () => {
   it('attach_file puts a shared file on the record, undoable', async () => {
-    const car = os.entities.create({ type: 'vehicle', data: { name: 'Creta' } });
+    const car = os.records.create({ type: 'vehicle', data: { name: 'Creta' } });
     const out = await tool('attach_file').run({ entityId: car.id, uri: 'file:///policy.pdf', name: 'policy.pdf', mime: 'application/pdf' }, os);
     expect(os.attachments.forEntity(car.id).map((a) => [a.name, a.kind])).toEqual([['policy.pdf', 'file']]);
     extrasOf(out).undo!();

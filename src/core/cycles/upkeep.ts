@@ -1,4 +1,4 @@
-import type { Entity, EntityTypeDef } from '../domain/types';
+import type { ObjectRecord, ObjectDef } from '../domain/types';
 import type { LifeOSContext } from '../registry/context';
 import type { Cycle } from './cycleRepo';
 import { addPeriod, startOfDay, type CycleStatus, type UpkeepBucket } from './schedule';
@@ -16,8 +16,8 @@ export type UpkeepFilter = 'All' | keyof typeof UPKEEP_FILTERS;
 
 export interface UpkeepItem {
   cycle: Cycle;
-  entity: Entity;
-  def: EntityTypeDef | undefined;
+  entity: ObjectRecord;
+  def: ObjectDef | undefined;
   status: CycleStatus;
 }
 
@@ -35,9 +35,9 @@ export function upkeep(os: LifeOSContext, filter: UpkeepFilter = 'All', now = Da
   const types: readonly string[] | null = filter === 'All' ? null : UPKEEP_FILTERS[filter];
   const items: UpkeepItem[] = [];
   for (const cycle of os.cycles.all()) {
-    const entity = os.entities.get(cycle.entityId);
+    const entity = os.records.get(cycle.entityId);
     if (!entity || (types && !types.includes(entity.type))) continue;
-    items.push({ cycle, entity, def: os.registry.entityTypes.get(entity.type), status: os.cycles.status(cycle, now) });
+    items.push({ cycle, entity, def: os.registry.objects.get(entity.type), status: os.cycles.status(cycle, now) });
   }
   const rank = (i: UpkeepItem) => (i.status.daysLeft ?? (i.status.meterLeft != null && i.cycle.meterEvery ? (i.status.meterLeft / i.cycle.meterEvery) * 180 : 9999));
   items.sort((a, b) => rank(a) - rank(b));
@@ -77,13 +77,13 @@ export function logDone(os: LifeOSContext, cycleId: string, input: { cost?: numb
   let eventId = '';
   os.db.transaction(() => {
     eventId = os.cycles.markDone(cycleId, { at, cost: input.cost, note: input.note, meter: input.meter });
-    if (input.asExpense && input.cost && input.cost > 0 && os.registry.entityTypes.has('transaction')) {
-      const record = os.entities.get(cycle.entityId);
-      const tx = os.entities.create({
+    if (input.asExpense && input.cost && input.cost > 0 && os.registry.objects.has('transaction')) {
+      const record = os.records.get(cycle.entityId);
+      const tx = os.records.create({
         type: 'transaction',
         data: { amount: input.cost, kind: 'expense', category: COST_CATEGORY[record?.type ?? ''] ?? 'other', merchant: record ? `${record.title} · ${cycle.name}` : cycle.name, date: localDate(at), note: input.note ?? undefined, currency: cycle.currency ?? undefined },
       });
-      if (record) os.relations.link(tx.id, record.id, record.type);
+      if (record) os.links.link(tx.id, record.id, record.type);
       transactionId = tx.id;
     }
   });
@@ -92,7 +92,7 @@ export function logDone(os: LifeOSContext, cycleId: string, input: { cost?: numb
 
 export function undoLoggedDone(os: LifeOSContext, done: LoggedDone): void {
   os.cycles.undoDone(done.eventId);
-  if (done.transactionId) os.entities.delete(done.transactionId);
+  if (done.transactionId) os.records.delete(done.transactionId);
 }
 
 function localDate(at: number): string {

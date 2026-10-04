@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'; // type-only: core has no runtime dependency on React (deps.test allows `import type`)
 import type { ZodTypeAny } from 'zod';
-import type { Entity, EntityTypeDef, WidgetSize } from '../domain/types';
+import type { ObjectRecord, ObjectDef, WidgetSize } from '../domain/types';
 import type { CoreEvents, EventName } from '../events/bus';
 import type { LifeOSContext } from './context';
 
@@ -38,12 +38,12 @@ export interface TriggerDef {
   event: EventName;
   /** Turn the event payload into the automation context (or null = ignore). */
   toContext: (payload: CoreEvents[EventName]) => AutomationContext | null;
-  configFields?: EntityTypeDef['fields'];
+  configFields?: ObjectDef['fields'];
 }
 
 export interface AutomationContext {
-  entity?: Entity;
-  previous?: Entity;
+  entity?: ObjectRecord;
+  previous?: ObjectRecord;
   changed?: string[];
   vars: Record<string, unknown>;
 }
@@ -53,7 +53,7 @@ export interface ActionDef {
   module: string;
   label: string;
   description?: string;
-  configFields?: EntityTypeDef['fields'];
+  configFields?: ObjectDef['fields'];
   run: (config: Record<string, unknown>, ctx: AutomationContext, os: LifeOSContext) => Promise<string | void>;
 }
 
@@ -77,7 +77,7 @@ export interface EntityDetailSection {
   entityType: string | '*';
   key: string;
   title: string;
-  component: ComponentType<{ entity: Entity<any>; ctx: LifeOSContext }>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  component: ComponentType<{ entity: ObjectRecord<any>; ctx: LifeOSContext }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   order?: number;
   /** 'top': above the details card (Stitch stat trio, attention, quick actions). Default: below it. */
   placement?: 'top' | 'body';
@@ -99,7 +99,7 @@ export interface TileDef {
   icon: string;
   sizes: WidgetSize[];
   defaultSize: WidgetSize;
-  configFields?: EntityTypeDef['fields'];
+  configFields?: ObjectDef['fields'];
   component: ComponentType<TileProps>;
 }
 
@@ -163,7 +163,7 @@ export interface ModuleManifest {
   color: string;
   /** Module ids that must be installed first. */
   dependencies?: string[];
-  entityTypes?: EntityTypeDef<any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  objects?: ObjectDef<any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
   triggers?: TriggerDef[];
   actions?: ActionDef[];
   aiTools?: AiToolDef[];

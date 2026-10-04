@@ -12,7 +12,7 @@ let os: LifeOSContext;
 const pick = (def: typeof transactionType | typeof budgetType) => def.fields.find((f) => f.key === 'category')!;
 beforeEach(async () => {
   bus.clear();
-  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [transactionType, budgetType] }], registry: new Registry() });
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [transactionType, budgetType] }], registry: new Registry() });
   for (const d of [transactionType, budgetType]) trackCategoryField(pick(d));
   applyCategories(os);
 });
@@ -46,11 +46,11 @@ describe('your own categories', () => {
     const gym = addCategory(os, { label: 'Gym' })!;
     updateCategory(os, gym.value, { label: 'Fitness', icon: 'activity' });
     expect(categoryOf('c_gym')).toMatchObject({ label: 'Fitness', icon: 'activity' });
-    const tx = os.entities.create({ type: 'transaction', data: { amount: 1500, kind: 'expense', category: 'c_gym', date: '2026-09-26', merchant: 'Cult' } });
+    const tx = os.records.create({ type: 'transaction', data: { amount: 1500, kind: 'expense', category: 'c_gym', date: '2026-09-26', merchant: 'Cult' } });
     expect(tx.subtitle).toBe('Fitness');
     setCategoryRules(os, [{ keyword: 'CULT', category: 'c_gym' }, { keyword: 'ZOMATO', category: 'food' }]);
     expect(deleteCategory(os, 'c_gym')).toBe(1);
-    expect(os.entities.get<{ category: string }>(tx.id)!.data.category).toBe('other');
+    expect(os.records.get<{ category: string }>(tx.id)!.data.category).toBe('other');
     expect(os.settings.get<Array<{ keyword: string }>>('categoryRules', []).map((r) => r.keyword)).toEqual(['ZOMATO']);
     expect(pick(transactionType).options!.some((o) => o.value === 'c_gym')).toBe(false);
   });

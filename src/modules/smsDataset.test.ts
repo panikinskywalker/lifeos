@@ -12,8 +12,8 @@ import { accountType, transactionType } from './finance/types';
 import { deliveryType } from './deliveries/types';
 
 const modules: ModuleManifest[] = [
-  { id: 'deliveries', name: 'Deliveries', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [deliveryType] },
-  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [accountType, transactionType] },
+  { id: 'deliveries', name: 'Deliveries', version: '1', description: '', icon: 'x', color: '#000', objects: [deliveryType] },
+  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType] },
 ];
 
 let os: LifeOSContext;

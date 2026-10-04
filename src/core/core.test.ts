@@ -16,7 +16,7 @@ const testModule: ModuleManifest = {
   description: 'test',
   icon: 'x',
   color: '#000',
-  entityTypes: [
+  objects: [
     {
       type: 'txn',
       module: 'test-finance',
@@ -68,80 +68,80 @@ afterEach(() => os.db.close());
 
 describe('entity store', () => {
   it('creates, derives title, indexes for search, writes timeline + change log', () => {
-    const t = os.entities.create({ type: 'txn', data: { amount: 450, category: 'food', merchant: 'Blue Tokai', date: '2026-09-01' } });
+    const t = os.records.create({ type: 'txn', data: { amount: 450, category: 'food', merchant: 'Blue Tokai', date: '2026-09-01' } });
     expect(t.title).toBe('Blue Tokai');
     expect(t.status).toBe('pending');
     expect(t.occurredAt).toBe(new Date('2026-09-01').getTime());
-    expect(os.entities.timeline.forEntity(t.id)[0].kind).toBe('created');
-    expect(os.entities.search.search('blue')[0].id).toBe(t.id);
+    expect(os.records.timeline.forEntity(t.id)[0].kind).toBe('created');
+    expect(os.records.search.search('blue')[0].id).toBe(t.id);
     expect(os.db.get<{ n: number }>(`SELECT COUNT(*) n FROM changes`)?.n).toBe(1);
   });
 
   it('validates data against the schema', () => {
-    expect(() => os.entities.create({ type: 'txn', data: { amount: 'lots', date: 'x' } })).toThrow();
+    expect(() => os.records.create({ type: 'txn', data: { amount: 'lots', date: 'x' } })).toThrow();
   });
 
   it('updates with diff, version bump and status timeline', () => {
-    const t = os.entities.create({ type: 'txn', data: { amount: 10, date: '2026-09-01', merchant: 'A' } });
-    const u = os.entities.update(t.id, { data: { amount: 20 }, status: 'cleared' });
+    const t = os.records.create({ type: 'txn', data: { amount: 10, date: '2026-09-01', merchant: 'A' } });
+    const u = os.records.update(t.id, { data: { amount: 20 }, status: 'cleared' });
     expect(u.version).toBe(2);
     expect(u.data.amount).toBe(20);
-    const tl = os.entities.timeline.forEntity(t.id);
+    const tl = os.records.timeline.forEntity(t.id);
     expect(tl.some((e) => e.kind === 'status')).toBe(true);
-    const same = os.entities.update(t.id, { data: { amount: 20 } });
+    const same = os.records.update(t.id, { data: { amount: 20 } });
     expect(same.version).toBe(2); // no-op update doesn't bump
   });
 
   it('queries with the universal filter DSL, sorts and aggregates', () => {
     for (const [amt, cat, d] of [[100, 'food', '2026-09-01'], [200, 'food', '2026-09-02'], [900, 'travel', '2026-08-15']] as const) {
-      os.entities.create({ type: 'txn', data: { amount: amt, category: cat, date: d } });
+      os.records.create({ type: 'txn', data: { amount: amt, category: cat, date: d } });
     }
-    const food = os.entities.query('txn', { filter: { and: [{ field: 'data.category', op: 'eq', value: 'food' }] }, sort: [{ field: 'data.amount', dir: 'desc' }] });
+    const food = os.records.query('txn', { filter: { and: [{ field: 'data.category', op: 'eq', value: 'food' }] }, sort: [{ field: 'data.amount', dir: 'desc' }] });
     expect(food.map((e) => e.data.amount)).toEqual([200, 100]);
-    const agg = os.entities.aggregate('txn', { filter: { and: [{ field: 'data.amount', op: 'gte', value: 150 }] } }, { sum: ['data.amount'], count: true });
+    const agg = os.records.aggregate('txn', { filter: { and: [{ field: 'data.amount', op: 'gte', value: 150 }] } }, { sum: ['data.amount'], count: true });
     expect(agg['sum_data.amount']).toBe(1100);
     expect(agg.count).toBe(2);
-    const grouped = os.entities.groupBy('txn', {}, 'data.category', { sum: ['data.amount'] });
+    const grouped = os.records.groupBy('txn', {}, 'data.category', { sum: ['data.amount'] });
     expect(grouped.find((g) => g.key === 'travel')?.values['sum_data.amount']).toBe(900);
-    const series = os.entities.series('txn', {}, 'month', 'data.amount');
+    const series = os.records.series('txn', {}, 'month', 'data.amount');
     expect(series.map((s) => s.bucket)).toEqual(['2026-08', '2026-09']);
     expect(series[1].sum).toBe(300);
   });
 
   it('soft deletes and hides from queries and search', () => {
-    const t = os.entities.create({ type: 'txn', data: { amount: 1, date: '2026-01-01', merchant: 'Gone' } });
-    os.entities.delete(t.id);
-    expect(os.entities.get(t.id)).toBeUndefined();
-    expect(os.entities.search.search('gone')).toHaveLength(0);
-    os.entities.restore(t.id);
-    expect(os.entities.get(t.id)).toBeDefined();
+    const t = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-01-01', merchant: 'Gone' } });
+    os.records.delete(t.id);
+    expect(os.records.get(t.id)).toBeUndefined();
+    expect(os.records.search.search('gone')).toHaveLength(0);
+    os.records.restore(t.id);
+    expect(os.records.get(t.id)).toBeDefined();
   });
 
   it('restore undoes a delete: record, its links, search, change log and an event', () => {
-    const t = os.entities.create({ type: 'txn', data: { amount: 900, date: '2026-09-01', merchant: 'Houseboat' } });
-    const trip = os.entities.create({ type: 'trip', data: { destination: 'Alleppey' } });
-    const other = os.entities.create({ type: 'trip', data: { destination: 'Goa' } });
-    os.relations.link(t.id, trip.id, 'trip');
-    os.relations.link(t.id, other.id, 'related');
+    const t = os.records.create({ type: 'txn', data: { amount: 900, date: '2026-09-01', merchant: 'Houseboat' } });
+    const trip = os.records.create({ type: 'trip', data: { destination: 'Alleppey' } });
+    const other = os.records.create({ type: 'trip', data: { destination: 'Goa' } });
+    os.links.link(t.id, trip.id, 'trip');
+    os.links.link(t.id, other.id, 'related');
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-23T09:00:00Z'));
-    os.relations.unlink(t.id, other.id, 'related'); // removed by hand earlier: must stay removed
+    os.links.unlink(t.id, other.id, 'related'); // removed by hand earlier: must stay removed
     vi.setSystemTime(new Date('2026-09-23T09:05:00Z'));
-    os.entities.delete(t.id);
+    os.records.delete(t.id);
     vi.useRealTimers();
-    expect(os.relations.forEntity(trip.id)).toHaveLength(0);
+    expect(os.links.forEntity(trip.id)).toHaveLength(0);
 
     const seen: string[] = [];
     const off = bus.on('entity.restored', ({ entity }) => void seen.push(entity.id));
-    os.entities.restore(t.id);
+    os.records.restore(t.id);
     off();
 
     expect(seen).toEqual([t.id]);
-    expect(os.relations.forEntity(t.id).map((r) => r.other.id)).toEqual([trip.id]);
-    expect(os.entities.search.search('houseboat').map((h) => h.id)).toEqual([t.id]);
+    expect(os.links.forEntity(t.id).map((r) => r.other.id)).toEqual([trip.id]);
+    expect(os.records.search.search('houseboat').map((h) => h.id)).toEqual([t.id]);
     const last = os.db.get<{ op: string; row_id: string }>(`SELECT op, row_id FROM changes WHERE tbl = 'entities' ORDER BY seq DESC LIMIT 1`);
     expect(last).toEqual({ op: 'update', row_id: t.id });
-    os.entities.restore(t.id); // restoring a live record is a no-op
+    os.records.restore(t.id); // restoring a live record is a no-op
     expect(seen).toEqual([t.id]);
   });
 
@@ -152,7 +152,7 @@ describe('entity store', () => {
 
 describe('live-query events', () => {
   it('every stored change emits an event, so live screens refresh', () => {
-    const e = os.entities.create({ type: 'txn', data: { amount: 1, date: '2026-09-01', merchant: 'Chai' } });
+    const e = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-09-01', merchant: 'Chai' } });
     const events: string[] = [];
     const off = bus.onAny((name) => void events.push(name));
     const emits = (label: string, fn: () => void) => {
@@ -182,37 +182,37 @@ describe('live-query events', () => {
 
 describe('relations, tags, comments, attachments', () => {
   it('links bidirectionally and filters by relatedTo', () => {
-    const trip = os.entities.create({ type: 'trip', data: { destination: 'Tokyo' } });
-    const t1 = os.entities.create({ type: 'txn', data: { amount: 5000, date: '2026-12-20', merchant: 'JR Pass' } });
-    os.entities.create({ type: 'txn', data: { amount: 50, date: '2026-12-20', merchant: 'Chai' } });
-    os.relations.link(t1.id, trip.id, 'trip');
-    expect(os.relations.forEntity(trip.id)[0].other.title).toBe('JR Pass');
-    const inTrip = os.entities.query('txn', { filter: { and: [{ field: 'relation.trip', op: 'relatedTo', value: trip.id }] } });
+    const trip = os.records.create({ type: 'trip', data: { destination: 'Tokyo' } });
+    const t1 = os.records.create({ type: 'txn', data: { amount: 5000, date: '2026-12-20', merchant: 'JR Pass' } });
+    os.records.create({ type: 'txn', data: { amount: 50, date: '2026-12-20', merchant: 'Chai' } });
+    os.links.link(t1.id, trip.id, 'trip');
+    expect(os.links.forEntity(trip.id)[0].other.title).toBe('JR Pass');
+    const inTrip = os.records.query('txn', { filter: { and: [{ field: 'relation.trip', op: 'relatedTo', value: trip.id }] } });
     expect(inTrip).toHaveLength(1);
-    os.relations.unlink(t1.id, trip.id);
-    expect(os.relations.forEntity(trip.id)).toHaveLength(0);
+    os.links.unlink(t1.id, trip.id);
+    expect(os.links.forEntity(trip.id)).toHaveLength(0);
   });
 
   it('tags are case-insensitive and filterable', () => {
-    const t = os.entities.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
+    const t = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
     os.tags.apply(t.id, 'Work');
     os.tags.apply(t.id, 'work');
     expect(os.tags.forEntity(t.id)).toHaveLength(1);
-    expect(os.entities.query('txn', { filter: { and: [{ field: 'tag', op: 'hasTag', value: 'WORK' }] } })).toHaveLength(1);
+    expect(os.records.query('txn', { filter: { and: [{ field: 'tag', op: 'hasTag', value: 'WORK' }] } })).toHaveLength(1);
     os.tags.set(t.id, ['home']);
     expect(os.tags.forEntity(t.id).map((x) => x.name)).toEqual(['home']);
   });
 
   it('comments and attachments land on the timeline', () => {
-    const t = os.entities.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
+    const t = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
     os.comments.add(t.id, 'Reimbursed by office');
     os.attachments.add({ entityId: t.id, name: 'receipt.jpg', uri: 'file:///x', kind: 'receipt' });
-    const kinds = os.entities.timeline.forEntity(t.id).map((e) => e.kind);
+    const kinds = os.records.timeline.forEntity(t.id).map((e) => e.kind);
     expect(kinds).toEqual(expect.arrayContaining(['comment', 'attachment', 'created']));
   });
 
   it('a record has at most one cover photo; replacing keeps the old one recoverable', () => {
-    const t = os.entities.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
+    const t = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
     expect(os.attachments.cover(t.id)).toBeNull();
     const first = os.attachments.setCover({ entityId: t.id, name: 'a.jpg', mime: 'image/jpeg', uri: 'file:///a' });
     const second = os.attachments.setCover({ entityId: t.id, name: 'b.jpg', mime: 'image/jpeg', uri: 'file:///b' });
@@ -248,8 +248,8 @@ describe('automation', () => {
       conditions: [{ field: 'data.amount', op: 'gt', value: 1000 }],
       actions: [{ id: 'test.flag', config: { tag: 'big' } }, { id: 'core.addComment', config: { body: '{{title}} was {{data.amount}}' } }],
     });
-    const small = os.entities.create({ type: 'txn', data: { amount: 10, date: '2026-01-01', merchant: 'S' } });
-    const big = os.entities.create({ type: 'txn', data: { amount: 5000, date: '2026-01-01', merchant: 'Flight' } });
+    const small = os.records.create({ type: 'txn', data: { amount: 10, date: '2026-01-01', merchant: 'S' } });
+    const big = os.records.create({ type: 'txn', data: { amount: 5000, date: '2026-01-01', merchant: 'Flight' } });
     await new Promise((r) => setTimeout(r, 20));
     expect(os.tags.forEntity(small.id)).toHaveLength(0);
     expect(os.tags.forEntity(big.id).map((t) => t.name)).toEqual(['big']);
@@ -284,8 +284,8 @@ describe('assistant tool loop', () => {
     };
     const a = new Assistant(os, { provider, confirm: async () => true });
     const turns = await a.send('add 120 at Cafe for coffee');
-    expect(os.entities.query('txn')).toHaveLength(1);
-    expect(os.tags.forEntity(os.entities.query('txn')[0].id)[0].name).toBe('coffee');
+    expect(os.records.query('txn')).toHaveLength(1);
+    expect(os.tags.forEntity(os.records.query('txn')[0].id)[0].name).toBe('coffee');
     expect(turns.at(-1)?.text).toContain('Total spend');
     const spec = a.tools().find((t) => t.name === 'query_entities')!;
     expect(spec).toBeDefined();
@@ -296,16 +296,16 @@ describe('nested transactions', () => {
   it('rolls back everything inside an outer transaction on failure', () => {
     expect(() =>
       os.db.transaction(() => {
-        os.entities.create({ type: 'trip', data: { destination: 'A' } });
-        os.entities.create({ type: 'trip', data: { destination: 'B' } });
+        os.records.create({ type: 'trip', data: { destination: 'A' } });
+        os.records.create({ type: 'trip', data: { destination: 'B' } });
         throw new Error('boom');
       }),
     ).toThrow('boom');
-    expect(os.entities.count('trip')).toBe(0);
+    expect(os.records.count('trip')).toBe(0);
     os.db.transaction(() => {
-      os.entities.create({ type: 'trip', data: { destination: 'C' } });
+      os.records.create({ type: 'trip', data: { destination: 'C' } });
     });
-    expect(os.entities.count('trip')).toBe(1);
+    expect(os.records.count('trip')).toBe(1);
   });
 });
 

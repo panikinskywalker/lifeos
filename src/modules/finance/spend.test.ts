@@ -11,14 +11,14 @@ let os: LifeOSContext;
 const NOW = new Date('2026-09-26T12:00:00');
 beforeEach(async () => {
   bus.clear();
-  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'finance', name: 'F', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [accountType, transactionType] }], registry: new Registry() });
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'finance', name: 'F', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType] }], registry: new Registry() });
 });
 afterEach(() => os.db.close());
 
 describe('Spend screen query', () => {
   it('this month vs last month by the same day, by category, filtered, sorted', () => {
-    const hdfc = os.entities.create({ type: 'account', title: 'HDFC', data: { kind: 'bank' } }).id;
-    const tx = (date: string, amount: number, category: string, merchant: string, kind = 'expense', accountId?: string) => os.entities.create({ type: 'transaction', data: { date, amount, category, merchant, kind, accountId } });
+    const hdfc = os.records.create({ type: 'account', title: 'HDFC', data: { kind: 'bank' } }).id;
+    const tx = (date: string, amount: number, category: string, merchant: string, kind = 'expense', accountId?: string) => os.records.create({ type: 'transaction', data: { date, amount, category, merchant, kind, accountId } });
     tx('2026-09-02', 1200, 'food', 'Swiggy', 'expense', hdfc);
     tx('2026-09-10', 300, 'transport', 'Uber');
     tx('2026-09-20', 800, 'food', 'Zomato', 'expense', hdfc);

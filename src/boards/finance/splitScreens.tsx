@@ -3,7 +3,7 @@ import { Alert, Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Card, Chip, EmptyState, Field, FilterChip, NumberField, RowItem, RowList, Section, Segmented, Sheet, Text, useToast } from '@ui/kit';
@@ -23,10 +23,10 @@ function confirm(title: string, body: string, ok: string, fn: () => void) {
   Alert.alert(title, body, [{ text: 'Cancel', style: 'cancel' }, { text: ok, onPress: fn }]);
 }
 
-const nameOf = (os: LifeOSContext, party: Party) => (party === 'me' ? 'You' : (os.entities.get(party)?.title ?? 'Someone'));
+const nameOf = (os: LifeOSContext, party: Party) => (party === 'me' ? 'You' : (os.records.get(party)?.title ?? 'Someone'));
 
 /** Transaction › Split: who paid, who's in, how it's divided — and what that leaves owed. */
-export function SplitSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function SplitSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const split = (entity.data as { split?: SplitRecord }).split;
@@ -58,13 +58,13 @@ export function SplitSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOS
   );
 }
 
-function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () => void; tx: Entity<any> }) {
+function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () => void; tx: ObjectRecord<any> }) {
   const os = useOS();
   const t = useTheme();
   const toast = useToast();
   const prev = (tx.data as { split?: SplitRecord }).split;
   const total = Number((tx.data as { amount: number }).amount);
-  const groups = useLive((o) => o.entities.query('group', {}, { limit: 50 }), []);
+  const groups = useLive((o) => o.records.query('group', {}, { limit: 50 }), []);
   const [payer, setPayer] = useState<Party>('me');
   const [people, setPeople] = useState<string[]>([]);
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -181,11 +181,11 @@ function SettleButton({ personId, groupId, amount, label }: { personId: string; 
 }
 
 /** Person › Money: the running balance, open items, settle up. */
-export function PersonBalanceSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function PersonBalanceSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const t = useTheme();
   const router = useRouter();
   const bal = useLive((o) => balanceWith(o, entity.id), [entity.id]);
-  const open = useLive((o) => o.entities.query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: entity.id }, { field: 'status', op: 'neq', value: 'settled' }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 20 }), [entity.id]);
+  const open = useLive((o) => o.records.query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: entity.id }, { field: 'status', op: 'neq', value: 'settled' }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 20 }), [entity.id]);
   if (!open.length && bal === 0) return null;
   const first = entity.title.split(' ')[0];
   return (
@@ -211,7 +211,7 @@ export function PersonBalanceSection({ entity, ctx }: { entity: Entity<any>; ctx
 }
 
 /** Group › Balances: each member's balance with me inside this group. */
-export function GroupBalanceSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function GroupBalanceSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const list = useLive((o) => balances(o, entity.id), [entity.id]);
   const members = useLive((o) => o.groups.members(entity.id), [entity.id]);
   return (

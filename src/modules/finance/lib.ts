@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import { nextOccurrence } from '@core/automation/recurrence';
 import type { AccountData, BudgetData, SubscriptionData, TransactionData } from './types';
 
@@ -28,16 +28,16 @@ export function periodRange(period: BudgetData['period'], at: number | Date = Da
 }
 
 /** Signed balance: opening + income − expense ± transfers. Credit cards show what you owe as negative. */
-export function accountBalance(os: LifeOSContext, account: Entity<AccountData>): number {
-  const inc = os.entities.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'income' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
-  const exp = os.entities.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
-  const out = os.entities.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'transfer' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
-  const inn = os.entities.aggregate('transaction', { filter: { and: [{ field: 'data.toAccountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'transfer' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
+export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountData>): number {
+  const inc = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'income' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
+  const exp = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
+  const out = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'transfer' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
+  const inn = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.toAccountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'transfer' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
   return (account.data.openingBalance ?? 0) + inc - exp - out + inn;
 }
 
-export function netWorth(os: LifeOSContext): { total: number; assets: number; liabilities: number; accounts: Array<{ account: Entity<AccountData>; balance: number }> } {
-  const accounts = os.entities.query<AccountData>('account');
+export function netWorth(os: LifeOSContext): { total: number; assets: number; liabilities: number; accounts: Array<{ account: ObjectRecord<AccountData>; balance: number }> } {
+  const accounts = os.records.query<AccountData>('account');
   const rows = accounts.map((a) => ({ account: a, balance: accountBalance(os, a) }));
   let assets = 0;
   let liabilities = 0;
@@ -52,19 +52,19 @@ export function netWorth(os: LifeOSContext): { total: number; assets: number; li
 export function spendInRange(os: LifeOSContext, start: string, end: string, category?: string): number {
   const and = [{ field: 'data.kind', op: 'eq' as const, value: 'expense' }, { field: 'data.date', op: 'gte' as const, value: start }, { field: 'data.date', op: 'lte' as const, value: end }];
   if (category) and.push({ field: 'data.category', op: 'eq', value: category });
-  return os.entities.aggregate('transaction', { filter: { and } }, { sum: ['data.amount'] })['sum_data.amount'];
+  return os.records.aggregate('transaction', { filter: { and } }, { sum: ['data.amount'] })['sum_data.amount'];
 }
 
 export function incomeInRange(os: LifeOSContext, start: string, end: string): number {
-  return os.entities.aggregate('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'income' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, { sum: ['data.amount'] })['sum_data.amount'];
+  return os.records.aggregate('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'income' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, { sum: ['data.amount'] })['sum_data.amount'];
 }
 
 export function spendByCategory(os: LifeOSContext, start: string, end: string) {
-  return os.entities.groupBy('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, 'data.category', { sum: ['data.amount'] }).map((g) => ({ category: g.key ?? 'other', total: g.values['sum_data.amount'], count: g.values.count }));
+  return os.records.groupBy('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, 'data.category', { sum: ['data.amount'] }).map((g) => ({ category: g.key ?? 'other', total: g.values['sum_data.amount'], count: g.values.count }));
 }
 
 export function dailySpend(os: LifeOSContext, start: string, end: string): Array<{ date: string; total: number }> {
-  const rows = os.entities.groupBy('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, 'data.date', { sum: ['data.amount'] });
+  const rows = os.records.groupBy('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, 'data.date', { sum: ['data.amount'] });
   const map = new Map(rows.map((r) => [r.key, r.values['sum_data.amount']]));
   const out: Array<{ date: string; total: number }> = [];
   const d = new Date(start);
@@ -77,7 +77,7 @@ export function dailySpend(os: LifeOSContext, start: string, end: string): Array
   return out;
 }
 
-export function budgetStatus(os: LifeOSContext, budget: Entity<BudgetData>, now: number | Date = Date.now()) {
+export function budgetStatus(os: LifeOSContext, budget: ObjectRecord<BudgetData>, now: number | Date = Date.now()) {
   const { start, end } = periodRange(budget.data.period, now);
   const spent = spendInRange(os, start, end, budget.data.category);
   return { spent, limit: budget.data.amount, progress: budget.data.amount ? spent / budget.data.amount : 0, remaining: budget.data.amount - spent };
@@ -91,7 +91,7 @@ export function budgetStatus(os: LifeOSContext, budget: Entity<BudgetData>, now:
  * user marks it paid.
  */
 export function postDueSubscriptions(os: LifeOSContext, today = iso(new Date())): number {
-  const subs = os.entities.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }, { field: 'data.nextBillingAt', op: 'lte', value: today }] } });
+  const subs = os.records.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }, { field: 'data.nextBillingAt', op: 'lte', value: today }] } });
   let n = 0;
   for (const s of subs) {
     if (s.data.autoPost === false) continue;
@@ -99,8 +99,8 @@ export function postDueSubscriptions(os: LifeOSContext, today = iso(new Date()))
     let next = s.data.nextBillingAt;
     let guard = 0;
     while (next <= today && guard++ < 24) {
-      const tx = os.entities.create<TransactionData>({ type: 'transaction', data: { amount: s.data.amount, kind: 'expense', category: s.data.category || 'subscriptions', accountId: s.data.accountId, merchant: s.data.name, date: next, currency: s.data.currency, note: 'Auto-posted subscription' } }, 'automation');
-      os.relations.link(tx.id, s.id, 'subscription', {}, 'automation');
+      const tx = os.records.create<TransactionData>({ type: 'transaction', data: { amount: s.data.amount, kind: 'expense', category: s.data.category || 'subscriptions', accountId: s.data.accountId, merchant: s.data.name, date: next, currency: s.data.currency, note: 'Auto-posted subscription' } }, 'automation');
+      os.links.link(tx.id, s.id, 'subscription', {}, 'automation');
       n++;
       if (renewal) {
         os.cycles.markDone(renewal.id, { at: new Date(`${next}T09:00:00`).getTime(), cost: s.data.amount, note: 'Auto-posted' }, 'automation');
@@ -110,7 +110,7 @@ export function postDueSubscriptions(os: LifeOSContext, today = iso(new Date()))
         next = iso(new Date(nextOccurrence(s.data.rrule, new Date(next).getTime(), new Date(next).getTime())));
       }
     }
-    if (os.entities.get<SubscriptionData>(s.id)?.data.nextBillingAt !== next) os.entities.update(s.id, { data: { nextBillingAt: next } }, 'automation');
+    if (os.records.get<SubscriptionData>(s.id)?.data.nextBillingAt !== next) os.records.update(s.id, { data: { nextBillingAt: next } }, 'automation');
   }
   return n;
 }

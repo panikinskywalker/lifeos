@@ -39,13 +39,13 @@ export function toInr(os: LifeOSContext, amount: number, currency: string): { in
 
 /** Transactions filed in a foreign currency before any rate was known: convert them now. */
 export function applyPendingFx(os: LifeOSContext): number {
-  if (!os.registry.entityTypes.has('transaction')) return 0;
-  const pending = os.entities.query<{ originalAmount?: number; originalCurrency?: string; fxRate?: number }>('transaction', { filter: { and: [{ field: 'data.originalCurrency', op: 'notNull' }] } }, { limit: 2000 }).filter((e) => e.data.originalCurrency && !e.data.fxRate && e.data.originalAmount);
+  if (!os.registry.objects.has('transaction')) return 0;
+  const pending = os.records.query<{ originalAmount?: number; originalCurrency?: string; fxRate?: number }>('transaction', { filter: { and: [{ field: 'data.originalCurrency', op: 'notNull' }] } }, { limit: 2000 }).filter((e) => e.data.originalCurrency && !e.data.fxRate && e.data.originalAmount);
   let n = 0;
   for (const e of pending) {
     const c = toInr(os, e.data.originalAmount!, e.data.originalCurrency!);
     if (!c) continue;
-    os.entities.update(e.id, { data: { amount: c.inr, fxRate: c.rate } }, 'system');
+    os.records.update(e.id, { data: { amount: c.inr, fxRate: c.rate } }, 'system');
     n++;
   }
   return n;

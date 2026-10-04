@@ -1,5 +1,5 @@
 import type { DatabaseAdapter, Row } from '../db/adapter';
-import type { Entity, EntityTypeDef } from '../domain/types';
+import type { ObjectRecord, ObjectDef } from '../domain/types';
 
 export interface SearchHit {
   id: string;
@@ -19,7 +19,7 @@ export class SearchIndex {
     this.fts = !!row?.sql && /fts5/i.test(row.sql);
   }
 
-  index(e: Entity, def: EntityTypeDef) {
+  index(e: ObjectRecord, def: ObjectDef) {
     const body = [
       def.searchText?.(e.data as never) ?? '',
       ...def.fields.filter((f) => ['text', 'longtext', 'select'].includes(f.type)).map((f) => String((e.data as Record<string, unknown>)[f.key] ?? '')),
@@ -93,7 +93,7 @@ export class SearchIndex {
   }
 
   /** Full rebuild (after import / restore). */
-  rebuild(entities: Entity[], defFor: (type: string) => EntityTypeDef | undefined) {
+  rebuild(entities: ObjectRecord[], defFor: (type: string) => ObjectDef | undefined) {
     this.db.transaction(() => {
       // Facts and dumps live in the same index but aren't entities: keep their rows.
       this.db.run(`DELETE FROM entities_fts WHERE type NOT IN ('fact', 'dump')`);

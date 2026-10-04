@@ -24,7 +24,7 @@ export default function RemindersRoute() {
     <Card padded={false} style={{ marginHorizontal: 16 }}>
       {items.map((r, i) => {
         const at = r.snoozedUntil ?? r.nextAt ?? r.dueAt;
-        const entity = r.entityId ? os.entities.get(r.entityId) : undefined;
+        const entity = r.entityId ? os.records.get(r.entityId) : undefined;
         return (
           <Row
             key={r.id}

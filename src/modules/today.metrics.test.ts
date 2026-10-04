@@ -15,7 +15,7 @@ let os: LifeOSContext;
 const NOW = Date.parse('2026-09-26T18:00:00');
 beforeEach(async () => {
   bus.clear();
-  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [measurementType, workoutType, accountType, transactionType, personType, eventType] }], registry: new Registry() });
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, transactionType, personType, eventType] }], registry: new Registry() });
 });
 afterEach(() => os.db.close());
 
@@ -45,7 +45,7 @@ describe('Today metrics', () => {
   });
 
   it('spend pace: this month so far vs your usual month by the same day', () => {
-    const tx = (date: string, amount: number) => os.entities.create({ type: 'transaction', data: { amount, kind: 'expense', category: 'food', date } });
+    const tx = (date: string, amount: number) => os.records.create({ type: 'transaction', data: { amount, kind: 'expense', category: 'food', date } });
     tx('2026-09-02', 1000);
     tx('2026-09-20', 500);
     tx('2026-08-10', 3000);
@@ -60,8 +60,8 @@ describe('Today metrics', () => {
   });
 
   it('upcoming: overdue first, then dues and events by time; people to call', () => {
-    const k = os.entities.create({ type: 'person', title: 'Kendal', data: { contactEvery: 14, lastContactAt: day(-20) } });
-    os.entities.create({ type: 'event', title: 'Dinner', data: { startAt: NOW + 86_400_000 } });
+    const k = os.records.create({ type: 'person', title: 'Kendal', data: { contactEvery: 14, lastContactAt: day(-20) } });
+    os.records.create({ type: 'event', title: 'Dinner', data: { startAt: NOW + 86_400_000 } });
     const up = upcoming(os, 5, NOW);
     expect(up[0]).toMatchObject({ title: 'Kendal · Keep in touch', overdue: true });
     expect(up.map((u) => u.title)).toContain('Dinner');

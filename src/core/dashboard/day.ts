@@ -39,18 +39,18 @@ export function myDay(os: LifeOSContext, now = Date.now(), u: Upkeep = upkeep(os
   const a = startOf(now);
   const b = a + DAY - 1;
   const today = isoDay(now);
-  const has = (t: string) => os.registry.entityTypes.has(t);
+  const has = (t: string) => os.registry.objects.has(t);
   const out: DayItem[] = [];
   if (has('event')) {
     for (const r of os.db.all<Row>(`SELECT id FROM entities WHERE type='event' AND deleted_at IS NULL AND ((occurred_at BETWEEN ? AND ?) OR (occurred_at < ? AND COALESCE(json_extract(data,'$.endAt'),0) >= ?)) ORDER BY occurred_at LIMIT 50`, [a, b, a, a])) {
-      const e = os.entities.get<{ startAt: number; endAt?: number; allDay?: boolean; location?: string; kind?: string }>(r.id as string);
+      const e = os.records.get<{ startAt: number; endAt?: number; allDay?: boolean; location?: string; kind?: string }>(r.id as string);
       if (!e) continue;
       const allDay = !!e.data.allDay || e.data.startAt < a;
       out.push({ id: e.id, at: allDay ? a : e.data.startAt, allDay, kind: 'event', title: e.title, sub: e.data.location ?? null, entityId: e.id, type: 'event', done: !allDay && (e.data.endAt ?? e.data.startAt + 3_600_000) < now, late: false });
     }
   }
   if (has('task')) {
-    for (const t of os.entities.query<{ dueDate?: string; completedAt?: number }>('task', { filter: { and: [{ field: 'data.dueDate', op: 'lte', value: today }] } }, { limit: 200 })) {
+    for (const t of os.records.query<{ dueDate?: string; completedAt?: number }>('task', { filter: { and: [{ field: 'data.dueDate', op: 'lte', value: today }] } }, { limit: 200 })) {
       const done = t.status === 'done';
       if (done && !(t.data.completedAt && t.data.completedAt >= a)) continue; // done earlier: not today's
       if (t.status === 'done' || t.data.dueDate === today || (t.data.dueDate ?? '') < today)
@@ -63,18 +63,18 @@ export function myDay(os: LifeOSContext, now = Date.now(), u: Upkeep = upkeep(os
     out.push({ id: `cycle:${i.cycle.id}`, at: a, allDay: true, kind: 'due', title: i.cycle.name.trim().toLowerCase() === i.entity.title.trim().toLowerCase() ? i.entity.title : `${i.cycle.name} · ${i.entity.title}`, sub: d < 0 ? `${-d} d late` : 'due today', entityId: i.entity.id, type: i.entity.type, done: false, late: d < 0 });
   }
   if (has('delivery')) {
-    for (const d of os.entities.query<{ status: string; expectedDate?: string; otp?: string }>('delivery', { filter: { and: [{ field: 'data.status', op: 'in', value: ['shipped', 'out_for_delivery'] }] } }, { limit: 50 })) {
+    for (const d of os.records.query<{ status: string; expectedDate?: string; otp?: string }>('delivery', { filter: { and: [{ field: 'data.status', op: 'in', value: ['shipped', 'out_for_delivery'] }] } }, { limit: 50 })) {
       if (d.data.status !== 'out_for_delivery' && d.data.expectedDate !== today) continue;
       out.push({ id: d.id, at: a, allDay: true, kind: 'delivery', title: d.title, sub: [d.data.status === 'out_for_delivery' ? 'out for delivery' : 'arriving today', d.data.otp ? `OTP ${d.data.otp}` : null].filter(Boolean).join(' · '), entityId: d.id, type: 'delivery', done: false, late: false });
     }
   }
   if (has('subscription')) {
-    for (const s of os.entities.query<{ nextBillingAt?: string; amount?: number }>('subscription', { filter: { and: [{ field: 'data.nextBillingAt', op: 'eq', value: today }] } }, { limit: 50 }))
+    for (const s of os.records.query<{ nextBillingAt?: string; amount?: number }>('subscription', { filter: { and: [{ field: 'data.nextBillingAt', op: 'eq', value: today }] } }, { limit: 50 }))
       out.push({ id: s.id, at: a, allDay: true, kind: 'bill', title: `${s.title} renews`, sub: s.data.amount ? os.format.currency(s.data.amount) : null, entityId: s.id, type: 'subscription', done: false, late: false });
   }
   for (const r of os.reminders.upcoming(50, b)) {
     if (r.dueAt < a) continue;
-    out.push({ id: `rem:${r.id}`, at: r.dueAt, allDay: false, kind: 'reminder', title: r.title, sub: null, entityId: r.entityId ?? null, type: r.entityId ? (os.entities.get(r.entityId)?.type ?? null) : null, done: r.dueAt < now, late: false });
+    out.push({ id: `rem:${r.id}`, at: r.dueAt, allDay: false, kind: 'reminder', title: r.title, sub: null, entityId: r.entityId ?? null, type: r.entityId ? (os.records.get(r.entityId)?.type ?? null) : null, done: r.dueAt < now, late: false });
   }
   const rank = (x: DayItem) => (x.allDay ? 0 : 1);
   return out.sort((x, y) => rank(x) - rank(y) || x.at - y.at || Number(y.late) - Number(x.late));
@@ -101,7 +101,7 @@ export interface DoneToday {
 export function doneToday(os: LifeOSContext, now = Date.now()): DoneToday {
   const a = startOf(now);
   const today = isoDay(now);
-  const has = (t: string) => os.registry.entityTypes.has(t);
+  const has = (t: string) => os.registry.objects.has(t);
   const money = has('transaction')
     ? os.db.all<{ kind: string; total: number; n: number }>(`SELECT json_extract(data,'$.kind') AS kind, SUM(json_extract(data,'$.amount')) AS total, COUNT(*) AS n FROM entities WHERE type='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date')=? GROUP BY kind`, [today])
     : [];
@@ -205,7 +205,7 @@ export interface Progress {
 export function progress(os: LifeOSContext, now = Date.now()): Progress[] {
   const g = Object.fromEntries(goals(os, now).map((x) => [x.id, x])) as Record<GoalId, Goal>;
   const today = isoDay(now);
-  const has = (t: string) => os.registry.entityTypes.has(t);
+  const has = (t: string) => os.registry.objects.has(t);
   const week = (id: MetricId) => {
     const m = daily(os, id, isoDay(now - 6 * DAY), today);
     return Array.from({ length: 7 }, (_, i) => m.get(isoDay(now - (6 - i) * DAY)) ?? null);
@@ -224,7 +224,7 @@ export function progress(os: LifeOSContext, now = Date.now()): Progress[] {
   const screenToday = daily(os, 'screen', today, today).get(today) ?? null;
   if (screenToday != null) metric('screen', 'h', screenToday);
   if (has('habit')) {
-    const active = os.entities.query<{ frequency?: string }>('habit', { filter: { and: [{ field: 'status', op: 'neq', value: 'paused' }] } }, { limit: 100 });
+    const active = os.records.query<{ frequency?: string }>('habit', { filter: { and: [{ field: 'status', op: 'neq', value: 'paused' }] } }, { limit: 100 });
     const dow = new Date(now).getDay();
     const due = active.filter((h) => h.data.frequency !== 'weekdays' || (dow > 0 && dow < 6)).filter((h) => h.data.frequency !== 'weekly');
     if (due.length) {

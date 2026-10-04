@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 
 /**
  * Places and organisations as nodes of the life graph (docs/GRAPH.md): so a
@@ -8,7 +8,7 @@ import type { EntityTypeDef } from '@core/domain/types';
  */
 
 export interface PlaceData { kind: string; city?: string; country?: string; address?: string; notes?: string }
-export const placeType: EntityTypeDef<PlaceData> = {
+export const placeType: ObjectDef<PlaceData> = {
   type: 'place', module: 'places', label: 'Place', labelPlural: 'Places', icon: 'location', color: 'teal',
   schema: z.object({ kind: z.string().default('other'), city: z.string().optional(), country: z.string().optional(), address: z.string().optional(), notes: z.string().optional() }),
   fields: [
@@ -21,7 +21,7 @@ export const placeType: EntityTypeDef<PlaceData> = {
 };
 
 export interface OrgData { kind: string; website?: string; notes?: string; /** UPI IDs this payee has paid or been paid from. */ upi?: string }
-export const orgType: EntityTypeDef<OrgData> = {
+export const orgType: ObjectDef<OrgData> = {
   type: 'org', module: 'places', label: 'Organisation', labelPlural: 'Organisations', icon: 'briefcase', color: 'indigo',
   schema: z.object({ kind: z.string().default('other'), website: z.string().optional(), notes: z.string().optional(), upi: z.string().optional() }),
   fields: [
@@ -30,5 +30,5 @@ export const orgType: EntityTypeDef<OrgData> = {
     { key: 'upi', label: 'UPI ID', type: 'text', section: 'Details' },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
-  relations: [{ kind: 'payee', label: 'Payments', to: 'transaction', cardinality: 'many' }],
+  links: [{ kind: 'payee', label: 'Payments', to: 'transaction', cardinality: 'many' }],
 };

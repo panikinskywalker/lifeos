@@ -37,7 +37,7 @@ export interface ExtractResult {
 export function filingPrompt(os: LifeOSContext, subject?: { type: string; title: string } | null, now = new Date()): string {
   const keep = ['person', 'place', 'org', 'trip', 'event', 'task', 'vehicle', 'asset', 'subscription', 'document', 'routine', 'note', 'project', 'account'];
   const types = keep
-    .map((t) => os.registry.entityTypes.get(t))
+    .map((t) => os.registry.objects.get(t))
     .filter((d): d is NonNullable<typeof d> => !!d)
     .map((d) => `${d.type}: ${d.fields.filter((f) => f.type !== 'relation' && f.key !== 'notes').slice(0, 7).map((f) => f.key).join(', ')}`)
     .join('\n');
@@ -113,8 +113,8 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
     if (dump.error !== NO_PROVIDER || dump.retryAt) os.dumps.setStatus(dumpId, 'pending', NO_PROVIDER);
     return { status: 'pending', via: parsedItems ? 'parser' : 'none', items: parsedItems };
   }
-  const subject = dump.subjectId ? os.entities.get(dump.subjectId) : undefined;
-  const system = filingPrompt(os, subject ? { type: os.registry.entityTypes.get(subject.type)?.label.toLowerCase() ?? subject.type, title: subject.title } : null);
+  const subject = dump.subjectId ? os.records.get(dump.subjectId) : undefined;
+  const system = filingPrompt(os, subject ? { type: os.registry.objects.get(subject.type)?.label.toLowerCase() ?? subject.type, title: subject.title } : null);
   const tools = graphTools(session);
   const byName = new Map(tools.map((t) => [t.name, t]));
   const specs = tools.map(toolSpec);
@@ -225,8 +225,8 @@ async function runLogged(os: LifeOSContext, dump: Dump, name: string, input: Rec
   if (name === 'split_transaction' || name === 'settle_debt') return out; // the money itself was logged by create_entity
   const created = name.startsWith('create_');
   const entityId = ((created ? out.id : (input.entityId ?? (input.cycleId ? os.cycles.get(String(input.cycleId))?.entityId : undefined))) as string | undefined) ?? null;
-  const type = entityId ? os.entities.get(entityId)?.type : undefined;
-  const label = String(out.logged ?? out.done ?? out.remembered ?? (out.title ? `${os.registry.entityTypes.get(String(input.type ?? type))?.label ?? 'Record'}: ${out.title}` : null) ?? input.title ?? name.replace(/_/g, ' '));
+  const type = entityId ? os.records.get(entityId)?.type : undefined;
+  const label = String(out.logged ?? out.done ?? out.remembered ?? (out.title ? `${os.registry.objects.get(String(input.type ?? type))?.label ?? 'Record'}: ${out.title}` : null) ?? input.title ?? name.replace(/_/g, ' '));
   const row = os.dumps.addExtraction({ dumpId: dump.id, kind: name === 'remember_fact' ? 'fact' : (type ?? name.replace(/^create_/, '')), action: created ? 'created' : 'logged', entityId, factId: (out.factId as string) ?? null, label });
   const undo = extrasOf(out).undo;
   if (undo) exactUndo.set(row.id, undo);

@@ -5,6 +5,6 @@ export * from './types';
 
 export const assetsModule: ModuleManifest = {
   id: 'assets', name: 'Assets', version: '1.0.0', description: 'Things you own — electronics, furniture, vehicles — with warranties, value and linked expenses.', icon: 'cube.box', color: ASSETS_COLOR,
-  dependencies: ['crm'], entityTypes: [assetType, vehicleType, routineType],
+  dependencies: ['crm'], objects: [assetType, vehicleType, routineType],
   aiTools: assetsAiTools,
 };

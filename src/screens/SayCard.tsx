@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { DumpSource } from '@core/repo/dumpRepo';
 import { useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -13,7 +13,7 @@ import { listen } from '../platform/voice';
  * say here is kept word for word and filed into this record — fields where
  * they fit, tidy Notes lines otherwise, links to whatever else you mention.
  */
-export function SayCard({ entity }: { entity: Entity }) {
+export function SayCard({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const t = useTheme();
   const toast = useToast();

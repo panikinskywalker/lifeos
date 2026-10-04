@@ -5,16 +5,16 @@ import { daysUntil, inDays, isoOf, type ModuleOverview, type OverviewBlock } fro
 export function travelOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
   const money = os.format.currency;
   const today = isoOf(now);
-  const trips = os.entities.query<{ destination: string; startDate?: string; endDate?: string; budget?: number }>('trip', { sort: [{ field: 'data.startDate', dir: 'asc' }] }, { limit: 500 });
+  const trips = os.records.query<{ destination: string; startDate?: string; endDate?: string; budget?: number }>('trip', { sort: [{ field: 'data.startDate', dir: 'asc' }] }, { limit: 500 });
   const upcoming = trips.filter((t) => t.data.startDate && (t.data.endDate ?? t.data.startDate) >= today);
   const year = today.slice(0, 4);
   const thisYear = trips.filter((t) => t.data.startDate?.startsWith(year));
   // What a trip cost: payments linked to it.
   const spent = (id: string) =>
-    os.relations
+    os.links
       .forEntity(id, 'part_of')
       .filter((r) => r.direction === 'in' && r.other.type === 'transaction')
-      .reduce((n, r) => n + (os.entities.get<{ amount?: number; kind?: string }>(r.other.id)?.data.amount ?? 0), 0);
+      .reduce((n, r) => n + (os.records.get<{ amount?: number; kind?: string }>(r.other.id)?.data.amount ?? 0), 0);
   const blocks: OverviewBlock[] = [
     { kind: 'stats', items: [{ label: 'Next trip', value: upcoming[0] ? upcoming[0].data.destination : '—', sub: upcoming[0]?.data.startDate ? inDays(daysUntil(upcoming[0].data.startDate, now)) : null }, { label: `Trips in ${year}`, value: String(thisYear.length) }, { label: `Spent in ${year}`, value: money(thisYear.reduce((n, t) => n + spent(t.id), 0)) }] },
     { kind: 'list', title: 'Coming up', items: upcoming.slice(0, 6).map((t) => ({ title: t.title, sub: `${t.data.startDate!.slice(8)}/${t.data.startDate!.slice(5, 7)}${t.data.endDate ? ` – ${t.data.endDate.slice(8)}/${t.data.endDate.slice(5, 7)}` : ''}`, value: inDays(daysUntil(t.data.startDate!, now)), entityId: t.id, type: 'trip' })), empty: 'No trips planned. Tickets from Gmail and dumps add them.' },

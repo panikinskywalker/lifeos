@@ -13,9 +13,9 @@ const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 
 /** A record, compactly: title, type, key data, cycles, recent timeline, links. */
 function describeRecord(os: LifeOSContext, id: string): string | null {
-  const e = os.entities.get(id);
+  const e = os.records.get(id);
   if (!e) return null;
-  const def = os.registry.entityTypes.get(e.type);
+  const def = os.registry.objects.get(e.type);
   const data = Object.entries(e.data as Record<string, unknown>)
     .filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && !v.length) && typeof v !== 'object')
     .slice(0, 10)
@@ -25,7 +25,7 @@ function describeRecord(os: LifeOSContext, id: string): string | null {
     const s = os.cycles.status(c);
     return `${c.name} (cycleId ${c.id}) ${s.state}${s.daysLeft != null ? `, ${s.daysLeft < 0 ? `${-s.daysLeft} d late` : `in ${s.daysLeft} d`}` : ''}${s.meterLeft != null ? `, ${Math.round(s.meterLeft)} km left` : ''}`;
   });
-  const timeline = os.entities.timeline.forEntity(e.id, 5).map((t) => `${iso(t.occurredAt)} ${t.title}${t.body ? ` — ${t.body.slice(0, 60)}` : ''}`);
+  const timeline = os.records.timeline.forEntity(e.id, 5).map((t) => `${iso(t.occurredAt)} ${t.title}${t.body ? ` — ${t.body.slice(0, 60)}` : ''}`);
   const rels = describeNeighbours(os, e.id, 10);
   const facts = os.facts.list({ subjectId: e.id, limit: 5 }).map((f) => f.text);
   return [
@@ -47,16 +47,16 @@ export function buildContext(os: LifeOSContext, userText: string, opts: Retrieva
   const budget = opts.budget ?? 6000;
   const sections: Array<[string, string[]]> = [];
   const facts = os.facts.search(userText, 8);
-  if (facts.length) sections.push(['Things the user told you before', facts.map((f) => `• ${f.text}${f.subjectId ? ` (about ${os.entities.get(f.subjectId)?.title ?? '?'})` : ''} [factId ${f.id}, ${iso(f.statedAt)}]`)]);
+  if (facts.length) sections.push(['Things the user told you before', facts.map((f) => `• ${f.text}${f.subjectId ? ` (about ${os.records.get(f.subjectId)?.title ?? '?'})` : ''} [factId ${f.id}, ${iso(f.statedAt)}]`)]);
   const about = resolveCandidates(os, userText).filter((c) => c.score >= 0.8).slice(0, 3);
   const detailed = about.map((c) => describeRecord(os, c.id)).filter((x): x is string => !!x);
   if (detailed.length) sections.push(['Records this message is probably about', detailed]);
   const shown = new Set(about.map((c) => c.id));
-  const all = os.entities.search.search(userText.split(/\s+/).filter((w) => w.length > 2).slice(0, 6).join(' '), { limit: 12 });
+  const all = os.records.search.search(userText.split(/\s+/).filter((w) => w.length > 2).slice(0, 6).join(' '), { limit: 12 });
   const dumps = all.filter((h) => h.type === 'dump').slice(0, 4).map((h) => os.dumps.get(h.id)).filter((d): d is NonNullable<typeof d> => !!d);
   if (dumps.length) sections.push(['From the user’s brain dumps (verbatim)', dumps.map((d) => `• ${iso(d.createdAt)}: “${d.body.replace(/\s+/g, ' ').slice(0, 400)}”`)]);
   const hits = all.filter((h) => h.type !== 'fact' && h.type !== 'dump' && !shown.has(h.id)).slice(0, 8);
-  if (hits.length) sections.push(['Other matching records', hits.map((h) => `• ${h.title} [${os.registry.entityTypes.get(h.type)?.label ?? h.type}, id ${h.id}]${h.subtitle ? ` — ${h.subtitle}` : ''}`)]);
+  if (hits.length) sections.push(['Other matching records', hits.map((h) => `• ${h.title} [${os.registry.objects.get(h.type)?.label ?? h.type}, id ${h.id}]${h.subtitle ? ` — ${h.subtitle}` : ''}`)]);
   let out = '';
   for (const [title, lines] of sections) {
     const head = `\n## ${title}\n`;

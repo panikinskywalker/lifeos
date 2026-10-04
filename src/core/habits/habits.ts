@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '../registry/context';
-import type { Entity } from '../domain/types';
+import type { ObjectRecord } from '../domain/types';
 
 /**
  * Habits (M5): check-ins, streaks that respect how often a habit is meant to
@@ -23,10 +23,10 @@ export const isoOf = (t: number | Date) => {
 const noon = (iso: string) => new Date(`${iso}T12:00:00`).getTime();
 
 export function activeHabits(os: LifeOSContext): Habit[] {
-  if (!os.registry.entityTypes.has('habit')) return [];
-  return os.entities
+  if (!os.registry.objects.has('habit')) return [];
+  return os.records
     .query<{ frequency?: Habit['frequency']; targetPerWeek?: number }>('habit', { filter: { and: [{ field: 'status', op: 'neq', value: 'paused' }] } }, { limit: 200 })
-    .map((h: Entity<{ frequency?: Habit['frequency']; targetPerWeek?: number }>) => {
+    .map((h: ObjectRecord<{ frequency?: Habit['frequency']; targetPerWeek?: number }>) => {
       const frequency = h.data.frequency ?? 'daily';
       return { id: h.id, title: h.title, frequency, perWeek: h.data.targetPerWeek ?? (frequency === 'weekdays' ? 5 : frequency === 'weekly' ? 1 : 7) };
     });
@@ -41,7 +41,7 @@ export function dueOn(h: Habit, iso: string): boolean {
 /** Days it was done since `fromIso`. */
 export function doneDays(os: LifeOSContext, habitId: string, fromIso: string): Set<string> {
   return new Set(
-    os.entities
+    os.records
       .query<{ habitId: string; date: string }>('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: habitId }, { field: 'data.date', op: 'gte', value: fromIso }] } }, { limit: 2000 })
       .map((l) => l.data.date),
   );
@@ -90,19 +90,19 @@ export function streakOf(h: Habit, done: Set<string>, now = Date.now()): { count
 
 /** Tick a habit for a day (idempotent). Returns the check-in's id, or null if it was already done. */
 export function checkIn(os: LifeOSContext, habitId: string, date: string): string | null {
-  const existing = os.entities.query('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: habitId }, { field: 'data.date', op: 'eq', value: date }] } }, { limit: 1 })[0];
+  const existing = os.records.query('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: habitId }, { field: 'data.date', op: 'eq', value: date }] } }, { limit: 1 })[0];
   if (existing) return null;
-  return os.entities.create({ type: 'habit_log', data: { habitId, date } }, 'user').id;
+  return os.records.create({ type: 'habit_log', data: { habitId, date } }, 'user').id;
 }
 
 /** Tap: done ↔ not done for a day. Returns whether it's done now. */
 export function toggleCheckIn(os: LifeOSContext, habitId: string, date: string): boolean {
-  const existing = os.entities.query('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: habitId }, { field: 'data.date', op: 'eq', value: date }] } }, { limit: 1 })[0];
+  const existing = os.records.query('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: habitId }, { field: 'data.date', op: 'eq', value: date }] } }, { limit: 1 })[0];
   if (existing) {
-    os.entities.delete(existing.id, 'user');
+    os.records.delete(existing.id, 'user');
     return false;
   }
-  os.entities.create({ type: 'habit_log', data: { habitId, date } }, 'user');
+  os.records.create({ type: 'habit_log', data: { habitId, date } }, 'user');
   return true;
 }
 

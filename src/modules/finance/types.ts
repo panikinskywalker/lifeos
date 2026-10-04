@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EntityTypeDef, FieldOption } from '@core/domain/types';
+import type { ObjectDef, FieldOption } from '@core/domain/types';
 import { dateField, nextAnnual, periodFromRRule } from '@core/cycles/schedule';
 
 export const FINANCE_COLOR = 'green';
@@ -39,7 +39,7 @@ export interface AccountData {
   color?: string;
 }
 
-export const accountType: EntityTypeDef<AccountData> = {
+export const accountType: ObjectDef<AccountData> = {
   type: 'account',
   module: 'finance',
   label: 'Account',
@@ -67,7 +67,7 @@ export const accountType: EntityTypeDef<AccountData> = {
     { key: 'includeInNetWorth', label: 'Include in net worth', type: 'boolean', defaultValue: true, section: 'Details' },
   ],
   indexed: ['kind'],
-  relations: [{ kind: 'account', label: 'Transactions', to: 'transaction', cardinality: 'many' }],
+  links: [{ kind: 'account', label: 'Transactions', to: 'transaction', cardinality: 'many' }],
 };
 
 export interface TransactionData {
@@ -88,7 +88,7 @@ export interface TransactionData {
   projectId?: string;
 }
 
-export const transactionType: EntityTypeDef<TransactionData> = {
+export const transactionType: ObjectDef<TransactionData> = {
   type: 'transaction',
   module: 'finance',
   label: 'Transaction',
@@ -134,7 +134,7 @@ export const transactionType: EntityTypeDef<TransactionData> = {
   computeTitle: (d) => d.merchant?.trim() || categoryOf(d.category).label,
   computeSubtitle: (d) => (d.merchant ? categoryOf(d.category).label : undefined),
   searchText: (d) => [d.note, d.category, d.kind].filter(Boolean).join(' '),
-  relations: [
+  links: [
     { kind: 'account', label: 'Account', to: 'account', cardinality: 'one' },
     { kind: 'trip', label: 'Trip', to: 'trip', cardinality: 'one' },
     { kind: 'person', label: 'People', to: 'person', cardinality: 'many' },
@@ -156,7 +156,7 @@ export interface BudgetData {
   rollover?: boolean;
 }
 
-export const budgetType: EntityTypeDef<BudgetData> = {
+export const budgetType: ObjectDef<BudgetData> = {
   type: 'budget',
   module: 'finance',
   label: 'Budget',
@@ -184,7 +184,7 @@ export interface SubscriptionData {
   currency?: string;
 }
 
-export const subscriptionType: EntityTypeDef<SubscriptionData> = {
+export const subscriptionType: ObjectDef<SubscriptionData> = {
   type: 'subscription',
   module: 'finance',
   label: 'Subscription',
@@ -224,11 +224,11 @@ export const subscriptionType: EntityTypeDef<SubscriptionData> = {
     return [{ template: 'subscription.renewal', name: 'Renewal', kind: 'fixed', ...p, nextDueAt: dateField(d.nextBillingAt), leadDays: 3, costEstimate: d.amount ?? null, currency: d.currency ?? null }];
   },
   computeSubtitle: (d, { formatCurrency }) => `${formatCurrency(d.amount)} · next ${d.nextBillingAt}`,
-  relations: [{ kind: 'account', label: 'Account', to: 'account', cardinality: 'one' }],
+  links: [{ kind: 'account', label: 'Account', to: 'account', cardinality: 'one' }],
 };
 
 /** Debt (PRODUCT §4): money between me and a person — from a split, a loan, or a payment that settles. */
-export const debtType: EntityTypeDef<{ personId: string; direction: 'they_owe' | 'i_owe'; amount: number; reason?: string; date: string; kind: 'split' | 'loan' | 'payment'; transactionId?: string; groupId?: string; currency?: string }> = {
+export const debtType: ObjectDef<{ personId: string; direction: 'they_owe' | 'i_owe'; amount: number; reason?: string; date: string; kind: 'split' | 'loan' | 'payment'; transactionId?: string; groupId?: string; currency?: string }> = {
   type: 'debt',
   module: 'finance',
   label: 'Debt',

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ModuleManifest, TriggerDef, ActionDef, AiToolDef } from './registry/types';
 import type { CoreEvents } from './events/bus';
-import type { Entity, FilterGroup, SortSpec } from './domain/types';
+import type { ObjectRecord, FilterGroup, SortSpec } from './domain/types';
 import type { LifeOSContext } from './registry/context';
 import { lifeTools, recordCard, touchesMoneyOrPeople } from './ai/lifeTools';
 import { withExtras } from './ai/cards';
@@ -66,7 +66,7 @@ const actions: ActionDef[] = [
     id: 'core.setStatus', module: 'core', label: 'Set status', configFields: [{ key: 'status', label: 'Status', type: 'text', required: true }],
     run: async (cfg, ctx, os) => {
       if (!ctx.entity) return 'no entity';
-      os.entities.setStatus(ctx.entity.id, String(cfg.status), 'automation');
+      os.records.setStatus(ctx.entity.id, String(cfg.status), 'automation');
       return `status=${cfg.status}`;
     },
   },
@@ -128,21 +128,21 @@ const actions: ActionDef[] = [
       let data: Record<string, unknown> = {};
       if (typeof cfg.data === 'string' && cfg.data.trim()) data = JSON.parse(cfg.data);
       else if (cfg.data && typeof cfg.data === 'object') data = cfg.data as Record<string, unknown>;
-      const e = os.entities.create({ type: String(cfg.entityType), title: cfg.title ? String(cfg.title) : undefined, data }, 'automation');
-      if (ctx.entity && cfg.linkKind) os.relations.link(e.id, ctx.entity.id, String(cfg.linkKind), {}, 'automation');
+      const e = os.records.create({ type: String(cfg.entityType), title: cfg.title ? String(cfg.title) : undefined, data }, 'automation');
+      if (ctx.entity && cfg.linkKind) os.links.link(e.id, ctx.entity.id, String(cfg.linkKind), {}, 'automation');
       return e.title;
     },
   },
   {
     id: 'core.star', module: 'core', label: 'Star record',
     run: async (_cfg, ctx, os) => {
-      if (ctx.entity) os.entities.update(ctx.entity.id, { starred: true }, 'automation');
+      if (ctx.entity) os.records.update(ctx.entity.id, { starred: true }, 'automation');
     },
   },
   {
     id: 'core.archive', module: 'core', label: 'Archive record',
     run: async (_cfg, ctx, os) => {
-      if (ctx.entity) os.entities.update(ctx.entity.id, { archived: true }, 'automation');
+      if (ctx.entity) os.records.update(ctx.entity.id, { archived: true }, 'automation');
     },
   },
 ];
@@ -164,9 +164,9 @@ const clauseSchema = z.object({
 });
 const sortSchema: z.ZodType<SortSpec> = z.object({ field: z.string(), dir: z.enum(['asc', 'desc']) });
 
-function slim(e: Entity, os: LifeOSContext) {
+function slim(e: ObjectRecord, os: LifeOSContext) {
   const tags = os.tags.forEntity(e.id).map((t) => t.name);
-  const rels = os.relations.forEntity(e.id).slice(0, 12).map((r) => ({ kind: r.relation.kind, direction: r.direction, id: r.other.id, type: r.other.type, title: r.other.title }));
+  const rels = os.links.forEntity(e.id).slice(0, 12).map((r) => ({ kind: r.relation.kind, direction: r.direction, id: r.other.id, type: r.other.type, title: r.other.title }));
   return { id: e.id, type: e.type, title: e.title, subtitle: e.subtitle, status: e.status, starred: e.starred, occurredAt: e.occurredAt ? new Date(e.occurredAt).toISOString() : null, data: e.data, tags, relations: rels, updatedAt: new Date(e.updatedAt).toISOString() };
 }
 
@@ -180,9 +180,9 @@ const aiTools: AiToolDef[] = [
     input: z.object({ module: z.string().optional() }),
     run: async (input, os) => {
       const { module } = input as { module?: string };
-      return [...os.registry.entityTypes.values()]
+      return [...os.registry.objects.values()]
         .filter((t) => !module || t.module === module)
-        .map((t) => ({ type: t.type, module: t.module, label: t.label, fields: t.fields.map((f) => ({ key: f.key, type: f.type, label: f.label, options: f.options?.map((o) => o.value), relationTo: f.relationTo, relationKind: f.relationKind })), statuses: t.statuses?.map((s) => s.value), relations: t.relations, count: os.entities.count(t.type) }));
+        .map((t) => ({ type: t.type, module: t.module, label: t.label, fields: t.fields.map((f) => ({ key: f.key, type: f.type, label: f.label, options: f.options?.map((o) => o.value), relationTo: f.relationTo, relationKind: f.relationKind })), statuses: t.statuses?.map((s) => s.value), relations: t.links, count: os.records.count(t.type) }));
     },
   },
   {
@@ -191,7 +191,7 @@ const aiTools: AiToolDef[] = [
     input: z.object({ query: z.string(), types: z.array(z.string()).optional(), limit: z.number().optional() }),
     run: async (input, os) => {
       const i = input as { query: string; types?: string[]; limit?: number };
-      return os.entities.search.search(i.query, { types: i.types, limit: i.limit ?? 20 });
+      return os.records.search.search(i.query, { types: i.types, limit: i.limit ?? 20 });
     },
   },
   {
@@ -200,7 +200,7 @@ const aiTools: AiToolDef[] = [
     input: z.object({ type: z.string(), filter: filterSchema.optional(), sort: z.array(sortSchema).optional(), limit: z.number().max(100).optional(), includeArchived: z.boolean().optional() }),
     run: async (input, os) => {
       const i = input as { type: string; filter?: FilterGroup; sort?: SortSpec[]; limit?: number; includeArchived?: boolean };
-      return os.entities.query(i.type, { filter: i.filter, sort: i.sort, includeArchived: i.includeArchived }, { limit: i.limit ?? 25 }).map((e) => slim(e, os));
+      return os.records.query(i.type, { filter: i.filter, sort: i.sort, includeArchived: i.includeArchived }, { limit: i.limit ?? 25 }).map((e) => slim(e, os));
     },
   },
   {
@@ -209,9 +209,9 @@ const aiTools: AiToolDef[] = [
     input: z.object({ type: z.string(), filter: filterSchema.optional(), sum: z.array(z.string()).optional(), avg: z.array(z.string()).optional(), groupBy: z.string().optional(), bucket: z.enum(['day', 'week', 'month']).optional(), timeField: z.string().optional() }),
     run: async (input, os) => {
       const i = input as { type: string; filter?: FilterGroup; sum?: string[]; avg?: string[]; groupBy?: string; bucket?: 'day' | 'week' | 'month'; timeField?: string };
-      if (i.bucket) return os.entities.series(i.type, { filter: i.filter }, i.bucket, i.sum?.[0], i.timeField ?? 'occurredAt');
-      if (i.groupBy) return os.entities.groupBy(i.type, { filter: i.filter }, i.groupBy, { sum: i.sum, avg: i.avg, count: true });
-      return os.entities.aggregate(i.type, { filter: i.filter }, { sum: i.sum, avg: i.avg, count: true });
+      if (i.bucket) return os.records.series(i.type, { filter: i.filter }, i.bucket, i.sum?.[0], i.timeField ?? 'occurredAt');
+      if (i.groupBy) return os.records.groupBy(i.type, { filter: i.filter }, i.groupBy, { sum: i.sum, avg: i.avg, count: true });
+      return os.records.aggregate(i.type, { filter: i.filter }, { sum: i.sum, avg: i.avg, count: true });
     },
   },
   {
@@ -219,9 +219,9 @@ const aiTools: AiToolDef[] = [
     description: 'Fetch one record by id including tags, relations, recent timeline, comments and reminders.',
     input: z.object({ id: z.string() }),
     run: async (input, os) => {
-      const e = os.entities.get((input as { id: string }).id);
+      const e = os.records.get((input as { id: string }).id);
       if (!e) return { error: 'not found' };
-      return { ...slim(e, os), timeline: os.entities.timeline.forEntity(e.id, 15).map((t) => ({ at: new Date(t.occurredAt).toISOString(), kind: t.kind, title: t.title, body: t.body })), comments: os.comments.forEntity(e.id).map((c) => ({ at: new Date(c.createdAt).toISOString(), author: c.author, body: c.body })), reminders: os.reminders.forEntity(e.id).map((r) => ({ id: r.id, title: r.title, nextAt: r.nextAt ? new Date(r.nextAt).toISOString() : null, done: !!r.doneAt })) };
+      return { ...slim(e, os), timeline: os.records.timeline.forEntity(e.id, 15).map((t) => ({ at: new Date(t.occurredAt).toISOString(), kind: t.kind, title: t.title, body: t.body })), comments: os.comments.forEntity(e.id).map((c) => ({ at: new Date(c.createdAt).toISOString(), author: c.author, body: c.body })), reminders: os.reminders.forEntity(e.id).map((r) => ({ id: r.id, title: r.title, nextAt: r.nextAt ? new Date(r.nextAt).toISOString() : null, done: !!r.doneAt })) };
     },
   },
   {
@@ -230,37 +230,37 @@ const aiTools: AiToolDef[] = [
     input: z.object({ type: z.string(), title: z.string().optional(), data: z.record(z.string(), z.unknown()), status: z.string().optional(), tags: z.array(z.string()).optional(), links: z.array(z.object({ toId: z.string(), kind: z.string() })).optional() }),
     confirm: (i: { type: string }, os) => touchesMoneyOrPeople(os, i.type),
     describe: (i: { type: string; title?: string; data: Record<string, unknown> }, os) => {
-      const label = os.registry.entityTypes.get(i.type)?.label ?? i.type;
+      const label = os.registry.objects.get(i.type)?.label ?? i.type;
       const amt = typeof i.data?.amount === 'number' ? ` · ${os.format.currency(i.data.amount as number)}` : '';
       return `Add ${label.toLowerCase()}: ${i.title ?? (i.data?.merchant as string) ?? (i.data?.name as string) ?? ''}${amt}`.trim();
     },
     run: async (input, os) => {
       const i = input as { type: string; title?: string; data: Record<string, unknown>; status?: string; tags?: string[]; links?: Array<{ toId: string; kind: string }> };
-      const def = os.registry.entityTypes.get(i.type);
+      const def = os.registry.objects.get(i.type);
       if (!def) return { error: `unknown record type ${i.type}` };
-      const e = os.entities.create({ type: i.type, title: i.title, data: fillDefaults(def, i.data ?? {}, i.title), status: i.status }, 'assistant');
+      const e = os.records.create({ type: i.type, title: i.title, data: fillDefaults(def, i.data ?? {}, i.title), status: i.status }, 'assistant');
       for (const t of i.tags ?? []) os.tags.apply(e.id, t, 'assistant');
-      for (const l of i.links ?? []) os.relations.link(e.id, l.toId, l.kind, {}, 'assistant');
-      const saved = os.entities.get(e.id)!;
-      return withExtras(slim(saved, os), { undo: () => os.entities.delete(e.id, 'user'), card: recordCard(os, saved) });
+      for (const l of i.links ?? []) os.links.link(e.id, l.toId, l.kind, {}, 'assistant');
+      const saved = os.records.get(e.id)!;
+      return withExtras(slim(saved, os), { undo: () => os.records.delete(e.id, 'user'), card: recordCard(os, saved) });
     },
   },
   {
     name: 'update_entity',
     description: 'Update fields, title, status, star or archive on an existing record. Only send the fields that change.',
     input: z.object({ id: z.string(), title: z.string().optional(), data: z.record(z.string(), z.unknown()).optional(), status: z.string().nullable().optional(), starred: z.boolean().optional(), archived: z.boolean().optional(), addTags: z.array(z.string()).optional() }),
-    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.entities.get(i.id)?.type),
-    describe: (i: { id: string; data?: Record<string, unknown> }, os) => `Change ${os.entities.get(i.id)?.title ?? 'record'}${i.data ? `: ${Object.entries(i.data).map(([k, v]) => `${k} → ${String(v)}`).join(', ')}` : ''}`,
+    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.records.get(i.id)?.type),
+    describe: (i: { id: string; data?: Record<string, unknown> }, os) => `Change ${os.records.get(i.id)?.title ?? 'record'}${i.data ? `: ${Object.entries(i.data).map(([k, v]) => `${k} → ${String(v)}`).join(', ')}` : ''}`,
     run: async (input, os) => {
       const i = input as { id: string; title?: string; data?: Record<string, unknown>; status?: string | null; starred?: boolean; archived?: boolean; addTags?: string[] };
-      const before = os.entities.get(i.id);
+      const before = os.records.get(i.id);
       if (!before) return { error: 'not found' };
       const hadTags = new Set(os.tags.forEntity(i.id).map((t) => t.name));
-      const e = os.entities.update(i.id, { title: i.title, data: i.data, status: i.status, starred: i.starred, archived: i.archived }, 'assistant');
+      const e = os.records.update(i.id, { title: i.title, data: i.data, status: i.status, starred: i.starred, archived: i.archived }, 'assistant');
       for (const t of i.addTags ?? []) os.tags.apply(e.id, t, 'assistant');
-      const saved = os.entities.get(e.id)!;
+      const saved = os.records.get(e.id)!;
       const undo = () => {
-        os.entities.update(before.id, { title: before.title, data: before.data as Record<string, unknown>, status: before.status, starred: before.starred, archived: before.archived }, 'user');
+        os.records.update(before.id, { title: before.title, data: before.data as Record<string, unknown>, status: before.status, starred: before.starred, archived: before.archived }, 'user');
         for (const t of os.tags.forEntity(before.id)) if (!hadTags.has(t.name)) os.tags.remove(before.id, t.id);
       };
       return withExtras(slim(saved, os), { undo, card: recordCard(os, saved) });
@@ -270,13 +270,13 @@ const aiTools: AiToolDef[] = [
     name: 'delete_entity',
     description: 'Soft-delete a record (recoverable).',
     input: z.object({ id: z.string() }),
-    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.entities.get(i.id)?.type),
-    describe: (i: { id: string }, os) => `Delete ${os.entities.get(i.id)?.title ?? 'record'} (you can restore it)`,
+    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.records.get(i.id)?.type),
+    describe: (i: { id: string }, os) => `Delete ${os.records.get(i.id)?.title ?? 'record'} (you can restore it)`,
     run: async (input, os) => {
       const id = (input as { id: string }).id;
-      const title = os.entities.get(id)?.title;
-      os.entities.delete(id, 'assistant');
-      return withExtras({ ok: true, deleted: title }, { undo: () => os.entities.restore(id) });
+      const title = os.records.get(id)?.title;
+      os.records.delete(id, 'assistant');
+      return withExtras({ ok: true, deleted: title }, { undo: () => os.records.restore(id) });
     },
   },
   {
@@ -285,8 +285,8 @@ const aiTools: AiToolDef[] = [
     input: z.object({ fromId: z.string(), toId: z.string(), kind: z.string() }),
     run: async (input, os) => {
       const i = input as { fromId: string; toId: string; kind: string };
-      const rel = os.relations.link(i.fromId, i.toId, i.kind, {}, 'assistant');
-      return withExtras({ ...rel }, { undo: () => os.relations.unlink(i.fromId, i.toId, i.kind, 'user') });
+      const rel = os.links.link(i.fromId, i.toId, i.kind, {}, 'assistant');
+      return withExtras({ ...rel }, { undo: () => os.links.unlink(i.fromId, i.toId, i.kind, 'user') });
     },
   },
   {
@@ -318,7 +318,7 @@ const aiTools: AiToolDef[] = [
     name: 'recent_activity',
     description: 'Most recent timeline events across all records — what the user has been doing.',
     input: z.object({ limit: z.number().optional() }),
-    run: async (input, os) => os.entities.timeline.recent((input as { limit?: number }).limit ?? 30).map((t) => ({ at: new Date(t.occurredAt).toISOString(), entity: t.entityTitle, type: t.entityType, entityId: t.entityId, event: t.title, body: t.body })),
+    run: async (input, os) => os.records.timeline.recent((input as { limit?: number }).limit ?? 30).map((t) => ({ at: new Date(t.occurredAt).toISOString(), entity: t.entityTitle, type: t.entityType, entityId: t.entityId, event: t.title, body: t.body })),
   },
   {
     name: 'create_automation',
@@ -338,7 +338,7 @@ export const coreModule: ModuleManifest = {
   id: 'core',
   name: 'Core',
   version: '1.0.0',
-  description: 'Entity system, relationships, timeline, reminders, tags, search, automation primitives.',
+  description: 'ObjectRecord system, relationships, timeline, reminders, tags, search, automation primitives.',
   icon: 'cube',
   color: '#8E8E93',
   triggers,

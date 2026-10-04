@@ -15,7 +15,7 @@ export const habitsModule: ModuleManifest = {
   description: 'Daily habits with streaks and a heat map.',
   icon: 'flame',
   color: HABITS_COLOR,
-  entityTypes: [habitType, habitLogType],
+  objects: [habitType, habitLogType],
   aiTools: [
     {
       name: 'habits_status',

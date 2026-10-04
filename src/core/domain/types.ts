@@ -27,9 +27,6 @@ export interface ObjectRecord<TData = Record<string, unknown>> {
   version: number;
 }
 
-/** @deprecated R0: use ObjectRecord. */
-export type Entity<TData = Record<string, unknown>> = ObjectRecord<TData>;
-
 export interface EntityRef {
   id: string;
   type: string;
@@ -70,11 +67,11 @@ export interface FieldDef {
 }
 
 /* ------------------------------------------------------------------ */
-/* Entity type definition — registered once, used everywhere           */
+/* ObjectRecord type definition — registered once, used everywhere           */
 /* ------------------------------------------------------------------ */
 
-/** An Object: the definition of a storage unit — name, Fields, cycles. (ObjectDef; `EntityTypeDef` is the old name.) */
-export interface EntityTypeDef<TData = Record<string, unknown>> {
+/** An Object: the definition of a storage unit — name, Fields, cycles. */
+export interface ObjectDef<TData = Record<string, unknown>> {
   /** Stable id, e.g. "transaction". Never rename. */
   type: string;
   /** Owning module id. */
@@ -90,8 +87,8 @@ export interface EntityTypeDef<TData = Record<string, unknown>> {
   indexed?: string[];
   /** Statuses this type supports (drives kanban/board views and filters). */
   statuses?: FieldOption[];
-  /** Named relation kinds this type participates in (for pickers/graph). */
-  relations?: RelationKindDef[];
+  /** The link words this Object takes part in (pickers, the Links screen). */
+  links?: LinkWordDef[];
   /** Which field's value maps into the envelope's occurredAt. */
   occurredAtField?: string;
   /** Derive title/subtitle from data (used when the form has no title input). */
@@ -113,9 +110,6 @@ export interface EntityTypeDef<TData = Record<string, unknown>> {
   cycleTemplates?: (data: TData) => CycleSeed[];
 }
 
-/** The vocabulary name; identical to EntityTypeDef until stage C renames the properties (`type` → `id`). */
-export type ObjectDef<TData = Record<string, unknown>> = EntityTypeDef<TData>;
-
 /** A default cycle from a type's template; `template` keeps it from being added twice. */
 export interface CycleSeed {
   template: string;
@@ -133,7 +127,7 @@ export interface CycleSeed {
   currency?: string | null;
 }
 
-export interface RelationKindDef {
+export interface LinkWordDef {
   kind: string;
   label: string;
   inverseLabel?: string;
@@ -187,8 +181,8 @@ export interface SavedViewDef {
 /* Side objects                                                        */
 /* ------------------------------------------------------------------ */
 
-/** A Link: one typed connection between two records (`Relation` is the old name). */
-export interface Relation {
+/** A Link: one typed connection between two records. */
+export interface Link {
   id: string;
   fromId: string;
   toId: string;
@@ -201,10 +195,8 @@ export interface Relation {
   confidence?: number;
 }
 
-export type Link = Relation;
-
-/** An Event: something that happened at a time, attached to a record (`TimelineEvent` is the old name). */
-export interface TimelineEvent {
+/** An Event: something that happened at a time, attached to a record. (LifeEvent in code: the DOM owns `Event`.) */
+export interface LifeEvent {
   id: string;
   entityId: string;
   kind: string; // created | updated | status | comment | attachment | relation | reminder | custom
@@ -215,8 +207,6 @@ export interface TimelineEvent {
   occurredAt: number;
   createdAt: number;
 }
-
-export type LifeEvent = TimelineEvent;
 
 export interface Attachment {
   id: string;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import { useOS } from '../hooks';
 import { RowItem, useToast } from '../kit';
 import { SwipeToDelete } from './SwipeToDelete';
@@ -11,11 +11,11 @@ import { tintForModule } from '../theme/moduleTint';
  * from summary fields, amount on the right when the type has a currency
  * field, and a status chip when the record is past its first status.
  */
-export function EntityRow({ entity, onPress, showType, value, subtitle, swipe = true }: { entity: Entity; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null; /** Swipe left to delete (with Undo). */ swipe?: boolean }) {
+export function EntityRow({ entity, onPress, showType, value, subtitle, swipe = true }: { entity: ObjectRecord; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null; /** Swipe left to delete (with Undo). */ swipe?: boolean }) {
   const os = useOS();
   const router = useRouter();
   const toast = useToast();
-  const def = os.registry.entityTypes.get(entity.type);
+  const def = os.registry.objects.get(entity.type);
   const tint = tintForModule(def?.module);
   const currencyField = def?.fields.find((f) => f.type === 'currency');
   const amount = currencyField ? (entity.data[currencyField.key] as number | undefined) : undefined;
@@ -34,7 +34,7 @@ export function EntityRow({ entity, onPress, showType, value, subtitle, swipe = 
             if (v == null || v === '') return null;
             if (f.type === 'select') return f.options?.find((o) => o.value === v)?.label ?? String(v);
             if (f.type === 'date') return os.format.date(String(v), 'short');
-            if (f.type === 'relation') return os.entities.ref(String(v))?.title ?? null;
+            if (f.type === 'relation') return os.records.ref(String(v))?.title ?? null;
             return String(v);
           })
           .filter(Boolean)
@@ -60,8 +60,8 @@ export function EntityRow({ entity, onPress, showType, value, subtitle, swipe = 
   );
   if (!swipe) return row;
   const remove = () => {
-    os.entities.delete(entity.id);
-    toast.show({ message: `Deleted ${entity.title}`, icon: 'trash', undo: () => os.entities.restore(entity.id) });
+    os.records.delete(entity.id);
+    toast.show({ message: `Deleted ${entity.title}`, icon: 'trash', undo: () => os.records.restore(entity.id) });
   };
   return <SwipeToDelete onDelete={remove}>{row}</SwipeToDelete>;
 }

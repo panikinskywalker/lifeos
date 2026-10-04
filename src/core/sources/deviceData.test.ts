@@ -10,7 +10,7 @@ import { measurementType, workoutType } from '../../modules/health/types';
 let os: LifeOSContext;
 beforeEach(async () => {
   bus.clear();
-  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'health', name: 'Health', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [measurementType, workoutType] }], registry: new Registry() });
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'health', name: 'Health', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType] }], registry: new Registry() });
 });
 afterEach(() => os.db.close());
 
@@ -28,8 +28,8 @@ describe('device data', () => {
     expect(saveHealthDays(os, [{ day: '2026-09-26', steps: 9100, sleepMin: 432, restingHr: 58.6, workouts: [{ id: 'w1', type: 56, title: 'Morning run', start: 0, minutes: 31.5 }] }])).toBe(0);
     expect(metricDays(os, 'steps', '2026-09-01', '2026-09-30')).toEqual([{ day: '2026-09-26', value: 9100 }]);
     expect(metricDays(os, 'sleep', '2026-09-01', '2026-09-30')).toEqual([{ day: '2026-09-26', value: 7.2 }]);
-    expect(os.entities.query('workout')[0]).toMatchObject({ title: 'Run', data: { kind: 'run', durationMin: 32, source: 'health_connect' } });
-    expect(os.entities.query('measurement')).toHaveLength(3);
+    expect(os.records.query('workout')[0]).toMatchObject({ title: 'Run', data: { kind: 'run', durationMin: 32, source: 'health_connect' } });
+    expect(os.records.query('measurement')).toHaveLength(3);
   });
 
   it('source state', () => {

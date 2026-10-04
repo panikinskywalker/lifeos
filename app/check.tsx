@@ -34,7 +34,7 @@ export default function ToCheckScreen() {
     else toast.show({ message: 'This one can’t be cancelled from here — open it to change it', icon: 'info' });
   };
   const edit = (x: Extraction) => {
-    const e = x.entityId ? os.entities.get(x.entityId) : undefined;
+    const e = x.entityId ? os.records.get(x.entityId) : undefined;
     if (e) router.push(`/entity/${e.type}/${e.id}${x.kind === 'link' || x.flag ? '' : '/edit'}` as never);
     else if (x.factId) router.push('/memory');
     os.dumps.setChecked(x.id);
@@ -50,7 +50,7 @@ export default function ToCheckScreen() {
             const dump = g.dumpId ? os.dumps.get(g.dumpId) : null;
             const msg = !g.dumpId && g.sourceRef ? ingestItem(os, g.sourceRef) : null;
             const when = dump?.createdAt ?? msg?.receivedAt ?? g.items[0]!.createdAt;
-            const head = dump ? `${dumpWhen(when)}${dump.subjectId ? ` · on ${os.entities.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : `${dumpWhen(when)} · ${msg ? sourceLabel(msg) : g.source}`;
+            const head = dump ? `${dumpWhen(when)}${dump.subjectId ? ` · on ${os.records.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : `${dumpWhen(when)} · ${msg ? sourceLabel(msg) : g.source}`;
             const quote = dump?.body ?? msg?.text ?? null;
             return (
               <View key={g.key} style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>

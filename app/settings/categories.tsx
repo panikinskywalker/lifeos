@@ -29,7 +29,7 @@ export default function CategoriesScreen() {
   const [showBuiltin, setShowBuiltin] = useState(false);
   const t = useTheme();
   const mine = useLive((o) => customCategories(o), []);
-  const groups = useLive((o) => (o.registry.entityTypes.has('group') ? o.entities.query('group', {}, { limit: 200 }) : []), []);
+  const groups = useLive((o) => (o.registry.objects.has('group') ? o.records.query('group', {}, { limit: 200 }) : []), []);
   const [mode, setMode] = useState<'exact' | 'range'>('exact');
   const [min, setMin] = useState<number | undefined>(undefined);
   const [max, setMax] = useState<number | undefined>(undefined);
@@ -63,18 +63,18 @@ export default function CategoriesScreen() {
   // Re-sort past spends that ended up in Other (or where a rule now says otherwise).
   const apply = () => {
     let n = 0;
-    for (const e of os.entities.query<{ merchant?: string; category?: string; kind?: string; note?: string; amount?: number }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'in', value: ['expense', 'income'] }] } }, { limit: 5000 })) {
+    for (const e of os.records.query<{ merchant?: string; category?: string; kind?: string; note?: string; amount?: number }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'in', value: ['expense', 'income'] }] } }, { limit: 5000 })) {
       // A rule decides; nothing else overrides a category you (or it) already set.
       const dir = e.data.kind === 'income' ? 'credit' : 'debit';
       let c = ruleCategory(os, e.data.merchant, e.data.note ?? '', e.data.amount ?? null, dir);
       // Range rules: only where they're sure (from the group / after the payment) — past guesses aren't worth the noise.
       if (!c && e.data.amount != null) {
-        const payerId = os.relations.forEntity(e.id).find((r) => r.relation.kind === 'person' && r.direction === 'out')?.other.id ?? null;
+        const payerId = os.links.forEntity(e.id).find((r) => r.relation.kind === 'person' && r.direction === 'out')?.other.id ?? null;
         const rr = rangeRule(os, { amount: e.data.amount, direction: dir, payerId, merchant: e.data.merchant, at: e.occurredAt ?? e.createdAt });
         if (rr?.sure) c = rr.category;
       }
       if (c && c !== e.data.category) {
-        os.entities.update(e.id, { data: { category: c } }, 'system');
+        os.records.update(e.id, { data: { category: c } }, 'system');
         n++;
       }
     }
@@ -154,7 +154,7 @@ export default function CategoriesScreen() {
           {rules.length ? (
             <RowList>
               {rules.map((r) => (
-                <RowItem key={`${r.keyword}|${ruleAmounts(r).join()}|${r.min ?? ''}-${r.max ?? ''}|${r.direction ?? ''}`} icon={r.keyword.trim() ? 'tag' : 'rupee'} tint="finance" title={ruleText(r, os.format.currency)} subtitle={r.min != null || r.max != null ? [r.fromGroupId ? `from ${os.entities.get(r.fromGroupId)?.title ?? 'a group'}` : null, r.afterKeyword ? `after a ${r.afterKeyword} payment (${r.withinHours ?? 48} h)` : null].filter(Boolean).join(' or ') || 'Always a guess to check' : r.keyword.trim() && ruleAmounts(r).length ? 'Both must match' : r.keyword.trim() ? 'Merchant or message says' : 'Exact amount'} value={label(r.category)} chevron={false} trailing={<IconButton icon="trash" size={34} accessibilityLabel={`Remove ${ruleText(r)}`} onPress={() => setCategoryRules(os, rules.filter((x) => x !== r))} />} />
+                <RowItem key={`${r.keyword}|${ruleAmounts(r).join()}|${r.min ?? ''}-${r.max ?? ''}|${r.direction ?? ''}`} icon={r.keyword.trim() ? 'tag' : 'rupee'} tint="finance" title={ruleText(r, os.format.currency)} subtitle={r.min != null || r.max != null ? [r.fromGroupId ? `from ${os.records.get(r.fromGroupId)?.title ?? 'a group'}` : null, r.afterKeyword ? `after a ${r.afterKeyword} payment (${r.withinHours ?? 48} h)` : null].filter(Boolean).join(' or ') || 'Always a guess to check' : r.keyword.trim() && ruleAmounts(r).length ? 'Both must match' : r.keyword.trim() ? 'Merchant or message says' : 'Exact amount'} value={label(r.category)} chevron={false} trailing={<IconButton icon="trash" size={34} accessibilityLabel={`Remove ${ruleText(r)}`} onPress={() => setCategoryRules(os, rules.filter((x) => x !== r))} />} />
               ))}
             </RowList>
           ) : (

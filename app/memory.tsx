@@ -25,7 +25,7 @@ export default function MemoryScreen() {
   const groups = useMemo(() => {
     const by = new Map<string, { title: string; entityId?: string; facts: Fact[] }>();
     for (const f of shown) {
-      const e = f.subjectId ? os.entities.get(f.subjectId) : null;
+      const e = f.subjectId ? os.records.get(f.subjectId) : null;
       const key = e ? e.id : f.subjectKey ?? 'general';
       const title = e ? e.title : f.subjectKey?.startsWith('name:') ? f.subjectKey.slice(5).replace(/^\w/, (c) => c.toUpperCase()) : 'About you';
       if (!by.has(key)) by.set(key, { title, entityId: e?.id, facts: [] });
@@ -46,7 +46,7 @@ export default function MemoryScreen() {
         <EmptyState icon="search" tint="memory" line={`Nothing about “${q}”.`} bare />
       ) : (
         groups.map((g) => (
-          <Section key={g.title} title={g.title} meta={`${g.facts.length}`} action={g.entityId ? 'Open' : undefined} onAction={g.entityId ? () => router.push(`/entity/${os.entities.get(g.entityId!)!.type}/${g.entityId}` as never) : undefined}>
+          <Section key={g.title} title={g.title} meta={`${g.facts.length}`} action={g.entityId ? 'Open' : undefined} onAction={g.entityId ? () => router.push(`/entity/${os.records.get(g.entityId!)!.type}/${g.entityId}` as never) : undefined}>
             <View style={{ gap: 8 }}>
               {g.facts.map((f) => (
                 <View key={f.id} style={{ backgroundColor: t.c.bg.tile, borderRadius: t.radius.card, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
@@ -68,7 +68,7 @@ export default function MemoryScreen() {
         visible={!!active}
         onClose={() => setActive(null)}
         title={active?.text}
-        actions={active ? [...(active.subjectId ? [{ label: 'Open what it’s about', icon: 'chevron-right' as const, onPress: () => { const e = os.entities.get(active.subjectId!); if (e) router.push(`/entity/${e.type}/${e.id}` as never); } }] : []), { label: 'Forget this', icon: 'trash' as const, destructive: true, onPress: () => forget(active) }] : []}
+        actions={active ? [...(active.subjectId ? [{ label: 'Open what it’s about', icon: 'chevron-right' as const, onPress: () => { const e = os.records.get(active.subjectId!); if (e) router.push(`/entity/${e.type}/${e.id}` as never); } }] : []), { label: 'Forget this', icon: 'trash' as const, destructive: true, onPress: () => forget(active) }] : []}
       />
       <AddFactSheet visible={adding} onClose={() => setAdding(false)} />
     </Screen>
@@ -92,9 +92,9 @@ function AddFactSheet({ visible, onClose }: { visible: boolean; onClose: () => v
     <Sheet visible={visible} onClose={onClose} title="Remember something" footer={<Button title="Remember" icon="check" block disabled={text.trim().length < 3} onPress={save} />}>
       <TextField label="What" value={text} onChange={setText} placeholder="Dad hates surprises" multiline />
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-        {subject ? <Chip label={`About ${os.entities.get(subject)?.title ?? ''}`} icon="x" onPress={() => setSubject(null)} /> : <Chip label="About a person or thing" icon="plus" onPress={() => setPicking(true)} />}
+        {subject ? <Chip label={`About ${os.records.get(subject)?.title ?? ''}`} icon="x" onPress={() => setSubject(null)} /> : <Chip label="About a person or thing" icon="plus" onPress={() => setPicking(true)} />}
       </View>
-      <EntityPicker visible={picking} onClose={() => setPicking(false)} types={[...os.registry.entityTypes.keys()]} title="About" onSelect={(id) => setSubject(id)} />
+      <EntityPicker visible={picking} onClose={() => setPicking(false)} types={[...os.registry.objects.keys()]} title="About" onSelect={(id) => setSubject(id)} />
     </Sheet>
   );
 }

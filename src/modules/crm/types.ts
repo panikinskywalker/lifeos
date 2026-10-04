@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 import { dateField, nextAnnual } from '@core/cycles/schedule';
 
 export const CRM_COLOR = 'pink';
@@ -21,7 +21,7 @@ export interface PersonData {
   upi?: string;
 }
 
-export const personType: EntityTypeDef<PersonData> = {
+export const personType: ObjectDef<PersonData> = {
   type: 'person',
   module: 'crm',
   label: 'Person',
@@ -48,7 +48,7 @@ export const personType: EntityTypeDef<PersonData> = {
   ],
   indexed: ['relationship'],
   searchText: (d) => [d.company, d.role, d.city, d.notes, d.email, d.phone].filter(Boolean).join(' '),
-  relations: [{ kind: 'person', label: 'Mentioned in', to: ['transaction', 'trip', 'task', 'event', 'note'], cardinality: 'many' }],
+  links: [{ kind: 'person', label: 'Mentioned in', to: ['transaction', 'trip', 'task', 'event', 'note'], cardinality: 'many' }],
   defaultViews: [
     { name: 'Family', definition: { filter: { and: [{ field: 'data.relationship', op: 'eq', value: 'family' }] }, sort: [{ field: 'title', dir: 'asc' }] } },
     { name: 'Friends', definition: { filter: { and: [{ field: 'data.relationship', op: 'eq', value: 'friend' }] }, sort: [{ field: 'title', dir: 'asc' }] } },
@@ -57,7 +57,7 @@ export const personType: EntityTypeDef<PersonData> = {
 };
 
 /** Group (PRODUCT §4): flatmates, a trip crew, family — splits and balances run per group. Members also live in group_members. */
-export const groupType: EntityTypeDef<{ name: string; kind?: string; memberIds: string[]; notes?: string }> = {
+export const groupType: ObjectDef<{ name: string; kind?: string; memberIds: string[]; notes?: string }> = {
   type: 'group', module: 'crm', label: 'Group', labelPlural: 'Groups', icon: 'people',
   schema: z.object({ name: z.string().min(1), kind: z.string().optional(), memberIds: z.array(z.string()).default([]), notes: z.string().optional() }),
   fields: [

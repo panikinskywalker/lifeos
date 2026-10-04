@@ -1,5 +1,5 @@
 import { Pressable, View } from 'react-native';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -117,7 +117,7 @@ export function HabitChecklist({ limit = 8 }: { limit?: number }) {
 }
 
 /** A habit's page: the streak, a big check-in, the last week (tap a day to fix it), 13 weeks as a heat map. */
-export function HabitSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function HabitSection({ entity }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const os = useOS();
   const h: Habit = useLive((o) => activeHabits(o).find((x) => x.id === entity.id) ?? { id: entity.id, title: entity.title, frequency: (entity.data as HabitData).frequency ?? 'daily', perWeek: (entity.data as HabitData).targetPerWeek ?? 7 }, [entity.id, entity.updatedAt]);
   const done = useLive((o) => doneDays(o, entity.id, isoOf(Date.now() - 400 * DAY)), [entity.id]);

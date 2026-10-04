@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import { periodFromRRule } from '@core/cycles/schedule';
 import type { AccountData, SubscriptionData, TransactionData } from './types';
 import { dailySpend, incomeInRange, spendByCategory, spendInRange } from './lib';
@@ -47,14 +47,14 @@ export function perMonth(amount: number, rrule: string): number {
 }
 
 export interface RunRate {
-  rows: Array<{ sub: Entity<SubscriptionData>; perMonth: number; perYear: number }>;
+  rows: Array<{ sub: ObjectRecord<SubscriptionData>; perMonth: number; perYear: number }>;
   monthly: number;
   yearly: number;
 }
 
 /** Active subscriptions by what they cost per month (Jio every 84 days → ₹399 × 30.44 / 84). */
 export function subscriptionRunRate(os: LifeOSContext): RunRate {
-  const subs = os.entities.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 1000 });
+  const subs = os.records.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 1000 });
   const rows = subs.map((sub) => {
     const m = perMonth(sub.data.amount, sub.data.rrule);
     return { sub, perMonth: m, perYear: m * 12 };
@@ -69,11 +69,11 @@ export function subscriptionRunRate(os: LifeOSContext): RunRate {
  * net worth are skipped.
  */
 export function netWorthSeries(os: LifeOSContext, months = 12, now = new Date()): Array<{ label: string; end: string; total: number }> {
-  const accounts = os.entities.query<AccountData>('account', {}, { limit: 1000 }).filter((a) => a.data.includeInNetWorth !== false);
+  const accounts = os.records.query<AccountData>('account', {}, { limit: 1000 }).filter((a) => a.data.includeInNetWorth !== false);
   const ids = new Set(accounts.map((a) => a.id));
   const opening = accounts.reduce((a, x) => a + (x.data.openingBalance ?? 0), 0);
-  const txs = os.entities.query<TransactionData>('transaction', {}, { limit: 100000 });
-  const effect = (t: Entity<TransactionData>) => {
+  const txs = os.records.query<TransactionData>('transaction', {}, { limit: 100000 });
+  const effect = (t: ObjectRecord<TransactionData>) => {
     const d = t.data;
     let v = 0;
     if (d.accountId && ids.has(d.accountId)) v += d.kind === 'income' ? d.amount : -d.amount;

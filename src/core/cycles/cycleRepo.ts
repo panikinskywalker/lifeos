@@ -1,5 +1,5 @@
 import type { DatabaseAdapter, Row, SqlParam } from '../db/adapter';
-import type { Entity, EntityTypeDef } from '../domain/types';
+import type { ObjectRecord, ObjectDef } from '../domain/types';
 import { newId } from '../domain/ids';
 import { bus, type Actor } from '../events/bus';
 import type { TimelineRepo } from '../repo/timelineRepo';
@@ -76,7 +76,7 @@ const COLS: Array<[keyof Cycle, string]> = [
 export class CycleRepo {
   constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
 
-  /** Set by the core: writes a cycle's dates back into its record's fields (EntityTypeDef.cycleFields). */
+  /** Set by the core: writes a cycle's dates back into its record's fields (ObjectDef.cycleFields). */
   onChanged?: (cycle: Cycle) => void;
 
   /** Set by the core: mirrors the latest reading into the record's meter field (odometerKm). */
@@ -160,7 +160,7 @@ export class CycleRepo {
    * Give a record its type's default cycles. A template already applied —
    * even if the user later deleted that cycle — is not added again.
    */
-  applyTemplates(entity: Entity, def: EntityTypeDef | undefined, actor: Actor = 'system'): Cycle[] {
+  applyTemplates(entity: ObjectRecord, def: ObjectDef | undefined, actor: Actor = 'system'): Cycle[] {
     if (!def?.cycleTemplates) return [];
     const seen = new Set(this.db.all<{ template: string }>(`SELECT template FROM cycles WHERE entity_id=? AND template IS NOT NULL`, [entity.id]).map((r) => r.template));
     const made: Cycle[] = [];
@@ -176,7 +176,7 @@ export class CycleRepo {
    * meter, lead, cost) always follows; a due date moves only when the field it
    * comes from changed, so a rolled cycle is not reset by an unrelated edit.
    */
-  syncTemplates(entity: Entity, previous: Entity, def: EntityTypeDef | undefined): void {
+  syncTemplates(entity: ObjectRecord, previous: ObjectRecord, def: ObjectDef | undefined): void {
     if (!def?.cycleTemplates) return;
     const before = new Map(def.cycleTemplates(previous.data as never).map((s) => [s.template, s]));
     const live = new Map(this.forEntity(entity.id).filter((c) => c.template).map((c) => [c.template!, c]));

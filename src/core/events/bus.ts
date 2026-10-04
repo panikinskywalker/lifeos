@@ -1,4 +1,4 @@
-import type { Entity, Relation, Reminder, Comment, Attachment } from '../domain/types';
+import type { ObjectRecord, Link, Reminder, Comment, Attachment } from '../domain/types';
 
 /**
  * Typed in-process event bus. Every mutation in the repo layer emits here;
@@ -6,13 +6,13 @@ import type { Entity, Relation, Reminder, Comment, Attachment } from '../domain/
  * subscribe. This is the seam that keeps modules decoupled from each other.
  */
 export type CoreEvents = {
-  'entity.created': { entity: Entity; actor: Actor };
-  'entity.updated': { entity: Entity; previous: Entity; changed: string[]; actor: Actor };
-  'entity.deleted': { entity: Entity; actor: Actor };
-  'entity.restored': { entity: Entity; actor: Actor };
-  'entity.status': { entity: Entity; from: string | null; to: string | null; actor: Actor };
-  'relation.added': { relation: Relation; actor: Actor };
-  'relation.removed': { relation: Relation; actor: Actor };
+  'entity.created': { entity: ObjectRecord; actor: Actor };
+  'entity.updated': { entity: ObjectRecord; previous: ObjectRecord; changed: string[]; actor: Actor };
+  'entity.deleted': { entity: ObjectRecord; actor: Actor };
+  'entity.restored': { entity: ObjectRecord; actor: Actor };
+  'entity.status': { entity: ObjectRecord; from: string | null; to: string | null; actor: Actor };
+  'relation.added': { relation: Link; actor: Actor };
+  'relation.removed': { relation: Link; actor: Actor };
   'comment.added': { comment: Comment; actor: Actor };
   'attachment.added': { attachment: Attachment; actor: Actor };
   'reminder.created': { reminder: Reminder; actor: Actor };

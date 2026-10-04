@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 
 /** A parcel on its way (M4.2c): one record per order, updated by each shipping text. */
 export interface DeliveryData {
@@ -28,7 +28,7 @@ export const DELIVERY_STATUSES = [
   { value: 'returned', label: 'Returned' },
 ];
 
-export const deliveryType: EntityTypeDef<DeliveryData> = {
+export const deliveryType: ObjectDef<DeliveryData> = {
   type: 'delivery',
   module: 'deliveries',
   label: 'Delivery',

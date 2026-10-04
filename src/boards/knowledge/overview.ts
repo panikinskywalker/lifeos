@@ -3,7 +3,7 @@ import { lastMonths, type ModuleOverview, type OverviewBlock } from '@core/dashb
 
 /** Notes at a glance: how many, written per month, the latest. */
 export function notesOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
-  const notes = os.entities.query('note', { sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 5000 });
+  const notes = os.records.query('note', { sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 5000 });
   const months = lastMonths(6, now);
   const byMonth = months.map((m) => notes.filter((n) => n.createdAt >= new Date(`${m.start}T00:00:00`).getTime() && n.createdAt <= new Date(`${m.end}T23:59:59`).getTime()).length);
   const blocks: OverviewBlock[] = [{ kind: 'stats', items: [{ label: 'Notes', value: String(notes.length) }, { label: 'This month', value: String(byMonth.at(-1) ?? 0) }] }];

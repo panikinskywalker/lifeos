@@ -17,7 +17,7 @@ export default function YouTab() {
   const toast = useToast();
   const s = useSettings();
   const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const counts = useLive((o) => o.entities.countsByType(), []);
+  const counts = useLive((o) => o.records.countsByType(), []);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const modules = useLive((o) => o.modules.installed(), []).filter((m) => m.id !== 'core');
   const confirm = (title: string, body: string, fn: () => void) => (Platform.OS === 'web' ? fn() : Alert.alert(title, body, [{ text: 'Cancel', style: 'cancel' }, { text: 'Continue', onPress: fn }]));
@@ -78,8 +78,8 @@ export default function YouTab() {
             title="Rebuild search index"
             chevron={false}
             onPress={() => {
-              const all = os.entities.query(null, { includeArchived: true }, { limit: 100000 });
-              os.entities.search.rebuild(all, (ty) => os.registry.entityTypes.get(ty));
+              const all = os.records.query(null, { includeArchived: true }, { limit: 100000 });
+              os.records.search.rebuild(all, (ty) => os.registry.objects.get(ty));
               toast.show({ message: `Search index rebuilt · ${all.length} records`, icon: 'check' });
             }}
           />

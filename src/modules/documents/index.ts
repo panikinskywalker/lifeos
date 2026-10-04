@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 import { dateField } from '@core/cycles/schedule';
 
 export const DOCUMENTS_COLOR = 'indigo';
 
 export interface DocumentData { kind: string; number?: string; issuedOn?: string; expiresOn?: string; issuer?: string; notes?: string; personId?: string; tripId?: string; assetId?: string }
-export const documentType: EntityTypeDef<DocumentData> = {
+export const documentType: ObjectDef<DocumentData> = {
   type: 'document', module: 'documents', label: 'Document', labelPlural: 'Documents', icon: 'doc.text',
   schema: z.object({ kind: z.string().default('other'), number: z.string().optional(), issuedOn: z.string().optional(), expiresOn: z.string().optional(), issuer: z.string().optional(), notes: z.string().optional(), personId: z.string().optional(), tripId: z.string().optional(), assetId: z.string().optional() }),
   cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'document.expiry', name: 'Renew', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: d.kind === 'id' ? 180 : 30 }] : []),
@@ -28,10 +28,10 @@ export const documentType: EntityTypeDef<DocumentData> = {
 
 export const documentsModule: ModuleManifest = {
   id: 'documents', name: 'Documents', version: '1.0.0', description: 'IDs, insurance, contracts and receipts — attach the scan, track the expiry.', icon: 'folder', color: DOCUMENTS_COLOR,
-  dependencies: ['crm', 'travel', 'assets'], entityTypes: [documentType],
+  dependencies: ['crm', 'travel', 'assets'], objects: [documentType],
   aiTools: [{
     name: 'expiring_documents', description: 'Documents expiring within N days (default 90).', input: z.object({ days: z.number().optional() }),
-    run: async (i, os) => { const days = (i as { days?: number }).days ?? 90; const until = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10); return os.entities.query<DocumentData>('document', { filter: { and: [{ field: 'data.expiresOn', op: 'notNull' }, { field: 'data.expiresOn', op: 'lte', value: until }] }, sort: [{ field: 'data.expiresOn', dir: 'asc' }] }).map((d) => ({ id: d.id, title: d.title, kind: d.data.kind, expiresOn: d.data.expiresOn })); },
+    run: async (i, os) => { const days = (i as { days?: number }).days ?? 90; const until = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10); return os.records.query<DocumentData>('document', { filter: { and: [{ field: 'data.expiresOn', op: 'notNull' }, { field: 'data.expiresOn', op: 'lte', value: until }] }, sort: [{ field: 'data.expiresOn', dir: 'asc' }] }).map((d) => ({ id: d.id, title: d.title, kind: d.data.kind, expiresOn: d.data.expiresOn })); },
   }],
   onInstall: async (os) => {
     os.automation.rules.save({ name: 'Remind 30 days before a document expires', enabled: true, trigger: { id: 'core.entity.created', config: { entityType: 'document' } }, conditions: [{ field: 'data.expiresOn', op: 'notNull' }], actions: [{ id: 'core.createReminder', config: { title: 'Renew {{title}}', atField: 'expiresOn', offsetDays: 30 } }] });

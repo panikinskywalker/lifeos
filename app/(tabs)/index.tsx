@@ -186,7 +186,7 @@ function SpendTile() {
   const router = useRouter();
   const t = useTheme();
   const os = useOS();
-  const p = useLive((o) => (o.registry.entityTypes.has('transaction') ? spendPace(o) : null), []);
+  const p = useLive((o) => (o.registry.objects.has('transaction') ? spendPace(o) : null), []);
   if (!p) return null;
   const diff = p.usualByToday != null ? p.spent - p.usualByToday : null;
   const series = [{ label: 'This month', color: t.tints.finance.ink, values: p.thisMonth }, ...(p.usual.length ? [{ label: 'Usual', color: t.c.fg.tertiary, values: p.usual.slice(0, 31), dashed: true }] : [])];

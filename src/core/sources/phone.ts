@@ -18,7 +18,7 @@ export const phoneKey = (p: string | null | undefined) => (p ?? '').replace(/\D/
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 type PersonRow = { id: string; title: string; data: { phone?: string; email?: string; contactId?: string; lastContactAt?: string; birthday?: string; company?: string; role?: string } };
-const people = (os: LifeOSContext) => os.entities.query<PersonRow['data']>('person', {}, { limit: 5000 }) as unknown as PersonRow[];
+const people = (os: LifeOSContext) => os.records.query<PersonRow['data']>('person', {}, { limit: 5000 }) as unknown as PersonRow[];
 
 /* ------------------------------------------------------------------ */
 /* Contacts                                                             */
@@ -64,15 +64,15 @@ export function importContacts(os: LifeOSContext, picked: DeviceContact[]): { cr
     const data = Object.fromEntries(Object.entries(contactData(c)).filter(([, v]) => v != null && v !== ''));
     const id = personForContact(os, c);
     if (!id) {
-      const e = os.entities.create({ type: 'person', title: c.name.trim(), data }, 'user');
+      const e = os.records.create({ type: 'person', title: c.name.trim(), data }, 'user');
       os.dumps.addExtraction({ source: 'contacts', sourceRef: c.id, kind: 'person', entityId: e.id, label: `Person: ${e.title} (from contacts)` });
       created++;
       continue;
     }
-    const cur = os.entities.get<Record<string, unknown>>(id)!;
+    const cur = os.records.get<Record<string, unknown>>(id)!;
     const fill = Object.fromEntries(Object.entries(data).filter(([k]) => cur.data[k] == null || cur.data[k] === ''));
     if (Object.keys(fill).length) {
-      os.entities.update(id, { data: fill }, 'user');
+      os.records.update(id, { data: fill }, 'user');
       os.dumps.addExtraction({ source: 'contacts', sourceRef: c.id, kind: 'person', action: 'updated', entityId: id, label: `${cur.title} · ${Object.keys(fill).filter((k) => k !== 'contactId').join(', ') || 'linked to contact'} from contacts`, before: Object.fromEntries(Object.keys(fill).map((k) => [k, null])) });
       updated++;
     }
@@ -90,7 +90,7 @@ export function resyncContacts(os: LifeOSContext, contacts: DeviceContact[]): nu
     const cur = p.data as Record<string, unknown>;
     const fill = Object.fromEntries(Object.entries(contactData(c)).filter(([k, v]) => v != null && v !== '' && (cur[k] == null || cur[k] === '')));
     if (Object.keys(fill).length) {
-      os.entities.update(p.id, { data: fill }, 'system');
+      os.records.update(p.id, { data: fill }, 'system');
       n++;
     }
   }
@@ -125,8 +125,8 @@ export function calendarKey(e: Pick<CalendarEvent, 'title' | 'start' | 'end'>): 
 
 /** Merge calendar events already filed twice or more (older syncs, other accounts): keep one, move its links, delete the rest. */
 export function dedupeCalendarEvents(os: LifeOSContext): number {
-  if (!os.registry.entityTypes.has('event')) return 0;
-  const all = os.entities.query<{ startAt: number; endAt?: number; source?: string; sourceKey?: string }>('event', { filter: { and: [{ field: 'data.source', op: 'eq', value: 'calendar' }] } }, { limit: 5000 });
+  if (!os.registry.objects.has('event')) return 0;
+  const all = os.records.query<{ startAt: number; endAt?: number; source?: string; sourceKey?: string }>('event', { filter: { and: [{ field: 'data.source', op: 'eq', value: 'calendar' }] } }, { limit: 5000 });
   const groups = new Map<string, typeof all>();
   for (const e of all) {
     const k = calendarKey({ title: e.title, start: e.data.startAt, end: e.data.endAt });
@@ -136,13 +136,13 @@ export function dedupeCalendarEvents(os: LifeOSContext): number {
   os.db.transaction(() => {
     for (const [key, list] of groups) {
       const [keep, ...rest] = list.sort((a, b) => a.createdAt - b.createdAt);
-      if (keep!.data.sourceKey !== key) os.entities.update(keep!.id, { data: { sourceKey: key } }, 'system');
+      if (keep!.data.sourceKey !== key) os.records.update(keep!.id, { data: { sourceKey: key } }, 'system');
       for (const dup of rest) {
-        for (const r of os.relations.forEntity(dup.id)) {
+        for (const r of os.links.forEntity(dup.id)) {
           const [from, to] = r.direction === 'out' ? [keep!.id, r.other.id] : [r.other.id, keep!.id];
-          os.relations.link(from, to, r.relation.kind, {}, 'system');
+          os.links.link(from, to, r.relation.kind, {}, 'system');
         }
-        os.entities.delete(dup.id, 'system');
+        os.records.delete(dup.id, 'system');
         removed++;
       }
     }
@@ -152,7 +152,7 @@ export function dedupeCalendarEvents(os: LifeOSContext): number {
 
 /** Calendar events → events, one per real event (not per calendar), linked to the people in them who are in LifeOS. Re-sync updates in place. */
 export function saveCalendarEvents(os: LifeOSContext, events: CalendarEvent[]): { created: number; updated: number; merged: number } {
-  if (!os.registry.entityTypes.has('event')) return { created: 0, updated: 0, merged: 0 };
+  if (!os.registry.objects.has('event')) return { created: 0, updated: 0, merged: 0 };
   const merged = dedupeCalendarEvents(os);
   let created = 0;
   let updated = 0;
@@ -168,22 +168,22 @@ export function saveCalendarEvents(os: LifeOSContext, events: CalendarEvent[]): 
   os.db.transaction(() => {
     for (const [key, ev] of byKey) {
       const data = { kind: 'event', startAt: ev.start, endAt: ev.end ?? undefined, allDay: !!ev.allDay, location: ev.location || undefined, notes: ev.notes?.slice(0, 2000) || undefined, source: 'calendar', sourceKey: key, calendars: ev.calendars?.length ? [...ev.calendars].sort() : undefined };
-      const [hit] = os.entities.query<Record<string, unknown>>('event', { filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 1 });
+      const [hit] = os.records.query<Record<string, unknown>>('event', { filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 1 });
       let id: string;
       if (hit) {
         id = hit.id;
         if (hit.data.location !== data.location || hit.data.notes !== data.notes || JSON.stringify(hit.data.calendars ?? null) !== JSON.stringify(data.calendars ?? null)) {
-          os.entities.update(id, { data }, 'system');
+          os.records.update(id, { data }, 'system');
           updated++;
         }
       } else {
-        id = os.entities.create({ type: 'event', title: ev.title.trim(), data }, 'system').id;
+        id = os.records.create({ type: 'event', title: ev.title.trim(), data }, 'system').id;
         created++;
       }
       for (const a of ev.attendees ?? []) {
         const email = a.email?.toLowerCase();
         const p = all.find((x) => (email && x.data.email?.toLowerCase() === email) || (a.name && norm(x.title) === norm(a.name)));
-        if (p && !os.relations.forEntity(id, 'with').some((r) => r.other.id === p.id)) os.relations.link(id, p.id, 'with', {}, 'system', { source: 'manual', sourceId: key });
+        if (p && !os.links.forEntity(id, 'with').some((r) => r.other.id === p.id)) os.links.link(id, p.id, 'with', {}, 'system', { source: 'manual', sourceId: key });
       }
     }
   });
@@ -219,11 +219,11 @@ export function applyCallLog(os: LifeOSContext, calls: CallEntry[]): number {
   }
   let n = 0;
   for (const [id, c] of latest) {
-    const p = os.entities.get<PersonRow['data']>(id)!;
+    const p = os.records.get<PersonRow['data']>(id)!;
     const day = iso(c.at);
     if (p.data.lastContactAt && p.data.lastContactAt >= day) continue;
-    os.entities.update(id, { data: { lastContactAt: day } }, 'system');
-    os.entities.timeline.add({ entityId: id, kind: 'call', title: `${c.type === 'outgoing' ? 'Called' : 'Call from'} ${p.title}${c.seconds ? ` · ${Math.max(1, Math.round(c.seconds / 60))} min` : ''}`, actor: 'system', occurredAt: c.at, meta: { calllog: true } });
+    os.records.update(id, { data: { lastContactAt: day } }, 'system');
+    os.records.timeline.add({ entityId: id, kind: 'call', title: `${c.type === 'outgoing' ? 'Called' : 'Call from'} ${p.title}${c.seconds ? ` · ${Math.max(1, Math.round(c.seconds / 60))} min` : ''}`, actor: 'system', occurredAt: c.at, meta: { calllog: true } });
     n++;
   }
   return n;

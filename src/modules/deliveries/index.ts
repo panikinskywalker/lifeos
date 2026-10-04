@@ -10,5 +10,5 @@ export const deliveriesModule: ModuleManifest = {
   description: 'Parcels on their way — filed from Amazon, Flipkart and courier texts, updated as they move.',
   icon: 'box',
   color: deliveryType.color!,
-  entityTypes: [deliveryType],
+  objects: [deliveryType],
 };

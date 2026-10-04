@@ -74,7 +74,7 @@ export function morningBrief(os: LifeOSContext, at: number): { title: string; bo
   const day = isoDay(at);
   const g = Object.fromEntries(goals(os, at).map((x) => [x.id, x]));
   const lines: string[] = [];
-  if (os.registry.entityTypes.has('measurement')) {
+  if (os.registry.objects.has('measurement')) {
     const slept = daily(os, 'sleep', day, day).get(day);
     if (slept != null) lines.push(`Slept ${fmtH(slept)}${g.sleep ? ` (goal ${fmtH(g.sleep.target)})` : ''}`);
     if (g.steps) lines.push(`Steps goal: ${formatMetric('steps', g.steps.target, os.format.currency)}`);
@@ -87,7 +87,7 @@ export function morningBrief(os: LifeOSContext, at: number): { title: string; bo
       .join(', ');
     lines.push(`${items.length} thing${items.length === 1 ? '' : 's'} today: ${first}${items.length > 3 ? '…' : ''}`);
   }
-  if (os.registry.entityTypes.has('transaction')) {
+  if (os.registry.objects.has('transaction')) {
     const p = spendPace(os, at);
     if (p.spent > 0) {
       const diff = p.usualByToday != null ? p.spent - p.usualByToday : null;
@@ -106,14 +106,14 @@ export function notificationPlan(os: LifeOSContext, now = Date.now(), limit = 60
     for (const r of os.reminders.upcoming(64)) {
       const at = r.snoozedUntil ?? r.nextAt ?? r.dueAt;
       if (at <= now) continue;
-      const entity = r.entityId ? os.entities.get(r.entityId) : undefined;
+      const entity = r.entityId ? os.records.get(r.entityId) : undefined;
       out.push({ kind: 'reminder', at, title: r.title, body: r.body ?? entity?.title ?? '', data: { reminderId: r.id, entityId: r.entityId ?? undefined, entityType: entity?.type } });
     }
   }
   if (prefs.upkeep) {
     for (const n of cycleNudges(os, now)) {
       if (n.at <= now) continue;
-      out.push({ kind: 'upkeep', at: n.at, title: n.title, body: n.body, data: { cycleId: n.cycleId, entityId: n.entityId, entityType: os.entities.get(n.entityId)?.type } });
+      out.push({ kind: 'upkeep', at: n.at, title: n.title, body: n.body, data: { cycleId: n.cycleId, entityId: n.entityId, entityType: os.records.get(n.entityId)?.type } });
     }
   }
   if (prefs.brief.on) {

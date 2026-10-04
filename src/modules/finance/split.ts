@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 
 /** 'me' is the phone's owner; everyone else is a person record id. */
 export type Party = 'me' | string;
@@ -79,12 +79,12 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-function openDebts(os: LifeOSContext, where: { personId?: string; groupId?: string; transactionId?: string }): Entity<DebtData>[] {
+function openDebts(os: LifeOSContext, where: { personId?: string; groupId?: string; transactionId?: string }): ObjectRecord<DebtData>[] {
   const and: Array<{ field: string; op: 'eq' | 'neq'; value: string }> = [{ field: 'status', op: 'neq', value: 'settled' }];
   if (where.personId) and.push({ field: 'data.personId', op: 'eq', value: where.personId });
   if (where.groupId) and.push({ field: 'data.groupId', op: 'eq', value: where.groupId });
   if (where.transactionId) and.push({ field: 'data.transactionId', op: 'eq', value: where.transactionId });
-  return os.entities.query<DebtData>('debt', { filter: { and } }, { limit: 10000 });
+  return os.records.query<DebtData>('debt', { filter: { and } }, { limit: 10000 });
 }
 
 /**
@@ -94,25 +94,25 @@ function openDebts(os: LifeOSContext, where: { personId?: string; groupId?: stri
  * replaces the transaction's earlier split debts. Returns the new debt ids.
  */
 export function applySplit(os: LifeOSContext, transactionId: string, input: SplitInput): string[] {
-  const tx = os.entities.get<{ amount: number; merchant?: string; date: string; currency?: string; personIds?: string[] }>(transactionId);
+  const tx = os.records.get<{ amount: number; merchant?: string; date: string; currency?: string; personIds?: string[] }>(transactionId);
   if (!tx) throw new Error('Transaction not found');
   const shares = splitAmounts(tx.data.amount, input.method, input.parts);
   const reason = tx.data.merchant || tx.title;
   const made: string[] = [];
   os.db.transaction(() => {
-    for (const d of os.entities.query<DebtData>('debt', { filter: { and: [{ field: 'data.transactionId', op: 'eq', value: transactionId }, { field: 'data.kind', op: 'eq', value: 'split' }] } }, { limit: 1000 })) os.entities.delete(d.id, 'system');
+    for (const d of os.records.query<DebtData>('debt', { filter: { and: [{ field: 'data.transactionId', op: 'eq', value: transactionId }, { field: 'data.kind', op: 'eq', value: 'split' }] } }, { limit: 1000 })) os.records.delete(d.id, 'system');
     const people = [...new Set([...shares.map((s) => s.party), input.payer].filter((p) => p !== 'me'))];
     const record: SplitRecord = { ...input, shares };
-    os.entities.update(transactionId, { data: { split: record, personIds: [...new Set([...(tx.data.personIds ?? []), ...people])] } });
+    os.records.update(transactionId, { data: { split: record, personIds: [...new Set([...(tx.data.personIds ?? []), ...people])] } });
     const base = { reason, date: tx.data.date, kind: 'split' as const, transactionId, groupId: input.groupId ?? undefined, currency: tx.data.currency };
     if (input.payer === 'me') {
       for (const s of shares) {
         if (s.party === 'me' || s.amount <= 0) continue;
-        made.push(os.entities.create<DebtData>({ type: 'debt', status: 'open', data: { ...base, personId: s.party, direction: 'they_owe', amount: s.amount } }).id);
+        made.push(os.records.create<DebtData>({ type: 'debt', status: 'open', data: { ...base, personId: s.party, direction: 'they_owe', amount: s.amount } }).id);
       }
     } else {
       const mine = shares.find((s) => s.party === 'me');
-      if (mine && mine.amount > 0) made.push(os.entities.create<DebtData>({ type: 'debt', status: 'open', data: { ...base, personId: input.payer, direction: 'i_owe', amount: mine.amount } }).id);
+      if (mine && mine.amount > 0) made.push(os.records.create<DebtData>({ type: 'debt', status: 'open', data: { ...base, personId: input.payer, direction: 'i_owe', amount: mine.amount } }).id);
     }
   });
   return made;
@@ -121,8 +121,8 @@ export function applySplit(os: LifeOSContext, transactionId: string, input: Spli
 /** Remove a transaction's split (Undo of applySplit when there was none before). */
 export function clearSplit(os: LifeOSContext, transactionId: string): void {
   os.db.transaction(() => {
-    for (const d of os.entities.query<DebtData>('debt', { filter: { and: [{ field: 'data.transactionId', op: 'eq', value: transactionId }, { field: 'data.kind', op: 'eq', value: 'split' }] } }, { limit: 1000 })) os.entities.delete(d.id, 'system');
-    os.entities.update(transactionId, { data: { split: undefined } });
+    for (const d of os.records.query<DebtData>('debt', { filter: { and: [{ field: 'data.transactionId', op: 'eq', value: transactionId }, { field: 'data.kind', op: 'eq', value: 'split' }] } }, { limit: 1000 })) os.records.delete(d.id, 'system');
+    os.records.update(transactionId, { data: { split: undefined } });
   });
 }
 
@@ -155,10 +155,10 @@ export function settleUp(os: LifeOSContext, personId: string, opts: { groupId?: 
   const settled: string[] = [];
   os.db.transaction(() => {
     if (bal !== 0) {
-      paymentId = os.entities.create<DebtData>({ type: 'debt', status: 'settled', data: { personId, direction: bal > 0 ? 'i_owe' : 'they_owe', amount: Math.abs(bal), reason: 'Settled up', date: opts.date ?? today(), kind: 'payment', groupId: opts.groupId } }).id;
+      paymentId = os.records.create<DebtData>({ type: 'debt', status: 'settled', data: { personId, direction: bal > 0 ? 'i_owe' : 'they_owe', amount: Math.abs(bal), reason: 'Settled up', date: opts.date ?? today(), kind: 'payment', groupId: opts.groupId } }).id;
     }
     for (const d of open) {
-      os.entities.setStatus(d.id, 'settled');
+      os.records.setStatus(d.id, 'settled');
       settled.push(d.id);
     }
   });
@@ -167,7 +167,7 @@ export function settleUp(os: LifeOSContext, personId: string, opts: { groupId?: 
 
 export function undoSettle(os: LifeOSContext, s: { paymentId: string | null; settled: string[] }): void {
   os.db.transaction(() => {
-    for (const id of s.settled) os.entities.setStatus(id, 'open');
-    if (s.paymentId) os.entities.delete(s.paymentId);
+    for (const id of s.settled) os.records.setStatus(id, 'open');
+    if (s.paymentId) os.records.delete(s.paymentId);
   });
 }

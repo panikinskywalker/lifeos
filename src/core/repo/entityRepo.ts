@@ -1,5 +1,5 @@
 import type { DatabaseAdapter, Row, SqlParam } from '../db/adapter';
-import type { Entity, EntityRef, EntityTypeDef, ViewDefinition } from '../domain/types';
+import type { ObjectRecord, EntityRef, ObjectDef, ViewDefinition } from '../domain/types';
 import { newId } from '../domain/ids';
 import { bus, type Actor } from '../events/bus';
 import type { Registry } from '../registry/registry';
@@ -43,7 +43,7 @@ export interface AggregateSpec {
   max?: string[];
 }
 
-function rowToEntity(r: Row): Entity {
+function rowToEntity(r: Row): ObjectRecord {
   return {
     id: r.id as string,
     type: r.type as string,
@@ -79,13 +79,13 @@ export function safeJson(s: string | null | undefined): Record<string, unknown> 
  *  5. updates the FTS index,
  *  6. emits a bus event (automation, UI cache, AI all listen).
  */
-export class EntityRepo {
+export class RecordRepo {
   readonly timeline: TimelineRepo;
   readonly search: SearchIndex;
   private changes: ChangeLog;
   formatCurrency: (n: number, c?: string) => string = (n, c = 'INR') => `${c} ${n.toFixed(2)}`;
   /** Injected at boot; keeps `data.<relationField>` and the relations table in sync. */
-  syncRelations: ((entity: Entity, def: EntityTypeDef, actor: Actor) => void) | null = null;
+  syncRelations: ((entity: ObjectRecord, def: ObjectDef, actor: Actor) => void) | null = null;
 
   constructor(private db: DatabaseAdapter, private registry: Registry) {
     this.timeline = new TimelineRepo(db);
@@ -93,11 +93,11 @@ export class EntityRepo {
     this.changes = new ChangeLog(db);
   }
 
-  private def(type: string): EntityTypeDef {
-    return this.registry.type(type);
+  private def(type: string): ObjectDef {
+    return this.registry.object(type);
   }
 
-  private derive(def: EntityTypeDef, data: Record<string, unknown>, title?: string, subtitle?: string | null, occurredAt?: number | null) {
+  private derive(def: ObjectDef, data: Record<string, unknown>, title?: string, subtitle?: string | null, occurredAt?: number | null) {
     const t = title?.trim() || def.computeTitle?.(data) || def.label;
     const st = subtitle !== undefined ? subtitle : def.computeSubtitle?.(data, { formatCurrency: this.formatCurrency }) ?? null;
     let occ = occurredAt ?? null;
@@ -109,13 +109,13 @@ export class EntityRepo {
     return { title: t, subtitle: st, occurredAt: occ };
   }
 
-  create<T extends object>(input: CreateInput<T>, actor: Actor = 'user'): Entity<T> {
+  create<T extends object>(input: CreateInput<T>, actor: Actor = 'user'): ObjectRecord<T> {
     const def = this.def(input.type);
     const data = def.schema.parse(input.data) as T;
     const now = input.createdAt ?? Date.now();
     const id = input.id ?? newId(now);
     const d = this.derive(def, data as Record<string, unknown>, input.title, input.subtitle, input.occurredAt);
-    const entity: Entity<T> = {
+    const entity: ObjectRecord<T> = {
       id,
       type: input.type,
       title: d.title,
@@ -138,23 +138,23 @@ export class EntityRepo {
       );
       this.changes.record('entities', id, 'insert', 1);
       this.timeline.add({ entityId: id, kind: 'created', title: `${def.label} created`, actor, occurredAt: now });
-      this.search.index(entity as Entity, def);
-      this.syncRelations?.(entity as Entity, def, actor);
+      this.search.index(entity as ObjectRecord, def);
+      this.syncRelations?.(entity as ObjectRecord, def, actor);
     });
-    bus.emit('entity.created', { entity: entity as Entity, actor });
+    bus.emit('entity.created', { entity: entity as ObjectRecord, actor });
     return entity;
   }
 
-  get<T = Record<string, unknown>>(id: string): Entity<T> | undefined {
+  get<T = Record<string, unknown>>(id: string): ObjectRecord<T> | undefined {
     const r = this.db.get(`SELECT * FROM entities WHERE id = ? AND deleted_at IS NULL`, [id]);
-    return r ? (rowToEntity(r) as Entity<T>) : undefined;
+    return r ? (rowToEntity(r) as ObjectRecord<T>) : undefined;
   }
 
-  getMany(ids: string[]): Entity[] {
+  getMany(ids: string[]): ObjectRecord[] {
     if (!ids.length) return [];
     const rows = this.db.all(`SELECT * FROM entities WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`, ids);
     const map = new Map(rows.map((r) => [r.id as string, rowToEntity(r)]));
-    return ids.map((i) => map.get(i)).filter((x): x is Entity => !!x);
+    return ids.map((i) => map.get(i)).filter((x): x is ObjectRecord => !!x);
   }
 
   ref(id: string): EntityRef | undefined {
@@ -162,9 +162,9 @@ export class EntityRepo {
     return r ?? undefined;
   }
 
-  update<T extends object>(id: string, patch: UpdateInput<T>, actor: Actor = 'user'): Entity<T> {
+  update<T extends object>(id: string, patch: UpdateInput<T>, actor: Actor = 'user'): ObjectRecord<T> {
     const previous = this.get<T>(id);
-    if (!previous) throw new Error(`Entity ${id} not found`);
+    if (!previous) throw new Error(`ObjectRecord ${id} not found`);
     const def = this.def(previous.type);
     const mergedData = patch.data ? def.schema.parse({ ...(previous.data as object), ...(patch.data as object) }) : previous.data;
     const now = Date.now();
@@ -174,7 +174,7 @@ export class EntityRepo {
     const title = patch.title !== undefined ? d.title : derivedPrev && previous.title === derivedPrev ? def.computeTitle!(mergedData as Record<string, unknown>) : previous.title;
     const subtitle = patch.subtitle !== undefined ? patch.subtitle : def.computeSubtitle ? def.computeSubtitle(mergedData as Record<string, unknown>, { formatCurrency: this.formatCurrency }) ?? null : previous.subtitle ?? null;
     const status = patch.status !== undefined ? patch.status : previous.status ?? null;
-    const next: Entity<T> = {
+    const next: ObjectRecord<T> = {
       ...previous,
       title,
       subtitle,
@@ -186,7 +186,7 @@ export class EntityRepo {
       updatedAt: now,
       version: previous.version + 1,
     };
-    const changed = diffKeys(previous as Entity, next as Entity);
+    const changed = diffKeys(previous as ObjectRecord, next as ObjectRecord);
     if (!changed.length) return previous;
     this.db.transaction(() => {
       this.db.run(
@@ -200,11 +200,11 @@ export class EntityRepo {
         const human = changed.filter((k) => !['updatedAt', 'version', 'subtitle'].includes(k)).map((k) => k.replace(/^data\./, '')).map((k) => def.fields.find((f) => f.key === k)?.label ?? k);
         if (human.length) this.timeline.add({ entityId: id, kind: 'updated', title: `Updated ${human.slice(0, 4).join(', ')}${human.length > 4 ? '…' : ''}`, actor, occurredAt: now, meta: { changed: human } });
       }
-      this.search.index(next as Entity, def);
-      if (changed.some((k) => k.startsWith('data.'))) this.syncRelations?.(next as Entity, def, actor);
+      this.search.index(next as ObjectRecord, def);
+      if (changed.some((k) => k.startsWith('data.'))) this.syncRelations?.(next as ObjectRecord, def, actor);
     });
-    bus.emit('entity.updated', { entity: next as Entity, previous: previous as Entity, changed, actor });
-    if (previous.status !== next.status) bus.emit('entity.status', { entity: next as Entity, from: previous.status ?? null, to: next.status ?? null, actor });
+    bus.emit('entity.updated', { entity: next as ObjectRecord, previous: previous as ObjectRecord, changed, actor });
+    if (previous.status !== next.status) bus.emit('entity.status', { entity: next as ObjectRecord, from: previous.status ?? null, to: next.status ?? null, actor });
     return next;
   }
 
@@ -242,13 +242,13 @@ export class EntityRepo {
   }
 
   /** The universal query: same DSL for screens, widgets, automations and AI. */
-  query<T = Record<string, unknown>>(type: string | string[] | null, view: ViewDefinition = {}, opts: QueryOptions = {}): Entity<T>[] {
+  query<T = Record<string, unknown>>(type: string | string[] | null, view: ViewDefinition = {}, opts: QueryOptions = {}): ObjectRecord<T>[] {
     const { where, params } = this.buildWhere(type, view);
     const sort = compileSort(view.sort);
     const limit = opts.limit ?? 200;
     const offset = opts.offset ?? 0;
     const rows = this.db.all(`SELECT e.* FROM entities e WHERE ${where} ORDER BY ${sort} LIMIT ? OFFSET ?`, [...params, limit, offset]);
-    return rows.map(rowToEntity) as Entity<T>[];
+    return rows.map(rowToEntity) as ObjectRecord<T>[];
   }
 
   count(type: string | string[] | null, view: ViewDefinition = {}): number {
@@ -318,7 +318,7 @@ export class EntityRepo {
   }
 
   /** Recently touched entities of any type — powers "Recents" and the AI context. */
-  recent(limit = 20, types?: string[]): Entity[] {
+  recent(limit = 20, types?: string[]): ObjectRecord[] {
     const params: SqlParam[] = [];
     let where = 'deleted_at IS NULL AND archived = 0';
     if (types?.length) {
@@ -335,7 +335,7 @@ export class EntityRepo {
   }
 
   /** Create expression indexes declared by a type (idempotent, safe on every start). */
-  ensureIndexes(def: EntityTypeDef) {
+  ensureIndexes(def: ObjectDef) {
     for (const key of def.indexed ?? []) {
       if (!/^[a-zA-Z0-9_]+$/.test(key)) continue;
       this.db.exec(`CREATE INDEX IF NOT EXISTS idx_data_${def.type}_${key} ON entities(type, json_extract(data,'$.${key}')) WHERE type='${def.type}'`);
@@ -343,7 +343,7 @@ export class EntityRepo {
   }
 }
 
-function diffKeys(a: Entity, b: Entity): string[] {
+function diffKeys(a: ObjectRecord, b: ObjectRecord): string[] {
   const out: string[] = [];
   for (const k of ['title', 'subtitle', 'status', 'starred', 'archived', 'occurredAt'] as const) {
     if (a[k] !== b[k]) out.push(k);
@@ -357,7 +357,7 @@ function diffKeys(a: Entity, b: Entity): string[] {
   return out;
 }
 
-function labelFor(def: EntityTypeDef, status: string | null | undefined): string {
+function labelFor(def: ObjectDef, status: string | null | undefined): string {
   if (!status) return 'none';
   return def.statuses?.find((s) => s.value === status)?.label ?? status;
 }

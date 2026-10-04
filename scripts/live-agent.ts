@@ -37,12 +37,12 @@ if (env.GEMINI_API_KEY && only !== 'groq') chain.push({ kind: 'gemini', apiKey: 
 if (!chain.length) { console.error(`No keys: put GROQ_API_KEY / GEMINI_API_KEY in ${file}`); process.exit(1); }
 
 const modules: ModuleManifest[] = [
-  { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [personType, groupType] },
-  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools },
-  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
-  { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [taskType, projectType, eventType] },
-  { id: 'places', name: 'Places', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [placeType, orgType] },
-  { id: 'travel', name: 'Travel', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [tripType] },
+  { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, groupType] },
+  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools },
+  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
+  { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', objects: [taskType, projectType, eventType] },
+  { id: 'places', name: 'Places', version: '1', description: '', icon: 'x', color: '#000', objects: [placeType, orgType] },
+  { id: 'travel', name: 'Travel', version: '1', description: '', icon: 'x', color: '#000', objects: [tripType] },
 ];
 
 const TELL = [
@@ -56,7 +56,7 @@ const ASK = ['when did I last see Kendal?', 'where does Karan work', 'who was on
 
 async function main() {
   const os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules, registry: new Registry() });
-  os.entities.create({ type: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
+  os.records.create({ type: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
   let fellBack = '';
   const built = buildAgentProviders({ chain, events: { onFallback: (a, b, e) => (fellBack += ` [${a}→${b}: ${e.message.slice(0, 120)}]`) } });
   // LIVE_DEBUG=1 prints every tool call the model makes and what came back.
@@ -83,13 +83,13 @@ async function main() {
     for (const x of os.dumps.extractions(d.id)) console.log(`    · ${x.label}${x.flag ? `   ⚑ ${x.flag}` : ''}`);
   };
   for (const s of TELL) await file1(s);
-  const kendal = os.entities.query('person').find((p) => p.title.toLowerCase() === ON_PAGE[0].toLowerCase());
+  const kendal = os.records.query('person').find((p) => p.title.toLowerCase() === ON_PAGE[0].toLowerCase());
   if (kendal) await file1(ON_PAGE[1], kendal.id);
   else console.log('✗ no Kendal to test the page update on');
 
   console.log('\n— Graph —');
-  for (const e of os.entities.query(null, {}, { limit: 100 })) {
-    const links = os.relations.forEntity(e.id).map((l) => `${edgeLabel(l.relation.kind, l.direction).toLowerCase()} ${l.other.title}`);
+  for (const e of os.records.query(null, {}, { limit: 100 })) {
+    const links = os.links.forEntity(e.id).map((l) => `${edgeLabel(l.relation.kind, l.direction).toLowerCase()} ${l.other.title}`);
     const d = e.data as Record<string, unknown>;
     const facts = ['birthday', 'company', 'relationship', 'notes', 'purchasePrice', 'warrantyUntil', 'amount', 'kind', 'dueDate'].filter((k) => d[k] != null && d[k] !== '').map((k) => `${k}=${String(d[k]).replace(/\n/g, ' / ')}`);
     console.log(`${e.type.padEnd(11)} ${e.title}${facts.length ? `  {${facts.join(', ')}}` : ''}${links.length ? `\n              ↳ ${links.join(' · ')}` : ''}`);

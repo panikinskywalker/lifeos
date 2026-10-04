@@ -3,7 +3,7 @@ import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import type { Entity, FilterClause, FilterGroup, ViewDefinition } from '@core/domain/types';
+import type { ObjectRecord, FilterClause, FilterGroup, ViewDefinition } from '@core/domain/types';
 import type { SavedView } from '@core/repo/sideRepos';
 import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
@@ -21,7 +21,7 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const def = os.registry.type(type);
+  const def = os.registry.object(type);
   const tint = tintForModule(def.module);
   const currencyKey = def.fields.find((f) => f.type === 'currency')?.key;
   const views = useLive((o) => o.views.forType(type), [type]);
@@ -41,8 +41,8 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
     if (!v.sort?.length && (v.groupBy === 'day' || v.groupBy === 'month')) v.sort = [{ field: 'occurredAt', dir: 'desc' }];
     return v;
   }, [activeView, override, search, currencyKey, def.occurredAtField]);
-  const entities = useLive((o) => o.entities.query(type, view, { limit: 500 }), [type, JSON.stringify(view)]);
-  const total = useLive((o) => o.entities.count(type), [type]);
+  const entities = useLive((o) => o.records.query(type, view, { limit: 500 }), [type, JSON.stringify(view)]);
+  const total = useLive((o) => o.records.count(type), [type]);
   const layout = view.layout ?? 'list';
   const groups = useMemo(() => groupEntities(entities, view.groupBy, os), [entities, view.groupBy, os]);
   const filterCount = countClauses(view.filter);
@@ -81,7 +81,7 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
   );
   // The rows, a day's (or 40 rows') card at a time, so long lists only draw what's on screen.
   const chunks = useMemo(() => {
-    const out: Array<{ key: string; label: string | null; meta: string | null; items: Entity[] }> = [];
+    const out: Array<{ key: string; label: string | null; meta: string | null; items: ObjectRecord[] }> = [];
     for (const g of groups) {
       const meta = g.totals ? [g.totals.out ? `${os.format.currency(g.totals.out)} out` : null, g.totals.in ? `${os.format.currency(g.totals.in)} in` : null].filter(Boolean).join(' · ') : null;
       for (let i = 0; i < g.items.length; i += 40) out.push({ key: `${g.key ?? '_'}:${i}`, label: i === 0 ? (g.label ?? null) : null, meta: i === 0 ? meta : null, items: g.items.slice(i, i + 40) });
@@ -166,7 +166,7 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
   );
 }
 
-function Board({ entities, statuses }: { entities: Entity[]; statuses: NonNullable<ReturnType<ReturnType<typeof useOS>['registry']['type']>['statuses']> }) {
+function Board({ entities, statuses }: { entities: ObjectRecord[]; statuses: NonNullable<ReturnType<ReturnType<typeof useOS>['registry']['object']>['statuses']> }) {
   const os = useOS();
   const router = useRouter();
   const t = useTheme();
@@ -187,7 +187,7 @@ function Board({ entities, statuses }: { entities: Entity[]; statuses: NonNullab
                 onPress={() => router.push(`/entity/${e.type}/${e.id}`)}
                 onLongPress={() => {
                   const idx = statuses.findIndex((x) => x.value === e.status);
-                  os.entities.setStatus(e.id, statuses[(idx + 1) % statuses.length]!.value);
+                  os.records.setStatus(e.id, statuses[(idx + 1) % statuses.length]!.value);
                 }}
                 style={({ pressed }) => ({ backgroundColor: pressed ? t.c.bg.pressed : t.c.bg.tile, borderRadius: t.radius.card, padding: 14, gap: 2 })}
               >
@@ -215,22 +215,22 @@ function Board({ entities, statuses }: { entities: Entity[]; statuses: NonNullab
   );
 }
 
-export function groupEntities(entities: Entity[], groupBy: string | undefined, os: ReturnType<typeof useOS>): Array<{ key: string | null; label: string | null; items: Entity[]; totals?: { out: number; in: number } | null }> {
+export function groupEntities(entities: ObjectRecord[], groupBy: string | undefined, os: ReturnType<typeof useOS>): Array<{ key: string | null; label: string | null; items: ObjectRecord[]; totals?: { out: number; in: number } | null }> {
   if (!groupBy) return [{ key: null, label: null, items: entities }];
-  const map = new Map<string, Entity[]>();
-  const labelFor = (e: Entity): string => {
-    if (groupBy === 'status') return os.registry.type(e.type).statuses?.find((s) => s.value === e.status)?.label ?? e.status ?? 'No status';
+  const map = new Map<string, ObjectRecord[]>();
+  const labelFor = (e: ObjectRecord): string => {
+    if (groupBy === 'status') return os.registry.object(e.type).statuses?.find((s) => s.value === e.status)?.label ?? e.status ?? 'No status';
     if (groupBy === 'occurredAt' || groupBy === 'createdAt' || groupBy === 'month') {
       const ts = groupBy === 'createdAt' ? e.createdAt : e.occurredAt ?? e.createdAt;
       return new Date(ts).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
     }
     if (groupBy === 'day') return dayLabel(e.occurredAt ?? e.createdAt);
     const key = groupBy.replace(/^data\./, '');
-    const f = os.registry.type(e.type).fields.find((x) => x.key === key);
+    const f = os.registry.object(e.type).fields.find((x) => x.key === key);
     const v = e.data[key];
     if (v == null || v === '') return 'None';
     if (f?.type === 'select') return f.options?.find((o) => o.value === v)?.label ?? String(v);
-    if (f?.type === 'relation') return os.entities.ref(String(v))?.title ?? 'None';
+    if (f?.type === 'relation') return os.records.ref(String(v))?.title ?? 'None';
     return String(v);
   };
   for (const e of entities) {
@@ -238,8 +238,8 @@ export function groupEntities(entities: Entity[], groupBy: string | undefined, o
     if (!map.has(l)) map.set(l, []);
     map.get(l)!.push(e);
   }
-  const currencyKey = entities[0] ? os.registry.type(entities[0].type).fields.find((f) => f.type === 'currency')?.key : undefined;
-  const sum = (items: Entity[], kind: string) => items.reduce((n, e) => n + (e.data.kind === kind ? Number(e.data[currencyKey!] ?? 0) : 0), 0);
+  const currencyKey = entities[0] ? os.registry.object(entities[0].type).fields.find((f) => f.type === 'currency')?.key : undefined;
+  const sum = (items: ObjectRecord[], kind: string) => items.reduce((n, e) => n + (e.data.kind === kind ? Number(e.data[currencyKey!] ?? 0) : 0), 0);
   return [...map.entries()].map(([label, items]) => ({
     key: label,
     label,

@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 
 export const KNOWLEDGE_COLOR = 'purple';
 
 export interface NoteData { body: string; kind?: string; source?: string; projectId?: string; personIds?: string[] }
-export const noteType: EntityTypeDef<NoteData> = {
+export const noteType: ObjectDef<NoteData> = {
   type: 'note', module: 'knowledge', label: 'Note', labelPlural: 'Notes', icon: 'note.text',
   schema: z.object({ body: z.string().default(''), kind: z.string().optional(), source: z.string().optional(), projectId: z.string().optional(), personIds: z.array(z.string()).optional() }),
   fields: [
@@ -22,5 +22,5 @@ export const noteType: EntityTypeDef<NoteData> = {
 
 export const knowledgeModule: ModuleManifest = {
   id: 'knowledge', name: 'Second Brain', version: '1.0.0', description: 'Notes, ideas, journal and references — searchable and linked to everything.', icon: 'brain', color: KNOWLEDGE_COLOR,
-  dependencies: ['crm', 'projects'], entityTypes: [noteType],
+  dependencies: ['crm', 'projects'], objects: [noteType],
 };

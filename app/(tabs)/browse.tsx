@@ -13,9 +13,9 @@ export default function BrowseTab() {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
-  const counts = useLive((o) => o.entities.countsByType(), []);
+  const counts = useLive((o) => o.records.countsByType(), []);
   const facts = useLive((o) => o.facts.list({ limit: 10000 }).length, []);
-  const recent = useLive((o) => o.entities.recent(6), []);
+  const recent = useLive((o) => o.records.recent(6), []);
   const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core');
   const boards = [...os.registry.boards.values()].filter((b) => b.placement === 'browse');
   return (
@@ -48,7 +48,7 @@ export default function BrowseTab() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           {modules.map((m) => {
             const tint = tintForModule(m.id);
-            const types = os.registry.typesForModule(m.id).filter((x) => !x.hidden);
+            const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
             const n = types.reduce((sum, ty) => sum + (counts[ty.type] ?? 0), 0);
             const unit = types.length === 1 ? types[0]!.labelPlural.toLowerCase() : 'records';
             const name = shortNameForModule(m.id, m.name);

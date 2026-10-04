@@ -27,7 +27,7 @@ export function CategoryLearnPrompt() {
                 message: `${done.length} ${done.length === 1 ? 'payment' : 'payments'} moved to ${name}`,
                 icon: 'check',
                 undo: () => {
-                  for (const d of done) os.entities.update(d.id, { data: { category: d.was } }, 'system');
+                  for (const d of done) os.records.update(d.id, { data: { category: d.was } }, 'system');
                 },
               });
             },

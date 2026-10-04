@@ -26,7 +26,7 @@ export function HealthHome() {
   const os = useOS();
   const router = useRouter();
   const week = useLive((o) => Object.fromEntries(SECTIONS.map((s) => [s.id, { day: metricSeries(o, s.id, 'day'), week: metricSeries(o, s.id, 'week'), month: metricSeries(o, s.id, 'month') }])), []);
-  const workouts = useLive((o) => (o.registry.entityTypes.has('workout') ? o.entities.query<{ kind: string; durationMin: number; date: string }>('workout', { sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 6 }) : []), []);
+  const workouts = useLive((o) => (o.registry.objects.has('workout') ? o.records.query<{ kind: string; durationMin: number; date: string }>('workout', { sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 6 }) : []), []);
   const anyData = SECTIONS.some((s) => week[s.id]!.month.daysWithData > 0);
   return (
     <Screen title="Health" subtitle="From Health Connect" onBack={() => router.back()}>

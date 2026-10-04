@@ -1,15 +1,15 @@
 import React from 'react';
 import { Linking, View } from 'react-native';
 import { formatDistanceToNowStrict } from 'date-fns';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Text } from '@ui/kit';
 import { DELIVERY_STATUSES, type DeliveryData } from '@modules/deliveries/types';
 
 /** A delivery on its way: the code for the agent (big), and the tracking page one tap away. */
-export function DeliveryHero({ entity }: { entity: Entity<any> }) {
+export function DeliveryHero({ entity }: { entity: ObjectRecord<any> }) {
   const t = useTheme();
-  const d = (entity as Entity<DeliveryData>).data;
+  const d = (entity as ObjectRecord<DeliveryData>).data;
   const active = d.status === 'ordered' || d.status === 'shipped' || d.status === 'out_for_delivery';
   const otp = active && d.otp && (!d.otpAt || Date.now() - d.otpAt < 3 * 86_400_000) ? d.otp : null;
   if (!otp && !d.trackingUrl) return null;

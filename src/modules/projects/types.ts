@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 
 /** Projects record types (no React Native — unit-tested). */
 
@@ -16,7 +16,7 @@ export interface TaskData {
   personIds?: string[];
 }
 
-export const taskType: EntityTypeDef<TaskData> = {
+export const taskType: ObjectDef<TaskData> = {
   type: 'task',
   module: 'projects',
   label: 'Task',
@@ -36,7 +36,7 @@ export const taskType: EntityTypeDef<TaskData> = {
   occurredAtField: 'dueDate',
   statuses: [{ value: 'todo', label: 'To do' }, { value: 'doing', label: 'In progress', color: 'orange' }, { value: 'done', label: 'Done', color: 'green' }, { value: 'blocked', label: 'Blocked', color: 'red' }],
   searchText: (d) => d.notes ?? '',
-  relations: [{ kind: 'project', label: 'Project', to: 'project', cardinality: 'one' }, { kind: 'goal', label: 'Goal', to: 'goal', cardinality: 'one' }],
+  links: [{ kind: 'project', label: 'Project', to: 'project', cardinality: 'one' }, { kind: 'goal', label: 'Goal', to: 'goal', cardinality: 'one' }],
   defaultViews: [
     { name: 'Today', icon: 'sun.max', isDefault: false, definition: { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'lte', value: '__TODAY__' }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }] } },
     { name: 'Upcoming', icon: 'calendar', definition: { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'gt', value: '__TODAY__' }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }], groupBy: 'day' } },
@@ -52,7 +52,7 @@ export interface ProjectData {
   area?: string;
 }
 
-export const projectType: EntityTypeDef<ProjectData> = {
+export const projectType: ObjectDef<ProjectData> = {
   type: 'project',
   module: 'projects',
   label: 'Project',
@@ -66,7 +66,7 @@ export const projectType: EntityTypeDef<ProjectData> = {
   ],
   statuses: [{ value: 'active', label: 'Active' }, { value: 'planning', label: 'Planning', color: 'gray' }, { value: 'on_hold', label: 'On hold', color: 'orange' }, { value: 'done', label: 'Done', color: 'green' }],
   searchText: (d) => d.description ?? '',
-  relations: [{ kind: 'project', label: 'Tasks', to: 'task', cardinality: 'many' }, { kind: 'goal', label: 'Goal', to: 'goal', cardinality: 'one' }],
+  links: [{ kind: 'project', label: 'Tasks', to: 'task', cardinality: 'many' }, { kind: 'goal', label: 'Goal', to: 'goal', cardinality: 'one' }],
 };
 
 export interface GoalData {
@@ -78,7 +78,7 @@ export interface GoalData {
   area?: string;
 }
 
-export const goalType: EntityTypeDef<GoalData> = {
+export const goalType: ObjectDef<GoalData> = {
   type: 'goal',
   module: 'projects',
   label: 'Goal',
@@ -117,7 +117,7 @@ export interface EventData {
   calendars?: string[];
 }
 
-export const eventType: EntityTypeDef<EventData> = {
+export const eventType: ObjectDef<EventData> = {
   type: 'event',
   module: 'projects',
   label: 'Event',

@@ -12,5 +12,5 @@ export const healthModule: ModuleManifest = {
   description: 'Workouts and body measurements with trends.',
   icon: 'heart',
   color: HEALTH_COLOR,
-  entityTypes: [workoutType, measurementType],
+  objects: [workoutType, measurementType],
 };

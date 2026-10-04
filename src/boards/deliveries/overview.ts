@@ -4,7 +4,7 @@ import type { DeliveryData } from '@modules/deliveries/types';
 
 /** Parcels at a glance: what's on the way (with its OTP), delivered this month, by month and by shop. */
 export function deliveriesOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
-  const all = os.entities.query<DeliveryData>('delivery', {}, { limit: 2000 });
+  const all = os.records.query<DeliveryData>('delivery', {}, { limit: 2000 });
   const onWay = all.filter((d) => d.data.status === 'ordered' || d.data.status === 'shipped' || d.data.status === 'out_for_delivery');
   const months = lastMonths(6, now);
   const byMonth = months.map((m) => all.filter((d) => d.data.status === 'delivered' && (d.data.deliveredOn ?? '') >= m.start && (d.data.deliveredOn ?? '') <= m.end).length);

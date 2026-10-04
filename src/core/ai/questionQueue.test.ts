@@ -14,17 +14,17 @@ import { placeType, orgType } from '../../modules/places/types';
 let os: LifeOSContext;
 beforeEach(async () => {
   bus.clear();
-  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [personType, eventType, placeType, orgType] }], registry: new Registry() });
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, eventType, placeType, orgType] }], registry: new Registry() });
 });
 afterEach(() => os.db.close());
 
 describe('questions when no model is free', () => {
   it('the phone answers from the graph: the record, its latest dated connections, notes', () => {
-    const k = os.entities.create({ type: 'person', title: 'Kendal', data: { notes: '• Favourite colour: pink' } });
-    const canoe = os.entities.create({ type: 'place', title: 'Canoe', data: { kind: 'restaurant' } });
-    const dinner = os.entities.create({ type: 'event', title: 'Dinner at Canoe', data: { kind: 'dinner', startAt: Date.parse('2026-09-08T12:00:00') } });
-    os.relations.link(dinner.id, k.id, 'with');
-    os.relations.link(dinner.id, canoe.id, 'at');
+    const k = os.records.create({ type: 'person', title: 'Kendal', data: { notes: '• Favourite colour: pink' } });
+    const canoe = os.records.create({ type: 'place', title: 'Canoe', data: { kind: 'restaurant' } });
+    const dinner = os.records.create({ type: 'event', title: 'Dinner at Canoe', data: { kind: 'dinner', startAt: Date.parse('2026-09-08T12:00:00') } });
+    os.links.link(dinner.id, k.id, 'with');
+    os.links.link(dinner.id, canoe.id, 'at');
     const a = localAnswer(os, 'when did I last see Kendal?');
     expect(a.text).toContain('Kendal (person)');
     expect(a.text).toMatch(/Latest: Dinner at Canoe, 8 Sept 2026 \(at Canoe\)/);

@@ -29,8 +29,8 @@ export default function TimeScreen() {
   const s = useLive((o) => periodSummary(o, p), [span, p.from]);
   const txs = useLive(
     (o) =>
-      span === 'day' && o.registry.entityTypes.has('transaction')
-        ? o.entities.query('transaction', { filter: { and: [{ field: 'data.date', op: 'eq', value: p.from }] } }, { limit: 100 })
+      span === 'day' && o.registry.objects.has('transaction')
+        ? o.records.query('transaction', { filter: { and: [{ field: 'data.date', op: 'eq', value: p.from }] } }, { limit: 100 })
         : [],
     [span, p.from],
   );
@@ -122,7 +122,7 @@ export default function TimeScreen() {
         <Section title="Upkeep done" meta={String(s.done.length)}>
           <RowList>
             {s.done.slice(0, 20).map((d) => {
-              const e = os.entities.get(d.entityId);
+              const e = os.records.get(d.entityId);
               return <RowItem key={d.id} icon="repeat" tint="upkeep" title={d.title} subtitle={`${e?.title ?? ''}${span === 'day' ? '' : ` · ${format(new Date(d.at), 'd MMM')}`}`} value={d.cost ? money(d.cost) : undefined} onPress={e ? () => router.push(`/entity/${e.type}/${e.id}` as never) : undefined} />;
             })}
           </RowList>
@@ -136,7 +136,7 @@ export default function TimeScreen() {
               <EntityRow key={e.id} entity={e} subtitle={`New · ${format(new Date(e.createdAt), 'd MMM')}`} />
             ))}
             {s.created.filter((c) => c.type !== 'person').slice(0, 8).map((c) => {
-              const def = os.registry.entityTypes.get(c.type)!;
+              const def = os.registry.objects.get(c.type)!;
               return <RowItem key={c.type} icon={def.icon} tint="tasks" title={c.count === 1 ? def.label : def.labelPlural} value={`+${c.count}`} valueTone="secondary" onPress={() => router.push(`/entity/${c.type}` as never)} />;
             })}
             {s.facts ? <RowItem icon="sparkle" tint="memory" title={s.facts === 1 ? 'Fact remembered' : 'Facts remembered'} value={`+${s.facts}`} valueTone="secondary" onPress={() => router.push('/memory')} /> : null}

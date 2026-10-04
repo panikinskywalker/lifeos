@@ -1,6 +1,6 @@
 import { categoryFor } from '../ingest/ingest';
 import { z } from 'zod';
-import type { EntityTypeDef, FieldDef } from '../domain/types';
+import type { ObjectDef, FieldDef } from '../domain/types';
 import type { LifeOSContext } from '../registry/context';
 import type { AiToolDef } from '../registry/types';
 import { coerce, parseDateish } from '../ai/createAnything';
@@ -48,9 +48,9 @@ function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['du
   s.writes++;
   const row = os.dumps.addExtraction({ ...x, dumpId: s.dumpId, flag });
   // The record's own timeline points back at what was said.
-  if (x.entityId && x.kind !== 'link' && os.entities.get(x.entityId)) {
+  if (x.entityId && x.kind !== 'link' && os.records.get(x.entityId)) {
     const body = os.dumps.get(s.dumpId)?.body ?? '';
-    os.entities.timeline.add({ entityId: x.entityId, kind: 'dump', title: x.action === 'created' ? 'From something you said' : x.label, body: body.slice(0, 160), actor: 'assistant', meta: { dumpId: s.dumpId, extractionId: row.id }, occurredAt: Date.now() });
+    os.records.timeline.add({ entityId: x.entityId, kind: 'dump', title: x.action === 'created' ? 'From something you said' : x.label, body: body.slice(0, 160), actor: 'assistant', meta: { dumpId: s.dumpId, extractionId: row.id }, occurredAt: Date.now() });
   }
   return row;
 }
@@ -81,11 +81,11 @@ export function resolveNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, op
   const r = typeof ref === 'string' ? { name: ref } : ref;
   const name = r.name.trim();
   const type = (r.type ?? opts.type)?.toLowerCase();
-  if (r.id && os.entities.get(r.id)) return { id: r.id, confidence: 1, name };
-  if (s.subjectId && (THIS.test(name) || norm(name) === norm(os.entities.get(s.subjectId)?.title ?? '\0'))) return { id: s.subjectId, confidence: 1, name };
+  if (r.id && os.records.get(r.id)) return { id: r.id, confidence: 1, name };
+  if (s.subjectId && (THIS.test(name) || norm(name) === norm(os.records.get(s.subjectId)?.title ?? '\0'))) return { id: s.subjectId, confidence: 1, name };
   const seen = s.seen.get(`${type ?? ''}:${norm(name)}`) ?? s.seen.get(norm(name));
   if (seen) return { id: seen, confidence: 1, name };
-  const cands = resolveCandidates(os, name, type && os.registry.entityTypes.has(type) ? [type] : undefined).filter((c) => c.why !== `a ${c.type}`);
+  const cands = resolveCandidates(os, name, type && os.registry.objects.has(type) ? [type] : undefined).filter((c) => c.why !== `a ${c.type}`);
   const [a, b] = cands;
   if (opts.isNew) {
     // Models mark almost everything "new". An exact name already here is that record; only when the
@@ -114,16 +114,16 @@ export function upsertNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, opt
   let created = false;
   if (!id) {
     const type = pickType(os, r.type, r.name);
-    const def = os.registry.entityTypes.get(type)!;
+    const def = os.registry.objects.get(type)!;
     const title = titleCase(r.name);
     const data = baseData(def, title);
-    const e = os.entities.create({ type, title, data }, 'assistant');
+    const e = os.records.create({ type, title, data }, 'assistant');
     id = e.id;
     created = true;
     if (r.flag) s.flags.set(id, r.flag);
     log(os, s, { kind: type, action: 'created', entityId: id, label: `${def.label}: ${title}`, flag: r.flag });
   } else if (r.flag) s.flags.set(id, r.flag);
-  const e = os.entities.get(id)!;
+  const e = os.records.get(id)!;
   s.seen.set(`${e.type}:${norm(r.name)}`, id);
   s.seen.set(norm(r.name), id);
   s.seen.set(norm(e.title), id);
@@ -134,12 +134,12 @@ export function upsertNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, opt
 function pickType(os: LifeOSContext, type: string | undefined, name: string): string {
   const alias: Record<string, string> = { people: 'person', friend: 'person', contact: 'person', organisation: 'org', organization: 'org', company: 'org', employer: 'org', brand: 'org', shop: 'org', city: 'place', country: 'place', venue: 'place', location: 'place', flight: 'event', meeting: 'event', car: 'vehicle', bike: 'vehicle', todo: 'task', book: 'note' };
   const t = type ? (alias[type] ?? type) : TYPE_GUESS.find(([re]) => re.test(name))?.[1] ?? 'person';
-  if (os.registry.entityTypes.has(t)) return t;
-  return os.registry.entityTypes.has('note') ? 'note' : [...os.registry.entityTypes.keys()][0]!;
+  if (os.registry.objects.has(t)) return t;
+  return os.registry.objects.has('note') ? 'note' : [...os.registry.objects.keys()][0]!;
 }
 
 /** Required fields filled from the title or first option, so any type can be created from just a name. */
-function baseData(def: EntityTypeDef, title: string): Record<string, unknown> {
+function baseData(def: ObjectDef, title: string): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const f of def.fields) {
     if (f.defaultValue !== undefined) out[f.key] = typeof f.defaultValue === 'function' ? (f.defaultValue as () => unknown)() : f.defaultValue;
@@ -173,7 +173,7 @@ const KEY_SYNONYMS: Record<string, string[]> = {
   endDate: ['end', 'ends', 'until', 'till'],
 };
 
-function fieldFor(def: EntityTypeDef, key: string): FieldDef | undefined {
+function fieldFor(def: ObjectDef, key: string): FieldDef | undefined {
   const k = norm(key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' '));
   return (
     def.fields.find((f) => norm(f.key.replace(/([a-z])([A-Z])/g, '$1 $2')) === k || norm(f.label) === k) ??
@@ -186,9 +186,9 @@ const shown = (v: unknown) => (v == null || v === '' ? '—' : Array.isArray(v) 
 
 /** Typed fields where the type has them, everything else as a tidy Notes line. Returns what went where. */
 export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, attributes: Record<string, unknown>): { fields: string[]; notes: string[] } {
-  const e = os.entities.get(id);
+  const e = os.records.get(id);
   if (!e) return { fields: [], notes: [] };
-  const def = os.registry.entityTypes.get(e.type)!;
+  const def = os.registry.objects.get(e.type)!;
   const data = e.data as Record<string, unknown>;
   const patch: Record<string, unknown> = {};
   const before: Record<string, unknown> = {};
@@ -217,13 +217,13 @@ export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, at
   }
   const fields = Object.keys(patch);
   if (fields.length) {
-    os.entities.update(id, { data: patch }, 'assistant');
+    os.records.update(id, { data: patch }, 'assistant');
     const label = fields.map((k) => `${fieldFor(def, k)?.label ?? k} → ${shown(patch[k])}`).join(', ');
     log(os, s, { kind: e.type, action: 'updated', entityId: id, label: `${e.title} · ${label}`, before });
   }
   for (const [label, value] of notes) addNoteLine(os, s, id, label, value);
   // A person's company is also a link to the organisation.
-  if (e.type === 'person' && typeof patch.company === 'string' && os.registry.entityTypes.has('org')) {
+  if (e.type === 'person' && typeof patch.company === 'string' && os.registry.objects.has('org')) {
     const org = upsertNode(os, s, { name: patch.company, type: 'org' });
     if (org) link(os, s, id, org.id, 'works_at');
   }
@@ -232,9 +232,9 @@ export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, at
 
 /** "• Favourite colour: pink" in the record's Notes; the same label again updates its line. */
 export function addNoteLine(os: LifeOSContext, s: GraphSession, id: string, label: string, value: string): void {
-  const e = os.entities.get(id);
+  const e = os.records.get(id);
   if (!e) return;
-  const def = os.registry.entityTypes.get(e.type)!;
+  const def = os.registry.objects.get(e.type)!;
   const key = def.fields.find((f) => f.key === 'notes' || f.key === 'body')?.key ?? def.fields.find((f) => f.type === 'longtext')?.key;
   const nice = titleCase(label.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).replace(/^(\p{L})(.*)$/u, (_m, a: string, b: string) => a + b.toLowerCase());
   const line = `• ${nice}: ${value.trim()}`;
@@ -249,7 +249,7 @@ export function addNoteLine(os: LifeOSContext, s: GraphSession, id: string, labe
   if (at >= 0 && lines[at] === line) return;
   if (at >= 0) lines[at] = line;
   else lines.push(line);
-  os.entities.update(id, { data: { [key]: lines.join('\n') } }, 'assistant');
+  os.records.update(id, { data: { [key]: lines.join('\n') } }, 'assistant');
   log(os, s, { kind: e.type, action: 'updated', entityId: id, label: `${e.title} · ${nice}: ${value}`, before: { [key]: old || null } });
 }
 
@@ -260,10 +260,10 @@ export function addNoteLine(os: LifeOSContext, s: GraphSession, id: string, labe
 export function link(os: LifeOSContext, s: GraphSession, fromId: string, toId: string, kind: string, confidence = 1): string | null {
   if (fromId === toId) return null;
   const [a, b] = [fromId, toId];
-  if (SYMMETRIC_EDGES.has(kind) && os.relations.forEntity(a, kind).some((x) => x.other.id === b)) return null;
-  const existing = os.relations.forEntity(a, kind).find((x) => x.other.id === b && x.direction === 'out');
+  if (SYMMETRIC_EDGES.has(kind) && os.links.forEntity(a, kind).some((x) => x.other.id === b)) return null;
+  const existing = os.links.forEntity(a, kind).find((x) => x.other.id === b && x.direction === 'out');
   if (existing) return null;
-  const r = os.relations.link(a, b, kind, {}, 'assistant', prov(s, confidence));
+  const r = os.links.link(a, b, kind, {}, 'assistant', prov(s, confidence));
   const ta = nodeLabel(os, a);
   const tb = nodeLabel(os, b);
   const word = EDGE_WORDS[kind]?.out.toLowerCase() ?? kind.replace(/_/g, ' ');
@@ -274,7 +274,7 @@ export function link(os: LifeOSContext, s: GraphSession, fromId: string, toId: s
 
 /** How a node reads in a To check line: an expense by its amount, anything else by its title. */
 function nodeLabel(os: LifeOSContext, id: string): string {
-  const e = os.entities.get(id);
+  const e = os.records.get(id);
   if (!e) return 'record';
   if (e.type === 'transaction') {
     const d = e.data as { amount?: number; merchant?: string };
@@ -286,7 +286,7 @@ function nodeLabel(os: LifeOSContext, id: string): string {
 /** A category as the model said it ("Pets", "food") → the category's stored value (your own ones included); unknown words kept as said. */
 function categoryValue(os: LifeOSContext, said: string | undefined): string {
   if (!said) return 'other';
-  const opts = os.registry.entityTypes.get('transaction')?.fields.find((f) => f.key === 'category')?.options ?? [];
+  const opts = os.registry.objects.get('transaction')?.fields.find((f) => f.key === 'category')?.options ?? [];
   const k = said.trim().toLowerCase();
   return (opts.find((o) => o.value.toLowerCase() === k || o.label.toLowerCase() === k) ?? opts.find((o) => o.label.toLowerCase().split(/\s*&\s*/)[0] === k))?.value ?? said;
 }
@@ -300,8 +300,8 @@ function dayStart(iso: string) {
 
 /** A trip this travel belongs to: one whose dates cover the day or whose destination matches, else a new "Trip to X". */
 function tripFor(os: LifeOSContext, s: GraphSession, day: string, destination?: string): string | null {
-  if (!os.registry.entityTypes.has('trip')) return null;
-  const trips = os.entities.query<{ destination?: string; startDate?: string; endDate?: string }>('trip', {}, { limit: 200 });
+  if (!os.registry.objects.has('trip')) return null;
+  const trips = os.records.query<{ destination?: string; startDate?: string; endDate?: string }>('trip', {}, { limit: 200 });
   // A trip with no end date is open for two weeks from its start.
   const openEnd = (start: string) => new Date(Date.parse(start) + 14 * 86400000).toISOString().slice(0, 10);
   const covers = trips.find((t) => t.data.startDate && t.data.startDate <= day && (t.data.endDate ?? openEnd(t.data.startDate)) >= day);
@@ -309,7 +309,7 @@ function tripFor(os: LifeOSContext, s: GraphSession, day: string, destination?: 
   const hit = covers ?? named;
   if (hit) return hit.id;
   if (!destination) return null;
-  const t = os.entities.create({ type: 'trip', title: `Trip to ${titleCase(destination)}`, data: { destination: titleCase(destination), startDate: day } }, 'assistant');
+  const t = os.records.create({ type: 'trip', title: `Trip to ${titleCase(destination)}`, data: { destination: titleCase(destination), startDate: day } }, 'assistant');
   log(os, s, { kind: 'trip', action: 'created', entityId: t.id, label: `Trip: Trip to ${titleCase(destination)}` });
   return t.id;
 }
@@ -327,7 +327,7 @@ export interface EventInput {
 
 /** Something that happened: an event with a kind, a date, and role links to who/where. Travel joins a trip. */
 export function recordEvent(os: LifeOSContext, s: GraphSession, i: EventInput): { id: string } | { error: string } {
-  if (!os.registry.entityTypes.has('event')) return { error: 'no event type installed' };
+  if (!os.registry.objects.has('event')) return { error: 'no event type installed' };
   const day = parseDateish(i.when ?? 'today') ?? parseDateish('today')!;
   const hasTime = !!i.when && /\d{1,2}[:.]\d{2}|\b\d{1,2}\s*(am|pm)\b/i.test(i.when);
   const startAt = hasTime && Number.isFinite(Date.parse(`${day} ${i.when!.match(/\d{1,2}([:.]\d{2})?\s*(am|pm)?/i)![0]}`)) ? Date.parse(`${day} ${i.when!.match(/\d{1,2}([:.]\d{2})?\s*(am|pm)?/i)![0]}`) : dayStart(day);
@@ -344,7 +344,7 @@ export function recordEvent(os: LifeOSContext, s: GraphSession, i: EventInput): 
   const title = i.title?.trim() || (kind === 'flight' && to ? `Flight to ${titleCase(to)}` : `${titleCase(kind)}${at ? ` at ${titleCase(at)}` : to ? ` to ${titleCase(to)}` : people}`);
   const cost = typeof i.cost === 'string' ? (parseAmount(i.cost) ?? undefined) : i.cost;
   const details = Object.fromEntries(Object.entries(i.details ?? {}).filter(([k]) => ['airline', 'flightNo', 'location', 'notes'].includes(k)).map(([k, v]) => [k, String(v)]));
-  const ev = os.entities.create({ type: 'event', title, data: { kind, startAt, allDay: !hasTime, ...(i.end ? { endAt: dayStart(parseDateish(i.end) ?? day) } : {}), ...(cost ? { cost } : {}), ...details } }, 'assistant');
+  const ev = os.records.create({ type: 'event', title, data: { kind, startAt, allDay: !hasTime, ...(i.end ? { endAt: dayStart(parseDateish(i.end) ?? day) } : {}), ...(cost ? { cost } : {}), ...details } }, 'assistant');
   log(os, s, { kind: 'event', action: 'created', entityId: ev.id, label: `${titleCase(kind)}: ${title} (${new Date(startAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})` });
   const withIds: string[] = [];
   for (const r of roles) {
@@ -377,12 +377,12 @@ export function reverseWrite(os: LifeOSContext, extractionId: string): boolean {
   if (exact) {
     exact();
     exactUndo.delete(extractionId);
-  } else if (x.relationId) os.relations.remove(x.relationId);
+  } else if (x.relationId) os.links.remove(x.relationId);
   else if (x.factId) os.facts.forget(x.factId);
-  else if (x.entityId && x.action === 'created') os.entities.delete(x.entityId, 'user');
+  else if (x.entityId && x.action === 'created') os.records.delete(x.entityId, 'user');
   else if (x.entityId && x.action === 'updated' && x.before) {
     const back = Object.fromEntries(Object.entries(x.before).map(([k, v]) => [k, v ?? undefined]));
-    if (os.entities.get(x.entityId)) os.entities.update(x.entityId, { data: back }, 'user');
+    if (os.records.get(x.entityId)) os.records.update(x.entityId, { data: back }, 'user');
   } else return false;
   os.dumps.markUndone(extractionId);
   return true;
@@ -408,7 +408,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         const i = input as { name: string; type?: string; is_new?: boolean; attributes?: Record<string, unknown> };
         const n = upsertNode(os, s, { name: i.name, type: i.type }, { isNew: i.is_new, attributes: i.attributes });
         if (!n) return { skipped: 'that is the user' };
-        const e = os.entities.get(n.id)!;
+        const e = os.records.get(n.id)!;
         return { id: n.id, name: e.title, type: e.type, created: n.created };
       },
     },
@@ -460,8 +460,8 @@ export function graphTools(s: GraphSession): AiToolDef[] {
       input: z.object({ title: z.string(), due: z.string().optional(), about: NodeRef.optional() }),
       run: async (input, os) => {
         const i = input as { title: string; due?: string; about?: NodeRef };
-        if (!os.registry.entityTypes.has('task')) return { error: 'no task type installed' };
-        const t = os.entities.create({ type: 'task', title: i.title.trim(), data: { dueDate: parseDateish(i.due), priority: 'medium' } }, 'assistant');
+        if (!os.registry.objects.has('task')) return { error: 'no task type installed' };
+        const t = os.records.create({ type: 'task', title: i.title.trim(), data: { dueDate: parseDateish(i.due), priority: 'medium' } }, 'assistant');
         log(os, s, { kind: 'task', action: 'created', entityId: t.id, label: `Task: ${t.title}${i.due ? ` (${parseDateish(i.due) ?? i.due})` : ''}` });
         if (i.about) {
           const n = upsertNode(os, s, i.about);
@@ -483,7 +483,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         const cost = typeof i.cost === 'string' ? (parseAmount(i.cost) ?? undefined) : i.cost;
         const out = (await tool.run(tool.input.parse({ entityId: r.id, what: i.what, date: parseDateish(i.date ?? 'today'), cost, meter: i.meter }), os)) as Record<string, unknown>;
         if (out?.error) return out;
-        const row = log(os, s, { kind: 'cycle', action: 'logged', entityId: r.id, label: String(out.logged ?? `${i.what} on ${os.entities.get(r.id)?.title}`), flag: r.flag });
+        const row = log(os, s, { kind: 'cycle', action: 'logged', entityId: r.id, label: String(out.logged ?? `${i.what} on ${os.records.get(r.id)?.title}`), flag: r.flag });
         const undo = extrasOf(out).undo;
         if (undo) exactUndo.set(row.id, undo);
         return { done: out.logged, next: out.next };
@@ -500,7 +500,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         const out = (await tool.run(tool.input.parse({ habit: i.habit, date: parseDateish(i.date ?? 'today') }), os)) as Record<string, unknown>;
         if (out?.error || !out.entityId) return out;
         const row = log(os, s, { kind: 'habit', action: 'logged', entityId: String(out.entityId), label: String(out.logged) });
-        if (out.logId) exactUndo.set(row.id, () => os.entities.delete(String(out.logId), 'user'));
+        if (out.logId) exactUndo.set(row.id, () => os.records.delete(String(out.logId), 'user'));
         return { done: out.logged };
       },
     },
@@ -510,12 +510,12 @@ export function graphTools(s: GraphSession): AiToolDef[] {
       input: z.object({ amount: z.union([z.number(), z.string()]), kind: z.enum(['expense', 'income']).optional(), merchant: z.string().optional(), category: z.string().optional(), date: z.string().optional(), for: NodeRef.optional(), with: z.array(NodeRef).optional(), account: z.string().optional(), note: z.string().optional() }),
       run: async (input, os) => {
         const i = input as { amount: number | string; kind?: 'expense' | 'income'; merchant?: string; category?: string; date?: string; for?: NodeRef; with?: NodeRef[]; account?: string; note?: string };
-        if (!os.registry.entityTypes.has('transaction')) return { error: 'no finance module installed' };
+        if (!os.registry.objects.has('transaction')) return { error: 'no finance module installed' };
         const amount = typeof i.amount === 'number' ? i.amount : parseAmount(i.amount);
         if (!amount) return { error: 'no amount' };
         const account = i.account ? resolveCandidates(os, i.account, ['account']).find((c) => c.score >= 0.8) : undefined;
         const data = { amount, kind: i.kind ?? 'expense', category: i.category ? categoryValue(os, i.category) : categoryFor(os, i.merchant ?? (i.for ? nameOf(i.for) : null), i.note ?? '', typeof amount === 'number' ? amount : null), merchant: i.merchant ?? (i.for ? nameOf(i.for) : undefined), date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined) };
-        const tx = os.entities.create({ type: 'transaction', data }, 'assistant');
+        const tx = os.records.create({ type: 'transaction', data }, 'assistant');
         log(os, s, { kind: 'transaction', action: 'created', entityId: tx.id, label: `${data.kind === 'income' ? 'Income' : 'Spent'}: ${os.format.currency(amount)}${data.merchant ? ` · ${data.merchant}` : ''}` });
         if (i.for) {
           const n = upsertNode(os, s, i.for);
@@ -523,10 +523,10 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         }
         for (const w of i.with ?? []) {
           const r = resolveNode(os, s, w, { type: 'person' });
-          const hit = r.id ? os.entities.get(r.id) : undefined;
+          const hit = r.id ? os.records.get(r.id) : undefined;
           // "…on the HDFC card" said as "with": it's how it was paid, not who was there.
           if (hit?.type === 'account') {
-            if (!data.accountId) os.entities.update(tx.id, { data: { accountId: hit.id } }, 'assistant');
+            if (!data.accountId) os.records.update(tx.id, { data: { accountId: hit.id } }, 'assistant');
             continue;
           }
           const n = upsertNode(os, s, w, { type: 'person' });

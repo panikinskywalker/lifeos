@@ -24,7 +24,7 @@ export interface Neighbour {
 }
 
 const eventTime = (os: LifeOSContext, id: string): number | null => {
-  const e = os.entities.get(id);
+  const e = os.records.get(id);
   if (!e) return null;
   const d = e.data as { startAt?: number; startDate?: string; date?: string };
   return d.startAt ?? (d.startDate ? Date.parse(d.startDate) : d.date ? Date.parse(d.date) : e.occurredAt ?? null);
@@ -33,12 +33,12 @@ const eventTime = (os: LifeOSContext, id: string): number | null => {
 /** Neighbours of a record, dated things first (newest first), then the rest by link word. */
 export function neighbours(os: LifeOSContext, id: string, opts: { kind?: string; limit?: number } = {}): Neighbour[] {
   const out: Neighbour[] = [];
-  for (const r of os.relations.forEntity(id, opts.kind)) {
+  for (const r of os.links.forEntity(id, opts.kind)) {
     const o = r.other;
     const dated = o.type === 'event' || o.type === 'trip' || o.type === 'transaction';
     let context: string | null = null;
     if (dated) {
-      const around = os.relations
+      const around = os.links
         .forEntity(o.id)
         .filter((x) => x.other.id !== id)
         .slice(0, 5)
@@ -67,7 +67,7 @@ export const graphReadTools: AiToolDef[] = [
       const i = input as { name?: string; id?: string; kind?: string; limit?: number };
       const id = i.id ?? (i.name ? clearMatch(resolveCandidates(os, i.name))?.id : undefined);
       if (!id) return { error: i.name ? `no clear record called ${i.name}` : 'name or id required' };
-      const e = os.entities.get(id)!;
+      const e = os.records.get(id)!;
       return { record: e.title, type: e.type, connections: neighbours(os, id, { kind: i.kind, limit: i.limit ?? 20 }).map((n) => ({ ...n, at: n.at ? day(n.at) : undefined })) };
     },
   },
@@ -94,11 +94,11 @@ export interface GraphEdge {
 export function egoGraph(os: LifeOSContext, centreId: string, opts: { hops?: number; limit?: number } = {}): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const hops = opts.hops ?? 2;
   const limit = opts.limit ?? 36;
-  const centre = os.entities.get(centreId);
+  const centre = os.records.get(centreId);
   if (!centre) return { nodes: [], edges: [] };
   const node = (id: string, hop: number): GraphNode | null => {
-    const e = os.entities.get(id);
-    return e ? { id: e.id, type: e.type, title: e.title, module: os.registry.entityTypes.get(e.type)?.module ?? null, hop } : null;
+    const e = os.records.get(id);
+    return e ? { id: e.id, type: e.type, title: e.title, module: os.registry.objects.get(e.type)?.module ?? null, hop } : null;
   };
   const nodes = new Map<string, GraphNode>([[centre.id, node(centre.id, 0)!]]);
   const edges = new Map<string, GraphEdge>();
@@ -106,7 +106,7 @@ export function egoGraph(os: LifeOSContext, centreId: string, opts: { hops?: num
   for (let hop = 1; hop <= hops && frontier.length; hop++) {
     const next: string[] = [];
     for (const id of frontier) {
-      for (const r of os.relations.forEntity(id)) {
+      for (const r of os.links.forEntity(id)) {
         if (r.relation.kind === 'mention') continue;
         const other = r.other.id;
         if (!nodes.has(other)) {

@@ -4,9 +4,9 @@ import { activeHabits, streakOf } from '@core/habits/habits';
 
 /** Habits at a glance: done today, streaks, the last 12 weeks as a heat map, this week per habit. */
 export function habitsOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
-  const habits = os.entities.query<{ frequency?: string; targetPerWeek?: number }>('habit', { filter: { and: [{ field: 'status', op: 'neq', value: 'paused' }] } }, { limit: 100 });
+  const habits = os.records.query<{ frequency?: string; targetPerWeek?: number }>('habit', { filter: { and: [{ field: 'status', op: 'neq', value: 'paused' }] } }, { limit: 100 });
   const from = isoOf(now - 83 * DAY_MS);
-  const logs = os.entities.query<{ habitId: string; date: string }>('habit_log', { filter: { and: [{ field: 'data.date', op: 'gte', value: from }] } }, { limit: 20000 });
+  const logs = os.records.query<{ habitId: string; date: string }>('habit_log', { filter: { and: [{ field: 'data.date', op: 'gte', value: from }] } }, { limit: 20000 });
   const byDay = new Map<string, Set<string>>();
   for (const l of logs) {
     if (!byDay.has(l.data.date)) byDay.set(l.data.date, new Set());

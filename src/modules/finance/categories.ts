@@ -91,9 +91,9 @@ export function deleteCategory(os: LifeOSContext, value: string): number {
   let moved = 0;
   os.db.transaction(() => {
     for (const type of ['transaction', 'budget', 'subscription']) {
-      if (!os.registry.entityTypes.has(type)) continue;
-      for (const e of os.entities.query<{ category?: string }>(type, { filter: { and: [{ field: 'data.category', op: 'eq', value }] } }, { limit: 100000 })) {
-        os.entities.update(e.id, { data: { category: 'other' } }, 'user');
+      if (!os.registry.objects.has(type)) continue;
+      for (const e of os.records.query<{ category?: string }>(type, { filter: { and: [{ field: 'data.category', op: 'eq', value }] } }, { limit: 100000 })) {
+        os.records.update(e.id, { data: { category: 'other' } }, 'user');
         moved++;
       }
     }

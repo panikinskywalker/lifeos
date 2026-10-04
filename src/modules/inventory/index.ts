@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 import { dateField } from '@core/cycles/schedule';
 
 export const INVENTORY_COLOR = 'teal';
 
 export interface ItemData { quantity: number; unit?: string; location?: string; minQuantity?: number; expiresOn?: string; category?: string; notes?: string }
-export const itemType: EntityTypeDef<ItemData> = {
+export const itemType: ObjectDef<ItemData> = {
   type: 'item', module: 'inventory', label: 'Item', labelPlural: 'Inventory', icon: 'shippingbox',
   schema: z.object({ quantity: z.coerce.number().default(1), unit: z.string().optional(), location: z.string().optional(), minQuantity: z.coerce.number().optional(), expiresOn: z.string().optional(), category: z.string().optional(), notes: z.string().optional() }),
   cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'item.expiry', name: 'Use or replace', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: 7 }] : []),
@@ -26,9 +26,9 @@ export const itemType: EntityTypeDef<ItemData> = {
 
 export const inventoryModule: ModuleManifest = {
   id: 'inventory', name: 'Inventory', version: '1.0.0', description: 'What you have, where it is, and when to restock.', icon: 'shippingbox', color: INVENTORY_COLOR,
-  entityTypes: [itemType],
+  objects: [itemType],
   aiTools: [{
     name: 'low_stock', description: 'Inventory items at or below their restock threshold.', input: z.object({}),
-    run: async (_i, os) => os.entities.query<ItemData>('item').filter((i) => i.data.minQuantity != null && i.data.quantity <= i.data.minQuantity).map((i) => ({ id: i.id, title: i.title, quantity: i.data.quantity, min: i.data.minQuantity, location: i.data.location })),
+    run: async (_i, os) => os.records.query<ItemData>('item').filter((i) => i.data.minQuantity != null && i.data.quantity <= i.data.minQuantity).map((i) => ({ id: i.id, title: i.title, quantity: i.data.quantity, min: i.data.minQuantity, location: i.data.location })),
   }],
 };

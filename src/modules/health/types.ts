@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 
 
 /** Health record types (no React Native — unit-tested). */
@@ -7,7 +7,7 @@ import type { EntityTypeDef } from '@core/domain/types';
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export interface WorkoutData { kind: string; durationMin: number; date: string; distanceKm?: number; calories?: number; intensity?: string; notes?: string; /** health_connect, … */ source?: string; /** The source's id for it (so a re-sync updates, never duplicates). */ sourceKey?: string }
-export const workoutType: EntityTypeDef<WorkoutData> = {
+export const workoutType: ObjectDef<WorkoutData> = {
   type: 'workout', module: 'health', label: 'Workout', labelPlural: 'Workouts', icon: 'figure.run',
   schema: z.object({ kind: z.string(), durationMin: z.coerce.number().positive(), date: z.string(), distanceKm: z.coerce.number().optional(), calories: z.coerce.number().optional(), intensity: z.string().optional(), notes: z.string().optional(), source: z.string().optional(), sourceKey: z.string().optional() }),
   fields: [
@@ -25,7 +25,7 @@ export const workoutType: EntityTypeDef<WorkoutData> = {
 };
 
 export interface MeasurementData { metric: string; value: number; unit?: string; date: string; notes?: string; source?: string; sourceKey?: string }
-export const measurementType: EntityTypeDef<MeasurementData> = {
+export const measurementType: ObjectDef<MeasurementData> = {
   type: 'measurement', module: 'health', label: 'Measurement', labelPlural: 'Measurements', icon: 'scalemass',
   // Shown as its metrics (Steps, Sleep, Weight…) on the Health page, not as a category of its own.
   hidden: true,

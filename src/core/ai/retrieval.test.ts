@@ -12,7 +12,7 @@ import type { ChatMessage, LLMProvider } from './provider';
 
 const mod: ModuleManifest = {
   id: 'm', name: 'M', version: '1', description: '', icon: 'x', color: '#000',
-  entityTypes: [
+  objects: [
     { type: 'vehicle', module: 'm', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car', schema: z.object({ name: z.string(), plate: z.string().optional() }), fields: [{ key: 'name', label: 'Name', type: 'text' }, { key: 'plate', label: 'Registration', type: 'text' }], computeTitle: (x) => String(x.name) },
     { type: 'person', module: 'm', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
   ],
@@ -26,7 +26,7 @@ afterEach(() => os.db.close());
 
 describe('retrieval', () => {
   it('packs matching facts, the record in question (cycles, timeline, facts) and other hits', () => {
-    const car = os.entities.create({ type: 'vehicle', data: { name: 'Creta', plate: 'KA 05 MZ 1234' } });
+    const car = os.records.create({ type: 'vehicle', data: { name: 'Creta', plate: 'KA 05 MZ 1234' } });
     os.cycles.create({ entityId: car.id, name: 'Service', kind: 'interval', everyN: 6, everyUnit: 'month', nextDueAt: Date.now() + 5 * 864e5 });
     os.facts.add({ text: 'The Creta is serviced at Hyundai Indiranagar', subjectId: car.id, source: 'talk' });
     os.facts.add({ text: 'Priya prefers window seats', source: 'talk' });

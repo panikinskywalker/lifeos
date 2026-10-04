@@ -1,12 +1,12 @@
 import type { DatabaseAdapter, Row } from '../db/adapter';
-import type { TimelineEvent } from '../domain/types';
+import type { LifeEvent } from '../domain/types';
 import { newId } from '../domain/ids';
 import { safeJson } from './entityRepo';
 
 export class TimelineRepo {
   constructor(private db: DatabaseAdapter) {}
 
-  add(ev: Omit<TimelineEvent, 'id' | 'createdAt' | 'meta'> & { meta?: Record<string, unknown> }): TimelineEvent {
+  add(ev: Omit<LifeEvent, 'id' | 'createdAt' | 'meta'> & { meta?: Record<string, unknown> }): LifeEvent {
     const now = Date.now();
     const id = newId(now);
     this.db.run(`INSERT INTO timeline_events(id,entity_id,kind,title,body,actor,meta,occurred_at,created_at) VALUES (?,?,?,?,?,?,?,?,?)`, [
@@ -20,12 +20,12 @@ export class TimelineRepo {
     this.db.run(`DELETE FROM timeline_events WHERE id=?`, [id]);
   }
 
-  forEntity(entityId: string, limit = 100): TimelineEvent[] {
+  forEntity(entityId: string, limit = 100): LifeEvent[] {
     return this.db.all(`SELECT * FROM timeline_events WHERE entity_id = ? ORDER BY occurred_at DESC LIMIT ?`, [entityId, limit]).map(toEvent);
   }
 
   /** Cross-entity activity feed (the Dashboard "Activity" widget). */
-  recent(limit = 50, types?: string[]): Array<TimelineEvent & { entityTitle: string; entityType: string }> {
+  recent(limit = 50, types?: string[]): Array<LifeEvent & { entityTitle: string; entityType: string }> {
     const params: (string | number)[] = [];
     let typeSql = '';
     if (types?.length) {
@@ -39,14 +39,14 @@ export class TimelineRepo {
   }
 }
 
-function toEvent(r: Row): TimelineEvent {
+function toEvent(r: Row): LifeEvent {
   return {
     id: r.id as string,
     entityId: r.entity_id as string,
     kind: r.kind as string,
     title: r.title as string,
     body: (r.body as string | null) ?? null,
-    actor: r.actor as TimelineEvent['actor'],
+    actor: r.actor as LifeEvent['actor'],
     meta: safeJson(r.meta as string),
     occurredAt: r.occurred_at as number,
     createdAt: r.created_at as number,

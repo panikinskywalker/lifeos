@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { Entity, EntityTypeDef, FieldDef } from '@core/domain/types';
+import type { ObjectRecord, ObjectDef, FieldDef } from '@core/domain/types';
 import { ZodError } from 'zod';
 import { useTheme } from '../theme/ThemeProvider';
 import { Button, Field, FilterChip, Screen, Section, Text, TextField } from '../kit';
@@ -12,12 +12,12 @@ import { useLive, useOS } from '../hooks';
  * One form for every entity type. Fields come from the type definition plus
  * the user's custom fields; validation from the zod schema.
  */
-export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type: string; id?: string; initial?: Record<string, unknown>; onSaved?: (e: Entity) => void; linkTo?: { id: string; kind: string } }) {
+export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type: string; id?: string; initial?: Record<string, unknown>; onSaved?: (e: ObjectRecord) => void; linkTo?: { id: string; kind: string } }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
-  const def: EntityTypeDef = os.registry.type(type);
-  const existing = useLive((o) => (id ? o.entities.get(id) : undefined), [id]);
+  const def: ObjectDef = os.registry.object(type);
+  const existing = useLive((o) => (id ? o.records.get(id) : undefined), [id]);
   const customFields = useLive((o) => o.customFields.forType(type), [type]);
   const existingTags = useLive((o) => (id ? o.tags.forEntity(id).map((x) => x.name) : []), [id]);
 
@@ -52,9 +52,9 @@ export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type:
     try {
       const clean: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(data)) if (v !== undefined && v !== '') clean[k] = v;
-      const saved = id ? os.entities.update(id, { title: hasTitleField ? title : undefined, data: clean, status }) : os.entities.create({ type, title: hasTitleField ? title : undefined, data: clean, status });
+      const saved = id ? os.records.update(id, { title: hasTitleField ? title : undefined, data: clean, status }) : os.records.create({ type, title: hasTitleField ? title : undefined, data: clean, status });
       os.tags.set(saved.id, tags);
-      if (linkTo && !id) os.relations.link(saved.id, linkTo.id, linkTo.kind);
+      if (linkTo && !id) os.links.link(saved.id, linkTo.id, linkTo.kind);
       if (onSaved) onSaved(saved);
       else if (id) close();
       else router.replace(`/entity/${type}/${saved.id}`);

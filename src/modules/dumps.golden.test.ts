@@ -26,12 +26,12 @@ import { orgType, placeType } from './places/types';
 import { tripType } from './travel/types';
 
 const modules: ModuleManifest[] = [
-  { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [personType, groupType] },
-  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools },
-  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
-  { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [taskType, projectType, eventType] },
-  { id: 'places', name: 'Places', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [placeType, orgType] },
-  { id: 'travel', name: 'Travel', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [tripType] },
+  { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, groupType] },
+  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools },
+  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
+  { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', objects: [taskType, projectType, eventType] },
+  { id: 'places', name: 'Places', version: '1', description: '', icon: 'x', color: '#000', objects: [placeType, orgType] },
+  { id: 'travel', name: 'Travel', version: '1', description: '', icon: 'x', color: '#000', objects: [tripType] },
 ];
 
 type Call = { name: string; input: Record<string, unknown> };
@@ -61,8 +61,8 @@ beforeEach(async () => {
 });
 afterEach(() => os.db.close());
 
-const person = (name: string) => os.entities.query('person').find((p) => p.title === name)!;
-const links = (id: string) => os.relations.forEntity(id).map((l) => `${edgeLabel(l.relation.kind, l.direction)} ${l.other.title}`).sort();
+const person = (name: string) => os.records.query('person').find((p) => p.title === name)!;
+const links = (id: string) => os.links.forEntity(id).map((l) => `${edgeLabel(l.relation.kind, l.direction)} ${l.other.title}`).sort();
 const say = async (body: string, m: LLMProvider | null, subjectId?: string) => {
   const d = os.dumps.add({ body, subjectId });
   const r = await extractDump(os, d.id, m);
@@ -82,16 +82,16 @@ describe('saying things (Jarvis golden flows)', () => {
   });
 
   it('on Kendal’s page: "her fav colour is pink, she’s vegetarian, new number 98450 12345" → phone field + tidy notes', async () => {
-    const k = os.entities.create({ type: 'person', title: 'Kendal', data: {} });
+    const k = os.records.create({ type: 'person', title: 'Kendal', data: {} });
     const m = model([{ name: 'set_attributes', input: { node: 'her', attributes: { 'favourite colour': 'pink', diet: 'vegetarian', phone: '98450 12345' } } }]);
     await say('her fav colour is pink, she’s vegetarian, new number 98450 12345', m, k.id);
-    expect(os.entities.get(k.id)!.data).toMatchObject({ phone: '98450 12345', notes: '• Favourite colour: pink\n• Diet: vegetarian' });
+    expect(os.records.get(k.id)!.data).toMatchObject({ phone: '98450 12345', notes: '• Favourite colour: pink\n• Diet: vegetarian' });
     expect(m.seen[0]!.system).toContain('page of person "Kendal"');
     expect(os.dumps.toCheck()).toHaveLength(3);
   });
 
   it('a day: flight US → Canada with Kendal on 8 Sept, dinner at Canoe with Kendal and her brother Mike, 180 for dinner → linked graph', async () => {
-    const kendal = os.entities.create({ type: 'person', title: 'Kendal', data: {} });
+    const kendal = os.records.create({ type: 'person', title: 'Kendal', data: {} });
     const m = model(
       [
         { name: 'record_event', input: { kind: 'flight', when: '8 Sept', roles: [{ role: 'from', node: { name: 'USA', type: 'place' } }, { role: 'to', node: { name: 'Canada', type: 'place' } }, { role: 'with', node: 'Kendal' }] } },
@@ -105,30 +105,30 @@ describe('saying things (Jarvis golden flows)', () => {
     );
     const { r } = await say('Took a flight from the US to Canada with Kendal on 8 Sept. Had dinner at Canoe with Kendal and her brother Mike, I paid 180 for dinner.', m);
     expect(r.status).toBe('done');
-    const trip = os.entities.query('trip')[0]!;
-    const flight = os.entities.query('event').find((e) => (e.data as { kind: string }).kind === 'flight')!;
-    const dinner = os.entities.query('event').find((e) => (e.data as { kind: string }).kind === 'dinner')!;
+    const trip = os.records.query('trip')[0]!;
+    const flight = os.records.query('event').find((e) => (e.data as { kind: string }).kind === 'flight')!;
+    const dinner = os.records.query('event').find((e) => (e.data as { kind: string }).kind === 'dinner')!;
     expect(trip.title).toBe('Trip to Canada');
     expect(links(flight.id)).toEqual(['From USA', 'Part of Trip to Canada', 'To Canada', 'With Kendal']);
     expect(links(dinner.id)).toEqual(['At Canoe', 'With Kendal', 'With Mike']);
     expect(links(kendal.id)).toEqual(expect.arrayContaining(['Family Mike', 'Was at Dinner at Canoe', 'Was at Flight to Canada', 'Was at Trip to Canada']));
-    expect(os.entities.query('transaction')[0]!.data).toMatchObject({ amount: 180, category: 'food', date: parseDateish('8 sept') });
-    expect(os.entities.query('person')).toHaveLength(2); // Kendal reused, Mike created — nobody duplicated
+    expect(os.records.query('transaction')[0]!.data).toMatchObject({ amount: 180, category: 'food', date: parseDateish('8 sept') });
+    expect(os.records.query('person')).toHaveLength(2); // Kendal reused, Mike created — nobody duplicated
     // The model got each tool's result back (ids to keep linking).
     expect(m.seen[1]!.results.length).toBe(3);
   });
 
   it('"bought a Dyson for 32k on the HDFC card, warranty 2 years" → asset with a warranty cycle + the expense paid for it', async () => {
-    const hdfc = os.entities.create({ type: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
+    const hdfc = os.records.create({ type: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
     const m = model([
       { name: 'upsert_node', input: { name: 'Dyson', type: 'asset', attributes: { category: 'appliance', purchasePrice: '32k', purchaseDate: 'today', warrantyUntil: '2 years' } } },
       { name: 'log_spend', input: { amount: '32k', merchant: 'Dyson', category: 'shopping', for: 'Dyson', account: 'HDFC card' } },
     ]);
     await say('bought a Dyson for 32k on the HDFC card, warranty 2 years', m);
-    const dyson = os.entities.query('asset')[0]!;
+    const dyson = os.records.query('asset')[0]!;
     expect(dyson.data).toMatchObject({ category: 'appliance', purchasePrice: 32000, warrantyUntil: parseDateish('2 years') });
     expect(os.cycles.forEntity(dyson.id).map((c) => c.name)).toEqual(['Warranty ends']);
-    const tx = os.entities.query('transaction')[0]!;
+    const tx = os.records.query('transaction')[0]!;
     expect(tx.data).toMatchObject({ amount: 32000, accountId: hdfc.id });
     expect(links(tx.id)).toEqual(['Account HDFC card', 'Paid for Dyson']);
   });
@@ -137,8 +137,8 @@ describe('saying things (Jarvis golden flows)', () => {
     const rant = ['Honestly today was exhausting.', 'The landlord still hasn’t fixed the leak and I’m so done with this building.', 'Work was chaos, three meetings that could have been emails.', 'Traffic on the way back was insane.', 'I need to call the plumber tomorrow before 10.', 'Anyway. Going to sleep early.'].join('\n');
     const m = model([{ name: 'create_task', input: { title: 'Call the plumber', due: 'tomorrow' } }]);
     const { d } = await say(rant, m);
-    expect(os.entities.countsByType()).toEqual({ task: 1 });
-    expect(os.entities.query('task')[0]!.data).toMatchObject({ dueDate: parseDateish('tomorrow') });
+    expect(os.records.countsByType()).toEqual({ task: 1 });
+    expect(os.records.query('task')[0]!.data).toMatchObject({ dueDate: parseDateish('tomorrow') });
     expect(os.dumps.get(d.id)!.body).toBe(rant);
     expect(m.seen[0]!.system).toMatch(/never invent/);
   });
@@ -150,7 +150,7 @@ describe('saying things (Jarvis golden flows)', () => {
     ]);
     await say('made a new friend today, Karan, works at Zomato, met at the gym', m);
     expect(links(person('Karan').id)).toEqual(['Was at Met at The Gym', 'Works at Zomato']);
-    expect(os.entities.query('org').map((o) => o.title)).toEqual(['Zomato']);
+    expect(os.records.query('org').map((o) => o.title)).toEqual(['Zomato']);
     // Cancel the organisation link only.
     const row = os.dumps.toCheck().find((x) => x.label.includes('works at'))!;
     expect(undoExtraction(os, row.id)).toBe(true);
@@ -160,7 +160,7 @@ describe('saying things (Jarvis golden flows)', () => {
 
 describe('filing mechanics', () => {
   it('parser first: "did laundry" is filed offline with no model call, and lands in To check', async () => {
-    os.entities.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
+    os.records.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
     const m = model();
     const { r } = await say('did laundry', m);
     expect(r).toMatchObject({ status: 'done', via: 'parser', items: 1 });
@@ -218,12 +218,12 @@ describe('filing mechanics', () => {
     expect(m.seen[0]!.first).not.toContain('Kendal called');
     expect(m.seen[0]!.system).toContain('Already filed from this text');
     expect(m.seen[0]!.system).toContain('Person: Kendal');
-    expect(os.entities.query('person')).toHaveLength(1);
+    expect(os.records.query('person')).toHaveLength(1);
     expect(os.dumps.get(d.id)!.status).toBe('done');
   });
 
   it('the parser files the everyday sentences inside a longer dump now; the model gets only the rest', async () => {
-    os.entities.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
+    os.records.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
     const { d, r } = await say('Did laundry. Spent 450 on lunch at Toit. Met Kendal there, she just moved to Pune.', null);
     // No key: the everyday sentences are filed anyway, the rest waits.
     expect(r).toMatchObject({ status: 'pending', via: 'parser', items: 2 });
@@ -231,7 +231,7 @@ describe('filing mechanics', () => {
     const m = model([{ name: 'link', input: { from: 'Kendal', to: 'Pune', kind: 'lives_in' } }]);
     await extractPending(os, m);
     expect(m.seen[0]!.first).toBe('Met Kendal there, she just moved to Pune.');
-    expect(os.entities.query('transaction')).toHaveLength(1);
+    expect(os.records.query('transaction')).toHaveLength(1);
   });
 
   it('low on free budget: the newest dump is filed first, the older backlog waits', async () => {

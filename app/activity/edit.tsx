@@ -103,7 +103,7 @@ function RuleForm({ kind, onAdd }: { kind: Kind; onAdd: (r: TrackerRule) => void
   const appList = useLive((o) => knownApps(o), []);
   const calList = useLive((o) => knownCalendars(o), []);
   const habits = useLive((o) => activeHabits(o), []);
-  const types = [...os.registry.entityTypes.values()].filter((d) => !d.hidden);
+  const types = [...os.registry.objects.values()].filter((d) => !d.hidden);
   const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
   switch (kind) {

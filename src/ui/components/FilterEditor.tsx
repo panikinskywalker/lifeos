@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import type { EntityTypeDef, FieldDef, FilterClause, FilterGroup, FilterOp, ViewDefinition } from '@core/domain/types';
+import type { ObjectDef, FieldDef, FilterClause, FilterGroup, FilterOp, ViewDefinition } from '@core/domain/types';
 import { useTheme } from '../theme/ThemeProvider';
 import { Button, ChipRow, FilterChip, IconButton, Text } from '../kit';
 import { FieldInput } from './fields';
@@ -24,7 +24,7 @@ function opsFor(f: FieldDef) {
   return OPS_FOR[k] ?? OPS_FOR.text;
 }
 
-export function filterableFields(def: EntityTypeDef): FieldDef[] {
+export function filterableFields(def: ObjectDef): FieldDef[] {
   const envelope: FieldDef[] = [{ key: 'title', label: 'Title', type: 'text' }];
   if (def.statuses?.length) envelope.push({ key: 'status', label: 'Status', type: 'select', options: def.statuses });
   envelope.push({ key: 'starred', label: 'Starred', type: 'boolean' }, { key: 'createdAt', label: 'Created', type: 'datetime' }, { key: 'tag', label: 'Tag', type: 'text' });
@@ -34,7 +34,7 @@ export function filterableFields(def: EntityTypeDef): FieldDef[] {
 export function FilterEditor({ type, value, onChange }: { type: string; value: ViewDefinition; onChange: (v: ViewDefinition) => void; accent?: string }) {
   const os = useOS();
   const t = useTheme();
-  const def = os.registry.type(type);
+  const def = os.registry.object(type);
   const fields = filterableFields(def);
   const clauses = (value.filter?.and ?? []).filter((c): c is FilterClause => !('and' in c || 'or' in c));
   const [adding, setAdding] = useState(false);
@@ -150,7 +150,7 @@ function normalise(f: FieldDef, v: unknown): unknown {
   return v;
 }
 
-export function describeFilter(g: FilterGroup | undefined, def: EntityTypeDef): string {
+export function describeFilter(g: FilterGroup | undefined, def: ObjectDef): string {
   if (!g) return '';
   const fields = filterableFields(def);
   const parts = (g.and ?? []).map((c) => {

@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '../registry/context';
-import type { Entity } from '../domain/types';
+import type { ObjectRecord } from '../domain/types';
 import type { Dump } from '../repo/dumpRepo';
 import type { Row } from '../db/adapter';
 import { daily, isoDay, type MetricId } from '../dashboard/metrics';
@@ -55,10 +55,10 @@ export interface SectionSummary extends SectionDef {
 
 /** Every section with the types installed and how many records each has. */
 export function almanacSections(os: LifeOSContext): SectionSummary[] {
-  const counts = os.entities.countsByType();
+  const counts = os.records.countsByType();
   return SECTIONS.map((s) => {
     const rows = s.types
-      .map((type) => os.registry.entityTypes.get(type))
+      .map((type) => os.registry.objects.get(type))
       .filter((d): d is NonNullable<typeof d> => !!d && !d.hidden)
       .map((d) => ({ type: d.type, label: d.labelPlural, icon: d.icon, count: counts[d.type] ?? 0 }));
     let total = rows.reduce((n, r) => n + r.count, 0);
@@ -151,13 +151,13 @@ export interface PeriodSummary {
   health: HealthAverages;
   workouts: { count: number; minutes: number };
   /** Events and trips in the period, by date. */
-  happened: Entity[];
+  happened: ObjectRecord[];
   dumps: Dump[];
   /** Upkeep jobs done (cycle.done on the timeline). */
   done: Array<{ id: string; entityId: string; title: string; at: number; cost: number | null }>;
   /** Records made in the period, by type (most first) — and the new people, named. */
   created: Array<{ type: string; count: number }>;
-  newPeople: Entity[];
+  newPeople: ObjectRecord[];
   facts: number;
   /** One mark per day (month view calendar; year view per month). */
   days: DayMark[];
@@ -177,7 +177,7 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
   const { from, to } = period;
   const a = startMs(from);
   const b = endMs(to);
-  const has = (t: string) => os.registry.entityTypes.has(t);
+  const has = (t: string) => os.registry.objects.has(t);
 
   // Money
   const byCategory: CategoryTotal[] = [];
@@ -229,7 +229,7 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
       [a, b, to, from],
     )
     .map((r) => r.id);
-  const happened = happenedIds.map((id) => os.entities.get(id)).filter((e): e is Entity => !!e);
+  const happened = happenedIds.map((id) => os.records.get(id)).filter((e): e is ObjectRecord => !!e);
 
   const dumps = os.dumps.list({ from: a, to: b, limit: 500 });
 
@@ -243,13 +243,13 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
   // Records made (not the automatic ones: measurements and transactions show as numbers above).
   const created = os.db
     .all<{ type: string; n: number }>(`SELECT type, COUNT(*) AS n FROM entities WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ? AND type NOT IN ('measurement','transaction','habit_log') GROUP BY type ORDER BY n DESC`, [a, b])
-    .filter((r) => os.registry.entityTypes.has(r.type))
+    .filter((r) => os.registry.objects.has(r.type))
     .map((r) => ({ type: r.type, count: r.n }));
   const newPeople = has('person')
     ? os.db
         .all<{ id: string }>(`SELECT id FROM entities WHERE type='person' AND deleted_at IS NULL AND created_at BETWEEN ? AND ? ORDER BY created_at LIMIT 50`, [a, b])
-        .map((r) => os.entities.get(r.id))
-        .filter((e): e is Entity => !!e)
+        .map((r) => os.records.get(r.id))
+        .filter((e): e is ObjectRecord => !!e)
     : [];
   const facts = os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM facts WHERE deleted_at IS NULL AND active=1 AND stated_at BETWEEN ? AND ?`, [a, b])?.n ?? 0;
 
@@ -315,7 +315,7 @@ export function onThisDay(os: LifeOSContext, today = isoDay(Date.now()), maxYear
     for (const r of os.db.all<{ id: string; title: string }>(`SELECT id, title FROM entities WHERE type='person' AND deleted_at IS NULL AND created_at BETWEEN ? AND ? LIMIT 5`, [a, b]))
       items.push({ kind: 'person', id: r.id, type: 'person', title: `Met ${r.title}` });
     for (const r of os.db.all<{ id: string; entity_id: string; title: string }>(`SELECT id, entity_id, title FROM timeline_events WHERE kind='cycle.done' AND occurred_at BETWEEN ? AND ? LIMIT 5`, [a, b])) {
-      const e = os.entities.get(r.entity_id);
+      const e = os.records.get(r.entity_id);
       if (e) items.push({ kind: 'done', id: e.id, type: e.type, title: `${r.title} · ${e.title}` });
     }
     if (items.length) out.push({ ago, day, items });

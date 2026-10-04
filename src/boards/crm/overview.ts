@@ -6,7 +6,7 @@ import { DAY_MS, type ModuleOverview, type OverviewBlock } from '@core/dashboard
 /** People at a glance: who to call, birthdays coming, who you've been in touch with, how your people split. */
 export function peopleOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
   const u = upkeep(os, 'All', now);
-  const people = os.entities.query<{ relationship?: string; lastContactAt?: string }>('person', {}, { limit: 5000 });
+  const people = os.records.query<{ relationship?: string; lastContactAt?: string }>('person', {}, { limit: 5000 });
   const call = peopleToCall(os, 8, now, u);
   const birthdays = u.items
     .filter((i) => i.entity.type === 'person' && i.cycle.template === 'person.birthday' && i.cycle.nextDueAt != null && i.cycle.nextDueAt - now <= 30 * DAY_MS)

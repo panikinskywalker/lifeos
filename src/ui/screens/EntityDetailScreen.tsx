@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import type { Entity, FieldDef } from '@core/domain/types';
+import type { ObjectRecord, FieldDef } from '@core/domain/types';
 import { describeRRule } from '@core/automation/recurrence';
 import type { LifeOSContext } from '@core/registry/context';
 import { useTheme } from '../theme/ThemeProvider';
@@ -30,13 +30,13 @@ type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 
  * timeline. Modules add sections via manifest.detailSections.
  */
 /** `say` renders the "Tell me about …" bar (it lives in the app shell: voice + filing). */
-export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Entity) => React.ReactNode }) {
+export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: ObjectRecord) => React.ReactNode }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const entity = useLive((o) => o.entities.get(id), [id]);
+  const entity = useLive((o) => o.records.get(id), [id]);
   const tags = useLive((o) => o.tags.forEntity(id), [id]);
   const cover = useLive((o) => o.attachments.cover(id), [id]);
   const [panel, setPanel] = useState<Panel>(null);
@@ -48,16 +48,16 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
       </View>
     );
   }
-  const def = os.registry.type(entity.type);
+  const def = os.registry.object(entity.type);
   const tint = tintForModule(def.module);
   const statusDef = def.statuses?.find((s) => s.value === entity.status);
   const sections = os.registry.detailSections.filter((s) => s.entityType === '*' || s.entityType === entity.type);
   const close = () => setPanel(null);
 
   const remove = () => {
-    os.entities.delete(entity.id);
+    os.records.delete(entity.id);
     back();
-    toast.show({ message: `${def.label} deleted`, icon: 'trash', undo: () => os.entities.restore(entity.id) });
+    toast.show({ message: `${def.label} deleted`, icon: 'trash', undo: () => os.records.restore(entity.id) });
   };
 
   return (
@@ -75,7 +75,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
           onBack={back}
           actions={
             <>
-              <IconButton icon="star" accessibilityLabel={entity.starred ? 'Unstar' : 'Star'} filled={entity.starred ? t.c.accent.mustard : 'overlay'} onPress={() => os.entities.update(entity.id, { starred: !entity.starred })} />
+              <IconButton icon="star" accessibilityLabel={entity.starred ? 'Unstar' : 'Star'} filled={entity.starred ? t.c.accent.mustard : 'overlay'} onPress={() => os.records.update(entity.id, { starred: !entity.starred })} />
               <IconButton icon="edit" accessibilityLabel="Edit record" filled="overlay" onPress={() => router.push(`/entity/${entity.type}/${entity.id}/edit`)} />
               <IconButton icon="more" accessibilityLabel="More" filled="overlay" onPress={() => setPanel('menu')} />
             </>
@@ -140,11 +140,11 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
             label: 'Duplicate',
             icon: 'file',
             onPress: () => {
-              const copy = os.entities.create({ type: entity.type, title: `${entity.title} (copy)`, data: entity.data, status: entity.status });
+              const copy = os.records.create({ type: entity.type, title: `${entity.title} (copy)`, data: entity.data, status: entity.status });
               router.push(`/entity/${copy.type}/${copy.id}`);
             },
           },
-          { label: entity.archived ? 'Unarchive' : 'Archive', icon: 'archive', onPress: () => os.entities.update(entity.id, { archived: !entity.archived }) },
+          { label: entity.archived ? 'Unarchive' : 'Archive', icon: 'archive', onPress: () => os.records.update(entity.id, { archived: !entity.archived }) },
           { label: 'Delete', icon: 'trash', destructive: true, onPress: remove },
         ]}
       />
@@ -157,7 +157,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
                 label={s.label}
                 selected={s.value === entity.status}
                 onPress={() => {
-                  os.entities.setStatus(entity.id, s.value);
+                  os.records.setStatus(entity.id, s.value);
                   close();
                 }}
               />
@@ -178,7 +178,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Ent
 }
 
 /** Display text for a field value, plus a target when it points at another record. */
-function renderValue(os: LifeOSContext, entity: Entity, f: FieldDef, v: unknown): { text: string; target?: Entity } {
+function renderValue(os: LifeOSContext, entity: ObjectRecord, f: FieldDef, v: unknown): { text: string; target?: ObjectRecord } {
   switch (f.type) {
     case 'currency':
       return { text: os.format.currency(Number(v), (entity.data.currency as string) || undefined) };
@@ -196,7 +196,7 @@ function renderValue(os: LifeOSContext, entity: Entity, f: FieldDef, v: unknown)
     case 'multiselect':
       return { text: (v as string[]).map((x) => f.options?.find((o) => o.value === x)?.label ?? x).join(', ') };
     case 'relation': {
-      const refs = os.entities.getMany(Array.isArray(v) ? (v as string[]) : [String(v)]);
+      const refs = os.records.getMany(Array.isArray(v) ? (v as string[]) : [String(v)]);
       return { text: refs.map((r) => r.title).join(', ') || '—', target: refs.length === 1 ? refs[0] : undefined };
     }
     case 'json':
@@ -209,14 +209,14 @@ function renderValue(os: LifeOSContext, entity: Entity, f: FieldDef, v: unknown)
 const hasValue = (v: unknown) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0);
 
 /** Up to three header stats: money first, then summary fields, then the record's date. */
-function headerStats(os: LifeOSContext, entity: Entity, fields: FieldDef[]): HeaderStat[] {
+function headerStats(os: LifeOSContext, entity: ObjectRecord, fields: FieldDef[]): HeaderStat[] {
   const picked = [...fields.filter((f) => f.type === 'currency'), ...fields.filter((f) => f.summary && f.type !== 'currency' && f.type !== 'longtext' && f.type !== 'relation')].filter((f) => hasValue(entity.data[f.key]));
   const stats = picked.slice(0, 3).map((f) => ({ label: f.label.toLowerCase(), value: renderValue(os, entity, f, entity.data[f.key]).text }));
   if (stats.length < 3 && entity.occurredAt) stats.push({ label: 'date', value: os.format.date(entity.occurredAt, 'medium') });
   return stats.filter((s) => s.value.length <= 16);
 }
 
-function DetailsCard({ entity, fields }: { entity: Entity; fields: FieldDef[] }) {
+function DetailsCard({ entity, fields }: { entity: ObjectRecord; fields: FieldDef[] }) {
   const os = useOS();
   const router = useRouter();
   const custom = useLive((o) => o.customFields.forType(entity.type), [entity.type]);
@@ -236,7 +236,7 @@ function DetailsCard({ entity, fields }: { entity: Entity; fields: FieldDef[] })
 }
 
 /** Dumps that filed into this record, or that mention it by name (M4.4) — newest first, word for word. */
-function DumpsCard({ entity }: { entity: Entity }) {
+function DumpsCard({ entity }: { entity: ObjectRecord }) {
   const router = useRouter();
   const dumps = useLive(
     (o) => {
@@ -244,7 +244,7 @@ function DumpsCard({ entity }: { entity: Entity }) {
       const seen = new Set(filed.map((d) => d.id));
       const named =
         entity.title.trim().length >= 3
-          ? o.entities.search
+          ? o.records.search
               .search(`"${entity.title.replace(/"/g, '')}"`, { types: ['dump'], limit: 20 })
               .map((h) => o.dumps.get(h.id))
               .filter((d): d is NonNullable<typeof d> => !!d && !seen.has(d.id) && d.body.toLowerCase().includes(entity.title.toLowerCase()))
@@ -266,7 +266,7 @@ function DumpsCard({ entity }: { entity: Entity }) {
 }
 
 /** Notes that [[link]] here and facts about this record (M3 second brain). */
-function BacklinksCard({ entity }: { entity: Entity }) {
+function BacklinksCard({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const router = useRouter();
   const notes = useLive((o) => backlinks(o, entity.id), [entity.id]);
@@ -276,7 +276,7 @@ function BacklinksCard({ entity }: { entity: Entity }) {
     <Section title="Mentioned in" meta={String(notes.length + facts.length)} action={facts.length ? 'Memory' : undefined} onAction={facts.length ? () => router.push({ pathname: '/memory', params: { q: entity.title } }) : undefined}>
       <RowList>
         {notes.map((n) => {
-          const d = os.registry.entityTypes.get(n.type);
+          const d = os.registry.objects.get(n.type);
           const body = String((n.data as Record<string, unknown>).body ?? n.subtitle ?? '').replace(/\[\[|\]\]/g, '');
           return <RowItem key={n.id} icon={d?.icon ?? 'file'} tint={tintForModule(d?.module)} title={n.title} subtitle={body.slice(0, 90) || d?.label} onPress={() => router.push(`/entity/${n.type}/${n.id}`)} />;
         })}
@@ -289,24 +289,24 @@ function BacklinksCard({ entity }: { entity: Entity }) {
 }
 
 /** Connections (docs/GRAPH.md §5): everything linked, grouped by link word; events dated, with who/where. */
-function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void }) {
+function RelationsCard({ entity, onLink }: { entity: ObjectRecord; onLink: () => void }) {
   const os = useOS();
   const router = useRouter();
   const toast = useToast();
   // Incoming [[mentions]] have their own section (Mentioned in).
   const items = useLive((o) => neighbours(o, entity.id, { limit: 60 }).filter((n) => n.kind !== 'mention'), [entity.id]);
   if (!items.length) return null;
-  const def = os.registry.type(entity.type);
+  const def = os.registry.object(entity.type);
   const groups: Array<{ label: string; items: typeof items }> = [];
   for (const n of items) {
-    const label = def.relations?.find((r) => r.kind === n.kind)?.label ?? n.label;
+    const label = def.links?.find((r) => r.kind === n.kind)?.label ?? n.label;
     const g = groups.find((x) => x.label === label);
     if (g) g.items.push(n);
     else groups.push({ label, items: [n] });
   }
   const unlink = (n: (typeof items)[number]) => {
-    os.relations.unlink(entity.id, n.id, n.kind);
-    toast.show({ message: `Unlinked ${n.title}`, icon: 'link', undo: () => void os.relations.link(entity.id, n.id, n.kind) });
+    os.links.unlink(entity.id, n.id, n.kind);
+    toast.show({ message: `Unlinked ${n.title}`, icon: 'link', undo: () => void os.links.link(entity.id, n.id, n.kind) });
   };
   return (
     <Section title="Connections" meta={String(items.length)} action="Link" onAction={onLink}>
@@ -315,15 +315,15 @@ function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void 
           <View key={g.label} style={{ gap: 6 }}>
             <Text variant="labelMicro" color="secondary" style={{ textTransform: 'uppercase' }}>
               {g.label}
-              {g.items.every((n) => n.type === 'transaction') && g.items.length > 1 ? ` · ${g.items.length} · ${os.format.currency(g.items.reduce((sum, n) => sum + ((os.entities.get(n.id)?.data as { amount?: number })?.amount ?? 0), 0))}` : ''}
+              {g.items.every((n) => n.type === 'transaction') && g.items.length > 1 ? ` · ${g.items.length} · ${os.format.currency(g.items.reduce((sum, n) => sum + ((os.records.get(n.id)?.data as { amount?: number })?.amount ?? 0), 0))}` : ''}
             </Text>
             {g.items.some((n) => n.at) ? (
               <RowList>
                 {g.items.map((n) => (
                   <RowItem
                     key={`${n.kind}${n.id}`}
-                    icon={os.registry.entityTypes.get(n.type)?.icon}
-                    tint={tintForModule(os.registry.entityTypes.get(n.type)?.module)}
+                    icon={os.registry.objects.get(n.type)?.icon}
+                    tint={tintForModule(os.registry.objects.get(n.type)?.module)}
                     title={n.title}
                     subtitle={n.type === 'transaction' ? (n.at ? os.format.date(n.at) : null) : n.context}
                     meta={n.type === 'transaction' ? undefined : n.at ? os.format.date(n.at) : undefined}
@@ -336,7 +336,7 @@ function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void 
             ) : (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {g.items.map((n) => (
-                  <Chip key={`${n.kind}${n.id}`} label={n.title} icon={os.registry.entityTypes.get(n.type)?.icon} onPress={() => router.push(`/entity/${n.type}/${n.id}`)} onLongPress={() => unlink(n)} />
+                  <Chip key={`${n.kind}${n.id}`} label={n.title} icon={os.registry.objects.get(n.type)?.icon} onPress={() => router.push(`/entity/${n.type}/${n.id}`)} onLongPress={() => unlink(n)} />
                 ))}
               </View>
             )}
@@ -351,17 +351,17 @@ function RelationsCard({ entity, onLink }: { entity: Entity; onLink: () => void 
 }
 
 function txAmount(os: LifeOSContext, id: string): string | undefined {
-  const d = os.entities.get(id)?.data as { amount?: number; kind?: string } | undefined;
+  const d = os.records.get(id)?.data as { amount?: number; kind?: string } | undefined;
   if (d?.amount == null) return undefined;
   return `${d.kind === 'income' ? '+' : d.kind === 'expense' ? '−' : ''}${os.format.currency(d.amount)}`;
 }
 
 /** A link the app guessed ("We think JOHN D is John Doe"): confirm it, or say it's someone else. */
-function GuessBanner({ entity }: { entity: Entity }) {
+function GuessBanner({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const t = useTheme();
   const toast = useToast();
-  const guesses = useLive((o) => o.relations.forEntity(entity.id).filter((r) => r.direction === 'out' && (r.relation.confidence ?? 1) < 1 && r.relation.meta.guess), [entity.id]);
+  const guesses = useLive((o) => o.links.forEntity(entity.id).filter((r) => r.direction === 'out' && (r.relation.confidence ?? 1) < 1 && r.relation.meta.guess), [entity.id]);
   if (!guesses.length) return null;
   return (
     <View style={{ gap: 8 }}>
@@ -382,7 +382,7 @@ function GuessBanner({ entity }: { entity: Entity }) {
 }
 
 /** A small graph of what's linked to this record; opens the full graph view. */
-function GraphCard({ entity }: { entity: Entity }) {
+function GraphCard({ entity }: { entity: ObjectRecord }) {
   const router = useRouter();
   const g = useLive((o) => egoGraph(o, entity.id, { hops: 1, limit: 14 }), [entity.id]);
   if (g.nodes.length < 3) return null;
@@ -394,14 +394,14 @@ function GraphCard({ entity }: { entity: Entity }) {
   );
 }
 
-function LinkSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: Entity }) {
+function LinkSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: ObjectRecord }) {
   const os = useOS();
   const toast = useToast();
   const [kind, setKind] = useState('related');
   const [picking, setPicking] = useState(false);
-  const def = os.registry.type(entity.type);
-  const kinds = [...new Set(['related', ...(def.relations?.map((r) => r.kind) ?? [])])];
-  const kindLabel = (k: string) => def.relations?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
+  const def = os.registry.object(entity.type);
+  const kinds = [...new Set(['related', ...(def.links?.map((r) => r.kind) ?? [])])];
+  const kindLabel = (k: string) => def.links?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
   return (
     <>
       <Sheet visible={visible && !picking} onClose={onClose} title="Link to…" footer={<Button title="Choose record" icon="search" block onPress={() => setPicking(true)} />}>
@@ -420,17 +420,17 @@ function LinkSheet({ visible, onClose, entity }: { visible: boolean; onClose: ()
         types={[]}
         exclude={[entity.id]}
         onSelect={(otherId) => {
-          os.relations.link(entity.id, otherId, kind || 'related');
+          os.links.link(entity.id, otherId, kind || 'related');
           setPicking(false);
           onClose();
-          toast.show({ message: `Linked as ${kindLabel(kind).toLowerCase()}`, icon: 'link', undo: () => os.relations.unlink(entity.id, otherId, kind || 'related') });
+          toast.show({ message: `Linked as ${kindLabel(kind).toLowerCase()}`, icon: 'link', undo: () => os.links.unlink(entity.id, otherId, kind || 'related') });
         }}
       />
     </>
   );
 }
 
-function RemindersCard({ entity, tint }: { entity: Entity; tint: TintKey }) {
+function RemindersCard({ entity, tint }: { entity: ObjectRecord; tint: TintKey }) {
   const os = useOS();
   const t = useTheme();
   const toast = useToast();
@@ -473,7 +473,7 @@ const REPEATS: Array<[string | null, string]> = [
   ['FREQ=YEARLY;INTERVAL=1', 'Yearly'],
 ];
 
-function ReminderSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: Entity }) {
+function ReminderSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: ObjectRecord }) {
   const os = useOS();
   const toast = useToast();
   const [title, setTitle] = useState(`Follow up: ${entity.title}`);
@@ -499,7 +499,7 @@ function ReminderSheet({ visible, onClose, entity }: { visible: boolean; onClose
   );
 }
 
-function AttachmentsCard({ entity }: { entity: Entity }) {
+function AttachmentsCard({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const t = useTheme();
   const items = useLive((o) => o.attachments.forEntity(entity.id), [entity.id]);
@@ -527,7 +527,7 @@ function AttachmentsCard({ entity }: { entity: Entity }) {
   );
 }
 
-function AttachSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: Entity }) {
+function AttachSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: ObjectRecord }) {
   const os = useOS();
   const pickDoc = async () => {
     const r = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
@@ -559,7 +559,7 @@ function AttachSheet({ visible, onClose, entity }: { visible: boolean; onClose: 
 }
 
 /** Cover photo (Stitch photo header): take, choose, or remove with Undo. Cropped to the header's 16:10. */
-function CoverSheet({ visible, onClose, entity, hasCover }: { visible: boolean; onClose: () => void; entity: Entity; hasCover: boolean }) {
+function CoverSheet({ visible, onClose, entity, hasCover }: { visible: boolean; onClose: () => void; entity: ObjectRecord; hasCover: boolean }) {
   const os = useOS();
   const toast = useToast();
   const pick = async (camera: boolean) => {
@@ -591,7 +591,7 @@ function CoverSheet({ visible, onClose, entity, hasCover }: { visible: boolean; 
   );
 }
 
-function NotesCard({ entity }: { entity: Entity }) {
+function NotesCard({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const t = useTheme();
   const comments = useLive((o) => o.comments.forEntity(entity.id), [entity.id]);
@@ -625,10 +625,10 @@ function NotesCard({ entity }: { entity: Entity }) {
   );
 }
 
-function TimelineCard({ entity, tint }: { entity: Entity; tint: TintKey }) {
+function TimelineCard({ entity, tint }: { entity: ObjectRecord; tint: TintKey }) {
   const os = useOS();
   const t = useTheme();
-  const events = useLive((o) => o.entities.timeline.forEntity(entity.id, 60), [entity.id]);
+  const events = useLive((o) => o.records.timeline.forEntity(entity.id, 60), [entity.id]);
   const [all, setAll] = useState(false);
   if (!events.length) return null;
   const shown = all ? events : events.slice(0, 6);

@@ -96,11 +96,11 @@ function MultiSelectField({ field, value, onChange, error }: FieldInputProps) {
 export function RelationField({ field, value, onChange, error }: FieldInputProps) {
   const multi = Array.isArray(value) || Array.isArray(field.defaultValue);
   const ids: string[] = Array.isArray(value) ? (value as string[]) : value ? [String(value)] : [];
-  const refs = useLive((o) => o.entities.getMany(ids), [ids.join(',')]);
+  const refs = useLive((o) => o.records.getMany(ids), [ids.join(',')]);
   const os = useOS();
   const [open, setOpen] = useState(false);
   const types = Array.isArray(field.relationTo) ? field.relationTo : field.relationTo ? [field.relationTo] : [];
-  const placeholder = `Choose ${types.map((x) => os.registry.entityTypes.get(x)?.label.toLowerCase() ?? x).join(' / ') || 'record'}`;
+  const placeholder = `Choose ${types.map((x) => os.registry.objects.get(x)?.label.toLowerCase() ?? x).join(' / ') || 'record'}`;
   return (
     <>
       <KitRelationField
@@ -135,13 +135,13 @@ export function EntityPicker({ visible, onClose, types, selected = [], onSelect,
   const os = useOS();
   const [q, setQ] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(types.length === 1 ? types[0]! : null);
-  const allTypes = types.length ? types : [...os.registry.entityTypes.values()].filter((d) => !d.hidden).map((d) => d.type);
+  const allTypes = types.length ? types : [...os.registry.objects.values()].filter((d) => !d.hidden).map((d) => d.type);
   const results = useLive(
     (o) => {
       if (!visible) return [];
       const tys = typeFilter ? [typeFilter] : allTypes;
-      if (q.trim()) return o.entities.search.search(q, { types: tys, limit: 40 }).map((h) => ({ id: h.id, type: h.type, title: h.title, subtitle: h.subtitle }));
-      return o.entities.query(tys, { sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 40 }).map((e) => ({ id: e.id, type: e.type, title: e.title, subtitle: e.subtitle }));
+      if (q.trim()) return o.records.search.search(q, { types: tys, limit: 40 }).map((h) => ({ id: h.id, type: h.type, title: h.title, subtitle: h.subtitle }));
+      return o.records.query(tys, { sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 40 }).map((e) => ({ id: e.id, type: e.type, title: e.title, subtitle: e.subtitle }));
     },
     [visible, q, typeFilter, allTypes.join(',')],
   ).filter((r) => !exclude?.includes(r.id));
@@ -155,7 +155,7 @@ export function EntityPicker({ visible, onClose, types, selected = [], onSelect,
       selected={selected}
       onSelect={(id) => onSelect(id, typeOf.get(id)!)}
       items={results.map((r) => {
-        const d = os.registry.entityTypes.get(r.type);
+        const d = os.registry.objects.get(r.type);
         return { id: r.id, title: r.title, subtitle: [d?.label, r.subtitle].filter(Boolean).join(' · '), icon: d?.icon };
       })}
       header={
@@ -163,7 +163,7 @@ export function EntityPicker({ visible, onClose, types, selected = [], onSelect,
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <FilterChip label="All" selected={!typeFilter} onPress={() => setTypeFilter(null)} />
             {allTypes.map((ty) => {
-              const d = os.registry.entityTypes.get(ty);
+              const d = os.registry.objects.get(ty);
               return d ? <FilterChip key={ty} label={d.labelPlural} selected={typeFilter === ty} onPress={() => setTypeFilter(ty)} /> : null;
             })}
           </View>

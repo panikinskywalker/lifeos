@@ -159,7 +159,7 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
 
   const kind = text.trim() ? classifyInput(text) : null;
   const open = (id: string, type?: string) => {
-    const ty = type ?? os.entities.get(id)?.type;
+    const ty = type ?? os.records.get(id)?.type;
     if (ty) router.push(`/entity/${ty}/${id}` as never);
   };
 

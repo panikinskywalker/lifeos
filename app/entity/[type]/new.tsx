@@ -8,12 +8,12 @@ import { EmptyState, Screen } from '@ui/kit';
 export default function NewEntityRoute() {
   const os = useOS();
   const { type, linkId, linkKind, ...prefill } = useLocalSearchParams() as Record<string, string | undefined> & { type: string; linkId?: string; linkKind?: string };
-  if (!type || !os.registry.hasType(type)) return (
+  if (!type || !os.registry.hasObject(type)) return (
       <Screen title="Not found">
         <EmptyState icon="box" line={`There is no record type called “${type}”.`} />
       </Screen>
     );
-  const def = os.registry.type(type);
+  const def = os.registry.object(type);
   const initial: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(prefill)) {
     if (v == null || v === '') continue;

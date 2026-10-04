@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { LifeOSContext } from '@core/registry/context';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Card, Chip, IconButton, Row, Screen, SectionHeader, Stat, Text, Button } from '@ui/components/primitives';
@@ -27,9 +27,9 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
       byCat: spendByCategory(os, m.start, m.end),
       days: dailySpend(os, m.start, m.end),
       nw: netWorth(os),
-      budgets: os.entities.query<BudgetData>('budget').map((b) => ({ b, s: budgetStatus(os, b) })),
-      recent: os.entities.query('transaction', { sort: [{ field: 'data.date', dir: 'desc' }, { field: 'createdAt', dir: 'desc' }] }, { limit: 8 }),
-      count: os.entities.count('transaction'),
+      budgets: os.records.query<BudgetData>('budget').map((b) => ({ b, s: budgetStatus(os, b) })),
+      recent: os.records.query('transaction', { sort: [{ field: 'data.date', dir: 'desc' }, { field: 'createdAt', dir: 'desc' }] }, { limit: 8 }),
+      count: os.records.count('transaction'),
     }),
     [m.start],
   );
@@ -125,7 +125,7 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
                 <Text color="tertiary">Add your first transaction — or ask the assistant: "spent 450 on lunch".</Text>
               </View>
             ) : (
-              data.recent.map((e: Entity, i) => <EntityRow key={e.id} entity={e} last={i === data.recent.length - 1} />)
+              data.recent.map((e: ObjectRecord, i) => <EntityRow key={e.id} entity={e} last={i === data.recent.length - 1} />)
             )}
           </Card>
         </View>
@@ -138,12 +138,12 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
 /* Detail sections contributed to the generic entity page               */
 /* ------------------------------------------------------------------ */
 
-export function AccountSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function AccountSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const router = useRouter();
   const t = useTheme();
-  const balance = useLive((os) => accountBalance(os, entity as Entity<AccountData>), [entity.id, entity.version]);
-  const txns = useLive((os) => os.entities.query('transaction', { filter: { or: [{ field: 'data.accountId', op: 'eq', value: entity.id }, { field: 'data.toAccountId', op: 'eq', value: entity.id }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 10 }), [entity.id]);
-  const a = entity as Entity<AccountData>;
+  const balance = useLive((os) => accountBalance(os, entity as ObjectRecord<AccountData>), [entity.id, entity.version]);
+  const txns = useLive((os) => os.records.query('transaction', { filter: { or: [{ field: 'data.accountId', op: 'eq', value: entity.id }, { field: 'data.toAccountId', op: 'eq', value: entity.id }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 10 }), [entity.id]);
+  const a = entity as ObjectRecord<AccountData>;
   return (
     <View style={{ gap: 16 }}>
       <Card>
@@ -167,12 +167,12 @@ export function AccountSection({ entity, ctx }: { entity: Entity<any>; ctx: Life
   );
 }
 
-export function BudgetSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function BudgetSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const t = useTheme();
   const router = useRouter();
-  const b = entity as Entity<BudgetData>;
+  const b = entity as ObjectRecord<BudgetData>;
   const s = useLive((os) => budgetStatus(os, b), [entity.id, entity.version]);
-  const txns = useLive((os) => os.entities.query('transaction', { filter: { and: [{ field: 'data.category', op: 'eq', value: b.data.category }, { field: 'data.kind', op: 'eq', value: 'expense' }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 8 }), [entity.id]);
+  const txns = useLive((os) => os.records.query('transaction', { filter: { and: [{ field: 'data.category', op: 'eq', value: b.data.category }, { field: 'data.kind', op: 'eq', value: 'expense' }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 8 }), [entity.id]);
   return (
     <View style={{ gap: 16 }}>
       <Card style={{ gap: 8 }}>

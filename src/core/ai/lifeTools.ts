@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Entity } from '../domain/types';
+import type { ObjectRecord } from '../domain/types';
 import type { LifeOSContext } from '../registry/context';
 import type { AiToolDef } from '../registry/types';
 import { logDone, undoLoggedDone, upkeep } from '../cycles/upkeep';
@@ -46,18 +46,18 @@ export function resolveCandidates(os: LifeOSContext, text: string, types?: strin
     if (!prev || prev.score < score) out.set(e.id, { id: e.id, type: e.type, title: e.title, subtitle: e.subtitle ?? null, score, why });
   };
   for (const a of os.aliases.lookup(q)) {
-    const e = os.entities.get(a.entityId);
+    const e = os.records.get(a.entityId);
     if (e) add(e, 1, `you call it "${a.alias}"`);
   }
   if (phrase) {
-    const hits = os.entities.search.search(phrase, { types, limit: 20 });
+    const hits = os.records.search.search(phrase, { types, limit: 20 });
     for (const h of hits) {
       const t = norm(h.title);
       add(h, t === phrase ? 0.95 : t.startsWith(phrase) ? 0.85 : t.includes(phrase) ? 0.8 : 0.6, 'title');
     }
     for (const w of words) {
       if (w.length < 3) continue;
-      for (const h of os.entities.search.search(w, { types, limit: 10 })) {
+      for (const h of os.records.search.search(w, { types, limit: 10 })) {
         const t = norm(h.title);
         // The record's whole title said inside the message ("did the creta service") names it.
         add(h, ` ${q} `.includes(` ${t} `) ? 0.85 : t.split(' ').includes(w) ? 0.55 : 0.4, ` ${q} `.includes(` ${t} `) ? 'named' : `matches "${w}"`);
@@ -65,8 +65,8 @@ export function resolveCandidates(os: LifeOSContext, text: string, types?: strin
     }
   }
   for (const [type, ws] of Object.entries(TYPE_WORDS)) {
-    if (!words.some((w) => ws.includes(w)) || !os.registry.entityTypes.has(type)) continue;
-    const all = os.entities.query(type, {}, { limit: 3 });
+    if (!words.some((w) => ws.includes(w)) || !os.registry.objects.has(type)) continue;
+    const all = os.records.query(type, {}, { limit: 3 });
     if (all.length === 1) add(all[0]!, 0.9, `your only ${type}`);
     else for (const e of all) add(e, 0.5, `a ${type}`);
   }
@@ -81,7 +81,7 @@ export function clearMatch(c: Candidate[]): Candidate | null {
   return a;
 }
 
-const recordCard = (os: LifeOSContext, e: Entity): ReplyCard => ({ kind: 'record', entityId: e.id, type: e.type, title: e.title, subtitle: [os.registry.entityTypes.get(e.type)?.label, e.subtitle].filter(Boolean).join(' · '), icon: os.registry.entityTypes.get(e.type)?.icon });
+const recordCard = (os: LifeOSContext, e: ObjectRecord): ReplyCard => ({ kind: 'record', entityId: e.id, type: e.type, title: e.title, subtitle: [os.registry.objects.get(e.type)?.label, e.subtitle].filter(Boolean).join(' · '), icon: os.registry.objects.get(e.type)?.icon });
 
 function dueText(os: LifeOSContext, c: Cycle): string {
   const s = cycleStatus(c, Date.now(), c.meter ? os.cycles.latestMeter(c.entityId, c.meter) : null);
@@ -92,7 +92,7 @@ function dueText(os: LifeOSContext, c: Cycle): string {
 }
 
 const cycleCard = (os: LifeOSContext, c: Cycle): ReplyCard => {
-  const e = os.entities.get(c.entityId);
+  const e = os.records.get(c.entityId);
   return { kind: 'cycle', entityId: c.entityId, cycleId: c.id, title: e && e.title !== c.name ? `${e.title} · ${c.name}` : c.name, due: dueText(os, c) };
 };
 
@@ -126,7 +126,7 @@ export const lifeTools: AiToolDef[] = [
     input: z.object({ alias: z.string().min(1), entityId: z.string() }),
     run: async (input, os) => {
       const i = input as { alias: string; entityId: string };
-      const e = os.entities.get(i.entityId);
+      const e = os.records.get(i.entityId);
       if (!e) return { error: 'record not found' };
       const known = os.aliases.forEntity(e.id).some((a) => a.alias.toLowerCase() === i.alias.trim().toLowerCase());
       const a = os.aliases.learn(i.alias, e.id);
@@ -139,7 +139,7 @@ export const lifeTools: AiToolDef[] = [
     input: z.object({ entityId: z.string(), uri: z.string(), name: z.string(), mime: z.string().optional() }),
     run: async (input, os) => {
       const i = input as { entityId: string; uri: string; name: string; mime?: string };
-      const e = os.entities.get(i.entityId);
+      const e = os.records.get(i.entityId);
       if (!e) return { error: 'record not found' };
       const image = !!i.mime?.startsWith('image/');
       const a = os.attachments.add({ entityId: e.id, name: i.name, mime: i.mime ?? null, size: null, uri: i.uri, kind: image ? (e.type === 'transaction' ? 'receipt' : 'image') : 'file' }, 'assistant');
@@ -169,7 +169,7 @@ export const lifeTools: AiToolDef[] = [
       const bySubject = i.subjectId ? os.facts.list({ subjectId: i.subjectId, limit: i.limit ?? 10 }) : [];
       const seen = new Set<string>();
       const facts = [...bySubject, ...byQuery].filter((f) => (seen.has(f.id) ? false : (seen.add(f.id), true)));
-      return { facts: facts.map((f) => ({ id: f.id, text: f.text, about: f.subjectId ? os.entities.get(f.subjectId)?.title : undefined, said: new Date(f.statedAt).toISOString().slice(0, 10) })) };
+      return { facts: facts.map((f) => ({ id: f.id, text: f.text, about: f.subjectId ? os.records.get(f.subjectId)?.title : undefined, said: new Date(f.statedAt).toISOString().slice(0, 10) })) };
     },
   },
   {
@@ -188,10 +188,10 @@ export const lifeTools: AiToolDef[] = [
     description: 'Log that something happened to a record ("did the car service today, 6,400 at Hyundai", "washed the white sneakers"). Adds a timeline entry; when it matches one of the record\'s cycles it also rolls that cycle (and files the cost as an expense). Use resolve_entity first to get entityId.',
     input: z.object({ entityId: z.string(), what: z.string().describe('Short event, e.g. "Service", "Wash"'), date: z.string().optional().describe('ISO date; default today'), cost: z.number().optional(), meter: z.number().optional().describe('Odometer reading if said'), note: z.string().optional() }),
     confirm: (i: { cost?: number }) => !!i.cost,
-    describe: (i: { entityId: string; what: string; cost?: number }, os) => `${i.what} on ${os.entities.get(i.entityId)?.title ?? 'record'} · file ${os.format.currency(i.cost ?? 0)} as an expense`,
+    describe: (i: { entityId: string; what: string; cost?: number }, os) => `${i.what} on ${os.records.get(i.entityId)?.title ?? 'record'} · file ${os.format.currency(i.cost ?? 0)} as an expense`,
     run: async (input, os) => {
       const i = input as { entityId: string; what: string; date?: string; cost?: number; meter?: number; note?: string };
-      const e = os.entities.get(i.entityId);
+      const e = os.records.get(i.entityId);
       if (!e) return { error: 'record not found' };
       const when = at(i.date);
       const cycle = pickCycle(os, e.id, i.what);
@@ -200,9 +200,9 @@ export const lifeTools: AiToolDef[] = [
         const after = os.cycles.get(cycle.id)!;
         return withExtras({ logged: `${cycle.name} done on ${e.title}`, cycleRolled: true, next: dueText(os, after), expenseFiled: !!done.transactionId }, { undo: () => undoLoggedDone(os, done), card: cycleCard(os, after) });
       }
-      const ev = os.entities.timeline.add({ entityId: e.id, kind: 'event', title: i.what, body: [i.note, i.cost ? os.format.currency(i.cost) : null].filter(Boolean).join(' · ') || null, actor: 'assistant', occurredAt: when, meta: { cost: i.cost ?? null } });
+      const ev = os.records.timeline.add({ entityId: e.id, kind: 'event', title: i.what, body: [i.note, i.cost ? os.format.currency(i.cost) : null].filter(Boolean).join(' · ') || null, actor: 'assistant', occurredAt: when, meta: { cost: i.cost ?? null } });
       const reading = i.meter != null ? os.cycles.logMeter(e.id, i.meter, { at: when, unit: 'km' }, 'assistant') : null;
-      return withExtras({ logged: `${i.what} on ${e.title}`, cycleRolled: false }, { undo: () => { os.entities.timeline.remove(ev.id); if (reading) os.cycles.removeReading(reading); }, card: recordCard(os, e) });
+      return withExtras({ logged: `${i.what} on ${e.title}`, cycleRolled: false }, { undo: () => { os.records.timeline.remove(ev.id); if (reading) os.cycles.removeReading(reading); }, card: recordCard(os, e) });
     },
   },
   {
@@ -210,7 +210,7 @@ export const lifeTools: AiToolDef[] = [
     description: 'Mark a recurring thing done ("did laundry", "paid the Jio recharge"): rolls the cycle to its next due. Give cycleId, or entityId (+ cycle name when the record has several). Optional cost files an expense.',
     input: z.object({ cycleId: z.string().optional(), entityId: z.string().optional(), cycle: z.string().optional(), date: z.string().optional(), cost: z.number().optional(), meter: z.number().optional(), note: z.string().optional() }),
     confirm: (i: { cost?: number }) => !!i.cost,
-    describe: (i: { cycleId?: string; entityId?: string; cost?: number }, os) => `Mark ${(i.cycleId ? os.cycles.get(i.cycleId)?.name : i.entityId ? os.entities.get(i.entityId)?.title : '') ?? ''} done · file ${os.format.currency(i.cost ?? 0)} as an expense`,
+    describe: (i: { cycleId?: string; entityId?: string; cost?: number }, os) => `Mark ${(i.cycleId ? os.cycles.get(i.cycleId)?.name : i.entityId ? os.records.get(i.entityId)?.title : '') ?? ''} done · file ${os.format.currency(i.cost ?? 0)} as an expense`,
     run: async (input, os) => {
       const i = input as { cycleId?: string; entityId?: string; cycle?: string; date?: string; cost?: number; meter?: number; note?: string };
       const c = i.cycleId ? os.cycles.get(i.cycleId) : i.entityId ? pickCycle(os, i.entityId, i.cycle) : null;
@@ -240,11 +240,11 @@ export const lifeTools: AiToolDef[] = [
     input: z.object({ entityId: z.string(), value: z.number(), date: z.string().optional() }),
     run: async (input, os) => {
       const i = input as { entityId: string; value: number; date?: string };
-      const e = os.entities.get(i.entityId);
+      const e = os.records.get(i.entityId);
       if (!e) return { error: 'record not found' };
-      const m = os.registry.entityTypes.get(e.type)?.meters?.[0];
+      const m = os.registry.objects.get(e.type)?.meters?.[0];
       const id = os.cycles.logMeter(e.id, i.value, { at: at(i.date), meter: m?.meter, unit: m?.unit ?? 'km', label: m?.label }, 'assistant');
-      return withExtras({ logged: `${m?.label ?? 'Reading'} ${i.value}` }, { undo: () => os.cycles.removeReading(id), card: recordCard(os, os.entities.get(e.id)!) });
+      return withExtras({ logged: `${m?.label ?? 'Reading'} ${i.value}` }, { undo: () => os.cycles.removeReading(id), card: recordCard(os, os.records.get(e.id)!) });
     },
   },
   {

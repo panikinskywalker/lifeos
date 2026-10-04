@@ -15,7 +15,7 @@ export default function GraphScreen() {
   const [centre, setCentre] = useState(String(id));
   const [hops, setHops] = useState<'1' | '2'>('2');
   const g = useLive((o) => egoGraph(o, centre, { hops: Number(hops), limit: 40 }), [centre, hops]);
-  const e = os.entities.get(centre);
+  const e = os.records.get(centre);
   const open = (nid: string, type: string) => router.push(`/entity/${type}/${nid}` as never);
   return (
     <Screen title={e?.title ?? 'Graph'} subtitle={g.nodes.length > 1 ? `${g.nodes.length - 1} linked · tap to walk, long-press to open` : undefined} onBack={() => router.back()} right={e ? <Button title="Open" size="sm" variant="secondary" icon="arrow-right" onPress={() => open(e.id, e.type)} /> : undefined}>
@@ -28,7 +28,7 @@ export default function GraphScreen() {
         )}
         {centre !== id ? (
           <Text variant="caption" color="secondary" style={{ textAlign: 'center' }} onPress={() => setCentre(String(id))}>
-            Back to {os.entities.get(String(id))?.title ?? 'the start'}
+            Back to {os.records.get(String(id))?.title ?? 'the start'}
           </Text>
         ) : null}
       </View>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Linking, View } from 'react-native';
 import { format } from 'date-fns';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { logDone, undoLoggedDone } from '@core/cycles/upkeep';
 import { useLive } from '@ui/hooks';
@@ -15,10 +15,10 @@ import { perMonth } from '@modules/finance/reports';
  * paid this year, a renewal nudge when it won't auto-post, quick actions,
  * billing history.
  */
-export function SubscriptionHero({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function SubscriptionHero({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const toast = useToast();
-  const s = entity as Entity<SubscriptionData>;
-  const posted = useLive((os) => os.relations.forEntity(entity.id, 'subscription').map((r) => os.entities.get<{ date: string; amount: number }>(r.other.id)).filter((x): x is Entity<{ date: string; amount: number }> => !!x && x.type === 'transaction'), [entity.id]);
+  const s = entity as ObjectRecord<SubscriptionData>;
+  const posted = useLive((os) => os.links.forEntity(entity.id, 'subscription').map((r) => os.records.get<{ date: string; amount: number }>(r.other.id)).filter((x): x is ObjectRecord<{ date: string; amount: number }> => !!x && x.type === 'transaction'), [entity.id]);
   const renewal = useLive((os) => {
     const c = os.cycles.forEntity(entity.id).find((x) => x.template === 'subscription.renewal');
     return c ? { cycle: c, status: os.cycles.status(c) } : null;
@@ -36,8 +36,8 @@ export function SubscriptionHero({ entity, ctx }: { entity: Entity<any>; ctx: Li
   };
   const setStatus = (to: string, msg: string) => {
     const prev = entity.status;
-    ctx.entities.setStatus(entity.id, to);
-    toast.show({ message: msg, icon: to === 'active' ? 'check' : 'clock', undo: () => void ctx.entities.setStatus(entity.id, prev ?? 'active') });
+    ctx.records.setStatus(entity.id, to);
+    toast.show({ message: msg, icon: to === 'active' ? 'check' : 'clock', undo: () => void ctx.records.setStatus(entity.id, prev ?? 'active') });
   };
   return (
     <View style={{ gap: 16 }}>

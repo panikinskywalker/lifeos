@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EntityTypeDef } from '@core/domain/types';
+import type { ObjectDef } from '@core/domain/types';
 
 export interface HabitData {
   frequency: 'daily' | 'weekdays' | 'weekly';
@@ -15,7 +15,7 @@ export interface HabitLogData {
   value?: number;
 }
 
-export const habitType: EntityTypeDef<HabitData> = {
+export const habitType: ObjectDef<HabitData> = {
   type: 'habit',
   module: 'habits',
   label: 'Habit',
@@ -28,10 +28,10 @@ export const habitType: EntityTypeDef<HabitData> = {
     { key: 'why', label: 'Why', type: 'longtext', section: 'Details' },
   ],
   statuses: [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused', color: 'gray' }],
-  relations: [{ kind: 'habit', label: 'Logs', to: 'habit_log', cardinality: 'many' }],
+  links: [{ kind: 'habit', label: 'Logs', to: 'habit_log', cardinality: 'many' }],
 };
 
-export const habitLogType: EntityTypeDef<HabitLogData> = {
+export const habitLogType: ObjectDef<HabitLogData> = {
   type: 'habit_log',
   module: 'habits',
   label: 'Habit check-in',

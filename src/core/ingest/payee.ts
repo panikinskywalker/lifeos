@@ -41,10 +41,10 @@ function nameScore(said: string, title: string): number {
 export function payeeFor(os: LifeOSContext, name: string | null | undefined, vpa?: string | null, opts: { business?: boolean } = {}): PayeeMatch | null {
   const said = (name ?? '').trim() || (vpa ? vpa.split('@')[0]!.replace(/[._-]+/g, ' ') : '');
   if (!said || /^(atm|cash|self|transfer)\b/i.test(said)) return null;
-  const hasPeople = os.registry.entityTypes.has('person');
-  const hasOrgs = os.registry.entityTypes.has('org');
-  const people = hasPeople ? os.entities.query<{ upi?: string }>('person', {}, { limit: 5000 }) : [];
-  const orgs = hasOrgs ? os.entities.query<{ upi?: string; kind?: string }>('org', {}, { limit: 5000 }) : [];
+  const hasPeople = os.registry.objects.has('person');
+  const hasOrgs = os.registry.objects.has('org');
+  const people = hasPeople ? os.records.query<{ upi?: string }>('person', {}, { limit: 5000 }) : [];
+  const orgs = hasOrgs ? os.records.query<{ upi?: string; kind?: string }>('org', {}, { limit: 5000 }) : [];
   const v = vpa?.toLowerCase();
   const byUpi = <T extends { data: { upi?: string } }>(list: T[]) => (v ? list.find((e) => (e.data.upi ?? '').toLowerCase().split(/[,\s]+/).includes(v)) : undefined);
   const p1 = byUpi(people);
@@ -53,7 +53,7 @@ export function payeeFor(os: LifeOSContext, name: string | null | undefined, vpa
   if (o1) return { id: o1.id, type: 'org', created: false, guess: null, confidence: 1 };
   // A name you confirmed before.
   for (const a of os.aliases.lookup(norm(said))) {
-    const e = os.entities.get(a.entityId);
+    const e = os.records.get(a.entityId);
     if (e && (e.type === 'person' || e.type === 'org')) return { id: e.id, type: e.type, created: false, guess: null, confidence: 1 };
   }
   const business = opts.business ?? BUSINESS.test(said);
@@ -70,51 +70,51 @@ export function payeeFor(os: LifeOSContext, name: string | null | undefined, vpa
   const n = norm(said);
   const o2 = orgs.find((o) => norm(o.title) === n) ?? orgs.find((o) => n.length >= 4 && (norm(o.title).startsWith(n) || n.startsWith(norm(o.title))));
   if (o2) {
-    if (v && !(o2.data.upi ?? '').includes(v)) os.entities.update(o2.id, { data: { upi: [o2.data.upi, v].filter(Boolean).join(', ') } }, 'system');
+    if (v && !(o2.data.upi ?? '').includes(v)) os.records.update(o2.id, { data: { upi: [o2.data.upi, v].filter(Boolean).join(', ') } }, 'system');
     return { id: o2.id, type: 'org', created: false, guess: null, confidence: 1 };
   }
-  const e = os.entities.create({ type: 'org', title: titleCase(said), data: { kind: business ? 'shop' : 'payee', upi: v ?? undefined } }, 'assistant');
+  const e = os.records.create({ type: 'org', title: titleCase(said), data: { kind: business ? 'shop' : 'payee', upi: v ?? undefined } }, 'assistant');
   return { id: e.id, type: 'org', created: true, guess: null, confidence: 1 };
 }
 
 /** Link a payment to its payee (people as 'person', everyone else as 'payee'), remembering what the message called them. */
 export function linkPayee(os: LifeOSContext, txId: string, m: PayeeMatch, said: string | null, vpa: string | null, source = 'sms') {
   const kind = m.type === 'person' ? 'person' : 'payee';
-  os.relations.link(txId, m.id, kind, { as: said, vpa, guess: m.guess }, 'assistant', { source: source as never, confidence: m.confidence });
+  os.links.link(txId, m.id, kind, { as: said, vpa, guess: m.guess }, 'assistant', { source: source as never, confidence: m.confidence });
 }
 
 /** You said yes: the link is certain, and that name / UPI ID now means them. */
 export function confirmPayee(os: LifeOSContext, relationId: string) {
-  const r = os.relations.get(relationId);
+  const r = os.links.get(relationId);
   if (!r) return;
-  os.relations.setConfidence(relationId, 1);
+  os.links.setConfidence(relationId, 1);
   const as = r.meta.as as string | undefined;
   const vpa = r.meta.vpa as string | undefined;
   if (as) os.aliases.learn(norm(as), r.toId);
   if (vpa) {
-    const e = os.entities.get<{ upi?: string }>(r.toId);
-    if (e && !(e.data.upi ?? '').includes(vpa)) os.entities.update(r.toId, { data: { upi: [e.data.upi, vpa].filter(Boolean).join(', ') } }, 'user');
+    const e = os.records.get<{ upi?: string }>(r.toId);
+    if (e && !(e.data.upi ?? '').includes(vpa)) os.records.update(r.toId, { data: { upi: [e.data.upi, vpa].filter(Boolean).join(', ') } }, 'user');
   }
   bus.emit('data.changed', { table: 'relations', id: relationId });
 }
 
 /** Not them: unlink, and give the payment its own payee under the name the message used. */
 export function rejectPayee(os: LifeOSContext, relationId: string) {
-  const r = os.relations.get(relationId);
+  const r = os.links.get(relationId);
   if (!r) return;
-  os.relations.remove(relationId);
+  os.links.remove(relationId);
   const as = (r.meta.as as string | undefined) ?? 'Payee';
-  const e = os.entities.create({ type: 'org', title: titleCase(as), data: { kind: 'payee', upi: (r.meta.vpa as string | undefined) ?? undefined } }, 'user');
-  os.relations.link(r.fromId, e.id, 'payee', { as }, 'user', { source: 'manual', confidence: 1 });
+  const e = os.records.create({ type: 'org', title: titleCase(as), data: { kind: 'payee', upi: (r.meta.vpa as string | undefined) ?? undefined } }, 'user');
+  os.links.link(r.fromId, e.id, 'payee', { as }, 'user', { source: 'manual', confidence: 1 });
 }
 
 /** Payments filed before payees existed: link them once. */
 export function linkMissingPayees(os: LifeOSContext): number {
-  if (!os.registry.entityTypes.has('transaction')) return 0;
+  if (!os.registry.objects.has('transaction')) return 0;
   let n = 0;
-  for (const t of os.entities.query<{ merchant?: string; kind?: string; category?: string }>('transaction', {}, { limit: 20000 })) {
+  for (const t of os.records.query<{ merchant?: string; kind?: string; category?: string }>('transaction', {}, { limit: 20000 })) {
     if (!t.data.merchant || t.data.category === 'investment' || t.data.kind === 'transfer') continue;
-    if (os.relations.forEntity(t.id).some((r) => r.relation.kind === 'payee' || r.relation.kind === 'person')) continue;
+    if (os.links.forEntity(t.id).some((r) => r.relation.kind === 'payee' || r.relation.kind === 'person')) continue;
     // The message it came from knows the UPI ID, which finds the right person for sure.
     const parsed = os.db.get<{ parsed: string | null }>(`SELECT parsed FROM ingest_queue WHERE entity_id=? AND parsed IS NOT NULL LIMIT 1`, [t.id])?.parsed;
     const vpa = parsed ? ((JSON.parse(parsed) as { txn?: { vpa?: string | null } }).txn?.vpa ?? null) : null;

@@ -10,7 +10,7 @@ import { backlinks, parseLinks } from './links';
 
 const mod: ModuleManifest = {
   id: 'k', name: 'K', version: '1', description: '', icon: 'x', color: '#000',
-  entityTypes: [
+  objects: [
     { type: 'note', module: 'k', label: 'Note', labelPlural: 'Notes', icon: 'file', schema: z.object({ title: z.string(), body: z.string().default('') }), fields: [{ key: 'title', label: 'Title', type: 'text' }, { key: 'body', label: 'Body', type: 'longtext' }], computeTitle: (x) => String(x.title) },
     { type: 'person', module: 'k', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
   ],
@@ -28,22 +28,22 @@ describe('[[links]]', () => {
   });
 
   it('a note’s links become mentions that follow edits; the target shows backlinks', () => {
-    const priya = os.entities.create({ type: 'person', data: { name: 'Priya Sharma' } });
-    const arjun = os.entities.create({ type: 'person', data: { name: 'Arjun' } });
-    const n = os.entities.create({ type: 'note', data: { title: 'Goa plan', body: 'Book with [[Priya Sharma]] and [[Arjun]]; ask [[Nobody]]' } });
-    expect(os.relations.targets(n.id, 'mention').sort()).toEqual([priya.id, arjun.id].sort());
+    const priya = os.records.create({ type: 'person', data: { name: 'Priya Sharma' } });
+    const arjun = os.records.create({ type: 'person', data: { name: 'Arjun' } });
+    const n = os.records.create({ type: 'note', data: { title: 'Goa plan', body: 'Book with [[Priya Sharma]] and [[Arjun]]; ask [[Nobody]]' } });
+    expect(os.links.targets(n.id, 'mention').sort()).toEqual([priya.id, arjun.id].sort());
     expect(backlinks(os, priya.id).map((e) => e.title)).toEqual(['Goa plan']);
-    os.entities.update(n.id, { data: { body: 'Only [[Arjun]] now' } });
-    expect(os.relations.targets(n.id, 'mention')).toEqual([arjun.id]);
+    os.records.update(n.id, { data: { body: 'Only [[Arjun]] now' } });
+    expect(os.links.targets(n.id, 'mention')).toEqual([arjun.id]);
     expect(backlinks(os, priya.id)).toEqual([]);
   });
 
   it('ambiguous titles are not guessed; a fact’s [[link]] sets what it is about', () => {
-    os.entities.create({ type: 'person', data: { name: 'Priya' } });
-    os.entities.create({ type: 'person', data: { name: 'Priya' } });
-    const n = os.entities.create({ type: 'note', data: { title: 'x', body: 'call [[Priya]]' } });
-    expect(os.relations.targets(n.id, 'mention')).toEqual([]);
-    const dad = os.entities.create({ type: 'person', data: { name: 'Dad' } });
+    os.records.create({ type: 'person', data: { name: 'Priya' } });
+    os.records.create({ type: 'person', data: { name: 'Priya' } });
+    const n = os.records.create({ type: 'note', data: { title: 'x', body: 'call [[Priya]]' } });
+    expect(os.links.targets(n.id, 'mention')).toEqual([]);
+    const dad = os.records.create({ type: 'person', data: { name: 'Dad' } });
     expect(os.facts.add({ text: '[[Dad]] hates surprises', source: 'user' }).subjectId).toBe(dad.id);
   });
 });

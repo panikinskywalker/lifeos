@@ -1,6 +1,6 @@
 import { Linking, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { AttentionCard, QuickActions, RowList, Section, StatTrio, Text, useToast } from '@ui/kit';
@@ -13,12 +13,12 @@ import { nextBirthday, type PersonData } from '@modules/crm';
  * trio, a nudge when you're overdue to get in touch, quick actions (call,
  * message, log contact, IOU) and shared expenses.
  */
-export function PersonSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function PersonSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const router = useRouter();
   const toast = useToast();
-  const p = entity as Entity<PersonData>;
-  const linked = useLive((os) => os.relations.forEntity(entity.id), [entity.id]);
-  const spend = useLive((os) => os.entities.aggregate('transaction', { filter: { and: [{ field: 'relation.person', op: 'relatedTo', value: entity.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'], count: true }), [entity.id]);
+  const p = entity as ObjectRecord<PersonData>;
+  const linked = useLive((os) => os.links.forEntity(entity.id), [entity.id]);
+  const spend = useLive((os) => os.records.aggregate('transaction', { filter: { and: [{ field: 'relation.person', op: 'relatedTo', value: entity.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'], count: true }), [entity.id]);
   const contact = useLive((os) => {
     const c = os.cycles.forEntity(entity.id).find((x) => x.template === 'person.contact');
     return c ? { cycle: c, status: os.cycles.status(c) } : null;
@@ -30,8 +30,8 @@ export function PersonSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeO
   const first = entity.title.split(' ')[0];
   const logContact = () => {
     const prev = p.data.lastContactAt;
-    ctx.entities.update<PersonData>(entity.id, { data: { lastContactAt: new Date().toISOString().slice(0, 10) } });
-    toast.show({ message: `Logged contact with ${first}`, icon: 'check', undo: () => void ctx.entities.update<PersonData>(entity.id, { data: { lastContactAt: prev } }) });
+    ctx.records.update<PersonData>(entity.id, { data: { lastContactAt: new Date().toISOString().slice(0, 10) } });
+    toast.show({ message: `Logged contact with ${first}`, icon: 'check', undo: () => void ctx.records.update<PersonData>(entity.id, { data: { lastContactAt: prev } }) });
   };
   const tel = p.data.phone?.replace(/[^+\d]/g, '');
   return (
@@ -65,7 +65,7 @@ export function PersonSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeO
         <Section title="Shared expenses" meta={`${spend.count}`} action="All" onAction={() => router.push({ pathname: '/entity/[type]', params: { type: 'transaction', personId: entity.id } })}>
           <RowList>
             {txns.map((r) => {
-              const e = ctx.entities.get(r.other.id);
+              const e = ctx.records.get(r.other.id);
               return e ? <EntityRow key={e.id} entity={e} /> : null;
             })}
           </RowList>

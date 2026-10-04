@@ -17,9 +17,9 @@ export function localAnswer(os: LifeOSContext, question: string): { text: string
   const cards: ReplyCard[] = [];
   const about = resolveCandidates(os, q).filter((c) => c.score >= 0.8 && c.why !== `a ${c.type}`).slice(0, 3);
   for (const c of about) {
-    const e = os.entities.get(c.id);
+    const e = os.records.get(c.id);
     if (!e) continue;
-    const def = os.registry.entityTypes.get(e.type);
+    const def = os.registry.objects.get(e.type);
     const n = neighbours(os, e.id, { limit: 8 });
     const dated = n.filter((x) => x.at);
     const other = n.filter((x) => !x.at);
@@ -34,7 +34,7 @@ export function localAnswer(os: LifeOSContext, question: string): { text: string
   const words = q.split(/\s+/).filter((w) => w.length > 2 && !/^(what|when|where|who|how|did|does|the|last|see|was|were|are|have|has|about|with|this|that|many|much)$/i.test(w)).join(' ');
   if (words) {
     for (const f of os.facts.search(words, 3)) if (!about.some((a) => a.id === f.subjectId)) lines.push(`• ${f.text}`);
-    const dumps = os.entities.search.search(words, { limit: 6 }).filter((h) => h.type === 'dump').slice(0, 2);
+    const dumps = os.records.search.search(words, { limit: 6 }).filter((h) => h.type === 'dump').slice(0, 2);
     for (const h of dumps) {
       const d = os.dumps.get(h.id);
       if (d) lines.push(`You said on ${day(d.createdAt)}: “${d.body.replace(/\s+/g, ' ').slice(0, 140)}${d.body.length > 140 ? '…' : ''}”`);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { format, formatDistanceToNowStrict } from 'date-fns';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { Cycle } from '@core/cycles/cycleRepo';
 import { dateField, describeCycle, type CycleKind, type CycleUnit } from '@core/cycles/schedule';
 import { logDone, undoLoggedDone, type UpkeepItem } from '@core/cycles/upkeep';
@@ -49,7 +49,7 @@ export function DoneWithCostSheet({ item, onClose }: { item: UpkeepItem | null; 
     setAsExpense(true);
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!item) return null;
-  const hasFinance = os.registry.entityTypes.has('transaction');
+  const hasFinance = os.registry.objects.has('transaction');
   const save = () => {
     const d = logDone(os, item.cycle.id, { cost: cost ?? null, note: note.trim() || null, meter: meter ?? null, asExpense: hasFinance && asExpense });
     onClose();
@@ -74,10 +74,10 @@ export function DoneWithCostSheet({ item, onClose }: { item: UpkeepItem | null; 
 const UNITS: CycleUnit[] = ['day', 'week', 'month', 'year'];
 
 /** Add or edit a cycle on a record: how it repeats, when it's next due, what it usually costs. */
-export function CycleSheet({ entity, cycle, visible, onClose }: { entity: Entity; cycle?: Cycle | null; visible: boolean; onClose: () => void }) {
+export function CycleSheet({ entity, cycle, visible, onClose }: { entity: ObjectRecord; cycle?: Cycle | null; visible: boolean; onClose: () => void }) {
   const os = useOS();
   const toast = useToast();
-  const hasMeter = !!os.registry.entityTypes.get(entity.type)?.meters?.length;
+  const hasMeter = !!os.registry.objects.get(entity.type)?.meters?.length;
   const [name, setName] = useState('');
   const [kind, setKind] = useState<CycleKind>('interval');
   const [everyN, setEveryN] = useState(1);
@@ -146,10 +146,10 @@ export function CycleSheet({ entity, cycle, visible, onClose }: { entity: Entity
 }
 
 /** Record page › Cycles: each cycle with where it stands, its stats and recent history. */
-export function CyclesSection({ entity }: { entity: Entity }) {
+export function CyclesSection({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const toast = useToast();
-  const def = os.registry.entityTypes.get(entity.type);
+  const def = os.registry.objects.get(entity.type);
   const items = useLive((o) => o.cycles.forEntity(entity.id).map((cycle) => ({ cycle, entity, def, status: o.cycles.status(cycle) })), [entity.id]);
   const [editing, setEditing] = useState<Cycle | null | 'new'>(null);
   const [active, setActive] = useState<UpkeepItem | null>(null);
@@ -246,7 +246,7 @@ function CycleCard({ item, onDone, onMore }: { item: UpkeepItem; onDone: () => v
 }
 
 /** Log a meter reading (odometer); cycles on the record recompute from it. */
-export function MeterSheet({ visible, onClose, entity, meter }: { visible: boolean; onClose: () => void; entity: Entity; meter: { meter: string; label: string; unit: string } }) {
+export function MeterSheet({ visible, onClose, entity, meter }: { visible: boolean; onClose: () => void; entity: ObjectRecord; meter: { meter: string; label: string; unit: string } }) {
   const os = useOS();
   const toast = useToast();
   const latest = useLive((o) => o.cycles.latestMeter(entity.id, meter.meter), [entity.id, meter.meter]);

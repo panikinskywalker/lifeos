@@ -76,7 +76,7 @@ const wordRe = (words: string[]) => {
 /** The days in [from, to] (ISO) on which one rule matched. */
 function ruleDays(os: LifeOSContext, r: TrackerRule, from: string, to: string): Set<string> {
   const out = new Set<string>();
-  const has = (t: string) => os.registry.entityTypes.has(t);
+  const has = (t: string) => os.registry.objects.has(t);
   switch (r.kind) {
     case 'message': {
       const re = wordRe(r.words);
@@ -193,7 +193,7 @@ export function trackerSummary(os: LifeOSContext, t: Tracker, now = Date.now(), 
 
 /** Calendars seen on synced events (for the "work calendar" picker). */
 export function knownCalendars(os: LifeOSContext): string[] {
-  if (!os.registry.entityTypes.has('event')) return [];
+  if (!os.registry.objects.has('event')) return [];
   return os.db.all<{ c: string }>(`SELECT DISTINCT j.value AS c FROM entities e, json_each(json_extract(e.data,'$.calendars')) j WHERE e.type='event' AND e.deleted_at IS NULL ORDER BY c`).map((r) => r.c);
 }
 
@@ -212,7 +212,7 @@ export function ruleText(r: TrackerRule, os?: LifeOSContext): string {
     case 'payment':
       return `${r.direction === 'received' ? 'Money in' : r.direction === 'any' ? 'A payment' : 'A payment out'}${r.words?.length ? ` mentioning ${r.words.join(' / ')}` : ''}${r.category ? ` in ${r.category}` : ''}`;
     case 'record':
-      return `A ${os?.registry.entityTypes.get(r.type)?.label.toLowerCase() ?? r.type} that day`;
+      return `A ${os?.registry.objects.get(r.type)?.label.toLowerCase() ?? r.type} that day`;
     case 'metric':
       return `${r.metric === 'steps' ? 'Steps' : r.metric === 'sleep' ? 'Sleep (h)' : r.metric === 'resting_hr' ? 'Resting heart rate' : 'Weight'} ${r.goal ? 'reach your goal' : `≥ ${r.min}`}`;
     case 'screen':
@@ -220,6 +220,6 @@ export function ruleText(r: TrackerRule, os?: LifeOSContext): string {
     case 'calendar':
       return `An event${r.calendars?.length ? ` on ${r.calendars.join(' / ')}` : ''}${r.calendars?.length && r.words?.length ? ' or' : ''}${r.words?.length ? ` titled ${r.words.join(' / ')}` : ''}`;
     case 'habit':
-      return `Habit “${os?.entities.get(r.habitId)?.title ?? 'habit'}” ticked`;
+      return `Habit “${os?.records.get(r.habitId)?.title ?? 'habit'}” ticked`;
   }
 }

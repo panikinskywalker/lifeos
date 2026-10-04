@@ -32,20 +32,20 @@ const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 async function main() {
   const os = await createLifeOS({
     db: createBetterSqliteAdapter(':memory:'),
-    modules: [{ id: 'all', name: 'all', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [measurementType, workoutType, accountType, budgetType, subscriptionType, transactionType, personType, groupType, eventType, taskType, projectType, goalType, tripType, deliveryType, habitType, habitLogType] }],
+    modules: [{ id: 'all', name: 'all', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, budgetType, subscriptionType, transactionType, personType, groupType, eventType, taskType, projectType, goalType, tripType, deliveryType, habitType, habitLogType] }],
     registry: new Registry(),
   });
   const now = Date.now();
   const cats = ['food', 'groceries', 'transport', 'shopping', 'utilities', 'entertainment', 'health'];
   os.db.transaction(() => {
-    for (let i = 0; i < 5000; i++) os.entities.create({ type: 'transaction', data: { amount: 50 + ((i * 37) % 3000), kind: i % 25 ? 'expense' : 'income', category: cats[i % cats.length], merchant: `Shop ${i % 300}`, date: iso(now - (i % 180) * DAY) } });
-    for (let i = 0; i < 300; i++) os.entities.create({ type: 'person', title: `Person ${i}`, data: { contactEvery: i % 3 ? undefined : 14, lastContactAt: iso(now - (i % 40) * DAY), birthday: `1990-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 27) + 1).padStart(2, '0')}` } });
-    for (let i = 0; i < 400; i++) os.entities.create({ type: 'task', title: `Task ${i}`, status: i % 3 ? 'todo' : 'done', data: { dueDate: iso(now + ((i % 30) - 10) * DAY), completedAt: i % 3 ? undefined : now - (i % 10) * DAY } });
-    for (let i = 0; i < 200; i++) os.entities.create({ type: 'event', title: `Event ${i}`, data: { startAt: now + ((i % 60) - 30) * DAY + (i % 10) * 3_600_000 } });
-    for (let i = 0; i < 150; i++) os.entities.create({ type: 'delivery', data: { item: `Parcel ${i}`, status: i % 10 ? 'delivered' : 'shipped', deliveredOn: iso(now - (i % 90) * DAY) } });
+    for (let i = 0; i < 5000; i++) os.records.create({ type: 'transaction', data: { amount: 50 + ((i * 37) % 3000), kind: i % 25 ? 'expense' : 'income', category: cats[i % cats.length], merchant: `Shop ${i % 300}`, date: iso(now - (i % 180) * DAY) } });
+    for (let i = 0; i < 300; i++) os.records.create({ type: 'person', title: `Person ${i}`, data: { contactEvery: i % 3 ? undefined : 14, lastContactAt: iso(now - (i % 40) * DAY), birthday: `1990-${String((i % 12) + 1).padStart(2, '0')}-${String((i % 27) + 1).padStart(2, '0')}` } });
+    for (let i = 0; i < 400; i++) os.records.create({ type: 'task', title: `Task ${i}`, status: i % 3 ? 'todo' : 'done', data: { dueDate: iso(now + ((i % 30) - 10) * DAY), completedAt: i % 3 ? undefined : now - (i % 10) * DAY } });
+    for (let i = 0; i < 200; i++) os.records.create({ type: 'event', title: `Event ${i}`, data: { startAt: now + ((i % 60) - 30) * DAY + (i % 10) * 3_600_000 } });
+    for (let i = 0; i < 150; i++) os.records.create({ type: 'delivery', data: { item: `Parcel ${i}`, status: i % 10 ? 'delivered' : 'shipped', deliveredOn: iso(now - (i % 90) * DAY) } });
     for (let h = 0; h < 6; h++) {
-      const habit = os.entities.create({ type: 'habit', title: `Habit ${h}`, data: { frequency: 'daily' } });
-      for (let d = 0; d < 120; d++) if ((d + h) % 3) os.entities.create({ type: 'habit_log', data: { habitId: habit.id, date: iso(now - d * DAY) } });
+      const habit = os.records.create({ type: 'habit', title: `Habit ${h}`, data: { frequency: 'daily' } });
+      for (let d = 0; d < 120; d++) if ((d + h) % 3) os.records.create({ type: 'habit_log', data: { habitId: habit.id, date: iso(now - d * DAY) } });
     }
   });
   saveHealthDays(os, Array.from({ length: 180 }, (_, i) => ({ day: iso(now - i * DAY), steps: 4000 + ((i * 97) % 8000), sleepMin: 360 + (i % 90), restingHr: 60 + (i % 8) })));

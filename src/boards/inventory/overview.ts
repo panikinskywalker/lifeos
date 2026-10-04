@@ -3,7 +3,7 @@ import { daysUntil, inDays, isoOf, type ModuleOverview, type OverviewBlock } fro
 
 /** Stock at a glance: running low, expiring, by location. */
 export function inventoryOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
-  const items = os.entities.query<{ quantity?: number; minQuantity?: number; expiresOn?: string; location?: string }>('item', {}, { limit: 5000 });
+  const items = os.records.query<{ quantity?: number; minQuantity?: number; expiresOn?: string; location?: string }>('item', {}, { limit: 5000 });
   const low = items.filter((i) => i.data.minQuantity != null && (i.data.quantity ?? 0) <= i.data.minQuantity);
   const expiring = items.filter((i) => i.data.expiresOn && daysUntil(i.data.expiresOn, now) <= 30).sort((a, b) => (a.data.expiresOn! < b.data.expiresOn! ? -1 : 1));
   const byLoc = new Map<string, number>();

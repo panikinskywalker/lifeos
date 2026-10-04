@@ -3,8 +3,8 @@ import { migrate } from './db/migrate';
 import { registry as defaultRegistry, Registry } from './registry/registry';
 import type { LifeOSContext } from './registry/context';
 import type { BoardManifest, ModuleManifest } from './registry/types';
-import { EntityRepo } from './repo/entityRepo';
-import { AttachmentRepo, CommentRepo, CustomFieldRepo, ModuleRepo, RelationRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from './repo/sideRepos';
+import { RecordRepo } from './repo/entityRepo';
+import { AttachmentRepo, CommentRepo, CustomFieldRepo, ModuleRepo, LinkRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from './repo/sideRepos';
 import { ChangeLog } from './sync/changeLog';
 import { CycleRepo } from './cycles/cycleRepo';
 import { GroupRepo } from './repo/groupRepo';
@@ -17,7 +17,7 @@ import { Scheduler } from './automation/scheduler';
 import { createFormatters, DEFAULT_LOCALE, type LocaleSettings } from './format';
 import { bus } from './events/bus';
 import { coreModule } from './coreModule';
-import type { Entity } from './domain/types';
+import type { ObjectRecord } from './domain/types';
 import { resolveLink, syncMentions } from './links';
 import { backfillDeliveries, learnCategory, payeeOf } from './ingest/ingest';
 import { linkMissingPayees } from './ingest/payee';
@@ -48,7 +48,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   const localeGetter = () => ({ ...DEFAULT_LOCALE, ...settings.get<Partial<LocaleSettings>>('locale', {}) });
   const format = createFormatters(localeGetter);
 
-  const entities = new EntityRepo(db, registry);
+  const entities = new RecordRepo(db, registry);
   entities.formatCurrency = (n, c) => format.currency(n, c);
   const changes = new ChangeLog(db);
   const timeline = entities.timeline;
@@ -56,8 +56,8 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   const ctx: LifeOSContext = {
     db,
     registry,
-    entities,
-    relations: new RelationRepo(db, timeline, changes),
+    records: entities,
+    links: new LinkRepo(db, timeline, changes),
     tags: new TagRepo(db, timeline),
     attachments: new AttachmentRepo(db, timeline, changes),
     cycles: new CycleRepo(db, timeline, changes),
@@ -82,7 +82,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   // Notes, tags and attachment names are part of a record's search text: reindex it when they change.
   const reindex = (entityId: string | null | undefined) => {
     const e = entityId ? entities.get(entityId) : undefined;
-    const def = e ? registry.entityTypes.get(e.type) : undefined;
+    const def = e ? registry.objects.get(e.type) : undefined;
     if (e && def) entities.search.index(e, def);
   };
   const ownerOf = (table: 'comments' | 'attachments', id: string) => db.get<{ entity_id: string }>(`SELECT entity_id FROM ${table} WHERE id=?`, [id])?.entity_id;
@@ -104,7 +104,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   wrap(ctx.attachments, 'setCover', (a) => (a[0] as { entityId: string }).entityId);
   wrap(ctx.attachments, 'remove', (a) => ownerOf('attachments', a[0] as string), true);
 
-  // Relation fields: data.<key> holding an entity id (or ids) mirrors into the
+  // Link fields: data.<key> holding an entity id (or ids) mirrors into the
   // relations table so the graph and the JSON stay consistent.
   entities.syncRelations = (entity, def, actor) => {
     for (const f of def.fields) {
@@ -112,9 +112,9 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
       const raw = (entity.data as Record<string, unknown>)[f.key];
       const want = new Set((Array.isArray(raw) ? raw : raw ? [raw] : []).map(String).filter(Boolean));
       // Only links the field made: a payment's payer (linked from the SMS, with what it called them) isn't the field's to remove.
-      const have = new Set(ctx.relations.forEntity(entity.id, f.relationKind).filter((r) => r.direction === 'out' && !('as' in r.relation.meta)).map((r) => r.other.id));
-      for (const id of want) if (!have.has(id)) ctx.relations.link(entity.id, id, f.relationKind, {}, actor);
-      for (const id of have) if (!want.has(id)) ctx.relations.unlink(entity.id, id, f.relationKind, actor);
+      const have = new Set(ctx.links.forEntity(entity.id, f.relationKind).filter((r) => r.direction === 'out' && !('as' in r.relation.meta)).map((r) => r.other.id));
+      for (const id of want) if (!have.has(id)) ctx.links.link(entity.id, id, f.relationKind, {}, actor);
+      for (const id of have) if (!want.has(id)) ctx.links.unlink(entity.id, id, f.relationKind, actor);
     }
   };
   ctx.automation = new AutomationEngine(ctx, registry);
@@ -128,10 +128,10 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
 
   // Install / start
   for (const m of all) {
-    for (const t of m.entityTypes ?? []) entities.ensureIndexes(t);
+    for (const t of m.objects ?? []) entities.ensureIndexes(t);
     if (!ctx.modules.isInstalled(m.id)) {
       db.transaction(() => {
-        for (const t of m.entityTypes ?? []) {
+        for (const t of m.objects ?? []) {
           for (const v of t.defaultViews ?? []) ctx.views.save(t.type, v);
         }
       });
@@ -151,7 +151,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   // Default cycles: new records get their type's templates; existing records get them once.
   ctx.cycles.onReading = (entityId, meter, actor) => {
     const e = entities.get(entityId);
-    const m = e && registry.entityTypes.get(e.type)?.meters?.find((x) => x.meter === meter);
+    const m = e && registry.objects.get(e.type)?.meters?.find((x) => x.meter === meter);
     if (!e || !m) return;
     const latest = ctx.cycles.latestMeter(entityId, meter);
     if ((e.data as Record<string, unknown>)[m.field] !== latest) entities.update(entityId, { data: { [m.field]: latest ?? undefined } }, actor);
@@ -162,7 +162,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   };
   ctx.cycles.onChanged = (c) => {
     const e = entities.get(c.entityId);
-    const map = e && c.template ? registry.entityTypes.get(e.type)?.cycleFields?.[c.template] : undefined;
+    const map = e && c.template ? registry.objects.get(e.type)?.cycleFields?.[c.template] : undefined;
     if (!e || !map) return;
     const data = e.data as Record<string, unknown>;
     const patch: Record<string, unknown> = {};
@@ -172,16 +172,16 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     if (Object.keys(patch).length) entities.update(e.id, { data: patch }, 'system');
   };
   // Paused / cancelled records: their cycles leave Upkeep until the record is live again.
-  const syncEnabled = (e: Entity) => {
-    const live = registry.entityTypes.get(e.type)?.cycleActiveStatuses;
+  const syncEnabled = (e: ObjectRecord) => {
+    const live = registry.objects.get(e.type)?.cycleActiveStatuses;
     if (!live) return;
     const on = e.status == null || live.includes(e.status);
     for (const c of ctx.cycles.forEntity(e.id)) if (c.enabled !== on) ctx.cycles.update(c.id, { enabled: on });
   };
   bus.on('entity.status', ({ entity }) => syncEnabled(entity));
   // Meters: a value typed into the mirrored field (odometerKm) becomes a reading.
-  const mirrorMeters = (entity: Entity) => {
-    for (const m of registry.entityTypes.get(entity.type)?.meters ?? []) {
+  const mirrorMeters = (entity: ObjectRecord) => {
+    for (const m of registry.objects.get(entity.type)?.meters ?? []) {
       const v = Number((entity.data as Record<string, unknown>)[m.field]);
       if (!Number.isFinite(v) || (entity.data as Record<string, unknown>)[m.field] == null) continue;
       if (ctx.cycles.latestMeter(entity.id, m.meter) === v) continue;
@@ -196,17 +196,17 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   });
   bus.on('entity.created', ({ entity }) => {
     mirrorMeters(entity);
-    ctx.cycles.applyTemplates(entity, registry.entityTypes.get(entity.type));
+    ctx.cycles.applyTemplates(entity, registry.objects.get(entity.type));
     syncEnabled(entity);
   });
   bus.on('entity.updated', ({ entity, previous, changed }) => {
-    if (changed.some((k) => k.startsWith('data.'))) ctx.cycles.syncTemplates(entity, previous, registry.entityTypes.get(entity.type));
-    const meters = registry.entityTypes.get(entity.type)?.meters ?? [];
+    if (changed.some((k) => k.startsWith('data.'))) ctx.cycles.syncTemplates(entity, previous, registry.objects.get(entity.type));
+    const meters = registry.objects.get(entity.type)?.meters ?? [];
     if (meters.some((m) => changed.includes(m.field) || changed.includes(`data.${m.field}`))) mirrorMeters(entity);
   });
   if (!settings.get('cycles.enabledSynced', false)) {
     db.transaction(() => {
-      for (const def of registry.entityTypes.values()) {
+      for (const def of registry.objects.values()) {
         if (!def.cycleActiveStatuses) continue;
         for (const e of entities.query(def.type, {}, { limit: 100000 })) syncEnabled(e);
       }
@@ -216,7 +216,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   // Records that predate meter readings: their typed value becomes the first reading, once.
   if (!settings.get('meters.backfilled', false)) {
     db.transaction(() => {
-      for (const def of registry.entityTypes.values()) {
+      for (const def of registry.objects.values()) {
         if (!def.meters?.length) continue;
         for (const e of entities.query(def.type, {}, { limit: 100000 })) mirrorMeters(e);
       }
@@ -225,7 +225,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   }
   if (!settings.get('cycles.templatesBackfilled', false)) {
     db.transaction(() => {
-      for (const def of registry.entityTypes.values()) {
+      for (const def of registry.objects.values()) {
         if (!def.cycleTemplates) continue;
         for (const e of entities.query(def.type, {}, { limit: 100000 })) {
           ctx.cycles.applyTemplates(e, def);

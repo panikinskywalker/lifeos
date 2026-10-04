@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { TransactionData } from './types';
 
 /**
@@ -46,7 +46,7 @@ const matchesKind = (t: TransactionData, k: SpendKind) =>
   k === 'all' ? true : k === 'spending' ? t.kind === 'expense' : k === 'income' ? t.kind === 'income' : t.category === 'investment';
 
 export interface SpendResult {
-  items: Array<Entity<TransactionData>>;
+  items: Array<ObjectRecord<TransactionData>>;
   total: number;
   count: number;
   prevTotal: number | null;
@@ -58,10 +58,10 @@ export interface SpendResult {
 
 export function spendQuery(os: LifeOSContext, q: SpendQuery, now = new Date()): SpendResult {
   const r = periodRange(q.period, now);
-  const all = os.entities.query<TransactionData>('transaction', r.from ? { filter: { and: [{ field: 'data.date', op: 'gte', value: r.prevFrom ?? r.from }, { field: 'data.date', op: 'lte', value: r.to }] } } : {}, { limit: 20000 });
+  const all = os.records.query<TransactionData>('transaction', r.from ? { filter: { and: [{ field: 'data.date', op: 'gte', value: r.prevFrom ?? r.from }, { field: 'data.date', op: 'lte', value: r.to }] } } : {}, { limit: 20000 });
   const words = (q.search ?? '').trim().toLowerCase();
   const inPeriod = (t: TransactionData, from: string | null, to: string | null) => (!from || t.date >= from) && (!to || t.date <= to);
-  const base = (e: Entity<TransactionData>) =>
+  const base = (e: ObjectRecord<TransactionData>) =>
     matchesKind(e.data, q.kind) &&
     (!q.accountIds?.length || q.accountIds.includes(e.data.accountId ?? '') || q.accountIds.includes(e.data.toAccountId ?? '')) &&
     (!words || `${e.title} ${e.data.merchant ?? ''} ${e.data.note ?? ''}`.toLowerCase().includes(words));
@@ -82,7 +82,7 @@ export function spendQuery(os: LifeOSContext, q: SpendQuery, now = new Date()): 
   items = [...items].sort((a, b) =>
     sort === 'largest' ? b.data.amount - a.data.amount : sort === 'smallest' ? a.data.amount - b.data.amount : sort === 'oldest' ? a.data.date.localeCompare(b.data.date) || a.createdAt - b.createdAt : b.data.date.localeCompare(a.data.date) || b.createdAt - a.createdAt,
   );
-  const sum = (xs: Array<Entity<TransactionData>>) => xs.reduce((s, e) => s + e.data.amount, 0);
+  const sum = (xs: Array<ObjectRecord<TransactionData>>) => xs.reduce((s, e) => s + e.data.amount, 0);
   const total = sum(items);
   const prevItems = prev ? (q.categories?.length ? prev.filter((e) => q.categories!.includes(e.data.category ?? 'other')) : prev) : null;
   const prevTotal = prevItems ? sum(prevItems) : null;
@@ -94,7 +94,7 @@ export function spendQuery(os: LifeOSContext, q: SpendQuery, now = new Date()): 
     prevTotal,
     change: prevTotal ? (total - prevTotal) / prevTotal : null,
     byCategory: [...cats].map(([category, c]) => ({ category, ...c, share: c.total / catTotal })).sort((a, b) => b.total - a.total),
-    accounts: [...accs].map(([id, total]) => ({ id, title: os.entities.get(id)?.title ?? 'Account', total })).sort((a, b) => b.total - a.total),
+    accounts: [...accs].map(([id, total]) => ({ id, title: os.records.get(id)?.title ?? 'Account', total })).sort((a, b) => b.total - a.total),
     label: r.label,
   };
 }

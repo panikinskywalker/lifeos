@@ -18,8 +18,8 @@ export function importAll(os: LifeOSContext, backup: { tables: Record<string, Re
       }
     }
   });
-  const all = os.entities.query(null, { includeArchived: true }, { limit: 100000 });
-  os.entities.search.rebuild(all, (ty) => os.registry.entityTypes.get(ty));
+  const all = os.records.query(null, { includeArchived: true }, { limit: 100000 });
+  os.records.search.rebuild(all, (ty) => os.registry.objects.get(ty));
   os.facts.reindex();
   os.dumps.reindex();
 }

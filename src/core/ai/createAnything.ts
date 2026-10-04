@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { LifeOSContext } from '../registry/context';
 import type { AiToolDef } from '../registry/types';
-import type { EntityTypeDef, FieldDef } from '../domain/types';
+import type { ObjectDef, FieldDef } from '../domain/types';
 import { withExtras, type ReplyCard } from './cards';
 import { clearMatch, resolveCandidates } from './lifeTools';
 import { parseAmount } from './parser';
@@ -79,7 +79,7 @@ export function coerce(f: FieldDef, v: unknown): unknown {
 }
 
 /** Fill required fields the sentence didn't give, and coerce "32k" / "2 years" / "Electronics" into field values. */
-export function fillDefaults(def: EntityTypeDef, data: Record<string, unknown>, title?: string): Record<string, unknown> {
+export function fillDefaults(def: ObjectDef, data: Record<string, unknown>, title?: string): Record<string, unknown> {
   const out: Record<string, unknown> = { ...data };
   for (const f of def.fields) {
     out[f.key] = coerce(f, out[f.key]);
@@ -100,7 +100,7 @@ export function fillDefaults(def: EntityTypeDef, data: Record<string, unknown>, 
 }
 
 const personCard = (os: LifeOSContext, id: string): ReplyCard => {
-  const e = os.entities.get(id)!;
+  const e = os.records.get(id)!;
   const d = e.data as { company?: string; role?: string };
   return { kind: 'record', entityId: id, type: 'person', title: e.title, subtitle: [d.role, d.company].filter(Boolean).join(' · ') || e.subtitle, icon: 'user' };
 };
@@ -124,7 +124,7 @@ export const createAnythingTools: AiToolDef[] = [
     describe: (i: { name: string; company?: string }) => `Add ${i.name}${i.company ? ` (${i.company})` : ''} to People`,
     run: async (input, os) => {
       const i = input as { name: string; company?: string; role?: string; relationship?: string; city?: string; whereMet?: string; metOn?: string; note?: string };
-      const def = os.registry.entityTypes.get('person');
+      const def = os.registry.objects.get('person');
       if (!def) return { error: 'People module is not installed' };
       const name = i.name.trim().replace(/\b\w/g, (c) => c.toUpperCase());
       const existing = clearMatch(resolveCandidates(os, name, ['person']).filter((c) => c.score >= 0.95));
@@ -133,22 +133,22 @@ export const createAnythingTools: AiToolDef[] = [
       let created = false;
       let filled: Record<string, unknown> = {};
       if (existing) {
-        const e = os.entities.get(existing.id)!;
+        const e = os.records.get(existing.id)!;
         const before = e.data as Record<string, unknown>;
         const fill = Object.fromEntries(Object.entries(patch).filter(([k]) => empty(before[k])));
         filled = Object.fromEntries(Object.keys(fill).map((k) => [k, before[k]]));
-        if (Object.keys(fill).length) os.entities.update(e.id, { data: fill }, 'assistant');
+        if (Object.keys(fill).length) os.records.update(e.id, { data: fill }, 'assistant');
         id = e.id;
       } else {
-        id = os.entities.create({ type: 'person', title: name, data: fillDefaults(def, patch, name) }, 'assistant').id;
+        id = os.records.create({ type: 'person', title: name, data: fillDefaults(def, patch, name) }, 'assistant').id;
         created = true;
       }
       const day = parseDateish(i.metOn) ?? isoDay(new Date());
       const fact = i.whereMet ? os.facts.add({ text: `Met ${name} at ${i.whereMet.replace(/^at\s+/i, '')} on ${day}`, subjectId: id, source: 'talk', statedAt: Date.parse(day) || Date.now() }) : null;
       const undo = () => {
         if (fact) os.facts.forget(fact.id);
-        if (created) os.entities.delete(id, 'user');
-        else if (Object.keys(filled).length) os.entities.update(id, { data: filled }, 'user');
+        if (created) os.records.delete(id, 'user');
+        else if (Object.keys(filled).length) os.records.update(id, { data: filled }, 'user');
       };
       return withExtras({ id, title: name, created, factId: fact?.id ?? null }, { undo, card: personCard(os, id) });
     },
@@ -167,19 +167,19 @@ export const createAnythingTools: AiToolDef[] = [
     }),
     run: async (input, os) => {
       const i = input as { id: string; kind: 'keep_in_touch' | 'warranty' | 'renewal' | 'repeat'; everyN?: number; everyUnit?: 'day' | 'week' | 'month' | 'year'; until?: string; name?: string };
-      const e = os.entities.get(i.id);
+      const e = os.records.get(i.id);
       if (!e) return { error: 'record not found' };
       const data = e.data as Record<string, unknown>;
       const days = (i.everyN ?? 30) * ({ day: 1, week: 7, month: 30, year: 365 } as const)[i.everyUnit ?? 'day'];
       const until = parseDateish(i.until);
       // Types that own the field get it through their cycle template, so the record page and the cycle agree.
       if (i.kind === 'keep_in_touch' && e.type === 'person') {
-        os.entities.update(e.id, { data: { contactEvery: days } }, 'assistant');
-        return withExtras({ ok: true, cycle: `Keep in touch every ${days} days` }, { undo: () => os.entities.update(e.id, { data: { contactEvery: data.contactEvery } }, 'user') });
+        os.records.update(e.id, { data: { contactEvery: days } }, 'assistant');
+        return withExtras({ ok: true, cycle: `Keep in touch every ${days} days` }, { undo: () => os.records.update(e.id, { data: { contactEvery: data.contactEvery } }, 'user') });
       }
       if (i.kind === 'warranty' && e.type === 'asset' && until) {
-        os.entities.update(e.id, { data: { warrantyUntil: until } }, 'assistant');
-        return withExtras({ ok: true, cycle: `Warranty until ${until}` }, { undo: () => os.entities.update(e.id, { data: { warrantyUntil: data.warrantyUntil } }, 'user') });
+        os.records.update(e.id, { data: { warrantyUntil: until } }, 'assistant');
+        return withExtras({ ok: true, cycle: `Warranty until ${until}` }, { undo: () => os.records.update(e.id, { data: { warrantyUntil: data.warrantyUntil } }, 'user') });
       }
       const name = i.name ?? { keep_in_touch: 'Keep in touch', warranty: 'Warranty ends', renewal: 'Renewal', repeat: 'Repeat' }[i.kind];
       const c = until && i.kind !== 'repeat'

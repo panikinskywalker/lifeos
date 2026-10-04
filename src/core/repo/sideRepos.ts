@@ -1,5 +1,5 @@
 import type { DatabaseAdapter, Row } from '../db/adapter';
-import type {Attachment, Comment, CustomFieldDef, EntityRef, Relation, Reminder, SavedViewDef, Tag, ViewDefinition} from '../domain/types';
+import type {Attachment, Comment, CustomFieldDef, EntityRef, Link, Reminder, SavedViewDef, Tag, ViewDefinition} from '../domain/types';
 import { newId } from '../domain/ids';
 import { bus, type Actor } from '../events/bus';
 import { safeJson } from './entityRepo';
@@ -12,10 +12,10 @@ import type { Provenance } from '../graph/edges';
 /* Relations — typed, bidirectional edges between any two entities     */
 /* ------------------------------------------------------------------ */
 
-export class RelationRepo {
+export class LinkRepo {
   constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
 
-  link(fromId: string, toId: string, kind: string, meta: Record<string, unknown> = {}, actor: Actor = 'user', prov: Provenance = {}): Relation {
+  link(fromId: string, toId: string, kind: string, meta: Record<string, unknown> = {}, actor: Actor = 'user', prov: Provenance = {}): Link {
     const now = Date.now();
     const existing = this.db.get<Row>(`SELECT * FROM relations WHERE from_id=? AND to_id=? AND kind=?`, [fromId, toId, kind]);
     if (existing && !existing.deleted_at) return toRelation(existing);
@@ -30,7 +30,7 @@ export class RelationRepo {
       this.timeline.add({ entityId: fromId, kind: 'relation', title: `Linked to ${to?.title ?? 'record'}`, actor, occurredAt: now, meta: { kind, toId } });
       this.timeline.add({ entityId: toId, kind: 'relation', title: `Linked from ${from?.title ?? 'record'}`, actor, occurredAt: now, meta: { kind, fromId } });
     });
-    const rel: Relation = { id, fromId, toId, kind, meta, createdAt: now, source: prov.source ?? null, sourceId: prov.sourceId ?? null, confidence: prov.confidence ?? 1 };
+    const rel: Link = { id, fromId, toId, kind, meta, createdAt: now, source: prov.source ?? null, sourceId: prov.sourceId ?? null, confidence: prov.confidence ?? 1 };
     bus.emit('relation.added', { relation: rel, actor });
     return rel;
   }
@@ -45,7 +45,7 @@ export class RelationRepo {
   }
 
   /** Everything linked to an entity in either direction, with the other side's ref. */
-  forEntity(id: string, kind?: string): Array<{ relation: Relation; other: EntityRef; direction: 'out' | 'in' }> {
+  forEntity(id: string, kind?: string): Array<{ relation: Link; other: EntityRef; direction: 'out' | 'in' }> {
     const rows = this.db.all<Row>(
       `SELECT r.*, e.id AS o_id, e.type AS o_type, e.title AS o_title, CASE WHEN r.from_id=? THEN 'out' ELSE 'in' END AS direction
        FROM relations r JOIN entities e ON e.id = CASE WHEN r.from_id=? THEN r.to_id ELSE r.from_id END
@@ -57,7 +57,7 @@ export class RelationRepo {
   }
 
   /** Ids of entities linked from `id` with a given kind (e.g. transaction → account). */
-  get(id: string): Relation | null {
+  get(id: string): Link | null {
     const r = this.db.get<Row>(`SELECT * FROM relations WHERE id=?`, [id]);
     return r ? toRelation(r) : null;
   }
@@ -85,7 +85,7 @@ export class RelationRepo {
   }
 }
 
-function toRelation(r: Row): Relation {
+function toRelation(r: Row): Link {
   return { id: r.id as string, fromId: r.from_id as string, toId: r.to_id as string, kind: r.kind as string, meta: safeJson(r.meta as string), createdAt: r.created_at as number, source: (r.source as string | null) ?? null, sourceId: (r.source_id as string | null) ?? null, confidence: (r.confidence as number | undefined) ?? 1 };
 }
 

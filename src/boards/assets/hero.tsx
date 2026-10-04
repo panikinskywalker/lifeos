@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { DAY, describeCycle } from '@core/cycles/schedule';
 import type { UpkeepItem } from '@core/cycles/upkeep';
@@ -14,9 +14,9 @@ import { DoneWithCostSheet, dueLabel, MeterSheet } from '@ui/components/cycles';
 const km = (n: number) => `${Math.round(n).toLocaleString('en-IN')}`;
 
 /** Upkeep items (cycle + status) for one record. */
-export function useRecordCycles(entity: Entity): UpkeepItem[] {
+export function useRecordCycles(entity: ObjectRecord): UpkeepItem[] {
   const os = useOS();
-  const def = os.registry.entityTypes.get(entity.type);
+  const def = os.registry.objects.get(entity.type);
   return useLive((o) => o.cycles.forEntity(entity.id).map((cycle) => ({ cycle, entity, def, status: o.cycles.status(cycle) })), [entity.id, entity.version]);
 }
 
@@ -41,7 +41,7 @@ export function whenText(i: UpkeepItem): string {
  * service cadence on both clocks, what needs attention, quick actions and
  * the service log.
  */
-export function VehicleHero({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function VehicleHero({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const t = useTheme();
   const router = useRouter();
   const toast = useToast();
@@ -50,8 +50,8 @@ export function VehicleHero({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSC
   const [costFor, setCostFor] = useState<UpkeepItem | null>(null);
   const year = new Date().getFullYear();
   const readings = useLive((o) => o.cycles.readings(entity.id, 'odometer', 200), [entity.id]);
-  const spend = useLive((o) => o.entities.aggregate('transaction', { filter: { and: [{ field: 'relation.vehicle', op: 'relatedTo', value: entity.id }, { field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: `${year}-01-01` }] } }, { sum: ['data.amount'], count: true }), [entity.id]);
-  const done = useLive((o) => o.entities.timeline.forEntity(entity.id, 200).filter((e) => e.kind === 'cycle.done'), [entity.id]);
+  const spend = useLive((o) => o.records.aggregate('transaction', { filter: { and: [{ field: 'relation.vehicle', op: 'relatedTo', value: entity.id }, { field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: `${year}-01-01` }] } }, { sum: ['data.amount'], count: true }), [entity.id]);
+  const done = useLive((o) => o.records.timeline.forEntity(entity.id, 200).filter((e) => e.kind === 'cycle.done'), [entity.id]);
 
   const latest = readings[0]?.value ?? null;
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();

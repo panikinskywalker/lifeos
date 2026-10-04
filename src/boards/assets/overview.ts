@@ -11,8 +11,8 @@ export function assetsOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
   const mine = u.items.filter((i) => THINGS.has(i.entity.type));
   const late = mine.filter((i) => (i.status.daysLeft ?? 1) < 0);
   const week = mine.filter((i) => (i.status.daysLeft ?? 99) >= 0 && (i.status.daysLeft ?? 99) <= 7);
-  const assets = os.registry.entityTypes.has('asset') ? os.entities.query<{ purchasePrice?: number; currentValue?: number; warrantyUntil?: string }>('asset', { filter: { and: [{ field: 'status', op: 'neq', value: 'sold' }] } }, { limit: 1000 }) : [];
-  const vehicles = os.registry.entityTypes.has('vehicle') ? os.entities.query<{ insuranceUntil?: string; pucUntil?: string }>('vehicle', {}, { limit: 50 }) : [];
+  const assets = os.registry.objects.has('asset') ? os.records.query<{ purchasePrice?: number; currentValue?: number; warrantyUntil?: string }>('asset', { filter: { and: [{ field: 'status', op: 'neq', value: 'sold' }] } }, { limit: 1000 }) : [];
+  const vehicles = os.registry.objects.has('vehicle') ? os.records.query<{ insuranceUntil?: string; pucUntil?: string }>('vehicle', {}, { limit: 50 }) : [];
   const worth = assets.reduce((n, a) => n + (a.data.currentValue ?? a.data.purchasePrice ?? 0), 0);
   // Upkeep spend per month: costs logged when a job was done.
   const months = lastMonths(6, now);

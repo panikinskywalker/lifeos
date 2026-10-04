@@ -27,8 +27,8 @@ export default function MetricScreen() {
   const apps = useLive((o) => (id === 'screen' ? screenTopApps(o, period, Date.now(), 8) : []), [id, period]);
   const txs = useLive(
     (o) =>
-      id === 'spend' && o.registry.entityTypes.has('transaction')
-        ? o.entities.query<{ amount: number; merchant?: string; category?: string; date: string; kind: string }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: s.from }, { field: 'data.date', op: 'lte', value: s.to }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 60 })
+      id === 'spend' && o.registry.objects.has('transaction')
+        ? o.records.query<{ amount: number; merchant?: string; category?: string; date: string; kind: string }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: s.from }, { field: 'data.date', op: 'lte', value: s.to }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 60 })
         : [],
     [id, s.from, s.to],
   );

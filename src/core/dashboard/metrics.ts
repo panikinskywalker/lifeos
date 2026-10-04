@@ -52,7 +52,7 @@ export function daily(os: LifeOSContext, id: MetricId, from: string, to: string)
   const out = new Map<string, number>();
   if (id === 'screen') for (const d of usageDays(os, from, to)) out.set(d.day, d.totalMs / 3_600_000);
   else if (id === 'spend') {
-    if (!os.registry.entityTypes.has('transaction')) return out;
+    if (!os.registry.objects.has('transaction')) return out;
     const rows = os.db.all<{ day: string; total: number }>(
       `SELECT json_extract(data,'$.date') AS day, SUM(json_extract(data,'$.amount')) AS total FROM entities
        WHERE type='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')='expense' AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY day`,
@@ -60,7 +60,7 @@ export function daily(os: LifeOSContext, id: MetricId, from: string, to: string)
     );
     for (const r of rows) out.set(r.day, r.total);
   } else {
-    if (!os.registry.entityTypes.has('measurement')) return out;
+    if (!os.registry.objects.has('measurement')) return out;
     for (const r of metricDays(os, id, from, to)) out.set(r.day, r.value);
   }
   return out;
@@ -204,13 +204,13 @@ export function upcoming(os: LifeOSContext, limit = 5, now = Date.now(), days = 
     if (at == null || at > now + days * DAY) continue;
     out.push({ id: i.cycle.id, entityId: i.entity.id, type: i.entity.type, title: i.entity.title === i.cycle.name ? i.entity.title : `${i.entity.title} · ${i.cycle.name}`, at, kind: 'due', overdue: at < now - DAY / 2 });
   }
-  if (os.registry.entityTypes.has('event')) {
-    for (const e of os.entities.query<{ startAt: number }>('event', { filter: { and: [{ field: 'data.startAt', op: 'gte', value: now - DAY / 4 }, { field: 'data.startAt', op: 'lte', value: now + days * DAY }] }, sort: [{ field: 'data.startAt', dir: 'asc' }] }, { limit: 20 })) {
+  if (os.registry.objects.has('event')) {
+    for (const e of os.records.query<{ startAt: number }>('event', { filter: { and: [{ field: 'data.startAt', op: 'gte', value: now - DAY / 4 }, { field: 'data.startAt', op: 'lte', value: now + days * DAY }] }, sort: [{ field: 'data.startAt', dir: 'asc' }] }, { limit: 20 })) {
       out.push({ id: e.id, entityId: e.id, type: 'event', title: e.title, at: e.data.startAt, kind: 'event', overdue: false });
     }
   }
-  if (os.registry.entityTypes.has('delivery')) {
-    for (const d of os.entities.query<{ status: string; expectedDate?: string; otp?: string; otpAt?: number }>('delivery', { filter: { and: [{ field: 'data.status', op: 'in', value: ['ordered', 'shipped', 'out_for_delivery'] }] } }, { limit: 50 })) {
+  if (os.registry.objects.has('delivery')) {
+    for (const d of os.records.query<{ status: string; expectedDate?: string; otp?: string; otpAt?: number }>('delivery', { filter: { and: [{ field: 'data.status', op: 'in', value: ['ordered', 'shipped', 'out_for_delivery'] }] } }, { limit: 50 })) {
       if (!d.data.expectedDate) continue;
       const at = Date.parse(`${d.data.expectedDate}T12:00:00`);
       if (at > now + days * DAY) continue;

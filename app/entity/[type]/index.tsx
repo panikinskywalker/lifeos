@@ -12,7 +12,7 @@ import { EmptyState, Screen } from '@ui/kit';
 export default function EntityListRoute() {
   const os = useOS();
   const { type, ...params } = useLocalSearchParams<{ type: string; [k: string]: string }>();
-  if (!type || !os.registry.hasType(type)) return (
+  if (!type || !os.registry.hasObject(type)) return (
       <Screen title="Not found">
         <EmptyState icon="box" line={`There is no record type called “${type}”.`} />
       </Screen>

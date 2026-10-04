@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { Card, Row, SectionHeader, Stat, Text } from '@ui/components/primitives';
@@ -12,17 +12,17 @@ import { palette, paletteColor } from '@ui/theme/tokens';
 
 const TRAVEL_COLOR = palette.cyan;
 
-export function TripSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function TripSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const router = useRouter();
-  const trip = entity as Entity<TripData>;
+  const trip = entity as ObjectRecord<TripData>;
   const data = useLive(
     (os) => {
       const filter = { and: [{ field: 'data.tripId', op: 'eq' as const, value: entity.id }, { field: 'data.kind', op: 'eq' as const, value: 'expense' }] };
       return {
-        total: os.entities.aggregate('transaction', { filter }, { sum: ['data.amount'], count: true }),
-        byCat: os.entities.groupBy('transaction', { filter }, 'data.category', { sum: ['data.amount'] }),
-        recent: os.entities.query('transaction', { filter, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 6 }),
-        docs: os.relations.forEntity(entity.id, 'trip').filter((r) => r.other.type === 'document' || r.other.type === 'event'),
+        total: os.records.aggregate('transaction', { filter }, { sum: ['data.amount'], count: true }),
+        byCat: os.records.groupBy('transaction', { filter }, 'data.category', { sum: ['data.amount'] }),
+        recent: os.records.query('transaction', { filter, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 6 }),
+        docs: os.links.forEntity(entity.id, 'trip').filter((r) => r.other.type === 'document' || r.other.type === 'event'),
       };
     },
     [entity.id],
@@ -66,7 +66,7 @@ export function TripSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSC
           <SectionHeader title="Bookings & documents" icon="doc" color={TRAVEL_COLOR} />
           <Card padded={false}>
             {data.docs.map((r, i) => (
-              <Row key={r.relation.id} title={r.other.title} subtitle={ctx.registry.entityTypes.get(r.other.type)?.label} icon={ctx.registry.entityTypes.get(r.other.type)?.icon} iconColor={paletteColor(ctx.registry.colorFor(r.other.type))} last={i === data.docs.length - 1} onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)} />
+              <Row key={r.relation.id} title={r.other.title} subtitle={ctx.registry.objects.get(r.other.type)?.label} icon={ctx.registry.objects.get(r.other.type)?.icon} iconColor={paletteColor(ctx.registry.colorFor(r.other.type))} last={i === data.docs.length - 1} onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)} />
             ))}
           </Card>
         </View>

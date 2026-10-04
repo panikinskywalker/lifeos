@@ -10,5 +10,5 @@ export const placesModule: ModuleManifest = {
   description: 'Cities, venues, companies and shops — the where and who-with of your life graph.',
   icon: 'location',
   color: placeType.color!,
-  entityTypes: [placeType, orgType],
+  objects: [placeType, orgType],
 };

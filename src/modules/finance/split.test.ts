@@ -28,7 +28,7 @@ describe('splitAmounts', () => {
 
 const person = { type: 'person', module: 'm', label: 'Person', labelPlural: 'People', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x: Record<string, unknown>) => String(x.name) };
 const group = { type: 'group', module: 'm', label: 'Group', labelPlural: 'Groups', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x: Record<string, unknown>) => String(x.name) };
-const mod: ModuleManifest = { id: 'finance', name: 'F', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [accountType, transactionType, debtType, person, group] };
+const mod: ModuleManifest = { id: 'finance', name: 'F', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, debtType, person, group] };
 let os: LifeOSContext;
 beforeEach(async () => {
   bus.clear();
@@ -38,13 +38,13 @@ afterEach(() => os.db.close());
 
 describe('splits, balances, settle up', () => {
   it('I paid: each person owes me their share; re-split replaces; clear removes', () => {
-    const priya = os.entities.create({ type: 'person', data: { name: 'Priya' } }).id;
-    const arjun = os.entities.create({ type: 'person', data: { name: 'Arjun' } }).id;
-    const tx = os.entities.create({ type: 'transaction', data: { amount: 3000, kind: 'expense', category: 'food', merchant: 'Toit', date: '2026-09-20' } });
+    const priya = os.records.create({ type: 'person', data: { name: 'Priya' } }).id;
+    const arjun = os.records.create({ type: 'person', data: { name: 'Arjun' } }).id;
+    const tx = os.records.create({ type: 'transaction', data: { amount: 3000, kind: 'expense', category: 'food', merchant: 'Toit', date: '2026-09-20' } });
     applySplit(os, tx.id, { payer: 'me', method: 'equal', parts: [{ party: 'me' }, { party: priya }, { party: arjun }] });
     expect(balanceWith(os, priya)).toBe(1000);
     expect(balances(os).map((b) => b.amount)).toEqual([1000, 1000]);
-    expect(os.entities.get<{ personIds: string[]; split: { shares: unknown[] } }>(tx.id)!.data).toMatchObject({ personIds: [priya, arjun], split: { method: 'equal' } });
+    expect(os.records.get<{ personIds: string[]; split: { shares: unknown[] } }>(tx.id)!.data).toMatchObject({ personIds: [priya, arjun], split: { method: 'equal' } });
 
     applySplit(os, tx.id, { payer: 'me', method: 'equal', parts: [{ party: 'me' }, { party: priya }] });
     expect(balanceWith(os, priya)).toBe(1500);
@@ -54,18 +54,18 @@ describe('splits, balances, settle up', () => {
   });
 
   it('someone else paid: I owe them my share; settling clears the balance; undo restores it', () => {
-    const priya = os.entities.create({ type: 'person', data: { name: 'Priya' } }).id;
-    const goa = os.entities.create({ type: 'group', data: { name: 'Goa' } }).id;
-    const cab = os.entities.create({ type: 'transaction', data: { amount: 1200, kind: 'expense', category: 'travel', merchant: 'Cab', date: '2026-09-20' } });
+    const priya = os.records.create({ type: 'person', data: { name: 'Priya' } }).id;
+    const goa = os.records.create({ type: 'group', data: { name: 'Goa' } }).id;
+    const cab = os.records.create({ type: 'transaction', data: { amount: 1200, kind: 'expense', category: 'travel', merchant: 'Cab', date: '2026-09-20' } });
     applySplit(os, cab.id, { payer: priya, method: 'equal', parts: [{ party: 'me' }, { party: priya }], groupId: goa });
-    const dinner = os.entities.create({ type: 'transaction', data: { amount: 2000, kind: 'expense', category: 'food', merchant: 'Dinner', date: '2026-09-21' } });
+    const dinner = os.records.create({ type: 'transaction', data: { amount: 2000, kind: 'expense', category: 'food', merchant: 'Dinner', date: '2026-09-21' } });
     applySplit(os, dinner.id, { payer: 'me', method: 'equal', parts: [{ party: 'me' }, { party: priya }] });
     expect(balanceWith(os, priya)).toBe(400); // 1000 − 600
     expect(balanceWith(os, priya, goa)).toBe(-600);
 
     const s = settleUp(os, priya);
     expect(balanceWith(os, priya)).toBe(0);
-    expect(os.entities.get<{ direction: string; amount: number }>(s.paymentId!)!.data).toMatchObject({ direction: 'i_owe', amount: 400 });
+    expect(os.records.get<{ direction: string; amount: number }>(s.paymentId!)!.data).toMatchObject({ direction: 'i_owe', amount: 400 });
     undoSettle(os, s);
     expect(balanceWith(os, priya)).toBe(400);
   });
@@ -77,8 +77,8 @@ describe('agent tools', () => {
     const t = (n: string) => financeAiTools.find((x) => x.name === n)!;
     expect(t('split_transaction').confirm).toBe(true);
     expect(t('settle_debt').confirm).toBe(true);
-    const arjun = os.entities.create({ type: 'person', data: { name: 'Arjun' } }).id;
-    const tx = os.entities.create({ type: 'transaction', data: { amount: 1800, kind: 'expense', category: 'food', merchant: 'Dinner', date: '2026-09-20' } });
+    const arjun = os.records.create({ type: 'person', data: { name: 'Arjun' } }).id;
+    const tx = os.records.create({ type: 'transaction', data: { amount: 1800, kind: 'expense', category: 'food', merchant: 'Dinner', date: '2026-09-20' } });
     const { extrasOf } = await import('@core/ai/cards');
     const out = await t('split_transaction').run({ transactionId: tx.id, payer: 'me', method: 'equal', parts: [{ party: arjun }] }, os);
     expect(balanceWith(os, arjun)).toBe(900);

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { Entity } from '@core/domain/types';
+import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -13,7 +13,7 @@ import { PRIORITIES, projectProgress, toggleTask, type TaskData, type ProjectDat
 const PROJECTS_COLOR = palette.blue;
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function TaskList({ tasks, showProject, empty }: { tasks: Entity<TaskData>[]; showProject?: boolean; empty?: string }) {
+export function TaskList({ tasks, showProject, empty }: { tasks: ObjectRecord<TaskData>[]; showProject?: boolean; empty?: string }) {
   const t = useTheme();
   const router = useRouter();
   const os = useOS();
@@ -29,7 +29,7 @@ export function TaskList({ tasks, showProject, empty }: { tasks: Entity<TaskData
         const done = task.status === 'done';
         const pr = PRIORITIES.find((p) => p.value === task.data.priority);
         const overdue = !done && task.data.dueDate && task.data.dueDate < today();
-        const project = showProject && task.data.projectId ? os.entities.ref(task.data.projectId) : undefined;
+        const project = showProject && task.data.projectId ? os.records.ref(task.data.projectId) : undefined;
         const sub = [project?.title, task.data.dueDate ? os.format.date(task.data.dueDate, 'relative') : null].filter(Boolean).join(' · ');
         return (
           <View key={task.id}>
@@ -54,7 +54,7 @@ function QuickAdd({ projectId, accent }: { projectId?: string; accent: string })
   const add = () => {
     const v = text.trim();
     if (!v) return;
-    os.entities.create<TaskData>({ type: 'task', title: v, data: { priority: 'medium', projectId } });
+    os.records.create<TaskData>({ type: 'task', title: v, data: { priority: 'medium', projectId } });
     setText('');
   };
   return <Input value={text} onChangeText={setText} placeholder="Add a task…" onSubmitEditing={add} returnKeyType="done" blurOnSubmit={false} right={text ? <IconButton icon="plus.circle.fill" onPress={add} color={accent} /> : undefined} />;
@@ -69,12 +69,12 @@ export function ProjectsHome({ ctx }: { ctx: LifeOSContext; params: Record<strin
   const t = useTheme();
   const data = useLive(
     (os) => ({
-      todayTasks: os.entities.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'lte', value: today() }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }] }, { limit: 20 }),
-      inbox: os.entities.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'isNull' }, { field: 'data.projectId', op: 'isNull' }] } }, { limit: 10 }),
-      projects: os.entities.query<ProjectData>('project', { filter: { and: [{ field: 'status', op: 'in', value: ['active', 'planning'] }] } }).map((p) => ({ p, ...projectProgress(os, p.id) })),
-      goals: os.entities.query<GoalData>('goal', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }),
-      events: os.entities.query<EventData>('event', { filter: { and: [{ field: 'occurredAt', op: 'gte', value: '__TODAY__' }] }, sort: [{ field: 'occurredAt', dir: 'asc' }] }, { limit: 5 }),
-      doneToday: os.entities.count('task', { filter: { and: [{ field: 'status', op: 'eq', value: 'done' }, { field: 'updatedAt', op: 'gte', value: '__TODAY__' }] } }),
+      todayTasks: os.records.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'lte', value: today() }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }] }, { limit: 20 }),
+      inbox: os.records.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'isNull' }, { field: 'data.projectId', op: 'isNull' }] } }, { limit: 10 }),
+      projects: os.records.query<ProjectData>('project', { filter: { and: [{ field: 'status', op: 'in', value: ['active', 'planning'] }] } }).map((p) => ({ p, ...projectProgress(os, p.id) })),
+      goals: os.records.query<GoalData>('goal', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }),
+      events: os.records.query<EventData>('event', { filter: { and: [{ field: 'occurredAt', op: 'gte', value: '__TODAY__' }] }, sort: [{ field: 'occurredAt', dir: 'asc' }] }, { limit: 5 }),
+      doneToday: os.records.count('task', { filter: { and: [{ field: 'status', op: 'eq', value: 'done' }, { field: 'updatedAt', op: 'gte', value: '__TODAY__' }] } }),
     }),
     [],
   );
@@ -168,11 +168,11 @@ export function ProjectsHome({ ctx }: { ctx: LifeOSContext; params: Record<strin
 /* Detail sections                                                     */
 /* ------------------------------------------------------------------ */
 
-export function ProjectSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function ProjectSection({ entity }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const router = useRouter();
-  const tasks = useLive((os) => os.entities.query<TaskData>('task', { filter: { and: [{ field: 'data.projectId', op: 'eq', value: entity.id }] }, sort: [{ field: 'status', dir: 'desc' }, { field: 'data.dueDate', dir: 'asc' }] }), [entity.id]);
+  const tasks = useLive((os) => os.records.query<TaskData>('task', { filter: { and: [{ field: 'data.projectId', op: 'eq', value: entity.id }] }, sort: [{ field: 'status', dir: 'desc' }, { field: 'data.dueDate', dir: 'asc' }] }), [entity.id]);
   const prog = useLive((os) => projectProgress(os, entity.id), [entity.id]);
-  const spend = useLive((os) => os.entities.aggregate('transaction', { filter: { and: [{ field: 'data.projectId', op: 'eq', value: entity.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'] })['sum_data.amount'], [entity.id]);
+  const spend = useLive((os) => os.records.aggregate('transaction', { filter: { and: [{ field: 'data.projectId', op: 'eq', value: entity.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'] })['sum_data.amount'], [entity.id]);
   const os = useOS();
   const open = tasks.filter((x) => x.status !== 'done');
   const done = tasks.filter((x) => x.status === 'done');
@@ -205,11 +205,11 @@ export function ProjectSection({ entity }: { entity: Entity<any>; ctx: LifeOSCon
   );
 }
 
-export function GoalSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function GoalSection({ entity }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const os = useOS();
-  const g = entity as Entity<GoalData>;
+  const g = entity as ObjectRecord<GoalData>;
   const prog = g.data.targetValue ? (g.data.currentValue ?? 0) / g.data.targetValue : null;
-  const tasks = useLive((o) => o.entities.query<TaskData>('task', { filter: { and: [{ field: 'data.goalId', op: 'eq', value: entity.id }] } }), [entity.id]);
+  const tasks = useLive((o) => o.records.query<TaskData>('task', { filter: { and: [{ field: 'data.goalId', op: 'eq', value: entity.id }] } }), [entity.id]);
   const [val, setVal] = useState('');
   return (
     <View style={{ gap: 16 }}>
@@ -219,7 +219,7 @@ export function GoalSection({ entity }: { entity: Entity<any>; ctx: LifeOSContex
           <ProgressBar progress={prog} color={palette.indigo} height={12} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Input value={val} onChangeText={setVal} placeholder="Update current value" keyboardType="decimal-pad" style={{ flex: 1 }} />
-            <Button title="Log" small color={palette.indigo} onPress={() => { const n = parseFloat(val); if (!Number.isNaN(n)) { os.entities.update<GoalData>(entity.id, { data: { currentValue: n } }); setVal(''); } }} />
+            <Button title="Log" small color={palette.indigo} onPress={() => { const n = parseFloat(val); if (!Number.isNaN(n)) { os.records.update<GoalData>(entity.id, { data: { currentValue: n } }); setVal(''); } }} />
           </View>
         </Card>
       ) : null}

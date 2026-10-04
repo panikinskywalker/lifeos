@@ -22,7 +22,7 @@ const day = (n: number) => {
 const at = (n: number, h = 13) => new Date(`${day(n)}T${String(h).padStart(2, '0')}:00:00`).getTime();
 beforeEach(async () => {
   bus.clear();
-  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', entityTypes: [measurementType, workoutType, accountType, transactionType, eventType] }], registry: new Registry() });
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, transactionType, eventType] }], registry: new Registry() });
 });
 afterEach(() => os.db.close());
 const get = (id: string) => trackers(os).find((t) => t.id === id)!;
@@ -44,11 +44,11 @@ describe('activity trackers', () => {
       { day: day(-1), totalMs: 5 * 3_600_000, apps: [{ package: 'com.Slack', label: 'Slack', ms: 45 * 60_000 }] },
       { day: day(-2), totalMs: 5 * 3_600_000, apps: [{ package: 'com.Slack', label: 'Slack', ms: 10 * 60_000 }, { package: 'com.instagram.android', label: 'Instagram', ms: 3 * 3_600_000 }] },
     ]);
-    os.entities.create({ type: 'event', title: 'Quarterly planning', data: { startAt: at(-4, 11), calendars: ['Work · me@acme.in'] } });
+    os.records.create({ type: 'event', title: 'Quarterly planning', data: { startAt: at(-4, 11), calendars: ['Work · me@acme.in'] } });
     upsertTracker(os, { ...get('worked'), rules: [...get('worked').rules, { kind: 'calendar', calendars: ['Work · me@acme.in'] }] });
     expect([...trackerDays(os, get('worked'), day(-10), day(0))].sort()).toEqual([day(-4), day(-1)]);
     expect(knownCalendars(os)).toEqual(['Work · me@acme.in']);
-    os.entities.create({ type: 'workout', data: { kind: 'run', durationMin: 30, date: day(-5) } });
+    os.records.create({ type: 'workout', data: { kind: 'run', durationMin: 30, date: day(-5) } });
     expect([...trackerDays(os, get('workouts'), day(-10), day(0))]).toEqual([day(-5)]);
     saveHealthDays(os, [{ day: day(-1), steps: 9000 }, { day: day(-2), steps: 5000 }]);
     expect([...trackerDays(os, get('steps'), day(-10), day(0))]).toEqual([day(-1)]); // goal 8,000 until there's a month of history
@@ -56,7 +56,7 @@ describe('activity trackers', () => {
 
   it('the grid: weeks × 7 ending this week, future days empty; this week, streak, longest', () => {
     const t: Tracker = { id: 'x', name: 'Runs', icon: 'activity', tint: 'health', rules: [{ kind: 'record', type: 'workout' }] };
-    for (const n of [0, -1, -2, -5, -6, -7, -8]) os.entities.create({ type: 'workout', data: { kind: 'run', durationMin: 20, date: day(n) } });
+    for (const n of [0, -1, -2, -5, -6, -7, -8]) os.records.create({ type: 'workout', data: { kind: 'run', durationMin: 20, date: day(n) } });
     const s = trackerSummary(os, t, NOW, 4);
     expect(s.days).toHaveLength(28);
     expect(s.days.at(-1)).toEqual({ day: day(0), value: 1 }); // Sunday ends the week

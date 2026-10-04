@@ -11,7 +11,7 @@ export const financeModule: ModuleManifest = {
   description: 'Accounts, transactions, budgets and subscriptions — with receipts, trips and people all linked.',
   icon: 'banknote',
   color: FINANCE_COLOR,
-  entityTypes: [accountType, transactionType, budgetType, subscriptionType, debtType],
+  objects: [accountType, transactionType, budgetType, subscriptionType, debtType],
   triggers: [
     {
       id: 'finance.transaction.created', module: 'finance', label: 'Transaction added', event: 'entity.created',
@@ -34,8 +34,8 @@ export const financeModule: ModuleManifest = {
         { key: 'accountId', label: 'Account', type: 'relation', relationTo: 'account' },
       ],
       run: async (cfg, ctx, os) => {
-        const tx = os.entities.create({ type: 'transaction', data: { amount: Number(cfg.amount), kind: (cfg.kind as string) || 'expense', category: (cfg.category as string) || 'other', merchant: cfg.merchant ? String(cfg.merchant) : undefined, accountId: cfg.accountId ? String(cfg.accountId) : undefined, date: new Date().toISOString().slice(0, 10) } }, 'automation');
-        if (ctx.entity) os.relations.link(tx.id, ctx.entity.id, 'related', {}, 'automation');
+        const tx = os.records.create({ type: 'transaction', data: { amount: Number(cfg.amount), kind: (cfg.kind as string) || 'expense', category: (cfg.category as string) || 'other', merchant: cfg.merchant ? String(cfg.merchant) : undefined, accountId: cfg.accountId ? String(cfg.accountId) : undefined, date: new Date().toISOString().slice(0, 10) } }, 'automation');
+        if (ctx.entity) os.links.link(tx.id, ctx.entity.id, 'related', {}, 'automation');
         return tx.title;
       },
     },

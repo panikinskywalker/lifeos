@@ -13,8 +13,8 @@ export default function SearchRoute() {
   const [q, setQ] = useState('');
   const [type, setType] = useState<string | null>(null);
   const query = q.trim();
-  const hits = useLive((o) => (query ? o.entities.search.search(query, { types: type ? [type] : undefined, limit: 50 }) : []), [query, type]);
-  const recent = useLive((o) => o.entities.recent(12), []);
+  const hits = useLive((o) => (query ? o.records.search.search(query, { types: type ? [type] : undefined, limit: 50 }) : []), [query, type]);
+  const recent = useLive((o) => o.records.recent(12), []);
   const tags = useLive((o) => o.tags.counts().slice(0, 12), []);
   const commands = os.registry.quickActions.filter((a) => !query || a.label.toLowerCase().includes(query.toLowerCase()));
   const typesInHits = [...new Set(hits.map((h) => h.type))];
@@ -28,7 +28,7 @@ export default function SearchRoute() {
             <ChipRow>
               <FilterChip label="All" selected={!type} onPress={() => setType(null)} />
               {typesInHits.map((ty) => (
-                <FilterChip key={ty} label={os.registry.entityTypes.get(ty)?.labelPlural ?? ty} selected={type === ty} onPress={() => setType(ty)} />
+                <FilterChip key={ty} label={os.registry.objects.get(ty)?.labelPlural ?? ty} selected={type === ty} onPress={() => setType(ty)} />
               ))}
             </ChipRow>
           ) : null}
@@ -44,7 +44,7 @@ export default function SearchRoute() {
               <RowList>
                 {hits.map((h) => {
                   if (h.type === 'fact') return <RowItem key={h.id} title={h.title} subtitle={`Memory${h.subtitle ? ` · about ${h.subtitle}` : ''}`} icon="sparkle" tint="memory" onPress={() => router.push({ pathname: '/memory', params: { q: h.title.split(' ').slice(0, 3).join(' ') } })} />;
-                  const def = os.registry.entityTypes.get(h.type);
+                  const def = os.registry.objects.get(h.type);
                   return <RowItem key={h.id} title={h.title} subtitle={`${def?.label ?? h.type}${h.subtitle ? ` · ${h.subtitle}` : ''}`} icon={def?.icon} tint={tintForModule(def?.module)} onPress={() => router.push(`/entity/${h.type}/${h.id}`)} />;
                 })}
               </RowList>

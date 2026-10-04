@@ -32,7 +32,7 @@ export default function SpendScreen() {
   const [sort, setSort] = useState<SpendSort>('newest');
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const r = useLive((o) => (o.registry.entityTypes.has('transaction') ? spendQuery(o, { period, kind, categories: cats, accountIds: accounts, search, sort }) : null), [period, kind, cats.join(), accounts.join(), search, sort]);
+  const r = useLive((o) => (o.registry.objects.has('transaction') ? spendQuery(o, { period, kind, categories: cats, accountIds: accounts, search, sort }) : null), [period, kind, cats.join(), accounts.join(), search, sort]);
   const toggle = (list: string[], set: (x: string[]) => void, v: string) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const header = useMemo(
     () =>

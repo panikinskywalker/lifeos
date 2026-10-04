@@ -123,8 +123,8 @@ export class Assistant {
 
   systemPrompt(): string {
     const os = this.os;
-    const types = [...os.registry.entityTypes.values()].map((t) => `- ${t.type} (${t.module}): ${t.fields.map((f) => f.key + (f.options ? `[${f.options.map((o) => o.value).join('|')}]` : '')).join(', ')}${t.statuses ? ` | statuses: ${t.statuses.map((s) => s.value).join('|')}` : ''}${t.relations?.length ? ` | relations: ${t.relations.map((r) => `${r.kind}→${Array.isArray(r.to) ? r.to.join('/') : r.to}`).join(', ')}` : ''}`).join('\n');
-    const counts = os.entities.countsByType();
+    const types = [...os.registry.objects.values()].map((t) => `- ${t.type} (${t.module}): ${t.fields.map((f) => f.key + (f.options ? `[${f.options.map((o) => o.value).join('|')}]` : '')).join(', ')}${t.statuses ? ` | statuses: ${t.statuses.map((s) => s.value).join('|')}` : ''}${t.links?.length ? ` | relations: ${t.links.map((r) => `${r.kind}→${Array.isArray(r.to) ? r.to.join('/') : r.to}`).join(', ')}` : ''}`).join('\n');
+    const counts = os.records.countsByType();
     const now = new Date();
     return `You are the LifeOS assistant — a personal operating system the user runs on their phone. All data is the user's own, stored locally.
 Today is ${now.toISOString()} (${now.toLocaleDateString('en-IN', { weekday: 'long' })}). Default currency ${os.format.defaultCurrency()}. Timestamps in tool inputs/outputs are epoch milliseconds unless labelled ISO.
@@ -315,8 +315,8 @@ export function confirmSummary(def: AiToolDef, input: unknown, os: LifeOSContext
     /* fall through */
   }
   const i = (input ?? {}) as Record<string, unknown>;
-  const title = (i.title as string) ?? (i.id ? os.entities.get(String(i.id))?.title : undefined);
-  const type = i.type ? os.registry.entityTypes.get(String(i.type))?.label : undefined;
+  const title = (i.title as string) ?? (i.id ? os.records.get(String(i.id))?.title : undefined);
+  const type = i.type ? os.registry.objects.get(String(i.type))?.label : undefined;
   return [def.name.replace(/_/g, ' '), type, title].filter(Boolean).join(' · ');
 }
 

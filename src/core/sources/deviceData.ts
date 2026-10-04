@@ -116,20 +116,20 @@ const METRICS: Array<[keyof HealthDayIn, string, string, (v: number) => number]>
 ];
 
 function upsertBySourceKey(os: LifeOSContext, type: string, key: string, data: Record<string, unknown>): 'created' | 'updated' | 'same' {
-  const [hit] = os.entities.query<Record<string, unknown>>(type, { filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 1 });
+  const [hit] = os.records.query<Record<string, unknown>>(type, { filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 1 });
   if (!hit) {
-    os.entities.create({ type, data: { ...data, sourceKey: key } }, 'system');
+    os.records.create({ type, data: { ...data, sourceKey: key } }, 'system');
     return 'created';
   }
   const changed = Object.entries(data).some(([k, v]) => hit.data[k] !== v);
-  if (changed) os.entities.update(hit.id, { data }, 'system');
+  if (changed) os.records.update(hit.id, { data }, 'system');
   return changed ? 'updated' : 'same';
 }
 
 /** Health Connect days → one measurement per metric per day, one workout per session. Returns records created. */
 export function saveHealthDays(os: LifeOSContext, days: HealthDayIn[]): number {
   let created = 0;
-  const has = (t: string) => os.registry.entityTypes.has(t);
+  const has = (t: string) => os.registry.objects.has(t);
   os.db.transaction(() => {
     for (const d of days) {
       if (has('measurement')) {
@@ -152,7 +152,7 @@ export function saveHealthDays(os: LifeOSContext, days: HealthDayIn[]): number {
 
 /** A metric per day in [from, to] (for Today's charts). */
 export function metricDays(os: LifeOSContext, metric: string, from: string, to: string): Array<{ day: string; value: number }> {
-  return os.entities
+  return os.records
     .query<{ metric: string; value: number; date: string }>('measurement', { filter: { and: [{ field: 'data.metric', op: 'eq', value: metric }, { field: 'data.date', op: 'gte', value: from }, { field: 'data.date', op: 'lte', value: to }] }, sort: [{ field: 'data.date', dir: 'asc' }] }, { limit: 1000 })
     .map((e) => ({ day: e.data.date, value: e.data.value }));
 }
