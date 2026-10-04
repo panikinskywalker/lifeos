@@ -1,5 +1,7 @@
 # LifeOS — audit against PRODUCT.md v4 (M4.0, 26 Sep 2026)
 
+> **Note, 4 Oct 2026:** this is a dated snapshot. The Almanac tab it audits against was dropped from the product on 4 Oct; Browse stays. See `docs/MODEL.md`.
+
 Built from the code on branch `m1-design-system` (M1–M3.5 done, 137 tests green). The phone walk is Rutvij's half: the checklist at the end lists what to look at on the device.
 
 **Legend:** ✅ exists and fits v4 · 🟡 exists, needs reshaping · ❌ missing

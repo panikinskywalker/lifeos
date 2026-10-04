@@ -39,7 +39,7 @@ Ask Claude Code to: extract exact hex/type/radius values from the canvas export 
 
 ## Course correction — 25 Sep 2026 (paste this to Claude Code after M3)
 
-> Stop. The product definition has changed: read `docs/PRODUCT.md` v4 in full, then `docs/MILESTONES.md` M4 (which replaces the old M4/M5). The short version: LifeOS is a **personal data dashboard + an almanac of my life**, fed automatically (Health Connect, Android UsageStats, bank SMS, payment notifications), by brain-dumps, and by the agent — not an agent with a filing cabinet. Keep everything you've built (shell, entity core, cycles, splits, provider chain); reshape it.
+> Stop. The product definition has changed: read `docs/PRODUCT.md` v4 in full, then `docs/MILESTONES.md` M4 (which replaces the old M4/M5). The short version: LifeOS is a **personal data dashboard + a record of my life**, fed automatically (Health Connect, Android UsageStats, bank SMS, payment notifications), by brain-dumps, and by the agent — not an agent with a filing cabinet. Keep everything you've built (shell, entity core, cycles, splits, provider chain); reshape it.
 >
 > Do M4.0 first and nothing else: walk every screen on my phone against PRODUCT.md §5 golden flows and write `docs/AUDIT.md` — exists / missing / wrong. Stop and show me. After I say go, M4.1 → M4.4 in order, one checklist item per commit, ticking the box in the same commit.
 >
@@ -48,7 +48,7 @@ Ask Claude Code to: extract exact hex/type/radius values from the canvas export 
 > 2. **The agent creates any record type from a sentence.** "Made a new friend today, Karan, works at Zomato, met at the gym" must produce a Person with company, a fact, and a link to the dump — no form. Add golden tests for the three sentences in M4.1 before writing the UI.
 > 3. **Today shows real device data as charts within 1 s of opening**: steps, sleep, screen time by app, spend pace, upcoming. Sparklines/bars/rings on `react-native-svg`, on the design tokens. Every tile opens a full-screen chart with day/week/month/year and previous-period comparison. No placeholder numbers, ever — an empty state that names the missing permission instead.
 > 4. **SMS is a first-class source.** Sender discovery, per-bank parsers with test fixtures, raw text always kept, first-run history import with a review screen, live receive → transaction within seconds, dedupe against notifications. The app is sideloaded, so `READ_SMS` is fine.
-> 5. **Almanac replaces Browse**: People · Things · Money · Body · Mind · Places · Time. The Time view (day/month/year) is not optional.
+> 5. ~~Almanac replaces Browse~~ *(dropped 4 Oct 2026: Browse stays as it is; see `docs/MODEL.md`.)* The Time view (day/month/year) is not optional; it is reached from Today.
 > 6. Health Connect and UsageStats are native modules with proper permission onboarding screens under You › Data sources, which also shows last sync and today's count per source.
 >
 > Verify on the phone, not the web preview. When a step needs a permission or a device feature I have to grant, stop and tell me exactly what to tap.

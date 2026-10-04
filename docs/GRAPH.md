@@ -44,7 +44,7 @@ Hybrid: keyword search (FTS) to find the starting nodes → walk their edges (1�
 - **Bell** (header) with a count → **To check**: everything filed, unticked; each item with tick / edit / cancel.
 - **Record pages**: a mic ("tell me about Kendal…") that files into this record; a **Connections** section (people, places, events, trips linked, grouped by edge word); Notes as the bullet list.
 - **Graph view** around any record: a force-directed network, 1–2 hops, tap to re-centre. A whole-life view with filters is in the backlog.
-- **Almanac** (M4.4) browses nodes by kind; its Time view is events by date.
+- **Browse** browses records by module; the Time view (from Today) is events by date. *(Almanac dropped 4 Oct 2026.)*
 
 ## 6. What stays from M4.1
 

@@ -1,6 +1,6 @@
-# LifeOS — product definition (v4, 25 Sep 2026)
+# LifeOS — product definition (v4, 25 Sep 2026; Almanac removed 4 Oct 2026 — see `docs/MODEL.md`)
 
-**Supersedes v3. What changed:** v3 was agent-first ("say it once, we file it"). v4 is **data-first**: LifeOS is a personal data dashboard and an almanac of Rutvij's life, fed automatically wherever possible, by brain-dumps otherwise, and browsed as charts and records. The agent is one of three inputs, not the product.
+**Supersedes v3. What changed:** v3 was agent-first ("say it once, we file it"). v4 is **data-first**: LifeOS is a personal data dashboard and a record of Rutvij's life, fed automatically wherever possible, by brain-dumps otherwise, and browsed as charts and records. The agent is one of three inputs, not the product.
 
 ## 0. In one line
 
@@ -19,9 +19,9 @@ Sources feeding it (all automatic, all local):
 
 Each tile opens a full-screen chart with a period switcher (day / week / month / year) and the underlying records.
 
-### 1.2 The second brain is an almanac
+### 1.2 The second brain is browsable
 A browsable reference to everything: every person, thing, place, subscription, fact, note, number — with history. Not just "the agent remembers what I said": a surface you can open and read.
-- **Almanac tab** (replaces Browse): search on top; then *People · Things · Money · Body · Mind · Places · Time*; each opens lists → records → related records.
+- **Browse tab** (kept as is; the Almanac tab idea was dropped 4 Oct): search on top; the grid of modules and boards; Memory; Recent with Tags. Each module opens its overview → lists → records → related records.
 - **Time view**: any day / month / year — what happened, what was spent, what was logged, what I dumped. "On this day."
 - **Facts** are first-class records (one line, subject, source, date) and show on the subject's page.
 - One full-text index across records, notes, facts and dumps. Semantic search later (P2).
@@ -56,12 +56,12 @@ Everything recurring is a cycle on an object (subscriptions, services, renewals,
 
 ## 4. Information architecture (v4)
 
-**Bottom bar:** **Today** · **Upkeep** · **Dump** (centre, raised) · **Almanac** · **You**
+**Bottom bar:** **Today** · **Upkeep** · **Dump** (centre, raised) · **Browse** · **You**
 
 - **Today** — the dashboard (1.1).
 - **Upkeep** — cycles by due date, chores, this-week strip.
 - **Dump** — the box. Toggle at the top: *Dump* (default) / *Talk*. Below: recent dumps with what was extracted.
-- **Almanac** — search; People · Things · Money · Body · Mind · Places · Time; recent.
+- **Browse** — search; the module and board grid; Memory; recent.
 - **You** — settings: data sources (Health Connect, Usage access, SMS, notifications), agent providers, backups, appearance.
 
 ## 5. Flows that must be excellent (golden tests)
@@ -73,7 +73,7 @@ Everything recurring is a cycle on an object (subscriptions, services, renewals,
 6. First run: SMS import finds N bank messages → review screen → confirm → Money shows months of history by category.
 7. New SMS "debited INR 1,240 at SWIGGY" → transaction appears within seconds, categorised Food.
 8. Talk: "how much did I spend on food this month vs. last?" / "when did I last meet Karan?" / "what did I dump about the landlord?"
-9. Almanac › Time › March 2026 → spend, dumps, events, health averages for that month.
+9. Today › On this day → Time › March 2026 → spend, dumps, events, health averages for that month.
 10. "Did the car service, 6,400 at Hyundai" → event + transaction + cycle rolled.
 
 ## 6. Non-goals (phase 1)
@@ -83,7 +83,7 @@ Photos, sending messages/emails, payments, iOS/web client, sync, Mac/iPhone scre
 - ✅ Android native (Expo/RN), offline-first, sideloaded (not Play Store) — enables READ_SMS.
 - ✅ Data-first: Today = dashboard; Health Connect + UsageStats + SMS in P1.
 - ✅ Dump is the primary input; raw dumps immutable; extraction async and undoable.
-- ✅ Almanac replaces Browse; Time view in P1.
+- ❌ Almanac replaces Browse — dropped 4 Oct 2026; Browse stays. Time view in P1, reached from Today.
 - ✅ Agent can create any entity type from a sentence.
 - ✅ Parser-first + provider chain (Groq → Gemini → Claude), usage cap.
 - ✅ Splits/groups P1; chores as routines P1; finance reports: month, subscriptions, net worth.
