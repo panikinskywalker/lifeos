@@ -5,8 +5,8 @@ import type { AccountData, BudgetData, SubscriptionData, TransactionData } from 
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-export function monthRange(offset = 0): { start: string; end: string; label: string } {
-  const d = new Date();
+export function monthRange(offset = 0, now: number | Date = Date.now()): { start: string; end: string; label: string } {
+  const d = new Date(now);
   d.setDate(1);
   d.setMonth(d.getMonth() + offset);
   const start = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -14,8 +14,8 @@ export function monthRange(offset = 0): { start: string; end: string; label: str
   return { start: iso(start), end: iso(end), label: start.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) };
 }
 
-export function periodRange(period: BudgetData['period']): { start: string; end: string } {
-  const now = new Date();
+export function periodRange(period: BudgetData['period'], at: number | Date = Date.now()): { start: string; end: string } {
+  const now = new Date(at);
   if (period === 'weekly') {
     const s = new Date(now);
     s.setDate(now.getDate() - ((now.getDay() + 6) % 7));
@@ -24,7 +24,7 @@ export function periodRange(period: BudgetData['period']): { start: string; end:
     return { start: iso(s), end: iso(e) };
   }
   if (period === 'yearly') return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
-  return monthRange(0);
+  return monthRange(0, now);
 }
 
 /** Signed balance: opening + income − expense ± transfers. Credit cards show what you owe as negative. */
@@ -77,8 +77,8 @@ export function dailySpend(os: LifeOSContext, start: string, end: string): Array
   return out;
 }
 
-export function budgetStatus(os: LifeOSContext, budget: Entity<BudgetData>) {
-  const { start, end } = periodRange(budget.data.period);
+export function budgetStatus(os: LifeOSContext, budget: Entity<BudgetData>, now: number | Date = Date.now()) {
+  const { start, end } = periodRange(budget.data.period, now);
   const spent = spendInRange(os, start, end, budget.data.category);
   return { spent, limit: budget.data.amount, progress: budget.data.amount ? spent / budget.data.amount : 0, remaining: budget.data.amount - spent };
 }

@@ -50,7 +50,7 @@ export function financeOverview(os: LifeOSContext, now = Date.now(), opts: { car
         kind: 'progress',
         title: 'Budgets',
         items: budgets.map((b: Entity<BudgetData>) => {
-          const s = budgetStatus(os, b);
+          const s = budgetStatus(os, b, now);
           return { label: categoryOf(b.data.category).label, ratio: s.progress, sub: `${money(s.spent)} of ${money(s.limit)}`, entityId: b.id, type: 'budget', over: s.progress > 1 };
         }),
       });
