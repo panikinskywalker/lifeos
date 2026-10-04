@@ -44,7 +44,7 @@ Consequences:
 - A record's timeline is simply the Events linked to it, system ones included
   (created, edited, cycle done) and life ones (met, flew, serviced).
 
-## 2. Objects — proposed
+## 2. Objects — proposed; each module's Objects are decided in that module's milestone (layer 6)
 
 Link, Cycle, Event, Fact and Dump are core Objects (Dump, Fact and Event are
 also listed under Mind and Agenda below because that is where you browse them).
@@ -148,7 +148,7 @@ large OTP on Delivery).
 
 Count: 19 domain Objects, down from 25 kinds plus two side tables.
 
-## 3. Three tiers: core, modules, boards + automations — agreed 4 Oct (module list to revisit)
+## 3. Three tiers: core, modules, boards + automations — agreed 4 Oct
 
 ### Core (plumbing, no domain data)
 Knows what a Record, Link, Fact, Event, Cycle and Dump are and how they are
@@ -160,14 +160,24 @@ A module declares:
 - its **Objects** with fields and the cycles they can carry (layer 2);
 - its **filing rules**: how a sentence, SMS, mail or device reading becomes its records;
 - the **sources** that feed it (SMS → Money, Health Connect → Body, contacts → People);
-- the **questions** it answers, as pure functions over its records (balances, spend by
-  category, streaks, who owes whom), usable by any board and by Talk;
+- its **AI tools**, read and write (balances, spend by category, streaks, who
+  owes whom; log spend, split a bill), with confirm / describe where money or
+  people are involved; called by the model in Talk and filing, and by boards;
 - nothing visual beyond field definitions; Browse renders a default list /
   record / form for every module, so a module is usable the day it lands.
 Rules: a module never imports another module. It reaches other modules' records
-only through core Links (a Transaction links to a Person; Money does not know
-what a Person is). Provisional set, to revisit before building: `people`, `things`, `money`, `body`,
-`mind`, `places`, `agenda`. Later as wanted: `games` (matches, teams, scores), …
+only through core Links (a Transaction links to a Person; Finance does not know
+what a Person is).
+
+**The modules (decided 4 Oct: all twelve existing data modules stay):**
+`finance` (Account, Transaction, Debt, Subscription, Budget, Group) · `crm`
+(Person) · `projects` (Task, Project, Goal, Event) · `travel` (Trip) · `assets`
+(Asset, Vehicle) · `inventory` (Item) · `documents` (Document) · `health`
+(Measurement, Workout) · `habits` (Habit, Habit log, Routine) · `knowledge`
+(Note) · `places` (Place, Organisation) · `deliveries` (Delivery). `dashboard`
+and `automation` own no data and become boards. Later as wanted: `games`
+(matches, teams, scores), … Each module's Objects and Fields are settled in its
+own milestone (layer 6), not before.
 
 ### Boards (the top tier: what you see on screen)
 A screen, or a set of screens, that connects modules into a purpose. It owns screens, tiles,
@@ -279,7 +289,7 @@ module's default surface, or settings.
 ### Five generic screens, derived from Object schemas
 Every module gets these for free from its Field types; it overrides only where
 the default is wrong.
-1. **Overview** — the module's key numbers (its *questions*), a trend, what needs you.
+1. **Overview** — the module's key numbers (from its AI tools), a trend, what needs you.
 2. **List** — rows rendered from the Object's fields; filter, sort, group; search.
 3. **Record** — header; fields by type; cycles; events (the timeline); the
    **Links card** (every link grouped by link word, tap to open, add one by
@@ -311,11 +321,23 @@ from the model when available). Below: the last 15 days of dumps, each with
 what it filed as chips (1 person · 2 facts · 1 task), per-item Undo, and its
 state (filed · waiting, why · needs you).
 
-### Browse (as it is today; the Almanac idea is dropped — 4 Oct)
-Search on top · a two-column grid of modules in their tints, each opening its
-Overview → Lists → Records · Memory · Recent, with Tags. Boards you make (Turf,
-Trip planner…) appear in this grid alongside the modules. Time (day / month /
-year) stays reachable from Today's "On this day" tile, not as a section here.
+### Browse
+**Search across the whole app** on top: every record of every module, facts,
+dumps, notes, tags, attachment names, events, cycles, boards and automations by
+name, settings screens, and metrics ("steps" opens the Steps metric). One index
+(`records_fts` plus a small index of screens and boards); results grouped by
+what they are, each opening the thing itself. Then two sections:
+- **Boards** — Turf, Time, Spend, Activity, Automations, and every board added
+  later; a grid of tiles, yours first, pinned before the rest. Today and Upkeep
+  are boards too but sit in the bottom bar, so they are not repeated here.
+- **Modules** — the twelve, in their tints, each opening its Overview → Lists →
+  Records (as the grid is today).
+Then **everything else lives here too**: Memory (facts), Recent, Tags, Reminders,
+To check history, Data sources status, the component gallery (dev). If it is a
+screen and not a tab, Browse reaches it. Any board can also be pinned to Today as a
+tile, and opened by name from the Dump box ("open turf"). A new board is one
+folder under `src/boards/<id>` registered in one list, like a module; later a
+board may come from a package (the plugin story), which changes nothing here.
 
 ### You (settings)
 Data sources (each source: permission, enabled, last sync, today's count; SMS
@@ -366,14 +388,14 @@ built twice.
   render (row, record, form, tile), query (filter, sort, aggregate) and filing
   (how it is parsed) behaviour. Every Object schema declares Fields by type.
 - [ ] **Module manifest split**: a module = Objects + cycles + filing rules +
-  sources + questions; no screens, widgets, overviews or tools. Boards and
-  Automations are separate manifests. The 14 code modules fold into the seven
-  (`people`, `things`, `money`, `body`, `mind`, `places`, `agenda`) plus core.
+  sources + AI tools; no screens, widgets or overviews. Boards and
+  Automations are separate manifests. The twelve data modules keep their names;
+  `dashboard` and `automation` become boards.
 - [ ] Dependency rule enforced by a lint test: modules import only core; boards
   and automations import modules and core; core imports nothing above it.
-- [ ] Object cuts from layer 2: vehicle → Asset, routine → Habit, habit_log →
-  Event, subscription → Cycle, budget → Category target, goal and item dropped,
-  org kinds → Organisation. Data migrated, old records readable.
+- [ ] Every existing Object moves into its module **unchanged**. Object changes
+  (merges, cuts, new Fields) happen in each module's own milestone, after its
+  discussion — never in R0.
 - [ ] One filing pipeline (layer 4): readings path, messages path, dumps path;
   leftovers; one To check. The three queues become one.
 - [ ] Fix the one failing test (`overviews.golden`); every golden test green.
@@ -381,26 +403,29 @@ built twice.
 describes every file in `src/`.
 
 ### Then module by module (each: Objects in the new schema → filing rules and
-sources moved in → questions as pure functions with tests → the six generic
+sources moved in → AI tools with tests → the six generic
 screens checked on the phone → overrides only where the default is wrong)
-- [ ] **R1 Money** — Account, Transaction, Debt; SMS, notification and mail
-  parsers; categories and rules; questions: balances, spend by period and
-  category, who owes whom, subscriptions run-rate, net worth. Parser dataset
-  export gains corrections. Spend screen re-hung on Money › List.
-- [ ] **R2 People** — Person, Group, Organisation; contacts source; payee and
-  UPI matching; keep-in-touch and birthday cycles; questions: people to call,
-  last met, balances per person.
-- [ ] **R3 Agenda** — Event, Task, Project, Trip, Habit; calendar source;
-  check-ins as Events; streaks; Upkeep re-hung on cycles from every module.
-- [ ] **R4 Things** — Asset (with meters), Document, Delivery; shipping and
-  receipt parsers; warranty, expiry and km cycles.
-- [ ] **R5 Body** — Measurement, Workout; Health Connect and Usage access
+- [ ] **R1 finance** — Account, Transaction, Debt, Subscription, Budget, Group;
+  SMS, notification and mail parsers; categories and rules; tools: balances,
+  spend by period and category, who owes whom, subscriptions run-rate, net
+  worth. Parser dataset export gains corrections. Spend screen on its board.
+- [ ] **R2 crm** — Person; contacts source; payee and UPI matching; keep-in-touch
+  and birthday cycles; tools: people to call, last met, balances per person.
+- [ ] **R3 places** — Place, Organisation; from calendar, mail and dumps.
+- [ ] **R4 projects** — Task, Project, Goal, Event; calendar source.
+- [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
+  Upkeep; Upkeep re-hung on cycles from every module.
+- [ ] **R6 health** — Measurement, Workout; Health Connect and Usage access
   sources; one page per metric; Metric screen comparisons.
-- [ ] **R6 Places** — Place; from calendar, mail and dumps; parent places.
-- [ ] **R7 Mind** (later) — Note, Fact as the Second Brain; Memory replaced.
+- [ ] **R7a assets** — Asset, Vehicle (meters); warranty, service and km cycles.
+- [ ] **R7b deliveries** — Delivery; shipping parsers; OTP; tracking.
+- [ ] **R7c documents** — Document; expiry cycles; files.
+- [ ] **R7d travel** — Trip; spend vs budget; flights and stays from mail.
+- [ ] **R7e inventory** — Item; quantity, restock.
+- [ ] **R7f knowledge** (later) — Note, Fact as the Second Brain; Memory replaced.
 
 ### Boards and automations
-- [ ] **R8 Today and Time** — Today tiles re-hung on module questions only; Time
+- [ ] **R8 Today and Time** — Today tiles re-hung on module tools and core queries only; Time
   board from On this day; the route moves from `app/almanac/time.tsx` to
   `app/time.tsx`.
 - [ ] **R9 Turf** — the first user board: this week's game, who paid, who owes,
@@ -427,9 +452,9 @@ screens checked on the phone → overrides only where the default is wrong)
 - [ ] **R16 Docs** — `ARCHITECTURE.md`, `GRAPH.md` and SCOPE §C retired into
   this file; `HANDOFF.md` rewritten for the three tiers.
 
-Suggested order: R0 → R1 → R2 → R8 → R9 → R3 → R12 → R4 → R5 → R10 → R6 →
-R11 → R13 → R15 → R14 → R7 → R16. Money, People and the Turf board early, so
-the structure is proved on the thing you actually want.
+Suggested order: R0 → R1 → R2 → R3 → R8 → R9 → R4 → R5 → R12 → R6 → R7a–e →
+R10 → R11 → R13 → R15 → R14 → R7f → R16. Finance, People, Places and the Turf
+board early, so the structure is proved on the thing you actually want.
 
 
 ## 7. The agent: a model LifeOS owns — proposed 4 Oct

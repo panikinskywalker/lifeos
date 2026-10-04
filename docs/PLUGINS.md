@@ -1,142 +1,156 @@
-# Writing a LifeOS module
+# LifeOS — contracts for modules, boards and automations (R0, agreed 4 Oct 2026)
 
-A module is one folder under `src/modules/` exporting a `ModuleManifest`, plus one line in `src/modules/index.ts`. This walkthrough builds a small **Plants** module: plants you own, watering logs, a "water today" widget, an automation trigger and an AI tool.
+How to write each tier. The shapes below are the contract; `docs/MODEL.md`
+says why. Status: **agreed 4 Oct 2026** — implemented by R0.
 
-## 1. Entity types
+## Folders and the one-way rule
 
-```ts
-// src/modules/plants/index.tsx
-import { z } from 'zod';
-import type { EntityTypeDef, ModuleManifest } from '@core/registry/types';
-import { palette } from '@ui/theme/tokens';
-
-export interface PlantData { species?: string; waterEveryDays: number; lastWateredOn?: string; location?: string }
-
-export const plantType: EntityTypeDef<PlantData> = {
-  type: 'plant',                 // stable id — never rename
-  module: 'plants',
-  label: 'Plant', labelPlural: 'Plants', icon: 'leaf',
-  schema: z.object({
-    species: z.string().optional(),
-    waterEveryDays: z.coerce.number().int().positive().default(7),
-    lastWateredOn: z.string().optional(),
-    location: z.string().optional(),
-  }),
-  fields: [
-    { key: 'species', label: 'Species', type: 'text', summary: true },
-    { key: 'waterEveryDays', label: 'Water every (days)', type: 'number', required: true, defaultValue: 7 },
-    { key: 'lastWateredOn', label: 'Last watered', type: 'date' },
-    { key: 'location', label: 'Location', type: 'text', summary: true },
-  ],
-  indexed: ['lastWateredOn'],
-  statuses: [{ value: 'alive', label: 'Alive' }, { value: 'gone', label: 'Gone', color: palette.gray }],
-  defaultViews: [{ name: 'Needs water', definition: { filter: { and: [{ field: 'data.lastWateredOn', op: 'lte', value: '__DAYS_AGO_7__' }] } } }],
-};
+```
+src/core        plumbing + the core Objects (link, cycle, event, fact, dump); imports nothing above
+src/modules/<m> one ModuleManifest: Objects, filing, sources, AI tools, triggers, actions; imports @core only
+src/boards/<b>  one BoardManifest: tiles, screens, overrides; imports @core, @modules, @ui
+src/ui          design system, Field type renderers, the six generic screens; imports @core only
+src/platform    app-shell glue (boot, notifications, native bridges)
+app/            expo-router routes, thin
 ```
 
-That alone gives you: a list screen with saved views, search and filters; a form; a detail page with timeline, tags, relations, reminders, attachments and comments; full-text search; AI access via `query_entities`/`create_entity`; automation triggers on create/update/status. No migration.
+A test (`src/core/deps.test.ts`) reads imports and fails the build when a tier
+imports upward or a module imports another module.
 
-`fields` drive the form, filters and the assistant's understanding. `type: 'relation'` fields with `relationKind` are mirrored into the relations table automatically:
+## Field types (core, closed)
 
 ```ts
-{ key: 'personId', label: 'Caretaker', type: 'relation', relationTo: 'person', relationKind: 'person' }
-```
+type FieldType =
+  | 'text' | 'longtext' | 'number' | 'money' | 'date' | 'datetime' | 'duration'
+  | 'select' | 'multiselect' | 'boolean' | 'link' | 'contact' | 'file'
+  | 'location' | 'meter';
 
-## 2. A widget
-
-```tsx
-import type { WidgetDef, WidgetProps } from '@core/registry/types';
-import { useLive } from '@ui/hooks';
-import { Card, SectionHeader, Stat } from '@ui/components/primitives';
-
-function WaterTodayWidget({ ctx }: WidgetProps) {
-  const due = useLive((os) => os.entities.query<PlantData>('plant', { filter: { and: [{ field: 'status', op: 'eq', value: 'alive' }] } })
-    .filter((p) => !p.data.lastWateredOn || daysSince(p.data.lastWateredOn) >= p.data.waterEveryDays), []);
-  return (
-    <Card onPress={() => ctx.navigate('/entity/plant')}>
-      <SectionHeader title="Plants" icon="leaf" color={palette.green} action="All" />
-      <Stat value={String(due.length)} unit="need water" />
-    </Card>
-  );
+/** One per FieldType, registered in core. The UI has one renderer per type for row / record / form / tile. */
+interface FieldTypeDef<T> {
+  type: FieldType;
+  parse(text: string, ctx: ParseCtx): T | undefined;          // filing: from a sentence / SMS / mail
+  format(value: T, ctx: FormatCtx): string;                   // row and record text
+  query: { ops: FilterOp[]; aggregate?: Array<'sum' | 'avg' | 'min' | 'max' | 'count'>; buckets?: boolean };
+  zod(field: Field): ZodTypeAny;                              // validation, derived per Field
 }
 
-const widgets: WidgetDef[] = [{ type: 'plants.water', module: 'plants', name: 'Water today', icon: 'leaf', sizes: ['small', 'medium'], defaultSize: 'small', component: WaterTodayWidget }];
+interface Field {
+  key: string; label: string; type: FieldType;
+  required?: boolean; summary?: boolean; section?: string; description?: string; default?: unknown;
+  unit?: string;                       // number, duration, meter
+  currency?: 'fixed' | 'perRecord';    // money
+  options?: FieldOption[];             // select, multiselect
+  linkTo?: string | string[] | 'any';  // link: Object id(s)
+  linkWord?: string;                   // link: the Link's word ("works at", "paid")
+  contactKind?: 'phone' | 'email' | 'url';
+}
 ```
 
-`useLive` re-runs the query whenever data changes. Widgets receive `size` and can adapt.
+Today's `currency` → `money`, `relation` → `link`, `json` → removed (use real
+Fields). New: `duration`, `contact`, `file`, `location`, `meter`.
 
-## 3. A detail section
-
-Anything you export as a `detailSections` entry appears on that type's record page, above the generic tags/relations/timeline blocks:
-
-```tsx
-detailSections: [{ entityType: 'plant', key: 'plants.watering', title: 'Watering', order: 10, component: WateringSection }]
-```
-
-## 4. Automation: a trigger and an action
-
-Modules can expose domain triggers (mapped from bus events) and actions:
+## Object (replaces EntityTypeDef)
 
 ```ts
-triggers: [{
-  id: 'plants.watered', module: 'plants', label: 'Plant watered', event: 'entity.updated',
-  toContext: (p) => {
-    const e = p as { entity: Entity; changed: string[] };
-    return e.entity.type === 'plant' && e.changed.includes('data.lastWateredOn') ? { entity: e.entity, vars: {} } : null;
-  },
-}],
-actions: [{
-  id: 'plants.markWatered', module: 'plants', label: 'Mark watered today',
-  run: async (_cfg, ctx, os) => { if (ctx.entity) os.entities.update(ctx.entity.id, { data: { lastWateredOn: today() } }, 'automation'); },
-}],
+interface ObjectDef<T = Record<string, unknown>> {
+  id: string;                 // 'person' — stable, never renamed
+  module: string;
+  label: string; labelPlural: string; icon: string;
+  fields: Field[];            // the schema; zod is derived from it (a module may tighten with `refine`)
+  indexed?: string[];         // Fields that get an expression index
+  statuses?: FieldOption[];
+  occurredAtField?: string;   // which Field is the record's domain time
+  title?(data: T): string; subtitle?(data: T, f: Fmt): string | undefined; searchText?(data: T): string;
+  cycles?: {
+    templates?(data: T): CycleSeed[];                       // new Vehicle → service, insurance, PUC
+    writeBack?: Record<string, { nextDueAt?: string; lastDoneAt?: string; nextDueMeter?: string }>;
+    activeStatuses?: string[];
+  };
+  refine?(schema: ZodObject): ZodTypeAny;
+}
 ```
 
-Users combine these with core actions (`core.createReminder`, `core.addTag`, `core.notify`, `core.createEntity`…) in the Automation screen, or ask the assistant to create the rule.
-
-For time-based work, register a scheduler handler in `onStart`:
+A record of an Object is an `ObjectRecord<T>` in code (TypeScript already owns
+the name `Record`); in UI copy and docs it is just "a record".
 
 ```ts
-onStart: async (os) => {
-  os.scheduler.registerHandler('plants.check', (_job, o) => { /* emit reminders for thirsty plants */ });
-  if (!os.scheduler.get('plants.check')) os.scheduler.schedule({ id: 'plants.check', kind: 'plants.check', at: Date.now(), rrule: 'FREQ=DAILY;INTERVAL=1' });
-},
+interface ObjectRecord<T> {
+  id: string; object: string; title: string; subtitle?: string | null; data: T;
+  status?: string | null; starred: boolean; archived: boolean;
+  occurredAt?: number | null; createdAt: number; updatedAt: number; deletedAt?: number | null; version: number;
+}
 ```
 
-## 5. An AI tool
+## Module
 
 ```ts
-aiTools: [{
-  name: 'plants_needing_water',
-  description: 'Plants overdue for watering, with days overdue.',
-  input: z.object({}),
-  run: async (_i, os) => os.entities.query<PlantData>('plant').map((p) => ({ id: p.id, name: p.title, overdueDays: ... })),
-}],
+interface ModuleManifest {
+  id: string; name: string; version: string; description: string; icon: string; color: string;
+  objects: ObjectDef[];
+  linkWords?: LinkWordDef[];           // { word, inverse, from: ObjectId[], to: ObjectId[] | 'any' }
+  filing?: {
+    sentences?: SentenceRule[];        // on-phone parser patterns → tool calls, with confidence
+    parsers?: MessageParser[];         // per-sender: { id, matches(msg), parse(msg) → filed records + confidence }
+  };
+  sources?: SourceDef[];               // { id, label, modules, permission?, sync(os, since) → { readings?, messages? } }
+  aiTools?: AiToolDef[];               // unchanged: { name, description, input: zod, run, confirm?, describe? }; read and write
+  triggers?: TriggerDef[];             // automation contributions (no UI)
+  actions?: ActionDef[];
+  onInstall?(os): void; onStart?(os): void;
+}
 ```
 
-Mutating tools should set `confirm: true` so the assistant asks before running them.
+Gone from the module: `screens`, `widgets`, `quickActions`, `detailSections`,
+`overview`, `defaultWidgets`. `aiTools` stay as they are: a module's read and
+write tools, with `confirm` and `describe`, called by whichever model is first
+in the chain (the local Ajax-like model, then the Mac model, then cloud). Boards
+may call a module's read tools directly as functions. Core keeps its generic
+tools (`create_record`, `set_fields`, `link`, `record_event`, `search`…),
+driven by Object schemas.
 
-## 6. Register it
+## Board
 
 ```ts
-export const plantsModule: ModuleManifest = {
-  id: 'plants', name: 'Plants', version: '1.0.0', description: 'Keep them alive.', icon: 'leaf', color: palette.green,
-  entityTypes: [plantType], widgets, detailSections, triggers, actions, aiTools,
-  defaultWidgets: [{ type: 'plants.water' }],
-  quickActions: [{ id: 'plants.add', label: 'Plant', icon: 'leaf', route: '/entity/plant/new' }],
-};
+interface BoardManifest {
+  id: string; name: string; icon: string; color: string;
+  /** Pinned in the bottom bar (today, upkeep) or a tile in Browse (everything else). */
+  placement: 'bar' | 'browse';
+  tiles?: TileDef[];                   // { id, name, sizes, component } reading module tools / core queries — for Today and grid boards
+  screens?: ScreenDef[];               // routes under /board/<id>/<key>
+  overrides?: ObjectOverride[];        // per Object: { object, record?: { hero?, sections? }, list?: { row? }, overview?: { blocks? } }
+  buttons?: ManualRun[];               // manual-run automations shown on this board
+}
 ```
 
-```ts
-// src/modules/index.ts
-export const installedModules = [..., plantsModule];
-```
+Every module has a companion board of the same id in `src/boards/<module>`
+holding its overrides (the Measurement hero chart, the Delivery OTP). Core UI
+generates the six generic screens — Overview, List, Record, Form, Metric, Links
+— for every Object; a board only overrides.
 
-On next launch the module is installed (default views + widgets seeded), its types are indexed and it shows up in Browse, Search, the widget gallery, the Automation editor and the assistant.
+## Automations
 
-## Rules of the road
+User-built, stored as data (`automation_rules` + `automation_runs`, extended with
+steps and per-step outputs). Code contributes only:
+- **triggers** and **actions** from modules (above);
+- **step kinds** from core: `create`, `set`, `link`, `roll_cycle`, `post_transaction`,
+  `notify`, `ask_model`, `wait`, `branch`, `run_tool`;
+- **templates** (`AutomationTemplate { id, name, trigger, conditions, steps }`)
+  from modules or boards, offered in the editor.
+A manual-run trigger lets a sentence ("run month close") or a board button start one.
 
-- Never rename a `type` or a field `key` once shipped; add a new one and migrate data in `onStart` if needed.
-- Keep `schema` permissive with `.default()`/`.optional()` so older records keep validating.
-- Don't import another module's internals; link through relations and query by type. (Importing another module's *types/constants* — like finance categories — is fine and explicit via `dependencies`.)
-- Use `os.format` for money/dates so locale settings apply everywhere.
-- Write through `os.entities`/`os.relations`; never raw SQL for records — the timeline, search index, change log and automations depend on it.
+## Storage (migration v11, append-only)
+
+Tables renamed to the vocabulary: `entities` → `records` (column `type` →
+`object`), `relations` → `links`, `timeline_events` → `events`. `comments` rows
+become `facts`; `reminders` rows become one-off `cycles`; both old tables
+dropped after copy. Object cuts from MODEL layer 2 are data migrations in the
+same version (vehicle → asset, routine → habit, habit_log → event, subscription
+→ cycle, budget → category setting, org kinds → organisation). `entities_fts`
+is rebuilt once as `records_fts`.
+
+## Writing a module, in order
+1. `objects.ts` — ObjectDefs with Fields. 2. `filing/` — sentence rules and
+parsers with fixtures. 3. `sources.ts`. 4. `aiTools.ts` with tests.
+5. `index.ts` — the manifest. 6. Register in `src/modules/index.ts`.
+7. Open the app: Browse shows the module with its six generic screens.
+8. Only now, `src/boards/<module>/` for overrides.
