@@ -17,9 +17,9 @@ import { eventType, goalType, projectType, taskType } from './projects/types';
 import { tripType } from './travel/types';
 import { deliveryType } from './deliveries/types';
 import { financeOverview } from './finance/overview';
-import { peopleOverview } from './crm/overview';
+import { peopleOverview } from '@boards/crm/overview';
 import { projectsOverview } from './projects/overview';
-import { travelOverview } from './travel/overview';
+import { travelOverview } from '@boards/travel/overview';
 import { deliveriesOverview } from '@boards/deliveries/overview';
 import { healthOverview } from '@boards/health/overview';
 

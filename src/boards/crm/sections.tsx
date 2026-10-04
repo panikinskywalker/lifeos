@@ -1,18 +1,11 @@
-import React from 'react';
 import { Linking, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { z } from 'zod';
-import type { ModuleManifest } from '@core/registry/types';
 import type { Entity } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { AttentionCard, QuickActions, RowList, Section, StatTrio, Text, useToast } from '@ui/kit';
 import { EntityRow } from '@ui/components/EntityRow';
-import { bus } from '@core/events/bus';
-import { CRM_COLOR, groupType, personType, type PersonData } from './types';
-import { peopleOverview } from './overview';
-
-export * from './types';
+import { nextBirthday, type PersonData } from '@modules/crm';
 
 
 /**
@@ -20,7 +13,7 @@ export * from './types';
  * trio, a nudge when you're overdue to get in touch, quick actions (call,
  * message, log contact, IOU) and shared expenses.
  */
-function PersonSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function PersonSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContext }) {
   const router = useRouter();
   const toast = useToast();
   const p = entity as Entity<PersonData>;
@@ -87,51 +80,3 @@ function PersonSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSContex
   );
 }
 
-function nextBirthday(iso: string): { days: number; age: number | null } | null {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const now = new Date();
-  const next = new Date(now.getFullYear(), d.getMonth(), d.getDate());
-  if (next < now) next.setFullYear(now.getFullYear() + 1);
-  const days = Math.ceil((next.getTime() - now.getTime()) / 86400000);
-  return { days, age: d.getFullYear() > 1900 ? next.getFullYear() - d.getFullYear() : null };
-}
-
-
-export const crmModule: ModuleManifest = {
-  overview: peopleOverview,
-  id: 'crm',
-  name: 'People',
-  version: '1.0.0',
-  description: 'Personal CRM: everyone in your life, with everything linked to them.',
-  icon: 'person.2',
-  color: CRM_COLOR,
-  entityTypes: [personType, groupType],
-  onStart: (os) => {
-    // A group's member field is mirrored into group_members (default shares for splits, "groups Priya is in").
-    const sync = (e: Entity) => {
-      if (e.type === 'group') os.groups.setMembers(e.id, ((e.data as { memberIds?: string[] }).memberIds ?? []).filter(Boolean));
-    };
-    bus.on('entity.created', ({ entity }) => sync(entity));
-    bus.on('entity.updated', ({ entity }) => sync(entity));
-  },
-  quickActions: [{ id: 'crm.addPerson', label: 'Person', icon: 'person', route: '/entity/person/new' }],
-  detailSections: [{ entityType: 'person', key: 'crm.person', title: 'Relationship', component: PersonSection, order: 10, placement: 'top' }],
-  aiTools: [
-    {
-      name: 'people_to_contact',
-      description: 'People overdue for contact (based on their keep-in-touch cadence) and upcoming birthdays in the next 30 days.',
-      input: z.object({}),
-      run: async (_i, os) => {
-        const people = os.entities.query<PersonData>('person');
-        const today = Date.now();
-        return {
-          overdue: people
-            .filter((p) => p.data.contactEvery && (!p.data.lastContactAt || (today - new Date(p.data.lastContactAt).getTime()) / 86400000 > p.data.contactEvery))
-            .map((p) => ({ id: p.id, name: p.title, lastContact: p.data.lastContactAt ?? null, every: p.data.contactEvery })),
-          birthdays: people.map((p) => ({ id: p.id, name: p.title, next: p.data.birthday ? nextBirthday(p.data.birthday) : null })).filter((x) => x.next && x.next.days <= 30),
-        };
-      },
-    },
-  ],
-};

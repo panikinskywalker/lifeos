@@ -20,10 +20,10 @@ import { tripType } from '../src/modules/travel/types';
 import { deliveryType } from '../src/modules/deliveries/types';
 import { habitLogType, habitType } from '../src/modules/habits/types';
 import { financeOverview } from '../src/modules/finance/overview';
-import { peopleOverview } from '../src/modules/crm/overview';
+import { peopleOverview } from '../src/boards/crm/overview';
 import { projectsOverview } from '../src/modules/projects/overview';
 import { habitsOverview } from '../src/modules/habits/overview';
-import { travelOverview } from '../src/modules/travel/overview';
+import { travelOverview } from '../src/boards/travel/overview';
 import { deliveriesOverview } from '../src/boards/deliveries/overview';
 
 const DAY = 86_400_000;

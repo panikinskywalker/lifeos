@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
 
 /** Trip record type (no React Native — unit-tested). */
 
-export const TRAVEL_COLOR = palette.cyan;
+export const TRAVEL_COLOR = 'cyan';
 
 export interface TripData {
   destination: string;
@@ -35,7 +34,7 @@ export const tripType: EntityTypeDef<TripData> = {
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Planning' },
   ],
   occurredAtField: 'startDate',
-  statuses: [{ value: 'idea', label: 'Idea', color: palette.gray }, { value: 'planning', label: 'Planning', color: palette.orange }, { value: 'booked', label: 'Booked' }, { value: 'ongoing', label: 'Ongoing', color: palette.green }, { value: 'done', label: 'Done', color: palette.gray }],
+  statuses: [{ value: 'idea', label: 'Idea', color: 'gray' }, { value: 'planning', label: 'Planning', color: 'orange' }, { value: 'booked', label: 'Booked' }, { value: 'ongoing', label: 'Ongoing', color: 'green' }, { value: 'done', label: 'Done', color: 'gray' }],
   computeTitle: (d) => d.destination,
   computeSubtitle: (d) => (d.startDate ? `${d.startDate}${d.endDate ? ` → ${d.endDate}` : ''}` : undefined),
   searchText: (d) => [d.notes, d.purpose].filter(Boolean).join(' '),

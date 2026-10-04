@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
 import { dateField, nextAnnual } from '@core/cycles/schedule';
 
-export const CRM_COLOR = palette.pink;
+export const CRM_COLOR = 'pink';
 
 export interface PersonData {
   relationship?: string;
@@ -35,7 +34,7 @@ export const personType: EntityTypeDef<PersonData> = {
     ...(d.birthday ? [{ template: 'person.birthday', name: 'Birthday', kind: 'fixed' as const, everyN: 1, everyUnit: 'year' as const, nextDueAt: nextAnnual(d.birthday, Date.now()), leadDays: 7 }] : []),
   ],
   fields: [
-    { key: 'relationship', label: 'Relationship', type: 'select', summary: true, options: [{ value: 'family', label: 'Family', color: palette.red }, { value: 'friend', label: 'Friend', color: palette.orange }, { value: 'partner', label: 'Partner', color: palette.pink }, { value: 'colleague', label: 'Colleague', color: palette.blue }, { value: 'client', label: 'Client', color: palette.indigo }, { value: 'vendor', label: 'Vendor / Service', color: palette.teal }, { value: 'acquaintance', label: 'Acquaintance', color: palette.gray }] },
+    { key: 'relationship', label: 'Relationship', type: 'select', summary: true, options: [{ value: 'family', label: 'Family', color: 'red' }, { value: 'friend', label: 'Friend', color: 'orange' }, { value: 'partner', label: 'Partner', color: 'pink' }, { value: 'colleague', label: 'Colleague', color: 'blue' }, { value: 'client', label: 'Client', color: 'indigo' }, { value: 'vendor', label: 'Vendor / Service', color: 'teal' }, { value: 'acquaintance', label: 'Acquaintance', color: 'gray' }] },
     { key: 'phone', label: 'Phone', type: 'text', section: 'Contact' },
     { key: 'email', label: 'Email', type: 'text', section: 'Contact' },
     { key: 'upi', label: 'UPI ID', type: 'text', section: 'Contact' },
