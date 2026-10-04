@@ -33,7 +33,7 @@ export interface SectionDef {
 export const SECTIONS: SectionDef[] = [
   { id: 'people', label: 'People', icon: 'people', tint: 'people', line: 'Everyone, and the groups they’re in', types: ['person', 'group'] },
   { id: 'things', label: 'Things', icon: 'cube.box', tint: 'upkeep', line: 'What you own, and its upkeep', types: ['vehicle', 'asset', 'item', 'document', 'delivery', 'routine'] },
-  { id: 'money', label: 'Money', icon: 'wallet', tint: 'finance', line: 'Spending, accounts, subscriptions, who you pay', types: ['transaction', 'account', 'subscription', 'budget', 'debt', 'org'] },
+  { id: 'money', label: 'Money', icon: 'wallet', tint: 'finance', line: 'Spending, accounts, subscriptions, who you pay', types: ['transaction', 'account', 'subscription', 'investment', 'debt', 'org'] },
   { id: 'body', label: 'Body', icon: 'activity', tint: 'health', line: 'Steps, sleep, heart, weight, workouts', types: ['workout'], metrics: ['steps', 'sleep', 'heart_rate', 'resting_hr', 'weight'] },
   { id: 'mind', label: 'Mind', icon: 'brain', tint: 'memory', line: 'Dumps, what you’ve told it, notes, plans', types: ['note', 'task', 'project', 'goal', 'habit'] },
   { id: 'places', label: 'Places', icon: 'location', tint: 'travel', line: 'Places, trips and what happened where', types: ['place', 'trip', 'event'] },
