@@ -17,7 +17,7 @@ export interface TaskData {
 }
 
 export const taskType: ObjectDef<TaskData> = {
-  type: 'task',
+  id: 'task',
   module: 'projects',
   label: 'Task',
   labelPlural: 'Tasks',
@@ -53,7 +53,7 @@ export interface ProjectData {
 }
 
 export const projectType: ObjectDef<ProjectData> = {
-  type: 'project',
+  id: 'project',
   module: 'projects',
   label: 'Project',
   labelPlural: 'Projects',
@@ -79,7 +79,7 @@ export interface GoalData {
 }
 
 export const goalType: ObjectDef<GoalData> = {
-  type: 'goal',
+  id: 'goal',
   module: 'projects',
   label: 'Goal',
   labelPlural: 'Goals',
@@ -118,7 +118,7 @@ export interface EventData {
 }
 
 export const eventType: ObjectDef<EventData> = {
-  type: 'event',
+  id: 'event',
   module: 'projects',
   label: 'Event',
   labelPlural: 'Events',

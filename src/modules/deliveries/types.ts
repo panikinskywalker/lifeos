@@ -29,7 +29,7 @@ export const DELIVERY_STATUSES = [
 ];
 
 export const deliveryType: ObjectDef<DeliveryData> = {
-  type: 'delivery',
+  id: 'delivery',
   module: 'deliveries',
   label: 'Delivery',
   labelPlural: 'Deliveries',

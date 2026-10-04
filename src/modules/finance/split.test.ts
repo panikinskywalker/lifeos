@@ -26,8 +26,8 @@ describe('splitAmounts', () => {
   });
 });
 
-const person = { type: 'person', module: 'm', label: 'Person', labelPlural: 'People', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x: Record<string, unknown>) => String(x.name) };
-const group = { type: 'group', module: 'm', label: 'Group', labelPlural: 'Groups', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x: Record<string, unknown>) => String(x.name) };
+const person = { id: 'person', module: 'm', label: 'Person', labelPlural: 'People', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x: Record<string, unknown>) => String(x.name) };
+const group = { id: 'group', module: 'm', label: 'Group', labelPlural: 'Groups', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x: Record<string, unknown>) => String(x.name) };
 const mod: ModuleManifest = { id: 'finance', name: 'F', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, debtType, person, group] };
 let os: LifeOSContext;
 beforeEach(async () => {

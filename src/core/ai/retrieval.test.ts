@@ -13,8 +13,8 @@ import type { ChatMessage, LLMProvider } from './provider';
 const mod: ModuleManifest = {
   id: 'm', name: 'M', version: '1', description: '', icon: 'x', color: '#000',
   objects: [
-    { type: 'vehicle', module: 'm', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car', schema: z.object({ name: z.string(), plate: z.string().optional() }), fields: [{ key: 'name', label: 'Name', type: 'text' }, { key: 'plate', label: 'Registration', type: 'text' }], computeTitle: (x) => String(x.name) },
-    { type: 'person', module: 'm', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
+    { id: 'vehicle', module: 'm', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car', schema: z.object({ name: z.string(), plate: z.string().optional() }), fields: [{ key: 'name', label: 'Name', type: 'text' }, { key: 'plate', label: 'Registration', type: 'text' }], computeTitle: (x) => String(x.name) },
+    { id: 'person', module: 'm', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
   ],
 };
 let os: LifeOSContext;

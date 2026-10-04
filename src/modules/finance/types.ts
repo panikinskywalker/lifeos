@@ -40,7 +40,7 @@ export interface AccountData {
 }
 
 export const accountType: ObjectDef<AccountData> = {
-  type: 'account',
+  id: 'account',
   module: 'finance',
   label: 'Account',
   labelPlural: 'Accounts',
@@ -89,7 +89,7 @@ export interface TransactionData {
 }
 
 export const transactionType: ObjectDef<TransactionData> = {
-  type: 'transaction',
+  id: 'transaction',
   module: 'finance',
   label: 'Transaction',
   labelPlural: 'Transactions',
@@ -157,7 +157,7 @@ export interface BudgetData {
 }
 
 export const budgetType: ObjectDef<BudgetData> = {
-  type: 'budget',
+  id: 'budget',
   module: 'finance',
   label: 'Budget',
   labelPlural: 'Budgets',
@@ -185,7 +185,7 @@ export interface SubscriptionData {
 }
 
 export const subscriptionType: ObjectDef<SubscriptionData> = {
-  type: 'subscription',
+  id: 'subscription',
   module: 'finance',
   label: 'Subscription',
   labelPlural: 'Subscriptions',
@@ -229,7 +229,7 @@ export const subscriptionType: ObjectDef<SubscriptionData> = {
 
 /** Debt (PRODUCT §4): money between me and a person — from a split, a loan, or a payment that settles. */
 export const debtType: ObjectDef<{ personId: string; direction: 'they_owe' | 'i_owe'; amount: number; reason?: string; date: string; kind: 'split' | 'loan' | 'payment'; transactionId?: string; groupId?: string; currency?: string }> = {
-  type: 'debt',
+  id: 'debt',
   module: 'finance',
   label: 'Debt',
   labelPlural: 'Debts',

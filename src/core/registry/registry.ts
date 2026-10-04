@@ -21,7 +21,7 @@ export class Registry {
       if (!this.modules.has(dep)) throw new Error(`Module "${m.id}" depends on "${dep}" which is not registered`);
     }
     this.modules.set(m.id, m);
-    for (const t of m.objects ?? []) this.objects.set(t.type, { ...t, module: m.id });
+    for (const t of m.objects ?? []) this.objects.set(t.id, { ...t, module: m.id });
     for (const t of m.triggers ?? []) this.triggers.set(t.id, { ...t, module: m.id });
     for (const a of m.actions ?? []) this.actions.set(a.id, { ...a, module: m.id });
     for (const t of m.aiTools ?? []) this.aiTools.set(t.name, t);

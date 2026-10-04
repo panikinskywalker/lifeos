@@ -63,16 +63,16 @@ describe('schedule (pure)', () => {
 const things: ModuleManifest = {
   id: 'test-things', name: 'Things', version: '1.0.0', description: 't', icon: 'x', color: '#000',
   objects: [
-    { type: 'car', module: 'test-things', label: 'Car', labelPlural: 'Cars', icon: 'x', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
+    { id: 'car', module: 'test-things', label: 'Car', labelPlural: 'Cars', icon: 'x', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
     {
-      type: 'van', module: 'test-things', label: 'Van', labelPlural: 'Vans', icon: 'x',
+      id: 'van', module: 'test-things', label: 'Van', labelPlural: 'Vans', icon: 'x',
       schema: z.object({ name: z.string(), odometerKm: z.number().optional() }),
       fields: [{ key: 'name', label: 'Name', type: 'text' }, { key: 'odometerKm', label: 'Odometer (km)', type: 'number' }],
       computeTitle: (x) => String(x.name),
       meters: [{ meter: 'odometer', field: 'odometerKm', label: 'Odometer', unit: 'km' }],
     },
     {
-      type: 'chore', module: 'test-things', label: 'Chore', labelPlural: 'Chores', icon: 'x',
+      id: 'chore', module: 'test-things', label: 'Chore', labelPlural: 'Chores', icon: 'x',
       schema: z.object({ name: z.string(), last: z.string().optional() }),
       fields: [],
       computeTitle: (x) => String(x.name),
@@ -80,7 +80,7 @@ const things: ModuleManifest = {
       cycleTemplates: (x) => [{ template: 'chore.cycle', name: String(x.name), kind: 'interval', everyN: 4, everyUnit: 'day', lastDoneAt: dateField(x.last) }],
     },
     {
-      type: 'sub', module: 'test-things', label: 'Sub', labelPlural: 'Subs', icon: 'x',
+      id: 'sub', module: 'test-things', label: 'Sub', labelPlural: 'Subs', icon: 'x',
       schema: z.object({ name: z.string(), rrule: z.string(), next: z.string().optional() }),
       fields: [{ key: 'name', label: 'Name', type: 'text' }],
       computeTitle: (x) => String(x.name),

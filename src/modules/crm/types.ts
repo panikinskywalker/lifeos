@@ -22,7 +22,7 @@ export interface PersonData {
 }
 
 export const personType: ObjectDef<PersonData> = {
-  type: 'person',
+  id: 'person',
   module: 'crm',
   label: 'Person',
   labelPlural: 'People',
@@ -58,7 +58,7 @@ export const personType: ObjectDef<PersonData> = {
 
 /** Group (PRODUCT §4): flatmates, a trip crew, family — splits and balances run per group. Members also live in group_members. */
 export const groupType: ObjectDef<{ name: string; kind?: string; memberIds: string[]; notes?: string }> = {
-  type: 'group', module: 'crm', label: 'Group', labelPlural: 'Groups', icon: 'people',
+  id: 'group', module: 'crm', label: 'Group', labelPlural: 'Groups', icon: 'people',
   schema: z.object({ name: z.string().min(1), kind: z.string().optional(), memberIds: z.array(z.string()).default([]), notes: z.string().optional() }),
   fields: [
     { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Flat 4B, Goa trip, Family' },

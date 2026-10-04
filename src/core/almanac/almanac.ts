@@ -60,7 +60,7 @@ export function almanacSections(os: LifeOSContext): SectionSummary[] {
     const rows = s.types
       .map((type) => os.registry.objects.get(type))
       .filter((d): d is NonNullable<typeof d> => !!d && !d.hidden)
-      .map((d) => ({ type: d.type, label: d.labelPlural, icon: d.icon, count: counts[d.type] ?? 0 }));
+      .map((d) => ({ type: d.id, label: d.labelPlural, icon: d.icon, count: counts[d.id] ?? 0 }));
     let total = rows.reduce((n, r) => n + r.count, 0);
     if (s.id === 'mind') total += dumpCount(os) + os.facts.list({ limit: 100000 }).length;
     if (s.id === 'body') total += counts.measurement ?? 0;

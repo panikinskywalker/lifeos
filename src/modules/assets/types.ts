@@ -8,7 +8,7 @@ export const ASSETS_COLOR = 'brown';
 
 export interface AssetData { category: string; purchaseDate?: string; purchasePrice?: number; currentValue?: number; serial?: string; warrantyUntil?: string; location?: string; notes?: string; vendorId?: string }
 export const assetType: ObjectDef<AssetData> = {
-  type: 'asset', module: 'assets', label: 'Asset', labelPlural: 'Assets', icon: 'cube.box',
+  id: 'asset', module: 'assets', label: 'Asset', labelPlural: 'Assets', icon: 'cube.box',
   schema: z.object({ category: z.string().default('electronics'), purchaseDate: z.string().optional(), purchasePrice: z.coerce.number().optional(), currentValue: z.coerce.number().optional(), serial: z.string().optional(), warrantyUntil: z.string().optional(), location: z.string().optional(), notes: z.string().optional(), vendorId: z.string().optional() }),
   cycleTemplates: (d) => (dateField(d.warrantyUntil) ? [{ template: 'asset.warranty', name: 'Warranty ends', kind: 'fixed', nextDueAt: dateField(d.warrantyUntil), leadDays: 30 }] : []),
   fields: [
@@ -33,7 +33,7 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 
 /** Routine (chores): a cycle with no physical object — laundry, water plants, haircut. SCOPE C3. */
 export const routineType: ObjectDef<RoutineData> = {
-  type: 'routine', module: 'assets', label: 'Routine', labelPlural: 'Routines', icon: 'repeat',
+  id: 'routine', module: 'assets', label: 'Routine', labelPlural: 'Routines', icon: 'repeat',
   schema: z.object({ name: z.string().min(1), kind: z.string().default('chore'), everyN: z.coerce.number().int().positive().default(7), everyUnit: z.enum(['day', 'week', 'month']).default('day'), minutes: z.coerce.number().optional(), weekday: z.string().optional(), lastDoneOn: z.string().optional(), notes: z.string().optional() }),
   fields: [
     { key: 'name', label: 'Routine', type: 'text', required: true, placeholder: 'Laundry, water plants, haircut…' },
@@ -56,7 +56,7 @@ export const routineType: ObjectDef<RoutineData> = {
 };
 
 export const vehicleType: ObjectDef<VehicleData> = {
-  type: 'vehicle', module: 'assets', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car',
+  id: 'vehicle', module: 'assets', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car',
   schema: z.object({ make: z.string(), model: z.string().optional(), year: z.coerce.number().optional(), plate: z.string().optional(), odometerKm: z.coerce.number().optional(), fuel: z.string().optional(), insuranceUntil: z.string().optional(), pucUntil: z.string().optional(), nextServiceKm: z.coerce.number().optional(), nextServiceDate: z.string().optional(), notes: z.string().optional() }),
   fields: [
     { key: 'make', label: 'Make', type: 'text', required: true }, { key: 'model', label: 'Model', type: 'text' }, { key: 'year', label: 'Year', type: 'number' }, { key: 'plate', label: 'Registration', type: 'text', summary: true },

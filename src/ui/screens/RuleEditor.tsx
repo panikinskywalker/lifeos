@@ -27,7 +27,7 @@ export function RuleEditor({ id }: { id?: string }) {
   const triggers = [...os.registry.triggers.values()];
   const actionDefs = [...os.registry.actions.values()];
   const trigDef = os.registry.triggers.get(trigger.id);
-  const entityTypeOptions = [...os.registry.objects.values()].filter((x) => !x.hidden).map((x) => ({ value: x.type, label: x.label }));
+  const entityTypeOptions = [...os.registry.objects.values()].filter((x) => !x.hidden).map((x) => ({ value: x.id, label: x.label }));
   const withTypeOptions = (f: FieldDef): FieldDef => (f.key === 'entityType' ? { ...f, options: entityTypeOptions } : f);
 
   const save = () => {

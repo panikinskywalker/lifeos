@@ -54,7 +54,7 @@ describe('search covers what hangs on a record', () => {
   it('notes (comments), tags and attachment names are searchable and follow edits', async () => {
     const { z } = await import('zod');
     const reg = new Registry();
-    const o = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), registry: reg, modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [{ type: 'thing', module: 'm', label: 'Thing', labelPlural: 'Things', icon: 'box', schema: z.object({}), fields: [] }] }] });
+    const o = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), registry: reg, modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [{ id: 'thing', module: 'm', label: 'Thing', labelPlural: 'Things', icon: 'box', schema: z.object({}), fields: [] }] }] });
     const e = o.records.create({ object: 'thing', title: 'Balcony', data: {} });
     const ids = (q: string) => o.records.search.search(q).map((h) => h.id);
     const c = o.comments.add(e.id, 'the plumber fixed the leak');

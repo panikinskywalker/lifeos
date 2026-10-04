@@ -135,7 +135,7 @@ export function EntityPicker({ visible, onClose, types, selected = [], onSelect,
   const os = useOS();
   const [q, setQ] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(types.length === 1 ? types[0]! : null);
-  const allTypes = types.length ? types : [...os.registry.objects.values()].filter((d) => !d.hidden).map((d) => d.type);
+  const allTypes = types.length ? types : [...os.registry.objects.values()].filter((d) => !d.hidden).map((d) => d.id);
   const results = useLive(
     (o) => {
       if (!visible) return [];

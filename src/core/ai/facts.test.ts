@@ -12,7 +12,7 @@ import { extrasOf } from './cards';
 import { Assistant } from './assistant';
 import type { LLMProvider } from './provider';
 
-const mod: ModuleManifest = { id: 'p', name: 'P', version: '1', description: '', icon: 'x', color: '#000', objects: [{ type: 'person', module: 'p', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) }] };
+const mod: ModuleManifest = { id: 'p', name: 'P', version: '1', description: '', icon: 'x', color: '#000', objects: [{ id: 'person', module: 'p', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) }] };
 const replying = (text: string): LLMProvider => ({ id: 'fake', complete: async () => ({ content: [{ type: 'text', text }], stopReason: 'end_turn' }) });
 const tool = (n: string) => lifeTools.find((t) => t.name === n)!;
 let os: LifeOSContext;

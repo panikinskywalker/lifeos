@@ -339,7 +339,7 @@ export class RecordRepo {
   ensureIndexes(def: ObjectDef) {
     for (const key of def.indexed ?? []) {
       if (!/^[a-zA-Z0-9_]+$/.test(key)) continue;
-      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_data_${def.type}_${key} ON entities(type, json_extract(data,'$.${key}')) WHERE type='${def.type}'`);
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_data_${def.id}_${key} ON entities(type, json_extract(data,'$.${key}')) WHERE type='${def.id}'`);
     }
   }
 }

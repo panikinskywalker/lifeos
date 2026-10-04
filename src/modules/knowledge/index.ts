@@ -6,7 +6,7 @@ export const KNOWLEDGE_COLOR = 'purple';
 
 export interface NoteData { body: string; kind?: string; source?: string; projectId?: string; personIds?: string[] }
 export const noteType: ObjectDef<NoteData> = {
-  type: 'note', module: 'knowledge', label: 'Note', labelPlural: 'Notes', icon: 'note.text',
+  id: 'note', module: 'knowledge', label: 'Note', labelPlural: 'Notes', icon: 'note.text',
   schema: z.object({ body: z.string().default(''), kind: z.string().optional(), source: z.string().optional(), projectId: z.string().optional(), personIds: z.array(z.string()).optional() }),
   fields: [
     { key: 'body', label: 'Note', type: 'longtext', required: true, placeholder: 'Write anything. Markdown-ish is fine.' },

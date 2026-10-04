@@ -17,7 +17,7 @@ export interface TripData {
 }
 
 export const tripType: ObjectDef<TripData> = {
-  type: 'trip',
+  id: 'trip',
   module: 'travel',
   label: 'Trip',
   labelPlural: 'Trips',

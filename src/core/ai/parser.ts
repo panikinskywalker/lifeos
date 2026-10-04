@@ -101,7 +101,7 @@ const TYPE_SYNONYMS: Record<string, string> = { car: 'vehicle', bike: 'vehicle',
 function typeFromWord(os: LifeOSContext, word: string): string | null {
   const w = word.trim().toLowerCase().replace(/^(?:my|the)\s+/, '');
   for (const def of os.registry.objects.values()) {
-    if ([def.type, def.label, def.labelPlural].some((x) => x?.toLowerCase() === w)) return def.type;
+    if ([def.id, def.label, def.labelPlural].some((x) => x?.toLowerCase() === w)) return def.id;
   }
   const syn = TYPE_SYNONYMS[w.replace(/s$/, '')] ?? TYPE_SYNONYMS[w];
   return syn && os.registry.objects.has(syn) ? syn : null;
@@ -126,7 +126,7 @@ export function parseMessage(os: LifeOSContext, raw: string): ParsedPlan | null 
   const newType = m && typeFromWord(os, m[1]!);
   if (newType) {
     const def = os.registry.objects.get(newType)!;
-    return { intent: 'new_record', steps: [], card: { kind: 'new', type: def.type, label: def.label, icon: def.icon }, reply: () => `Here’s a new ${def.label.toLowerCase()} — fill in what you know.` };
+    return { intent: 'new_record', steps: [], card: { kind: 'new', type: def.id, label: def.label, icon: def.icon }, reply: () => `Here’s a new ${def.label.toLowerCase()} — fill in what you know.` };
   }
 
   // — Questions answered from data

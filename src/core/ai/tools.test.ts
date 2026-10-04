@@ -15,9 +15,9 @@ const d = (s: string) => new Date(`${s}T10:00:00`).getTime();
 const mod: ModuleManifest = {
   id: 'things', name: 'Things', version: '1', description: '', icon: 'x', color: '#000',
   objects: [
-    { type: 'vehicle', module: 'things', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car', schema: z.object({ name: z.string(), odometerKm: z.number().optional() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name), meters: [{ meter: 'odometer', field: 'odometerKm', label: 'Odometer', unit: 'km' }] },
-    { type: 'person', module: 'things', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
-    { type: 'item', module: 'things', label: 'Item', labelPlural: 'Items', icon: 'box', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
+    { id: 'vehicle', module: 'things', label: 'Vehicle', labelPlural: 'Vehicles', icon: 'car', schema: z.object({ name: z.string(), odometerKm: z.number().optional() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name), meters: [{ meter: 'odometer', field: 'odometerKm', label: 'Odometer', unit: 'km' }] },
+    { id: 'person', module: 'things', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
+    { id: 'item', module: 'things', label: 'Item', labelPlural: 'Items', icon: 'box', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
   ],
 };
 const tool = (name: string) => lifeTools.find((t) => t.name === name)!;

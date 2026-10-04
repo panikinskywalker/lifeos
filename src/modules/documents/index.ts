@@ -7,7 +7,7 @@ export const DOCUMENTS_COLOR = 'indigo';
 
 export interface DocumentData { kind: string; number?: string; issuedOn?: string; expiresOn?: string; issuer?: string; notes?: string; personId?: string; tripId?: string; assetId?: string }
 export const documentType: ObjectDef<DocumentData> = {
-  type: 'document', module: 'documents', label: 'Document', labelPlural: 'Documents', icon: 'doc.text',
+  id: 'document', module: 'documents', label: 'Document', labelPlural: 'Documents', icon: 'doc.text',
   schema: z.object({ kind: z.string().default('other'), number: z.string().optional(), issuedOn: z.string().optional(), expiresOn: z.string().optional(), issuer: z.string().optional(), notes: z.string().optional(), personId: z.string().optional(), tripId: z.string().optional(), assetId: z.string().optional() }),
   cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'document.expiry', name: 'Renew', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: d.kind === 'id' ? 180 : 30 }] : []),
   fields: [

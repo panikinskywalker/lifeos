@@ -12,9 +12,9 @@ const d = (s: string) => new Date(`${s}T10:00:00`).getTime();
 const mod: ModuleManifest = {
   id: 'm', name: 'M', version: '1', description: '', icon: 'x', color: '#000',
   objects: [
-    { type: 'transaction', module: 'm', label: 'Txn', labelPlural: 'Txns', icon: 'x', schema: z.object({ amount: z.number(), kind: z.string(), category: z.string(), merchant: z.string().optional(), date: z.string(), note: z.string().optional(), currency: z.string().optional() }), fields: [], computeTitle: (x) => String(x.merchant ?? 'Txn') },
-    { type: 'subscription', module: 'm', label: 'Sub', labelPlural: 'Subs', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
-    { type: 'routine', module: 'm', label: 'Routine', labelPlural: 'Routines', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
+    { id: 'transaction', module: 'm', label: 'Txn', labelPlural: 'Txns', icon: 'x', schema: z.object({ amount: z.number(), kind: z.string(), category: z.string(), merchant: z.string().optional(), date: z.string(), note: z.string().optional(), currency: z.string().optional() }), fields: [], computeTitle: (x) => String(x.merchant ?? 'Txn') },
+    { id: 'subscription', module: 'm', label: 'Sub', labelPlural: 'Subs', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
+    { id: 'routine', module: 'm', label: 'Routine', labelPlural: 'Routines', icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x) => String(x.name) },
   ],
 };
 

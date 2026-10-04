@@ -16,7 +16,7 @@ export interface HabitLogData {
 }
 
 export const habitType: ObjectDef<HabitData> = {
-  type: 'habit',
+  id: 'habit',
   module: 'habits',
   label: 'Habit',
   labelPlural: 'Habits',
@@ -32,7 +32,7 @@ export const habitType: ObjectDef<HabitData> = {
 };
 
 export const habitLogType: ObjectDef<HabitLogData> = {
-  type: 'habit_log',
+  id: 'habit_log',
   module: 'habits',
   label: 'Habit check-in',
   labelPlural: 'Habit check-ins',

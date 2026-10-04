@@ -132,7 +132,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     if (!ctx.modules.isInstalled(m.id)) {
       db.transaction(() => {
         for (const t of m.objects ?? []) {
-          for (const v of t.defaultViews ?? []) ctx.views.save(t.type, v);
+          for (const v of t.defaultViews ?? []) ctx.views.save(t.id, v);
         }
       });
       await m.onInstall?.(ctx);
@@ -208,7 +208,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     db.transaction(() => {
       for (const def of registry.objects.values()) {
         if (!def.cycleActiveStatuses) continue;
-        for (const e of entities.query(def.type, {}, { limit: 100000 })) syncEnabled(e);
+        for (const e of entities.query(def.id, {}, { limit: 100000 })) syncEnabled(e);
       }
     });
     settings.set('cycles.enabledSynced', true);
@@ -218,7 +218,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     db.transaction(() => {
       for (const def of registry.objects.values()) {
         if (!def.meters?.length) continue;
-        for (const e of entities.query(def.type, {}, { limit: 100000 })) mirrorMeters(e);
+        for (const e of entities.query(def.id, {}, { limit: 100000 })) mirrorMeters(e);
       }
     });
     settings.set('meters.backfilled', true);
@@ -227,7 +227,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     db.transaction(() => {
       for (const def of registry.objects.values()) {
         if (!def.cycleTemplates) continue;
-        for (const e of entities.query(def.type, {}, { limit: 100000 })) {
+        for (const e of entities.query(def.id, {}, { limit: 100000 })) {
           ctx.cycles.applyTemplates(e, def);
           syncEnabled(e);
         }

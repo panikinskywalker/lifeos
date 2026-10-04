@@ -123,7 +123,7 @@ export class Assistant {
 
   systemPrompt(): string {
     const os = this.os;
-    const types = [...os.registry.objects.values()].map((t) => `- ${t.type} (${t.module}): ${t.fields.map((f) => f.key + (f.options ? `[${f.options.map((o) => o.value).join('|')}]` : '')).join(', ')}${t.statuses ? ` | statuses: ${t.statuses.map((s) => s.value).join('|')}` : ''}${t.links?.length ? ` | relations: ${t.links.map((r) => `${r.kind}→${Array.isArray(r.to) ? r.to.join('/') : r.to}`).join(', ')}` : ''}`).join('\n');
+    const types = [...os.registry.objects.values()].map((t) => `- ${t.id} (${t.module}): ${t.fields.map((f) => f.key + (f.options ? `[${f.options.map((o) => o.value).join('|')}]` : '')).join(', ')}${t.statuses ? ` | statuses: ${t.statuses.map((s) => s.value).join('|')}` : ''}${t.links?.length ? ` | relations: ${t.links.map((r) => `${r.kind}→${Array.isArray(r.to) ? r.to.join('/') : r.to}`).join(', ')}` : ''}`).join('\n');
     const counts = os.records.countsByType();
     const now = new Date();
     return `You are the LifeOS assistant — a personal operating system the user runs on their phone. All data is the user's own, stored locally.

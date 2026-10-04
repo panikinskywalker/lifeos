@@ -74,7 +74,7 @@ export interface FieldDef {
 /** An Object: the definition of a storage unit — name, Fields, cycles. */
 export interface ObjectDef<TData = Record<string, unknown>> {
   /** Stable id, e.g. "transaction". Never rename. */
-  type: string;
+  id: string;
   /** Owning module id. */
   module: string;
   label: string;

@@ -9,7 +9,7 @@ import { bus } from '../events/bus';
 import { cycleNudges } from './nudges';
 
 const d = (s: string, h = 10) => new Date(`${s}T${String(h).padStart(2, '0')}:00:00`).getTime();
-const plain = (type: string) => ({ type, module: 'm', label: type, labelPlural: type, icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x: Record<string, unknown>) => String(x.name) });
+const plain = (type: string) => ({ id: type, module: 'm', label: type, labelPlural: type, icon: 'x', schema: z.object({ name: z.string() }), fields: [], computeTitle: (x: Record<string, unknown>) => String(x.name) });
 const mod: ModuleManifest = { id: 'm', name: 'M', version: '1', description: '', icon: 'x', color: '#000', objects: [plain('subscription'), plain('routine'), plain('vehicle'), plain('person')] };
 
 let os: LifeOSContext;

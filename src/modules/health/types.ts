@@ -8,7 +8,7 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 
 export interface WorkoutData { kind: string; durationMin: number; date: string; distanceKm?: number; calories?: number; intensity?: string; notes?: string; /** health_connect, … */ source?: string; /** The source's id for it (so a re-sync updates, never duplicates). */ sourceKey?: string }
 export const workoutType: ObjectDef<WorkoutData> = {
-  type: 'workout', module: 'health', label: 'Workout', labelPlural: 'Workouts', icon: 'figure.run',
+  id: 'workout', module: 'health', label: 'Workout', labelPlural: 'Workouts', icon: 'figure.run',
   schema: z.object({ kind: z.string(), durationMin: z.coerce.number().positive(), date: z.string(), distanceKm: z.coerce.number().optional(), calories: z.coerce.number().optional(), intensity: z.string().optional(), notes: z.string().optional(), source: z.string().optional(), sourceKey: z.string().optional() }),
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [{ value: 'run', label: 'Run' }, { value: 'walk', label: 'Walk' }, { value: 'cycle', label: 'Cycling' }, { value: 'strength', label: 'Strength' }, { value: 'yoga', label: 'Yoga' }, { value: 'swim', label: 'Swim' }, { value: 'sport', label: 'Sport' }, { value: 'other', label: 'Other' }] },
@@ -26,7 +26,7 @@ export const workoutType: ObjectDef<WorkoutData> = {
 
 export interface MeasurementData { metric: string; value: number; unit?: string; date: string; notes?: string; source?: string; sourceKey?: string }
 export const measurementType: ObjectDef<MeasurementData> = {
-  type: 'measurement', module: 'health', label: 'Measurement', labelPlural: 'Measurements', icon: 'scalemass',
+  id: 'measurement', module: 'health', label: 'Measurement', labelPlural: 'Measurements', icon: 'scalemass',
   // Shown as its metrics (Steps, Sleep, Weight…) on the Health page, not as a category of its own.
   hidden: true,
   schema: z.object({ metric: z.string(), value: z.coerce.number(), unit: z.string().optional(), date: z.string(), notes: z.string().optional(), source: z.string().optional(), sourceKey: z.string().optional() }),

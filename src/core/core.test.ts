@@ -18,7 +18,7 @@ const testModule: ModuleManifest = {
   color: '#000',
   objects: [
     {
-      type: 'txn',
+      id: 'txn',
       module: 'test-finance',
       label: 'Transaction',
       labelPlural: 'Transactions',
@@ -37,7 +37,7 @@ const testModule: ModuleManifest = {
       defaultViews: [{ name: 'Food', definition: { filter: { and: [{ field: 'data.category', op: 'eq', value: 'food' }] } } }],
     },
     {
-      type: 'trip',
+      id: 'trip',
       module: 'test-finance',
       label: 'Trip',
       labelPlural: 'Trips',

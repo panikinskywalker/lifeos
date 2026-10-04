@@ -182,7 +182,7 @@ const aiTools: AiToolDef[] = [
       const { module } = input as { module?: string };
       return [...os.registry.objects.values()]
         .filter((t) => !module || t.module === module)
-        .map((t) => ({ type: t.type, module: t.module, label: t.label, fields: t.fields.map((f) => ({ key: f.key, type: f.type, label: f.label, options: f.options?.map((o) => o.value), relationTo: f.relationTo, relationKind: f.relationKind })), statuses: t.statuses?.map((s) => s.value), relations: t.links, count: os.records.count(t.type) }));
+        .map((t) => ({ type: t.id, module: t.module, label: t.label, fields: t.fields.map((f) => ({ key: f.key, type: f.type, label: f.label, options: f.options?.map((o) => o.value), relationTo: f.relationTo, relationKind: f.relationKind })), statuses: t.statuses?.map((s) => s.value), relations: t.links, count: os.records.count(t.id) }));
     },
   },
   {

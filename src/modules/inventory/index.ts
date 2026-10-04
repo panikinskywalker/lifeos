@@ -7,7 +7,7 @@ export const INVENTORY_COLOR = 'teal';
 
 export interface ItemData { quantity: number; unit?: string; location?: string; minQuantity?: number; expiresOn?: string; category?: string; notes?: string }
 export const itemType: ObjectDef<ItemData> = {
-  type: 'item', module: 'inventory', label: 'Item', labelPlural: 'Inventory', icon: 'shippingbox',
+  id: 'item', module: 'inventory', label: 'Item', labelPlural: 'Inventory', icon: 'shippingbox',
   schema: z.object({ quantity: z.coerce.number().default(1), unit: z.string().optional(), location: z.string().optional(), minQuantity: z.coerce.number().optional(), expiresOn: z.string().optional(), category: z.string().optional(), notes: z.string().optional() }),
   cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'item.expiry', name: 'Use or replace', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: 7 }] : []),
   fields: [

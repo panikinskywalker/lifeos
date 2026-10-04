@@ -133,7 +133,7 @@ function RuleForm({ kind, onAdd }: { kind: Kind; onAdd: (r: TrackerRule) => void
         <View style={{ gap: 10 }}>
           <ChipRow>
             {types.map((d) => (
-              <FilterChip key={d.type} label={d.label} icon={d.icon} selected={type === d.type} onPress={() => setType(d.type)} />
+              <FilterChip key={d.id} label={d.label} icon={d.icon} selected={type === d.id} onPress={() => setType(d.id)} />
             ))}
           </ChipRow>
           <Button title="Add rule" icon="plus" size="sm" disabled={!type} onPress={() => onAdd({ kind: 'record', type: type! })} />

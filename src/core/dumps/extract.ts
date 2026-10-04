@@ -39,7 +39,7 @@ export function filingPrompt(os: LifeOSContext, subject?: { type: string; title:
   const types = keep
     .map((t) => os.registry.objects.get(t))
     .filter((d): d is NonNullable<typeof d> => !!d)
-    .map((d) => `${d.type}: ${d.fields.filter((f) => f.type !== 'relation' && f.key !== 'notes').slice(0, 7).map((f) => f.key).join(', ')}`)
+    .map((d) => `${d.id}: ${d.fields.filter((f) => f.type !== 'relation' && f.key !== 'notes').slice(0, 7).map((f) => f.key).join(', ')}`)
     .join('\n');
   const day = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   return `You file what the user said into their personal life graph, using the tools. Today is ${day}.

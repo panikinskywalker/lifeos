@@ -11,8 +11,8 @@ import { backlinks, parseLinks } from './links';
 const mod: ModuleManifest = {
   id: 'k', name: 'K', version: '1', description: '', icon: 'x', color: '#000',
   objects: [
-    { type: 'note', module: 'k', label: 'Note', labelPlural: 'Notes', icon: 'file', schema: z.object({ title: z.string(), body: z.string().default('') }), fields: [{ key: 'title', label: 'Title', type: 'text' }, { key: 'body', label: 'Body', type: 'longtext' }], computeTitle: (x) => String(x.title) },
-    { type: 'person', module: 'k', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
+    { id: 'note', module: 'k', label: 'Note', labelPlural: 'Notes', icon: 'file', schema: z.object({ title: z.string(), body: z.string().default('') }), fields: [{ key: 'title', label: 'Title', type: 'text' }, { key: 'body', label: 'Body', type: 'longtext' }], computeTitle: (x) => String(x.title) },
+    { id: 'person', module: 'k', label: 'Person', labelPlural: 'People', icon: 'user', schema: z.object({ name: z.string() }), fields: [{ key: 'name', label: 'Name', type: 'text' }], computeTitle: (x) => String(x.name) },
   ],
 };
 let os: LifeOSContext;

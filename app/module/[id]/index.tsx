@@ -33,7 +33,7 @@ export default function ModuleRoute() {
   const tint = tintForModule(m.id);
   const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
   const hasHome = screens.some((s) => s.key === "index");
-  const total = types.reduce((n, ty) => n + (counts[ty.type] ?? 0), 0);
+  const total = types.reduce((n, ty) => n + (counts[ty.id] ?? 0), 0);
   return (
     <Screen
       title={m.name}
@@ -74,13 +74,13 @@ export default function ModuleRoute() {
             ))}
           {types.map((ty) => (
             <RowItem
-              key={ty.type}
+              key={ty.id}
               icon={ty.icon}
               tint={tint}
               title={ty.labelPlural}
-              value={String(counts[ty.type] ?? 0)}
+              value={String(counts[ty.id] ?? 0)}
               valueTone="secondary"
-              onPress={() => router.push(`/entity/${ty.type}`)}
+              onPress={() => router.push(`/entity/${ty.id}`)}
               chevron
             />
           ))}

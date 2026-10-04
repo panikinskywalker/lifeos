@@ -49,7 +49,7 @@ export default function BrowseTab() {
           {modules.map((m) => {
             const tint = tintForModule(m.id);
             const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
-            const n = types.reduce((sum, ty) => sum + (counts[ty.type] ?? 0), 0);
+            const n = types.reduce((sum, ty) => sum + (counts[ty.id] ?? 0), 0);
             const unit = types.length === 1 ? types[0]!.labelPlural.toLowerCase() : 'records';
             const name = shortNameForModule(m.id, m.name);
             const line = `${n.toLocaleString('en-IN')} ${unit}`;
