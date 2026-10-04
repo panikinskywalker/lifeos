@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { senders, setSenderTrusted } from '@core/ingest/ingest';
-import { BANK_NAMES } from '@core/ingest/bankSms';
+import { senders, setSenderTrusted } from '@core/filing/messages';
+import { BANK_NAMES } from '@core/filing/parsers/bankSms';
 import { useLive, useOS } from '@ui/hooks';
 import { Button, EmptyState, RowList, Screen, Section, SwitchField, Text, useToast } from '@ui/kit';
 import { importSmsHistory } from '../../src/platform/sources';

@@ -1,12 +1,12 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import type { LifeOSContext } from '@core/registry/context';
-import { ingestMessage } from '@core/ingest/ingest';
-import { PAYMENT_APPS } from '@core/ingest/bankSms';
+import { fileMessage } from '@core/filing/messages';
+import { PAYMENT_APPS } from '@core/filing/parsers/bankSms';
 import { saveHealthDays, saveUsageDays, setSourceState, sourceState } from '@core/sources/deviceData';
-import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@core/ingest/fx';
+import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@core/filing/parsers/fx';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
-import type { RawMessage } from '@core/ingest/ingest';
+import type { RawMessage } from '@core/filing/messages';
 import { syncMail } from './email';
 import { calendarGranted, callLogGranted, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
 
@@ -105,7 +105,7 @@ async function ingestMany(os: LifeOSContext, msgs: RawMessage[], mode: 'live' | 
     for (let i = 0; i < msgs.length; i += 200) {
       os.db.transaction(() => {
         for (const m of msgs.slice(i, i + 200)) {
-          const r = ingestMessage(os, m, { mode });
+          const r = fileMessage(os, m, { mode });
           if (r.status === 'confirmed') out.confirmed++;
           if (r.status === 'proposed') out.proposed++;
         }
@@ -143,7 +143,7 @@ async function syncNotifications(os: LifeOSContext) {
   if (!Device.notificationAccess()) return;
   let n = 0;
   for (const m of Device.drain('notifications') as Array<{ package: string; title: string; text: string; at: number }>) {
-    if (ingestMessage(os, { source: 'notification', from: m.package, title: m.title, body: m.text, receivedAt: m.at }).status === 'confirmed') n++;
+    if (fileMessage(os, { source: 'notification', from: m.package, title: m.title, body: m.text, receivedAt: m.at }).status === 'confirmed') n++;
   }
   setSourceState(os, 'notifications', { enabled: true, lastSync: Date.now(), addTotal: n, error: null });
 }

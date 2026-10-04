@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import type { LifeOSContext } from '@core/registry/context';
-import { buildSmsDataset } from '@core/ingest/smsDataset';
+import { buildSmsDataset } from '@core/filing/parsers/smsDataset';
 import { Device } from '../../modules/lifeos-device';
 import { access } from './sources';
 

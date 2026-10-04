@@ -27,13 +27,13 @@ describe('dumps (PRODUCT v4 §1.3)', () => {
     expect(os.dumps.pending().map((x) => x.id)).toEqual([d.id]);
     os.dumps.setStatus(d.id, 'failed', 'offline');
     expect(os.dumps.get(d.id)).toMatchObject({ status: 'failed', attempts: 1, error: 'offline' });
-    const x = os.dumps.addExtraction({ dumpId: d.id, kind: 'task', entityId: 'e1', label: 'Call the landlord' });
+    const x = os.filings.add({ dumpId: d.id, kind: 'task', entityId: 'e1', label: 'Call the landlord' });
     os.dumps.setStatus(d.id, 'done');
     expect(os.dumps.get(d.id)!.extractedAt).not.toBeNull();
     expect(os.dumps.pending()).toEqual([]);
     expect(os.dumps.forEntity('e1').map((y) => y.id)).toEqual([d.id]);
-    os.dumps.markUndone(x.id);
-    expect(os.dumps.extractions(d.id)[0]).toMatchObject({ undone: true });
+    os.filings.markUndone(x.id);
+    expect(os.filings.forDump(d.id)[0]).toMatchObject({ undone: true });
     expect(os.dumps.forEntity('e1')).toEqual([]);
   });
 

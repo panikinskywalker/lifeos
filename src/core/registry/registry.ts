@@ -1,5 +1,5 @@
 import type { ObjectDef } from '../domain/types';
-import type { ActionDef, AiToolDef, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, TileDef, TriggerDef } from './types';
+import type { ActionDef, AiToolDef, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, SourceDef, TileDef, TriggerDef } from './types';
 
 /**
  * Central registry. Modules register manifests; every other subsystem looks
@@ -13,6 +13,7 @@ export class Registry {
   readonly triggers = new Map<string, TriggerDef>();
   readonly actions = new Map<string, ActionDef>();
   readonly aiTools = new Map<string, AiToolDef>();
+  readonly sources = new Map<string, SourceDef>();
   readonly quickActions: QuickAction[] = [];
   readonly detailSections: EntityDetailSection[] = [];
 
@@ -25,6 +26,7 @@ export class Registry {
     for (const t of m.triggers ?? []) this.triggers.set(t.id, { ...t, module: m.id });
     for (const a of m.actions ?? []) this.actions.set(a.id, { ...a, module: m.id });
     for (const t of m.aiTools ?? []) this.aiTools.set(t.name, t);
+    for (const src of m.sources ?? []) this.sources.set(src.id, src);
   }
 
   /** Boards register after modules; their tiles, overrides and quick actions join the same lookups. */

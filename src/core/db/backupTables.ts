@@ -23,7 +23,7 @@ export const BACKUP_TABLES = [
   'ingest_queue',
   'aliases',
   'dumps',
-  'dump_extractions',
+  'filings',
   'queued_questions',
   'sms_senders',
   'source_state',
@@ -36,7 +36,7 @@ export const BACKUP_TABLES = [
 export const BACKUP_EXCLUDED = ['_migrations', 'modules', 'automation_runs', 'ai_messages', 'changes', 'records_fts', 'ai_usage', 'dashboards'] as const;
 
 /** Backups written before migration v11 (4 Oct 2026) use the old names; importAll maps them. */
-export const LEGACY_TABLE_NAMES: Record<string, string> = { entities: 'records', relations: 'links', timeline_events: 'events', entity_tags: 'record_tags' };
+export const LEGACY_TABLE_NAMES: Record<string, string> = { entities: 'records', relations: 'links', timeline_events: 'events', entity_tags: 'record_tags', filings: 'filings' };
 export const LEGACY_COLUMN_NAMES: Record<string, Record<string, string>> = {
   records: { type: 'object' },
   events: { entity_id: 'record_id' },
@@ -47,7 +47,7 @@ export const LEGACY_COLUMN_NAMES: Record<string, Record<string, string>> = {
   meter_readings: { entity_id: 'record_id' },
   ingest_queue: { entity_id: 'record_id' },
   aliases: { entity_id: 'record_id' },
-  dump_extractions: { entity_id: 'record_id' },
+  filings: { entity_id: 'record_id' },
   custom_field_defs: { entity_type: 'object' },
   saved_views: { entity_type: 'object' },
 };

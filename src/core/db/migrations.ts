@@ -725,4 +725,14 @@ export const migrations: Migration[] = [
       `UPDATE changes SET tbl = 'facts' WHERE tbl = 'comments'`,
     ],
   },
+  {
+    version: 13,
+    name: 'filings',
+    // docs/MODEL.md §4: what filing wrote — from a dump or a message — are
+    // filings. Same rows, the vocabulary name.
+    up: [
+      `ALTER TABLE dump_extractions RENAME TO filings`,
+      `UPDATE changes SET tbl = 'filings' WHERE tbl = 'dump_extractions'`,
+    ],
+  },
 ];

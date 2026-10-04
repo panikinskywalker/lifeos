@@ -8,6 +8,7 @@ import type { GroupRepo } from '../repo/groupRepo';
 import type { AliasRepo } from '../repo/aliasRepo';
 import type { FactRepo } from '../repo/factRepo';
 import type { DumpRepo } from '../repo/dumpRepo';
+import type { FilingRepo } from '../repo/filingRepo';
 import type { QuestionRepo } from '../repo/questionRepo';
 import type { Scheduler } from '../automation/scheduler';
 
@@ -27,6 +28,8 @@ export interface LifeOSContext {
   aliases: AliasRepo;
   facts: FactRepo;
   dumps: DumpRepo;
+  /** What filing wrote, with provenance; the To check list. */
+  filings: FilingRepo;
   questions: QuestionRepo;
   reminders: ReminderRepo;
   customFields: CustomFieldRepo;

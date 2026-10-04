@@ -1,12 +1,12 @@
 import type { LifeOSContext } from '../registry/context';
 import type { Row } from '../db/adapter';
 import { bus } from '../events/bus';
-import { toInr } from './fx';
-import { linkPayee, payeeFor } from './payee';
-import { knownMerchant } from './merchants';
-import { parseDeliverySms, type ParsedDelivery } from './delivery';
-import { AIRPORTS, parseMail, type Mail, type ParsedFlight, type ParsedStay } from './mail';
-import { parseBankSms, parsePaymentNotification, looksLikeBankSender, bankOf, BANK_NAMES, PAYMENT_APPS, type ParsedTxn, type SmsKind } from './bankSms';
+import { toInr } from './parsers/fx';
+import { linkPayee, payeeFor } from './parsers/payee';
+import { knownMerchant } from './parsers/merchants';
+import { parseDeliverySms, type ParsedDelivery } from './parsers/delivery';
+import { AIRPORTS, parseMail, type Mail, type ParsedFlight, type ParsedStay } from './parsers/mail';
+import { parseBankSms, parsePaymentNotification, looksLikeBankSender, bankOf, BANK_NAMES, PAYMENT_APPS, type ParsedTxn, type SmsKind } from './parsers/bankSms';
 
 /**
  * Messages → money (PRODUCT v4 §1.5, M4.2). Every bank SMS or payment-app
@@ -365,7 +365,7 @@ function fundAccount(os: LifeOSContext, fund: string | null, created: string[]):
 /* ------------------------------------------------------------------ */
 
 /** What the app did with one message: filed, set aside (and why), or never seen; and the record it made. */
-export function ingestOutcome(os: LifeOSContext, m: RawMessage): { status: string; note: string | null; record: Record<string, unknown> | null } | null {
+export function messageOutcome(os: LifeOSContext, m: RawMessage): { status: string; note: string | null; record: Record<string, unknown> | null } | null {
   const r = os.db.get<{ status: string; error: string | null; record_id: string | null }>(`SELECT status, error, record_id FROM ingest_queue WHERE id=?`, [messageId(m)]);
   if (!r) return null;
   const e = r.record_id ? os.records.get(r.record_id) : null;
@@ -374,12 +374,12 @@ export function ingestOutcome(os: LifeOSContext, m: RawMessage): { status: strin
   return { status: r.status, note: r.error, record };
 }
 
-export function ingestItem(os: LifeOSContext, id: string): IngestItem | null {
+export function messageItem(os: LifeOSContext, id: string): IngestItem | null {
   const r = os.db.get<Row>(`SELECT * FROM ingest_queue WHERE id=?`, [id]);
   return r ? toItem(r) : null;
 }
 
-export function ingestList(os: LifeOSContext, opts: { status?: IngestItem['status']; source?: string; limit?: number } = {}): IngestItem[] {
+export function messageList(os: LifeOSContext, opts: { status?: IngestItem['status']; source?: string; limit?: number } = {}): IngestItem[] {
   const where: string[] = [];
   const p: (string | number)[] = [];
   if (opts.status) (where.push('status=?'), p.push(opts.status));
@@ -431,10 +431,10 @@ export interface IngestResult {
  * Take in one message. `mode: 'live'` files it now (To check + Undo);
  * `mode: 'import'` (first-run history) proposes it for the review screen.
  */
-export function ingestMessage(os: LifeOSContext, m: RawMessage, opts: { mode?: 'live' | 'import' } = {}): IngestResult {
+export function fileMessage(os: LifeOSContext, m: RawMessage, opts: { mode?: 'live' | 'import' } = {}): IngestResult {
   const mode = opts.mode ?? 'live';
   const id = messageId(m);
-  const existing = ingestItem(os, id);
+  const existing = messageItem(os, id);
   if (existing) return { id, status: existing.status, entityId: existing.entityId, reason: 'seen before' };
   const now = Date.now();
   os.db.run(`INSERT INTO ingest_queue(id,source,package,received_at,raw_title,raw_text,status,created_at,updated_at) VALUES (?,?,?,?,?,?,'pending',?,?)`, [id, m.source, m.from, m.receivedAt, m.title ?? null, m.body, now, now]);
@@ -473,7 +473,7 @@ export function ingestMessage(os: LifeOSContext, m: RawMessage, opts: { mode?: '
     enrich(os, dup.entityId, t, m);
     setItem(os, id, { status: 'confirmed', entityId: dup.entityId, note: 'matched a transaction you filed' });
     const e = os.records.get(dup.entityId)!;
-    os.dumps.addExtraction({ source: m.source, sourceRef: id, kind: 'transaction', action: 'updated', entityId: e.id, label: `Matched ${e.title} · ${os.format.currency(t.amount)} to ${sourceLabel(m)}` });
+    os.filings.add({ source: m.source, sourceRef: id, kind: 'transaction', action: 'updated', entityId: e.id, label: `Matched ${e.title} · ${os.format.currency(t.amount)} to ${sourceLabel(m)}` });
     return { id, status: 'confirmed', entityId: dup.entityId };
   }
   if (mode === 'import') {
@@ -506,7 +506,7 @@ function enrich(os: LifeOSContext, entityId: string, t: ParsedTxn, m: RawMessage
 
 /** File one parsed (or proposed) message as a transaction; logged in To check. */
 export function fileItem(os: LifeOSContext, id: string): IngestResult {
-  const item = ingestItem(os, id);
+  const item = messageItem(os, id);
   if (!item || item.parsed?.kind !== 'txn') return { id, status: item?.status ?? 'failed' };
   if (item.status === 'confirmed') return { id, status: 'confirmed', entityId: item.entityId };
   if (!os.registry.objects.has('transaction')) {
@@ -589,9 +589,9 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
     const ce = os.records.get(a);
     const kind = ce?.object === 'org' || ce?.object === 'subscription' ? ce.object : 'account';
     const label = kind === 'org' ? `Payee: ${ce!.title}` : kind === 'subscription' ? `Subscription: ${ce!.title} (monthly — change if yearly)` : `Account: ${ce?.title ?? 'new account'}`;
-    os.dumps.addExtraction({ source: item.source, sourceRef: id, kind, entityId: a, label });
+    os.filings.add({ source: item.source, sourceRef: id, kind, entityId: a, label });
   }
-  os.dumps.addExtraction({ source: item.source, sourceRef: id, kind: 'transaction', entityId: e.id, label, flag });
+  os.filings.add({ source: item.source, sourceRef: id, kind: 'transaction', entityId: e.id, label, flag });
   return { id, status: 'confirmed', entityId: e.id };
 }
 
@@ -659,7 +659,7 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
   if (!hit) {
     const e = os.records.create({ object: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, trackingUrl: d.link ?? undefined, otp: d.otp ?? undefined, otpAt: d.otp ? m.receivedAt : undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
     os.records.timeline.add({ entityId: e.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
-    os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', entityId: e.id, label: `Delivery: ${e.title} · ${STATUS_WORD[d.status]}${d.expected && d.status !== 'delivered' ? ` · by ${d.expected.slice(8)}/${d.expected.slice(5, 7)}` : ''}${via}` });
+    os.filings.add({ source: m.source, sourceRef: ingestId, kind: 'delivery', entityId: e.id, label: `Delivery: ${e.title} · ${STATUS_WORD[d.status]}${d.expected && d.status !== 'delivered' ? ` · by ${d.expected.slice(8)}/${d.expected.slice(5, 7)}` : ''}${via}` });
     return e.id;
   }
   const patch: Record<string, unknown> = {};
@@ -683,7 +683,7 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
   if (d.status === 'delivered' && hit.data.otp) (patch.otp = undefined, before.otp = hit.data.otp);
   if (Object.keys(patch).length) {
     os.records.update(hit.id, { data: patch }, 'assistant');
-    os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', action: 'updated', entityId: hit.id, label: `${os.records.get(hit.id)?.title ?? 'Delivery'} · ${STATUS_WORD[(patch.status as string) ?? hit.data.status]}${via}`, before });
+    os.filings.add({ source: m.source, sourceRef: ingestId, kind: 'delivery', action: 'updated', entityId: hit.id, label: `${os.records.get(hit.id)?.title ?? 'Delivery'} · ${STATUS_WORD[(patch.status as string) ?? hit.data.status]}${via}`, before });
   }
   os.records.timeline.add({ entityId: hit.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
   return hit.id;
@@ -713,7 +713,7 @@ export function backfillDeliveries(os: LifeOSContext, now = Date.now(), days = 4
     if (!e || STAGE[e.data.status]! >= 3) continue;
     if (now - last < 10 * DAY) continue;
     os.records.update(id, { data: { status: 'delivered', deliveredOn: iso(last) } }, 'assistant');
-    os.dumps.addExtraction({ source: 'sms', kind: 'delivery', action: 'updated', entityId: id, label: `${e.title} · Delivered`, before: { status: e.data.status }, flag: `Assumed delivered — no update since ${iso(last).slice(8)}/${iso(last).slice(5, 7)}` });
+    os.filings.add({ source: 'sms', kind: 'delivery', action: 'updated', entityId: id, label: `${e.title} · Delivered`, before: { status: e.data.status }, flag: `Assumed delivered — no update since ${iso(last).slice(8)}/${iso(last).slice(5, 7)}` });
   }
   return touched.size;
 }
@@ -741,11 +741,11 @@ export { sourceLabel };
  * flight in its trip, a booking a stay. Every record it touches says which
  * mailbox it came from — in its note, on its timeline, and in To check.
  */
-export function ingestMail(os: LifeOSContext, mail: Mail, account: string): IngestResult {
+export function fileMail(os: LifeOSContext, mail: Mail, account: string): IngestResult {
   const text = mail.text.slice(0, 6000);
   const m: RawMessage = { source: 'email', from: mail.from, account, title: mail.subject, body: text, receivedAt: mail.date };
   const id = messageId({ ...m, body: `${account}|${mail.uid}|${mail.subject}` });
-  const existing = ingestItem(os, id);
+  const existing = messageItem(os, id);
   if (existing) return { id, status: existing.status, entityId: existing.entityId, reason: 'seen before' };
   const now = Date.now();
   os.db.run(
@@ -786,7 +786,7 @@ export function ingestMail(os: LifeOSContext, mail: Mail, account: string): Inge
     // The mail knows who it was ("Adobe"), where the bank only had a code.
     if (t.counterparty && (!e.data.merchant || /\d{4,}|\*/.test(e.data.merchant))) os.records.update(same, { data: { merchant: t.counterparty } }, 'assistant');
     setItem(os, id, { status: 'duplicate', entityId: same, note: 'same payment as a filed transaction' });
-    os.dumps.addExtraction({ source: 'email', sourceRef: id, kind: 'transaction', action: 'updated', entityId: same, label: `Matched ${os.records.get(same)?.title ?? 'a payment'} · ${os.format.currency(t.amount)} to an email from ${account}` });
+    os.filings.add({ source: 'email', sourceRef: id, kind: 'transaction', action: 'updated', entityId: same, label: `Matched ${os.records.get(same)?.title ?? 'a payment'} · ${os.format.currency(t.amount)} to an email from ${account}` });
     entityId = same;
   } else {
     entityId = fileItem(os, id).entityId;
@@ -824,7 +824,7 @@ function tripOn(os: LifeOSContext, day: string, destination: string | null, inge
   if (!destination) return null;
   const t = os.records.create({ object: 'trip', title: `Trip to ${destination}`, data: { destination, startDate: day, ...(end ? { endDate: end } : {}) } }, 'assistant');
   os.records.timeline.add({ entityId: t.id, kind: 'email', title: `From Email · ${account}`, body: null, actor: 'system', occurredAt: Date.now(), meta: { ingestId } });
-  os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'trip', entityId: t.id, label: `Trip: Trip to ${destination} · from ${account}` });
+  os.filings.add({ source: 'email', sourceRef: ingestId, kind: 'trip', entityId: t.id, label: `Trip: Trip to ${destination} · from ${account}` });
   return t.id;
 }
 
@@ -844,7 +844,7 @@ function fileFlight(os: LifeOSContext, ingestId: string, f: ParsedFlight, mail: 
     os.records.update(id, { data: { startAt, ...(f.time ? { allDay: false } : {}) } }, 'assistant');
   } else {
     id = os.records.create({ object: 'event', title, data }, 'assistant').id;
-    os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Flight: ${route ?? f.flightNo} · ${f.date.slice(8)}/${f.date.slice(5, 7)}${f.flightNo ? ` · ${f.flightNo}` : ''} · from ${account}` });
+    os.filings.add({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Flight: ${route ?? f.flightNo} · ${f.date.slice(8)}/${f.date.slice(5, 7)}${f.flightNo ? ` · ${f.flightNo}` : ''} · from ${account}` });
   }
   os.records.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
   const tripId = tripOn(os, f.date, cityOf(f.to), ingestId, account);
@@ -862,7 +862,7 @@ function fileStay(os: LifeOSContext, ingestId: string, st: ParsedStay, mail: Mai
   if (same) id = same.id;
   else {
     id = os.records.create({ object: 'event', title: `Stay · ${st.name}`, data: { kind: 'stay', startAt, allDay: true, ...(st.checkOut ? { endAt: new Date(`${st.checkOut}T11:00:00`).getTime() } : {}), location: st.place ?? undefined, notes: `From ${account}: “${mail.subject}”` } }, 'assistant').id;
-    os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Stay: ${st.name} · ${st.checkIn.slice(8)}/${st.checkIn.slice(5, 7)}${st.checkOut ? `–${st.checkOut.slice(8)}/${st.checkOut.slice(5, 7)}` : ''} · from ${account}` });
+    os.filings.add({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Stay: ${st.name} · ${st.checkIn.slice(8)}/${st.checkIn.slice(5, 7)}${st.checkOut ? `–${st.checkOut.slice(8)}/${st.checkOut.slice(5, 7)}` : ''} · from ${account}` });
   }
   os.records.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
   const tripId = tripOn(os, st.checkIn, st.place, ingestId, account, st.checkOut);

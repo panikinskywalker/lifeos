@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BUILTIN_CATEGORIES, categoryRules, rangeRule, ruleAmounts, ruleCategory, ruleText, setCategoryRules } from '@core/ingest/ingest';
+import { BUILTIN_CATEGORIES, categoryRules, rangeRule, ruleAmounts, ruleCategory, ruleText, setCategoryRules } from '@core/filing/messages';
 import { CATEGORIES } from '@modules/finance/types';
 import { CATEGORY_COLORS, CATEGORY_ICONS, addCategory, customCategories, deleteCategory, updateCategory, type CustomCategory } from '@modules/finance/categories';
 import { useLive, useOS } from '@ui/hooks';

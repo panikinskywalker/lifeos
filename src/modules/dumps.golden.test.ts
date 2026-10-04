@@ -14,7 +14,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ModuleManifest } from '@core/registry/types';
 import type { ContentBlock, LLMProvider } from '@core/ai/provider';
 import { bus } from '@core/events/bus';
-import { chunks, extractDump, extractPending, filingPrompt, undoExtraction } from '@core/dumps/extract';
+import { chunks, fileDump, filePending, filingPrompt, undoFiling } from '@core/filing/dumps';
 import { fillDefaults, parseDateish } from '@core/ai/createAnything';
 import { edgeLabel } from '@core/graph/edges';
 import { accountType, debtType, subscriptionType, transactionType } from './finance/types';
@@ -65,7 +65,7 @@ const person = (name: string) => os.records.query('person').find((p) => p.title 
 const links = (id: string) => os.links.forEntity(id).map((l) => `${edgeLabel(l.relation.kind, l.direction)} ${l.other.title}`).sort();
 const say = async (body: string, m: LLMProvider | null, subjectId?: string) => {
   const d = os.dumps.add({ body, subjectId });
-  const r = await extractDump(os, d.id, m);
+  const r = await fileDump(os, d.id, m);
   return { d, r };
 };
 
@@ -76,7 +76,7 @@ describe('saying things (Jarvis golden flows)', () => {
     expect(r).toMatchObject({ status: 'done', via: 'model' });
     expect(person('Kendal').data).toMatchObject({ birthday: parseDateish('8 sept'), relationship: 'friend' });
     expect(os.cycles.forEntity(person('Kendal').id).map((c) => c.name)).toEqual(['Birthday']);
-    expect(os.dumps.toCheck().map((x) => x.label)).toEqual([expect.stringMatching(/^Kendal · Birthday → .*, Relationship → friend$/), 'Person: Kendal']);
+    expect(os.filings.toCheck().map((x) => x.label)).toEqual([expect.stringMatching(/^Kendal · Birthday → .*, Relationship → friend$/), 'Person: Kendal']);
     expect(os.dumps.get(d.id)!.body).toBe('met a new friend today named Kendal, her birthday is on 8 Sept');
     expect(m.seen[0]!.system).toMatch(/never ask questions/);
   });
@@ -87,7 +87,7 @@ describe('saying things (Jarvis golden flows)', () => {
     await say('her fav colour is pink, she’s vegetarian, new number 98450 12345', m, k.id);
     expect(os.records.get(k.id)!.data).toMatchObject({ phone: '98450 12345', notes: '• Favourite colour: pink\n• Diet: vegetarian' });
     expect(m.seen[0]!.system).toContain('page of person "Kendal"');
-    expect(os.dumps.toCheck()).toHaveLength(3);
+    expect(os.filings.toCheck()).toHaveLength(3);
   });
 
   it('a day: flight US → Canada with Kendal on 8 Sept, dinner at Canoe with Kendal and her brother Mike, 180 for dinner → linked graph', async () => {
@@ -152,8 +152,8 @@ describe('saying things (Jarvis golden flows)', () => {
     expect(links(person('Karan').id)).toEqual(['Was at Met at The Gym', 'Works at Zomato']);
     expect(os.records.query('org').map((o) => o.title)).toEqual(['Zomato']);
     // Cancel the organisation link only.
-    const row = os.dumps.toCheck().find((x) => x.label.includes('works at'))!;
-    expect(undoExtraction(os, row.id)).toBe(true);
+    const row = os.filings.toCheck().find((x) => x.label.includes('works at'))!;
+    expect(undoFiling(os, row.id)).toBe(true);
     expect(links(person('Karan').id)).toEqual(['Was at Met at The Gym']);
   });
 });
@@ -165,16 +165,16 @@ describe('filing mechanics', () => {
     const { r } = await say('did laundry', m);
     expect(r).toMatchObject({ status: 'done', via: 'parser', items: 1 });
     expect(m.seen).toEqual([]);
-    const [x] = os.dumps.toCheck();
+    const [x] = os.filings.toCheck();
     expect(x).toMatchObject({ kind: 'routine', action: 'logged' });
-    expect(undoExtraction(os, x!.id)).toBe(true);
+    expect(undoFiling(os, x!.id)).toBe(true);
   });
 
   it('no key → waits for one; offline or rate-limited → waiting (never counted as a failure); garbage → failed', async () => {
     const { d } = await say('Kendal’s sister is Ana', null);
     expect(os.dumps.get(d.id)).toMatchObject({ status: 'pending', error: 'no provider', attempts: 0 });
     // No connection: waits a minute, not a failed attempt; not due before then.
-    expect(await extractDump(os, d.id, offline)).toMatchObject({ status: 'waiting', error: 'No connection' });
+    expect(await fileDump(os, d.id, offline)).toMatchObject({ status: 'waiting', error: 'No connection' });
     const w = os.dumps.get(d.id)!;
     expect(w).toMatchObject({ status: 'pending', attempts: 0 });
     expect(w.retryAt! - Date.now()).toBeGreaterThan(30_000);
@@ -182,12 +182,12 @@ describe('filing mechanics', () => {
     expect(os.dumps.nextWake()).toBe(w.retryAt);
     // Groq's daily limit: waits for as long as Groq says.
     const daily: LLMProvider = { id: 'groq', complete: async () => { throw Object.assign(new Error('groq 429: Rate limit reached on tokens per day (TPD): Limit 200000. Please try again in 7m50.4s.'), { status: 429, retryAfterMs: 470_400 }); } };
-    expect(await extractDump(os, d.id, daily)).toMatchObject({ status: 'waiting', error: "Groq's free daily limit is used up" });
+    expect(await fileDump(os, d.id, daily)).toMatchObject({ status: 'waiting', error: "Groq's free daily limit is used up" });
     expect(os.dumps.get(d.id)!.retryAt! - Date.now()).toBeGreaterThan(460_000);
     // Once it's due, a working model files it.
-    expect(await extractPending(os, model([{ name: 'link', input: { from: 'Ana', to: 'Kendal', kind: 'family_of' } }]))).toEqual([]);
+    expect(await filePending(os, model([{ name: 'link', input: { from: 'Ana', to: 'Kendal', kind: 'family_of' } }]))).toEqual([]);
     os.db.run(`UPDATE dumps SET retry_at=? WHERE id=?`, [Date.now() - 1, d.id]);
-    expect(await extractPending(os, model([{ name: 'link', input: { from: 'Ana', to: 'Kendal', kind: 'family_of' } }]))).toEqual([{ status: 'done', via: 'model', items: 3 }]);
+    expect(await filePending(os, model([{ name: 'link', input: { from: 'Ana', to: 'Kendal', kind: 'family_of' } }]))).toEqual([{ status: 'done', via: 'model', items: 3 }]);
     // Unusable output is a real failure (counts toward giving up).
     const garbage: LLMProvider = { id: 'x', complete: async () => { throw new Error('extraction: model returned nonsense'); } };
     const { r } = await say('Asha moved to Pune', garbage);
@@ -213,7 +213,7 @@ describe('filing mechanics', () => {
     expect(os.dumps.get(d.id)!.progress).toMatchObject({ parsed: true, chunksDone: 1 });
     os.db.run(`UPDATE dumps SET retry_at=? WHERE id=?`, [Date.now() - 1, d.id]);
     const m = model([{ name: 'create_task', input: { title: 'Book the Toronto hotel', due: 'tomorrow' } }]);
-    await extractPending(os, m);
+    await filePending(os, m);
     expect(m.seen[0]!.first).toContain('Toronto hotel');
     expect(m.seen[0]!.first).not.toContain('Kendal called');
     expect(m.seen[0]!.system).toContain('Already filed from this text');
@@ -227,9 +227,9 @@ describe('filing mechanics', () => {
     const { d, r } = await say('Did laundry. Spent 450 on lunch at Toit. Met Kendal there, she just moved to Pune.', null);
     // No key: the everyday sentences are filed anyway, the rest waits.
     expect(r).toMatchObject({ status: 'pending', via: 'parser', items: 2 });
-    expect(os.dumps.extractions(d.id).map((x) => x.kind)).toEqual(['routine', 'transaction']);
+    expect(os.filings.forDump(d.id).map((x) => x.kind)).toEqual(['routine', 'transaction']);
     const m = model([{ name: 'link', input: { from: 'Kendal', to: 'Pune', kind: 'lives_in' } }]);
-    await extractPending(os, m);
+    await filePending(os, m);
     expect(m.seen[0]!.first).toBe('Met Kendal there, she just moved to Pune.');
     expect(os.records.query('transaction')).toHaveLength(1);
   });
@@ -239,7 +239,7 @@ describe('filing mechanics', () => {
     os.dumps.add({ body: 'older thing about Asha', createdAt: Date.now() - 60_000 });
     os.dumps.add({ body: 'newest thing about Kendal' });
     const m = model();
-    await extractPending(os, m, { newestFirst: true, max: 1 });
+    await filePending(os, m, { newestFirst: true, max: 1 });
     expect(m.seen[0]!.first).toBe('newest thing about Kendal');
     expect(budgetLow(170_000, 200_000, false)).toBe(true);
     expect(budgetLow(20_000, 200_000, false)).toBe(false);

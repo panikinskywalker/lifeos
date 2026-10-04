@@ -6,7 +6,7 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { activeHabits, checkIn, doneDays, habitSaid, streakOf, toggleCheckIn } from '@core/habits/habits';
-import { extractDump } from '@core/dumps/extract';
+import { fileDump } from '@core/filing/dumps';
 import { habitLogType, habitType } from './habits/types';
 import { z } from 'zod';
 
@@ -75,8 +75,8 @@ describe('habits', () => {
   it('a dump ticks the habit on the phone, logged in To check with Undo', async () => {
     const yoga = os.records.create({ object: 'habit', title: 'Yoga', data: {} });
     const d = os.dumps.add({ body: 'Did yoga. Then had a long call with mom.', createdAt: NOW });
-    await extractDump(os, d.id, null);
+    await fileDump(os, d.id, null);
     expect(doneDays(os, yoga.id, day(-1)).has(day(0))).toBe(true);
-    expect(os.dumps.extractions(d.id).map((x) => x.label)).toContain('Yoga ✓');
+    expect(os.filings.forDump(d.id).map((x) => x.label)).toContain('Yoga ✓');
   });
 });

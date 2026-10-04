@@ -148,6 +148,47 @@ export interface BoardManifest {
 }
 
 /* ------------------------------------------------------------------ */
+/* Sources — where data comes from automatically (docs/MODEL.md §4).   */
+/* A module declares the sources that feed it; platform code supplies  */
+/* the device access. State (enabled, last sync, count, error) is kept  */
+/* by core in source_state. R0 defines the contract; R1+ move today's   */
+/* sources (src/platform/sources.ts) onto it.                           */
+/* ------------------------------------------------------------------ */
+
+export interface Reading {
+  /** The Object the reading becomes a record of (measurement, workout, event…). */
+  object: string;
+  /** The source's own id for this reading: re-syncing never duplicates. */
+  sourceKey: string;
+  data: Record<string, unknown>;
+  title?: string;
+  occurredAt?: number;
+}
+
+export interface Message {
+  /** The source's own id for this message. */
+  id: string;
+  /** Sender: a DLT header, a package name, a mail address. */
+  from: string;
+  text: string;
+  at: number;
+  /** Subject, title, attachments — whatever the source adds. */
+  meta?: Record<string, unknown>;
+}
+
+export interface SourceDef {
+  /** 'sms', 'health', 'usage', 'contacts', 'calendar', 'calllog', 'notifications', 'gmail'… */
+  id: string;
+  label: string;
+  /** The modules whose records this source produces. */
+  modules: string[];
+  /** The permission the user must grant, in their words ("Health Connect", "Usage access"). */
+  permission?: string;
+  /** Readings become records directly; messages go through the parsers (docs/MODEL.md §4). */
+  sync: (os: LifeOSContext, since: number | null) => Promise<{ readings?: Reading[]; messages?: Message[] }>;
+}
+
+/* ------------------------------------------------------------------ */
 /* Modules — one domain of data each: Objects, filing, sources, AI     */
 /* tools, triggers, actions. Nothing visual — that is the companion    */
 /* board's (docs/MODEL.md §3).                                          */
@@ -167,6 +208,8 @@ export interface ModuleManifest {
   triggers?: TriggerDef[];
   actions?: ActionDef[];
   aiTools?: AiToolDef[];
+  /** The sources that feed this module (contract above). */
+  sources?: SourceDef[];
   /** Runs once when installed: seed default views/dashboards/rules. */
   onInstall?: (os: LifeOSContext) => void | Promise<void>;
   /** Runs every app start after install. */

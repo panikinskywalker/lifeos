@@ -1,4 +1,4 @@
-import { categoryFor } from '../ingest/ingest';
+import { categoryFor } from '../filing/messages';
 import { z } from 'zod';
 import type { ObjectDef, Field } from '../domain/types';
 import type { LifeOSContext } from '../registry/context';
@@ -43,10 +43,10 @@ export function newSession(dumpId: string, opts: { source?: GraphSession['source
   return { dumpId, source: opts.source ?? 'dump', subjectId: opts.subjectId ?? null, seen: new Map(), flags: new Map(), writes: 0, saidNew: !!opts.saidNew };
 }
 
-function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['dumps']['addExtraction']>[0] extends infer T ? Omit<T & object, 'dumpId'> : never) {
+function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['filings']['add']>[0] extends infer T ? Omit<T & object, 'dumpId'> : never) {
   const flag = x.flag ?? (x.entityId ? s.flags.get(x.entityId) : undefined) ?? null;
   s.writes++;
-  const row = os.dumps.addExtraction({ ...x, dumpId: s.dumpId, flag });
+  const row = os.filings.add({ ...x, dumpId: s.dumpId, flag });
   // The record's own timeline points back at what was said.
   if (x.entityId && x.kind !== 'link' && os.records.get(x.entityId)) {
     const body = os.dumps.get(s.dumpId)?.body ?? '';
@@ -371,7 +371,7 @@ export function recordEvent(os: LifeOSContext, s: GraphSession, i: EventInput): 
 
 /** Reverse exactly one logged write: remove the link, delete what was created, restore replaced fields, forget the fact. */
 export function reverseWrite(os: LifeOSContext, extractionId: string): boolean {
-  const x = os.dumps.extraction(extractionId);
+  const x = os.filings.get(extractionId);
   if (!x || x.undone) return false;
   const exact = exactUndo.get(extractionId);
   if (exact) {
@@ -384,7 +384,7 @@ export function reverseWrite(os: LifeOSContext, extractionId: string): boolean {
     const back = Object.fromEntries(Object.entries(x.before).map(([k, v]) => [k, v ?? undefined]));
     if (os.records.get(x.entityId)) os.records.update(x.entityId, { data: back }, 'user');
   } else return false;
-  os.dumps.markUndone(extractionId);
+  os.filings.markUndone(extractionId);
   return true;
 }
 

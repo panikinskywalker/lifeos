@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import { confirmProposed, ingestList, sourceLabel } from '@core/ingest/ingest';
+import { confirmProposed, messageList, sourceLabel } from '@core/filing/messages';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Checkbox, EmptyState, Screen, Text, useToast } from '@ui/kit';
@@ -17,7 +17,7 @@ export default function SmsReviewScreen() {
   const t = useTheme();
   const router = useRouter();
   const toast = useToast();
-  const items = useLive((o) => ingestList(o, { status: 'proposed', limit: 5000 }), []);
+  const items = useLive((o) => messageList(o, { status: 'proposed', limit: 5000 }), []);
   const [off, setOff] = useState<Set<string>>(new Set());
   const months = useMemo(() => {
     const m = new Map<string, typeof items>();

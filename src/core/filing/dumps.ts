@@ -88,10 +88,10 @@ export function sentences(body: string): string[] {
  * stopped. Limits and outages make it wait (never fail); with no key it
  * waits for one.
  */
-export async function extractDump(os: LifeOSContext, dumpId: string, provider?: LLMProvider | null): Promise<ExtractResult> {
+export async function fileDump(os: LifeOSContext, dumpId: string, provider?: LLMProvider | null): Promise<ExtractResult> {
   const dump = os.dumps.get(dumpId);
   if (!dump) throw new Error('dump not found');
-  if (dump.status === 'done' || dump.status === 'skipped') return { status: 'done', via: 'none', items: os.dumps.extractions(dumpId).length };
+  if (dump.status === 'done' || dump.status === 'skipped') return { status: 'done', via: 'none', items: os.filings.forDump(dumpId).length };
   const session = newSession(dump.id, { source: dump.subjectId ? 'record-voice' : 'dump', subjectId: dump.subjectId, saidNew: /\bnew\b/i.test(dump.body) });
 
   // 1. Parser first, once: every everyday sentence ("did laundry", "spent 450 on lunch") is filed offline now.
@@ -102,7 +102,7 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
     os.dumps.setProgress(dumpId, progress);
   }
   const rest = (progress.rest ?? '').trim();
-  const parsedItems = os.dumps.extractions(dumpId).length;
+  const parsedItems = os.filings.forDump(dumpId).length;
   if (!rest) {
     os.dumps.setStatus(dumpId, 'done');
     return { status: 'done', via: 'parser', items: parsedItems };
@@ -122,24 +122,24 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
   try {
     for (let i = progress.chunksDone ?? 0; i < parts.length; i++) {
       // Resuming (or the parser took some sentences): tell the model what's already filed so nothing doubles.
-      const filed = os.dumps.extractions(dumpId).filter((x) => !x.undone).map((x) => `- ${x.label}`);
+      const filed = os.filings.forDump(dumpId).filter((x) => !x.undone).map((x) => `- ${x.label}`);
       const sys = filed.length ? `${system}\nAlready filed from this text — don't file these again:\n${filed.slice(-40).join('\n')}` : system;
       await fileChunk(os, provider, sys, specs, byName, parts[i]!);
       progress = { ...progress, chunksDone: i + 1 };
       os.dumps.setProgress(dumpId, progress);
     }
     os.dumps.setStatus(dumpId, 'done');
-    return { status: 'done', via: 'model', items: os.dumps.extractions(dumpId).length };
+    return { status: 'done', via: 'model', items: os.filings.forDump(dumpId).length };
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
     const f = classifyFailure(e);
     if (f.kind === 'wait') {
       // Not a failure: file it when the provider is back. Never counts toward giving up.
       os.dumps.setWaiting(dumpId, f.reason, f.until);
-      return { status: 'waiting', via: 'model', items: os.dumps.extractions(dumpId).length, error: f.reason };
+      return { status: 'waiting', via: 'model', items: os.filings.forDump(dumpId).length, error: f.reason };
     }
     os.dumps.setStatus(dumpId, 'failed', f.reason);
-    return { status: 'failed', via: 'model', items: os.dumps.extractions(dumpId).length, error: f.reason };
+    return { status: 'failed', via: 'model', items: os.filings.forDump(dumpId).length, error: f.reason };
   }
 }
 
@@ -227,20 +227,20 @@ async function runLogged(os: LifeOSContext, dump: Dump, name: string, input: Rec
   const entityId = ((created ? out.id : (input.entityId ?? (input.cycleId ? os.cycles.get(String(input.cycleId))?.entityId : undefined))) as string | undefined) ?? null;
   const type = entityId ? os.records.get(entityId)?.object : undefined;
   const label = String(out.logged ?? out.done ?? out.remembered ?? (out.title ? `${os.registry.objects.get(String(input.type ?? type))?.label ?? 'Record'}: ${out.title}` : null) ?? input.title ?? name.replace(/_/g, ' '));
-  const row = os.dumps.addExtraction({ dumpId: dump.id, kind: name === 'remember_fact' ? 'fact' : (type ?? name.replace(/^create_/, '')), action: created ? 'created' : 'logged', entityId, factId: (out.factId as string) ?? null, label });
+  const row = os.filings.add({ dumpId: dump.id, kind: name === 'remember_fact' ? 'fact' : (type ?? name.replace(/^create_/, '')), action: created ? 'created' : 'logged', entityId, factId: (out.factId as string) ?? null, label });
   const undo = extrasOf(out).undo;
   if (undo) exactUndo.set(row.id, undo);
   return out;
 }
 
 /** Everything still waiting, oldest first; one at a time so free tiers aren't flooded. */
-export async function extractPending(os: LifeOSContext, provider?: LLMProvider | null, opts: { max?: number; newestFirst?: boolean } = {}): Promise<ExtractResult[]> {
+export async function filePending(os: LifeOSContext, provider?: LLMProvider | null, opts: { max?: number; newestFirst?: boolean } = {}): Promise<ExtractResult[]> {
   const out: ExtractResult[] = [];
   // Low on free budget: what was just said matters most; the older backlog waits.
   const due = os.dumps.pending();
   if (opts.newestFirst) due.reverse();
   for (const d of due.slice(0, opts.max ?? 10)) {
-    const r = await extractDump(os, d.id, provider);
+    const r = await fileDump(os, d.id, provider);
     out.push(r);
     if (r.status === 'waiting') break; // every provider is resting: the rest would wait too
   }
@@ -248,6 +248,6 @@ export async function extractPending(os: LifeOSContext, provider?: LLMProvider |
 }
 
 /** Cancel one filed item (To check › cancel, or Undo under a dump). */
-export function undoExtraction(os: LifeOSContext, extractionId: string): boolean {
+export function undoFiling(os: LifeOSContext, extractionId: string): boolean {
   return reverseWrite(os, extractionId);
 }

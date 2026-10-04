@@ -20,7 +20,7 @@ import { persistAttachment } from '../lib/files';
 import { CyclesSection, MeterSheet } from '../components/cycles';
 import { backlinks } from '@core/links';
 import { egoGraph, neighbours } from '@core/graph/read';
-import { confirmPayee, rejectPayee } from '@core/ingest/payee';
+import { confirmPayee, rejectPayee } from '@core/filing/parsers/payee';
 import { LinksView } from '../components/LinksView';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';

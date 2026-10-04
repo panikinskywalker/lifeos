@@ -5,7 +5,7 @@ import type { DumpSource } from '@core/repo/dumpRepo';
 import { useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { IconButton, useToast } from '@ui/kit';
-import { saveDump } from '../platform/dumpExtraction';
+import { saveDump } from '../platform/filing';
 import { listen } from '../platform/voice';
 
 /**

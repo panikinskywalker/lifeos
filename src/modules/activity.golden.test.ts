@@ -5,7 +5,7 @@ import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
-import { ingestMessage } from '@core/ingest/ingest';
+import { fileMessage } from '@core/filing/messages';
 import { saveHealthDays, saveUsageDays } from '@core/sources/deviceData';
 import { DEFAULT_TRACKERS, knownCalendars, trackerDays, trackerSummary, trackers, upsertTracker, type Tracker } from '@core/activity/trackers';
 import { measurementType, workoutType } from './health/types';
@@ -33,9 +33,9 @@ describe('activity trackers', () => {
   });
 
   it('ordered food: any day a Zomato / Swiggy text came in (even one set aside), or a payment to them', () => {
-    ingestMessage(os, { source: 'sms', from: 'AX-ZOMATO', body: 'Your Zomato order from Truffles is on its way!', receivedAt: at(-1, 21) });
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On ' + day(-3).split('-').reverse().join('/').replace(/^(\d+)\/(\d+)\/20(\d+)$/, '$1/$2/$3'), receivedAt: at(-3) });
-    ingestMessage(os, { source: 'sms', from: 'AX-FRIEND', body: 'dinner at 8?', receivedAt: at(-2) });
+    fileMessage(os, { source: 'sms', from: 'AX-ZOMATO', body: 'Your Zomato order from Truffles is on its way!', receivedAt: at(-1, 21) });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On ' + day(-3).split('-').reverse().join('/').replace(/^(\d+)\/(\d+)\/20(\d+)$/, '$1/$2/$3'), receivedAt: at(-3) });
+    fileMessage(os, { source: 'sms', from: 'AX-FRIEND', body: 'dinner at 8?', receivedAt: at(-2) });
     expect([...trackerDays(os, get('food'), day(-10), day(0))].sort()).toEqual([day(-3), day(-1)]);
   });
 

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { bus } from '@core/events/bus';
-import { recategorise } from '@core/ingest/ingest';
+import { recategorise } from '@core/filing/messages';
 import { categoryOf } from '@modules/finance/types';
 import { useOS } from '@ui/hooks';
 import { useToast } from '@ui/kit';

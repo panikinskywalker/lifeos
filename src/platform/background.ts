@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundTask from 'expo-background-task';
 import type { LifeOSContext } from '@core/registry/context';
-import { runDumpExtraction } from './dumpExtraction';
+import { runFiling } from './filing';
 import { syncSources } from './sources';
 import { syncReminderNotifications } from './notifySync';
 
@@ -15,7 +15,7 @@ TaskManager.defineTask(TASK, async () => {
     if (osRef) {
       await osRef.scheduler.tick();
       await syncSources(osRef);
-      await runDumpExtraction(osRef);
+      await runFiling(osRef);
       // The morning brief is written when it's scheduled: refresh it with what just synced.
       await syncReminderNotifications(osRef);
     }

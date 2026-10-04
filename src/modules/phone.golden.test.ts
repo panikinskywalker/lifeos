@@ -29,7 +29,7 @@ describe('contacts you pick', () => {
     expect(importContacts(os, [{ id: 'c2', name: 'Karan', phones: ['09845000000'], emails: [], company: 'Zomato' }])).toEqual({ created: 0, updated: 1 });
     expect(os.records.get(karan.id)!.data).toMatchObject({ company: 'Swiggy', phone: '09845000000', contactId: 'c2' });
     expect(personForContact(os, { id: 'zz', name: 'Someone', phones: ['9845000000'], emails: [] })).toBe(karan.id);
-    expect(os.dumps.toCheck().map((x) => x.source)).toEqual(['contacts', 'contacts']);
+    expect(os.filings.toCheck().map((x) => x.source)).toEqual(['contacts', 'contacts']);
   });
 
   it('re-sync fills what an imported contact gained, and nothing for people you never imported', () => {

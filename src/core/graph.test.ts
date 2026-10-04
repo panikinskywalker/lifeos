@@ -35,16 +35,16 @@ describe('life graph model (v7)', () => {
     const k = os.records.create({ object: 'person', title: 'Kendal', data: {} });
     const d = os.dumps.add({ body: 'her favourite colour is pink', subjectId: k.id });
     expect(os.dumps.get(d.id)!.subjectId).toBe(k.id);
-    const a = os.dumps.addExtraction({ dumpId: d.id, kind: 'person', action: 'updated', entityId: k.id, label: 'Kendal · notes', before: { notes: null } });
-    const b = os.dumps.addExtraction({ dumpId: d.id, kind: 'person', entityId: k.id, label: 'Kendal', flag: 'Guessed which Kendal', confidence: 0.7 });
-    expect(os.dumps.toCheck().map((x) => x.id)).toEqual([b.id, a.id]);
-    expect(os.dumps.extraction(a.id)!.before).toEqual({ notes: null });
-    os.dumps.setChecked(b.id);
-    expect(os.dumps.toCheckCount()).toBe(1);
+    const a = os.filings.add({ dumpId: d.id, kind: 'person', action: 'updated', entityId: k.id, label: 'Kendal · notes', before: { notes: null } });
+    const b = os.filings.add({ dumpId: d.id, kind: 'person', entityId: k.id, label: 'Kendal', flag: 'Guessed which Kendal', confidence: 0.7 });
+    expect(os.filings.toCheck().map((x) => x.id)).toEqual([b.id, a.id]);
+    expect(os.filings.get(a.id)!.before).toEqual({ notes: null });
+    os.filings.setChecked(b.id);
+    expect(os.filings.toCheckCount()).toBe(1);
     // 15 days untouched → approved (the record itself was always saved).
-    expect(os.dumps.autoApprove(15, Date.now() + 14 * 86_400_000)).toBe(0);
-    expect(os.dumps.autoApprove(15, Date.now() + 16 * 86_400_000)).toBe(1);
-    expect(os.dumps.toCheckCount()).toBe(0);
-    expect(os.dumps.extraction(a.id)).toMatchObject({ checked: true, undone: false });
+    expect(os.filings.autoApprove(15, Date.now() + 14 * 86_400_000)).toBe(0);
+    expect(os.filings.autoApprove(15, Date.now() + 16 * 86_400_000)).toBe(1);
+    expect(os.filings.toCheckCount()).toBe(0);
+    expect(os.filings.get(a.id)).toMatchObject({ checked: true, undone: false });
   });
 });

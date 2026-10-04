@@ -11,6 +11,7 @@ import { GroupRepo } from './repo/groupRepo';
 import { AliasRepo } from './repo/aliasRepo';
 import { FactRepo } from './repo/factRepo';
 import { DumpRepo } from './repo/dumpRepo';
+import { FilingRepo } from './repo/filingRepo';
 import { QuestionRepo } from './repo/questionRepo';
 import { AutomationEngine } from './automation/engine';
 import { Scheduler } from './automation/scheduler';
@@ -19,8 +20,8 @@ import { bus } from './events/bus';
 import { coreModule } from './coreModule';
 import type { ObjectRecord } from './domain/types';
 import { resolveLink, syncMentions } from './links';
-import { backfillDeliveries, learnCategory, payeeOf } from './ingest/ingest';
-import { linkMissingPayees } from './ingest/payee';
+import { backfillDeliveries, learnCategory, payeeOf } from './filing/messages';
+import { linkMissingPayees } from './filing/parsers/payee';
 
 export interface LifeOSOptions {
   db: DatabaseAdapter;
@@ -65,6 +66,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     aliases: new AliasRepo(db, changes),
     facts: new FactRepo(db, changes, timeline),
     dumps: new DumpRepo(db, changes),
+    filings: new FilingRepo(db),
     questions: new QuestionRepo(db),
     reminders: new ReminderRepo(db, timeline, changes),
     customFields: new CustomFieldRepo(db),

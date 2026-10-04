@@ -49,7 +49,7 @@ describe('graph tools', () => {
     const e = os.records.get(String(k.id))!;
     expect(e).toMatchObject({ title: 'Kendal', data: { birthday: parseDateish('8 sept'), relationship: 'friend' } });
     expect(os.cycles.forEntity(e.id).map((c) => c.name)).toContain('Birthday');
-    expect(os.dumps.toCheck().map((x) => x.label)).toEqual([expect.stringContaining('Birthday → '), 'Person: Kendal']);
+    expect(os.filings.toCheck().map((x) => x.label)).toEqual([expect.stringContaining('Birthday → '), 'Person: Kendal']);
   });
 
   it('on her page: "her favourite colour is pink" → a tidy Notes line, updated in place later', async () => {
@@ -61,7 +61,7 @@ describe('graph tools', () => {
     await call(s2, 'set_attributes', { node: 'this', attributes: { favourite_colour: 'green' } });
     expect((os.records.get(k.id)!.data as { notes: string }).notes).toBe('Met at Priya’s party\n• Favourite colour: green\n• Loves: sushi');
     // Cancel the change → back to pink.
-    reverseWrite(os, os.dumps.extractions(s2.dumpId)[0]!.id);
+    reverseWrite(os, os.filings.forDump(s2.dumpId)[0]!.id);
     expect((os.records.get(k.id)!.data as { notes: string }).notes).toContain('• Favourite colour: pink');
   });
 
@@ -128,7 +128,7 @@ describe('graph tools', () => {
     const s = session('Asha lives in Pune, birthday 3 March');
     await call(s, 'upsert_node', { name: 'Asha', type: 'person', attributes: { birthday: '3 March' } });
     await call(s, 'link', { from: 'Asha', to: 'Pune', kind: 'lives_in' });
-    const xs = os.dumps.extractions(s.dumpId);
+    const xs = os.filings.forDump(s.dumpId);
     const asha = os.records.query('person')[0]!;
     const linkRow = xs.find((x) => x.kind === 'link')!;
     expect(reverseWrite(os, linkRow.id)).toBe(true);
@@ -138,6 +138,6 @@ describe('graph tools', () => {
     expect((os.records.get(asha.id)!.data as { birthday?: string }).birthday).toBeUndefined();
     reverseWrite(os, xs.find((x) => x.kind === 'person' && x.action === 'created')!.id);
     expect(os.records.query('person')).toEqual([]);
-    expect(os.dumps.toCheckCount()).toBe(1); // only Pune left
+    expect(os.filings.toCheckCount()).toBe(1); // only Pune left
   });
 });

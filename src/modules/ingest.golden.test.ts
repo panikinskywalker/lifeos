@@ -9,9 +9,9 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ModuleManifest } from '@core/registry/types';
 import { bus } from '@core/events/bus';
-import { confirmProposed, ingestList, ingestMessage, learnCategory, senders, setSenderTrusted } from '@core/ingest/ingest';
-import { extractDump } from '@core/dumps/extract';
-import { undoExtraction } from '@core/dumps/extract';
+import { confirmProposed, messageList, fileMessage, learnCategory, senders, setSenderTrusted } from '@core/filing/messages';
+import { fileDump } from '@core/filing/dumps';
+import { undoFiling } from '@core/filing/dumps';
 import { accountType, subscriptionType, transactionType } from './finance/types';
 import { financeAiTools } from './finance/aiTools';
 import { groupType, personType } from './crm/types';
@@ -38,31 +38,31 @@ const txs = () => os.records.query<Record<string, unknown>>('transaction');
 
 describe('bank SMS → transactions', () => {
   it('7 · "spent at SWIGGY" SMS → expense within the same call, categorised Food, on a new HDFC card account, in To check', () => {
-    const r = ingestMessage(os, { source: 'sms', from: 'AD-HDFCBK', body: SWIGGY, receivedAt: at });
+    const r = fileMessage(os, { source: 'sms', from: 'AD-HDFCBK', body: SWIGGY, receivedAt: at });
     expect(r.status).toBe('confirmed');
     const [t] = txs();
     expect(t!.data).toMatchObject({ amount: 1240, kind: 'expense', category: 'food', merchant: 'Swiggy', date: '2026-09-26' });
     const acc = os.records.get(t!.data.accountId as string)!;
     expect(acc).toMatchObject({ title: 'HDFC Bank card ••5678', data: { kind: 'credit', last4: '5678', institution: 'HDFC Bank' } });
-    expect(os.dumps.toCheck().map((x) => x.label)).toEqual(['Spent ₹1,240 · Swiggy · ••5678', 'Account: HDFC Bank card ••5678']);
-    expect(os.dumps.toCheck()[0]).toMatchObject({ source: 'sms', dumpId: null });
+    expect(os.filings.toCheck().map((x) => x.label)).toEqual(['Spent ₹1,240 · Swiggy · ••5678', 'Account: HDFC Bank card ••5678']);
+    expect(os.filings.toCheck()[0]).toMatchObject({ source: 'sms', dumpId: null });
     // The raw text is on the transaction's timeline.
     expect(os.records.timeline.forEntity(t!.id).some((e) => e.body?.includes('SWIGGY'))).toBe(true);
     // Cancel from To check removes the expense.
-    expect(undoExtraction(os, os.dumps.toCheck()[0]!.id)).toBe(true);
+    expect(undoFiling(os, os.filings.toCheck()[0]!.id)).toBe(true);
     expect(txs()).toEqual([]);
   });
 
   it('an existing account is found by its last digits', () => {
     const mine = os.records.create({ object: 'account', title: 'My HDFC', data: { kind: 'credit', institution: 'HDFC Bank', last4: '5678' } });
-    ingestMessage(os, { source: 'sms', from: 'AD-HDFCBK', body: SWIGGY, receivedAt: at });
+    fileMessage(os, { source: 'sms', from: 'AD-HDFCBK', body: SWIGGY, receivedAt: at });
     expect(txs()[0]!.data.accountId).toBe(mine.id);
     expect(os.records.query('account')).toHaveLength(1);
   });
 
   it('the same payment as an SMS and a GPay notification is filed once; the second fills in what the first lacked', () => {
-    ingestMessage(os, { source: 'notification', from: 'com.google.android.apps.nbu.paisa.user', title: 'Payment successful', body: '₹450 paid to Swiggy', receivedAt: at });
-    const r = ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00\nFrom HDFC Bank A/C *1234\nTo SWIGGY\nOn 26/09/26\nRef 426912345678', receivedAt: at + 40_000 });
+    fileMessage(os, { source: 'notification', from: 'com.google.android.apps.nbu.paisa.user', title: 'Payment successful', body: '₹450 paid to Swiggy', receivedAt: at });
+    const r = fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00\nFrom HDFC Bank A/C *1234\nTo SWIGGY\nOn 26/09/26\nRef 426912345678', receivedAt: at + 40_000 });
     expect(r.status).toBe('duplicate');
     expect(txs()).toHaveLength(1);
     expect(os.records.get(txs()[0]!.data.accountId as string)?.title).toBe('HDFC Bank ••1234');
@@ -70,24 +70,24 @@ describe('bank SMS → transactions', () => {
 
   it('you said it first ("spent 450 on lunch at Toit"), then the SMS came: matched, not doubled; the account filled in', async () => {
     const d = os.dumps.add({ body: 'spent 450 on lunch at Toit' });
-    await extractDump(os, d.id, null);
+    await fileDump(os, d.id, null);
     expect(txs()).toHaveLength(1);
-    const r = ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00 From HDFC Bank A/C *1234 To TOIT BREWPUB On 26/09/26', receivedAt: Date.now() });
+    const r = fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00 From HDFC Bank A/C *1234 To TOIT BREWPUB On 26/09/26', receivedAt: Date.now() });
     expect(r.status).toBe('confirmed');
     expect(txs()).toHaveLength(1);
     expect(txs()[0]!.data).toMatchObject({ merchant: 'Toit', accountId: expect.any(String) });
-    expect(os.dumps.toCheck()[0]!.label).toMatch(/^Matched .* ₹450 to HDFC Bank SMS$/);
+    expect(os.filings.toCheck()[0]!.label).toMatch(/^Matched .* ₹450 to HDFC Bank SMS$/);
   });
 
   it('OTPs are kept raw but not filed; unknown senders are not trusted until you tick them; a message seen twice is one row', () => {
-    expect(ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: '123456 is your OTP for txn of Rs.450 at SWIGGY', receivedAt: at })).toMatchObject({ status: 'dismissed', reason: 'otp' });
-    expect(ingestMessage(os, { source: 'sms', from: 'AX-SWIGGY', body: 'Your order of Rs.450 is on the way', receivedAt: at })).toMatchObject({ status: 'dismissed', reason: 'sender not trusted' });
+    expect(fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: '123456 is your OTP for txn of Rs.450 at SWIGGY', receivedAt: at })).toMatchObject({ status: 'dismissed', reason: 'otp' });
+    expect(fileMessage(os, { source: 'sms', from: 'AX-SWIGGY', body: 'Your order of Rs.450 is on the way', receivedAt: at })).toMatchObject({ status: 'dismissed', reason: 'sender not trusted' });
     expect(senders(os).map((s) => [s.address, s.trusted])).toEqual([['VM-HDFCBK', true], ['AX-SWIGGY', false]]);
     setSenderTrusted(os, 'VM-HDFCBK', false);
-    expect(ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.99 From HDFC Bank A/C *1234 To X', receivedAt: at + 1 })).toMatchObject({ status: 'dismissed' });
-    const again = ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: '123456 is your OTP for txn of Rs.450 at SWIGGY', receivedAt: at });
+    expect(fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.99 From HDFC Bank A/C *1234 To X', receivedAt: at + 1 })).toMatchObject({ status: 'dismissed' });
+    const again = fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: '123456 is your OTP for txn of Rs.450 at SWIGGY', receivedAt: at });
     expect(again.reason).toBe('seen before');
-    expect(ingestList(os)).toHaveLength(3);
+    expect(messageList(os)).toHaveLength(3);
   });
 
   it('6 · first-run history import → proposals → review keeps some → filed; a learned category sticks', () => {
@@ -96,61 +96,61 @@ describe('bank SMS → transactions', () => {
       ['VM-HDFCBK', 'Sent Rs.2,000.00 From HDFC Bank A/C *1234 To GURU TAILORS On 12/08/26', '2026-08-12T11:00:00'],
       ['VM-HDFCBK', 'Rs.50000 credited to HDFC Bank A/c XX1234 on 01-09-26 from ACME PVT LTD', '2026-09-01T10:00:00'],
     ] as const;
-    const ids = history.map(([from, body, when]) => ingestMessage(os, { source: 'sms', from, body, receivedAt: Date.parse(when) }, { mode: 'import' }).id);
-    expect(ingestList(os, { status: 'proposed' })).toHaveLength(3);
+    const ids = history.map(([from, body, when]) => fileMessage(os, { source: 'sms', from, body, receivedAt: Date.parse(when) }, { mode: 'import' }).id);
+    expect(messageList(os, { status: 'proposed' })).toHaveLength(3);
     expect(txs()).toEqual([]);
     learnCategory(os, 'GURU TAILORS', 'shopping');
     expect(confirmProposed(os, [ids[1]!, ids[2]!], [ids[0]!])).toBe(2);
     expect(txs().map((t) => [t.data.merchant, t.data.kind, t.data.category]).sort()).toEqual([['ACME', 'income', 'other'], ['GURU TAILORS', 'expense', 'shopping']]);
-    expect(ingestList(os, { status: 'dismissed' })).toHaveLength(1);
+    expect(messageList(os, { status: 'dismissed' })).toHaveLength(1);
   });
 });
 
 describe('learning', () => {
   it('recategorising a transaction teaches the merchant', () => {
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.300.00 From HDFC Bank A/C *1234 To GURU TAILORS On 26/09/26', receivedAt: at });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.300.00 From HDFC Bank A/C *1234 To GURU TAILORS On 26/09/26', receivedAt: at });
     const t = txs()[0]!;
     expect(t.data.category).toBe('other');
     os.records.update(t.id, { data: { category: 'shopping' } }, 'user');
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.500.00 From HDFC Bank A/C *1234 To GURU TAILORS On 27/09/26', receivedAt: at + 86_400_000 });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.500.00 From HDFC Bank A/C *1234 To GURU TAILORS On 27/09/26', receivedAt: at + 86_400_000 });
     expect(txs().find((x) => x.data.amount === 500)!.data.category).toBe('shopping');
   });
 });
 
 describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
   it('a USD card spend is stored in dollars and rupees at the day\'s rate; the limit is never the amount', async () => {
-    const { setFxRatesFromInrBase, applyPendingFx } = await import('@core/ingest/fx');
+    const { setFxRatesFromInrBase, applyPendingFx } = await import('@core/filing/parsers/fx');
     const body = 'USD 45.00 spent using ICICI Bank Card XX9012 on 26-Sep-26 on AMAZON US. Avl Limit: INR 1,20,000.00.';
     // No rate yet: filed in dollars, flagged, converted when rates arrive.
-    ingestMessage(os, { source: 'sms', from: 'AX-ICICIB', body, receivedAt: at });
+    fileMessage(os, { source: 'sms', from: 'AX-ICICIB', body, receivedAt: at });
     expect(txs()[0]!.data).toMatchObject({ amount: 45, originalAmount: 45, originalCurrency: 'USD' });
-    expect(os.dumps.toCheck()[0]!.flag).toMatch(/No USD rate yet/);
+    expect(os.filings.toCheck()[0]!.flag).toMatch(/No USD rate yet/);
     setFxRatesFromInrBase(os, '2026-09-26', { USD: 1 / 84, GBP: 1 / 110, JPY: 1 / 0.56, AED: 1 / 22.9 });
     expect(applyPendingFx(os)).toBe(1);
     expect(txs()[0]!.data).toMatchObject({ amount: 3780, fxRate: 84 });
     // With a rate on file: converted at once. When the SMS gives the rupee figure, that wins.
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent USD 10.00 (INR 861.50) on HDFC Bank Card 5678 at OPENAI On 2026-09-26', receivedAt: at + 3_600_000 });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent USD 10.00 (INR 861.50) on HDFC Bank Card 5678 at OPENAI On 2026-09-26', receivedAt: at + 3_600_000 });
     expect(txs().find((t) => t.data.merchant === 'ChatGPT')!.data).toMatchObject({ amount: 861.5, originalAmount: 10, originalCurrency: 'USD' });
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent AED 150.00 On HDFC Bank Card 5678 At DUBAI MALL On 2026-09-26', receivedAt: at + 7_200_000 });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent AED 150.00 On HDFC Bank Card 5678 At DUBAI MALL On 2026-09-26', receivedAt: at + 7_200_000 });
     expect(txs().find((t) => t.data.merchant === 'DUBAI MALL')!.data.amount).toBeCloseTo(3435, 0);
   });
 
   it('a mutual fund SIP is an investment transfer into the fund; the registrar\'s confirmation is skipped; no fake bank account', () => {
-    const r = ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.5,000.00 debited from A/c XX1234 on 05-09-26 towards Parag Parikh Flexi Cap Fund SIP. Avl Bal Rs.40,000', receivedAt: at });
+    const r = fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.5,000.00 debited from A/c XX1234 on 05-09-26 towards Parag Parikh Flexi Cap Fund SIP. Avl Bal Rs.40,000', receivedAt: at });
     expect(r.status).toBe('confirmed');
     const t = txs()[0]!;
     expect(t.data).toMatchObject({ amount: 5000, kind: 'transfer', category: 'investment' });
     const fund = os.records.get(t.data.toAccountId as string)!;
     expect(fund).toMatchObject({ title: 'Parag Parikh Flexi Cap Fund', data: { kind: 'investment' } });
-    expect(ingestMessage(os, { source: 'sms', from: 'CP-CAMSPM', body: 'Dear Investor, units allotted in Folio No XX7788 for Rs 5000 under Parag Parikh Flexi Cap Fund at NAV 78.12. CAMS', receivedAt: at + 86_400_000 })).toMatchObject({ status: 'dismissed' });
+    expect(fileMessage(os, { source: 'sms', from: 'CP-CAMSPM', body: 'Dear Investor, units allotted in Folio No XX7788 for Rs 5000 under Parag Parikh Flexi Cap Fund at NAV 78.12. CAMS', receivedAt: at + 86_400_000 })).toMatchObject({ status: 'dismissed' });
     expect(os.records.query('account').map((a) => a.title).sort()).toEqual(['HDFC Bank ••1234', 'Parag Parikh Flexi Cap Fund']);
-    expect(os.dumps.toCheck().map((x) => x.label)).toContain('Invested ₹5,000 · Parag Parikh Flexi Cap Fund');
+    expect(os.filings.toCheck().map((x) => x.label)).toContain('Invested ₹5,000 · Parag Parikh Flexi Cap Fund');
   });
 
   it('your keyword rules win: ZOMATO → food, a word in the message text too', async () => {
-    const { setCategoryRules, categoryFor } = await import('@core/ingest/ingest');
+    const { setCategoryRules, categoryFor } = await import('@core/filing/messages');
     setCategoryRules(os, [{ keyword: 'guru tailors', category: 'shopping' }, { keyword: 'rent', category: 'housing' }]);
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.300.00 From HDFC Bank A/C *1234 To GURU TAILORS On 26/09/26', receivedAt: at });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.300.00 From HDFC Bank A/C *1234 To GURU TAILORS On 26/09/26', receivedAt: at });
     expect(txs()[0]!.data.category).toBe('shopping');
     expect(categoryFor(os, 'Suresh K', 'Rs 25000 sent to Suresh K for September rent')).toBe('housing');
     expect(categoryFor(os, 'ZOMATO LTD')).toBe('food');
@@ -158,21 +158,21 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
   });
 
   it('amount rules: exactly ₹28 is the water bottle; keyword + amount beats either alone; credits never match', async () => {
-    const { setCategoryRules, categoryFor } = await import('@core/ingest/ingest');
+    const { setCategoryRules, categoryFor } = await import('@core/filing/messages');
     setCategoryRules(os, [{ keyword: '', amount: 28, category: 'c_water' }, { keyword: 'SWIGGY', category: 'food' }, { keyword: 'SWIGGY', amount: 149, category: 'subscriptions' }]);
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.28.00 From HDFC Bank A/C *1234 To RAMESH STORE On 26/09/26', receivedAt: at });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.28.00 From HDFC Bank A/C *1234 To RAMESH STORE On 26/09/26', receivedAt: at });
     expect(txs()[0]!.data.category).toBe('c_water');
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.28.50 From HDFC Bank A/C *1234 To RAMESH STORE On 26/09/26', receivedAt: at + 3_600_000 });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.28.50 From HDFC Bank A/C *1234 To RAMESH STORE On 26/09/26', receivedAt: at + 3_600_000 });
     expect(txs().find((t) => t.data.amount === 28.5)!.data.category).not.toBe('c_water');
     expect(categoryFor(os, 'SWIGGY', '', 149)).toBe('subscriptions');
     expect(categoryFor(os, 'SWIGGY', '', 450)).toBe('food');
     expect(categoryFor(os, 'SWIGGY', '', 28)).toBe('food'); // a keyword rule beats an amount-only one
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.28.00 credited to HDFC Bank A/c XX1234 on 26-09-26 from VPA priya@okaxis', receivedAt: at + 7_200_000 });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.28.00 credited to HDFC Bank A/c XX1234 on 26-09-26 from VPA priya@okaxis', receivedAt: at + 7_200_000 });
     expect(txs().find((t) => t.data.kind === 'income')!.data.category).not.toBe('c_water');
   });
 
   it('amount rules for money in, with multiples: football shares ₹147 / ₹131, or a friend’s share too', async () => {
-    const { setCategoryRules, categoryFor, ruleText } = await import('@core/ingest/ingest');
+    const { setCategoryRules, categoryFor, ruleText } = await import('@core/filing/messages');
     const rule = { keyword: '', amounts: [147, 131], multiples: true, direction: 'received' as const, category: 'c_football' };
     setCategoryRules(os, [rule, { keyword: '', amounts: [28], multiples: true, category: 'c_water' }]);
     expect(ruleText(rule)).toBe('₹147 / ₹131 (or multiples) · received');
@@ -181,21 +181,21 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
     expect(categoryFor(os, 'Arjun', '', 147, 'debit')).toBe('other'); // paying 147 out isn't a share coming in
     expect(categoryFor(os, 'Kirana', '', 56, 'debit')).toBe('c_water'); // two bottles
     expect(categoryFor(os, 'Kirana', '', 56, 'credit')).toBe('other');
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.294.00 credited to HDFC Bank A/c XX1234 on 26-09-26 from VPA arjun.m@okaxis (UPI 426912345699)', receivedAt: at });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.294.00 credited to HDFC Bank A/c XX1234 on 26-09-26 from VPA arjun.m@okaxis (UPI 426912345699)', receivedAt: at });
     expect(txs()[0]!.data).toMatchObject({ kind: 'income', category: 'c_football' });
   });
 
   it('a range rule is sure only with a second signal (from the group, or soon after the turf payment); otherwise a flagged guess, and never again for a payer you corrected', async () => {
-    const { setCategoryRules } = await import('@core/ingest/ingest');
+    const { setCategoryRules } = await import('@core/filing/messages');
     os.registry.objects.set('group', groupType as never);
     const arjun = os.records.create({ object: 'person', title: 'Arjun Mehta', data: { upi: 'arjun.m@okaxis' } });
     os.records.create({ object: 'person', title: 'Priya Nair', data: { upi: 'priya.n@okaxis' } });
     const team = os.records.create({ object: 'group', data: { name: 'Football', memberIds: [arjun.id] } });
     os.groups.setMembers(team.id, [arjun.id]);
     setCategoryRules(os, [{ keyword: '', min: 100, max: 200, direction: 'received', fromGroupId: team.id, afterKeyword: 'TURF', withinHours: 48, category: 'c_football' }]);
-    const credit = (amt: number, vpa: string, when: string) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: `Rs.${amt}.00 credited to HDFC Bank A/c XX1234 on ${when} from VPA ${vpa} (UPI ${Math.floor(Math.random() * 1e12)})`, receivedAt: Date.parse(`20${when.slice(6)}-${when.slice(3, 5)}-${when.slice(0, 2)}T20:00:00`) });
+    const credit = (amt: number, vpa: string, when: string) => fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: `Rs.${amt}.00 credited to HDFC Bank A/c XX1234 on ${when} from VPA ${vpa} (UPI ${Math.floor(Math.random() * 1e12)})`, receivedAt: Date.parse(`20${when.slice(6)}-${when.slice(3, 5)}-${when.slice(0, 2)}T20:00:00`) });
     const byAmt = (n: number) => txs().find((t) => t.data.amount === n)!;
-    const checkFor = (id: string) => os.dumps.toCheck().find((x) => x.entityId === id)!;
+    const checkFor = (id: string) => os.filings.toCheck().find((x) => x.entityId === id)!;
     // From the group: sure.
     credit(147, 'arjun.m@okaxis', '12-09-26');
     expect(byAmt(147).data.category).toBe('c_football');
@@ -205,7 +205,7 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
     expect(byAmt(152).data.category).toBe('c_football');
     expect(checkFor(byAmt(152).id).flag).toMatch(/^Guessed c_football: only the amount fits — not from Football/);
     // You booked the turf; Priya's share the next day is sure.
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.1800.00 From HDFC Bank A/C *1234 To GREEN TURF ARENA On 19/09/26', receivedAt: Date.parse('2026-09-19T18:00:00') });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.1800.00 From HDFC Bank A/C *1234 To GREEN TURF ARENA On 19/09/26', receivedAt: Date.parse('2026-09-19T18:00:00') });
     credit(131, 'priya.n@okaxis', '20-09-26');
     expect(byAmt(131).data.category).toBe('c_football');
     expect(checkFor(byAmt(131).id).flag).toBeNull();
@@ -223,7 +223,7 @@ describe('deliveries from shipping texts', () => {
   it('one record per order, moved along by each text (never backwards), in Upcoming until delivered', async () => {
     const { upcoming } = await import('@core/dashboard/metrics');
     const t0 = Date.parse('2026-09-26T10:00:00');
-    const send = (body: string, dt: number, from = 'AX-AMAZON') => ingestMessage(os, { source: 'sms', from, body, receivedAt: t0 + dt });
+    const send = (body: string, dt: number, from = 'AX-AMAZON') => fileMessage(os, { source: 'sms', from, body, receivedAt: t0 + dt });
     send('Shipped: boAt Rockerz 255 Pro will be delivered by Tue, 29 Sep. Order 402-1234567-7654321', 0);
     const [d] = os.records.query('delivery');
     expect(d).toMatchObject({ title: 'boAt Rockerz 255 Pro', data: { shop: 'Amazon', status: 'shipped', expectedDate: '2026-09-29', orderId: '402-1234567-7654321' } });
@@ -239,7 +239,7 @@ describe('deliveries from shipping texts', () => {
     send('Your shipment AWB 1234567890123 from Myntra is out for delivery today. Delhivery', 0, 'VM-DLHVRY');
     send('Your Swiggy order is out for delivery!', 0, 'AX-SWIGGY');
     expect(os.records.query('delivery').map((x) => x.data.shop).sort()).toEqual(['Amazon', 'Myntra']);
-    expect(os.dumps.toCheck().filter((x) => x.kind === 'delivery').length).toBeGreaterThanOrEqual(3);
+    expect(os.filings.toCheck().filter((x) => x.kind === 'delivery').length).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -248,34 +248,34 @@ describe('60-day clean-up', () => {
     const { pruneOldData } = await import('@core/sources/retention');
     const { saveUsageDays } = await import('@core/sources/deviceData');
     const old = Date.now() - 70 * 86_400_000;
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: '123456 is your OTP', receivedAt: old });
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On 26/07/26', receivedAt: old + 1 });
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.90.00 From HDFC Bank A/C *1234 To CHAI POINT', receivedAt: Date.now() });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: '123456 is your OTP', receivedAt: old });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On 26/07/26', receivedAt: old + 1 });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.90.00 From HDFC Bank A/C *1234 To CHAI POINT', receivedAt: Date.now() });
     const d70 = new Date(old).toISOString().slice(0, 10);
     saveUsageDays(os, [{ day: d70, totalMs: 3_600_000, apps: [{ package: 'a', ms: 3_600_000 }] }]);
     const r = pruneOldData(os);
     expect(r).toMatchObject({ ignoredMessages: 1, rawTexts: 1, appUsageRows: 1 });
     expect(txs()).toHaveLength(2); // the expenses themselves stay
-    expect(ingestList(os).map((i) => i.text)).toEqual(['Sent Rs.90.00 From HDFC Bank A/C *1234 To CHAI POINT', '']);
+    expect(messageList(os).map((i) => i.text)).toEqual(['Sent Rs.90.00 From HDFC Bank A/C *1234 To CHAI POINT', '']);
     expect(os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM usage_daily`)!.n).toBe(1); // the day's total stays
   });
 });
 
 describe('payees: one record per person or shop you pay', () => {
   it('two payments to John land on your John; "JOHN D" is a flagged guess until you confirm; shops become one payee each', async () => {
-    const { confirmPayee, rejectPayee } = await import('@core/ingest/payee');
+    const { confirmPayee, rejectPayee } = await import('@core/filing/parsers/payee');
     const { placeType, orgType } = await import('./places/types');
     void placeType;
     os.registry.objects.set('org', orgType as never);
     const john = os.records.create({ object: 'person', title: 'John Doe', data: {} });
-    const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: at + dt });
+    const send = (body: string, dt: number) => fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: at + dt });
     const payeeOf = (txId: string) => os.links.forEntity(txId).find((r) => r.relation.kind === 'person' || r.relation.kind === 'payee');
     send('Sent Rs.1,300.00 From HDFC Bank A/C *1234 To JOHN D On 26/09/26', 0);
     const t1 = txs()[0]!;
     const r1 = payeeOf(t1.id)!;
     expect(r1.other.id).toBe(john.id);
     expect(r1.relation.confidence).toBeCloseTo(0.85);
-    expect(os.dumps.toCheck().find((x) => x.kind === 'transaction')!.flag).toBe('We think “JOHN D” is John Doe');
+    expect(os.filings.toCheck().find((x) => x.kind === 'transaction')!.flag).toBe('We think “JOHN D” is John Doe');
     // Yes → certain, and "JOHN D" + the UPI ID now mean John.
     confirmPayee(os, r1.relation.id);
     send('Sent Rs.500.00 From HDFC Bank A/C *1234 To JOHN D On 27/09/26', 86_400_000);
@@ -297,13 +297,13 @@ describe('payees: one record per person or shop you pay', () => {
 
   it('subscriptions: an Adobe charge (any descriptor) is Adobe, Subscriptions, and joins one Adobe subscription record', () => {
     os.registry.objects.set('subscription', subscriptionType as never);
-    const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: Date.parse('2026-08-12T10:00:00') + dt });
+    const send = (body: string, dt: number) => fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: Date.parse('2026-08-12T10:00:00') + dt });
     send('Spent Rs.1,675.60 On HDFC Bank Card 5678 At PAYPAL *ADOBE On 2026-08-12:10:02:11', 0);
     const [t1] = txs();
     expect(t1!.data).toMatchObject({ merchant: 'Adobe', category: 'subscriptions', kind: 'expense' });
     const [sub] = os.records.query<{ name: string; amount: number; nextBillingAt: string; autoPost: boolean }>('subscription');
     expect(sub!.data).toMatchObject({ name: 'Adobe', amount: 1675.6, nextBillingAt: '2026-09-12', autoPost: false });
-    expect(os.dumps.toCheck().some((x) => x.label.startsWith('Subscription: Adobe'))).toBe(true);
+    expect(os.filings.toCheck().some((x) => x.label.startsWith('Subscription: Adobe'))).toBe(true);
     // Next month, a different descriptor and a new price: same record, amount and next date updated.
     send('Rs.1799.00 has been debited from your HDFC Bank Credit Card XX5678 towards ADOBE SYSTEMS for e-mandate (SI) on 12-09-26.', 31 * 86_400_000);
     expect(os.records.query('subscription')).toHaveLength(1);
@@ -318,37 +318,37 @@ describe('payees: one record per person or shop you pay', () => {
 describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox', () => {
   const mail = (from: string, fromName: string, subject: string, text: string, date: string, uid = 1) => ({ uid, from, fromName, subject, text, date: Date.parse(date) });
   it('a receipt files an expense that says which mailbox it came from; the bank SMS for it confirms, never doubles', async () => {
-    const { ingestMail } = await import('@core/ingest/ingest');
-    const r = ingestMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Friday evening trip with Uber', 'Total ₹312.45\nPaid with UPI', '2026-09-25T21:10:00'), 'rutvij@gmail.com');
+    const { fileMail } = await import('@core/filing/messages');
+    const r = fileMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Friday evening trip with Uber', 'Total ₹312.45\nPaid with UPI', '2026-09-25T21:10:00'), 'rutvij@gmail.com');
     expect(r.status).toBe('confirmed');
     const [t] = txs();
     expect(t!.data).toMatchObject({ amount: 312.45, merchant: 'Uber', category: 'transport', note: 'From rutvij@gmail.com' });
     expect(os.records.timeline.forEntity(t!.id).some((e) => e.title === 'From Email · rutvij@gmail.com')).toBe(true);
-    expect(os.dumps.toCheck()[0]!.label).toContain('from rutvij@gmail.com');
+    expect(os.filings.toCheck()[0]!.label).toContain('from rutvij@gmail.com');
     // The same ride in the bank SMS a minute later: matched, not a second expense.
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.312.45 From HDFC Bank A/C *1234 To UBER INDIA On 25/09/26', receivedAt: Date.parse('2026-09-25T21:11:00') });
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.312.45 From HDFC Bank A/C *1234 To UBER INDIA On 25/09/26', receivedAt: Date.parse('2026-09-25T21:11:00') });
     expect(txs()).toHaveLength(1);
     // A second mailbox, the same kind of mail: its own record, naming that mailbox.
-    ingestMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Saturday trip with Uber', 'Total ₹150.00', '2026-09-26T10:00:00', 2), 'work@acme.in');
+    fileMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Saturday trip with Uber', 'Total ₹150.00', '2026-09-26T10:00:00', 2), 'work@acme.in');
     expect(txs().find((x) => x.data.amount === 150)!.data.note).toBe('From work@acme.in');
     // Seen twice (a re-sync): nothing new.
-    expect(ingestMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Saturday trip with Uber', 'Total ₹150.00', '2026-09-26T10:00:00', 2), 'work@acme.in').reason).toBe('seen before');
+    expect(fileMail(os, mail('noreply@uber.com', 'Uber Receipts', 'Your Saturday trip with Uber', 'Total ₹150.00', '2026-09-26T10:00:00', 2), 'work@acme.in').reason).toBe('seen before');
   });
 
   it('an emailed bank alert after the SMS confirms the same payment; the mail names the merchant the bank coded', async () => {
-    const { ingestMail } = await import('@core/ingest/ingest');
-    ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent Rs.1,675.60 On HDFC Bank Card 5678 At PYU*00412 On 2026-09-12', receivedAt: Date.parse('2026-09-12T10:00:00') });
-    ingestMail(os, mail('message@adobe.com', 'Adobe', 'Your Adobe invoice is ready', 'Total amount: ₹1,675.60\nCharged to Visa ending 5678', '2026-09-12T10:05:00'), 'rutvij@gmail.com');
+    const { fileMail } = await import('@core/filing/messages');
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Spent Rs.1,675.60 On HDFC Bank Card 5678 At PYU*00412 On 2026-09-12', receivedAt: Date.parse('2026-09-12T10:00:00') });
+    fileMail(os, mail('message@adobe.com', 'Adobe', 'Your Adobe invoice is ready', 'Total amount: ₹1,675.60\nCharged to Visa ending 5678', '2026-09-12T10:05:00'), 'rutvij@gmail.com');
     expect(txs()).toHaveLength(1);
     expect(txs()[0]!.data.merchant).toBe('Adobe');
     expect(os.records.timeline.forEntity(txs()[0]!.id).some((e) => e.title === 'Seen in Email · rutvij@gmail.com')).toBe(true);
   });
 
   it('a ticket → a flight in a trip, with its fare; the web check-in mail updates the same flight', async () => {
-    const { ingestMail } = await import('@core/ingest/ingest');
+    const { fileMail } = await import('@core/filing/messages');
     os.registry.objects.set('event', eventType as never);
     os.registry.objects.set('trip', tripType as never);
-    ingestMail(os, mail('reservations@customer.goindigo.in', 'IndiGo', 'Your IndiGo Itinerary - PNR K7XQ2M', 'PNR: K7XQ2M\nFlight 6E 2134\nBLR → GOI\nDeparture: Sat, 10 Oct 2026, 06:15 hrs\nTotal fare: ₹5,842', '2026-09-20T09:00:00'), 'rutvij@gmail.com');
+    fileMail(os, mail('reservations@customer.goindigo.in', 'IndiGo', 'Your IndiGo Itinerary - PNR K7XQ2M', 'PNR: K7XQ2M\nFlight 6E 2134\nBLR → GOI\nDeparture: Sat, 10 Oct 2026, 06:15 hrs\nTotal fare: ₹5,842', '2026-09-20T09:00:00'), 'rutvij@gmail.com');
     const [flight] = os.records.query<{ kind: string; flightNo: string; notes: string }>('event');
     expect(flight).toMatchObject({ title: 'Flight Bengaluru → Goa', data: { kind: 'flight', flightNo: '6E 2134' } });
     expect(flight!.data.notes).toContain('From rutvij@gmail.com');
@@ -356,17 +356,17 @@ describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox
     expect(trip).toMatchObject({ title: 'Trip to Goa', data: { startDate: '2026-10-10' } });
     expect(os.links.forEntity(flight!.id, 'part_of')[0]!.other.id).toBe(trip!.id);
     expect(txs()[0]!.data).toMatchObject({ amount: 5842, merchant: 'IndiGo', category: 'travel' });
-    ingestMail(os, mail('reservations@customer.goindigo.in', 'IndiGo', 'Web check-in is open for PNR K7XQ2M', 'Flight 6E 2134 BLR → GOI on 10 Oct 2026 06:15', '2026-10-08T06:15:00', 9), 'rutvij@gmail.com');
+    fileMail(os, mail('reservations@customer.goindigo.in', 'IndiGo', 'Web check-in is open for PNR K7XQ2M', 'Flight 6E 2134 BLR → GOI on 10 Oct 2026 06:15', '2026-10-08T06:15:00', 9), 'rutvij@gmail.com');
     expect(os.records.query('event')).toHaveLength(1);
     expect(os.records.query('trip')).toHaveLength(1);
   });
 
   it('learning: by payee (any name the bank uses), offers to fix the earlier ones, never learns a person; dumps use it too', async () => {
-    const { recategorise } = await import('@core/ingest/ingest');
+    const { recategorise } = await import('@core/filing/messages');
     os.registry.objects.set('org', (await import('./places/types')).orgType as never);
     const learned: Array<{ payee: string; others: string[] }> = [];
     const off = bus.on('category.learned', (e) => void learned.push({ payee: e.payee, others: e.others }));
-    const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: at + dt });
+    const send = (body: string, dt: number) => fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: at + dt });
     send('Sent Rs.180.00 From HDFC Bank A/C *1234 To SHARMA GENERAL STORES On 20/09/26', 0);
     send('Sent Rs.220.00 From HDFC Bank A/C *1234 To SHARMA GENERAL STORES On 21/09/26', 86_400_000);
     const first = txs().find((t) => t.data.amount === 180)!;
@@ -392,7 +392,7 @@ describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox
 
 describe('deliveries from texts read before tracking existed', () => {
   it('re-reads set-aside texts once: orders move forward in order; a stale one is assumed delivered, flagged', async () => {
-    const { backfillDeliveries } = await import('@core/ingest/ingest');
+    const { backfillDeliveries } = await import('@core/filing/messages');
     const now = Date.parse('2026-09-26T12:00:00');
     const day = 86_400_000;
     // Stored as they were before: set aside, not parsed.
@@ -406,12 +406,12 @@ describe('deliveries from texts read before tracking existed', () => {
     expect(backfillDeliveries(os, now)).toBe(2);
     const ds = os.records.query<{ status: string; item?: string; shop?: string }>('delivery');
     expect(ds.map((d) => [d.data.shop, d.data.status]).sort()).toEqual([['Amazon', 'delivered'], ['Flipkart', 'delivered']]);
-    expect(os.dumps.toCheck().find((x) => x.flag?.startsWith('Assumed delivered'))!.label).toContain('Nike');
+    expect(os.filings.toCheck().find((x) => x.flag?.startsWith('Assumed delivered'))!.label).toContain('Nike');
   });
 
   it('an order keeps its tracking link; the OTP text puts the code on it; delivery clears it', () => {
     const at = Date.parse('2026-09-26T09:00:00');
-    const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-FLPKRT', body, receivedAt: at + dt });
+    const send = (body: string, dt: number) => fileMessage(os, { source: 'sms', from: 'VM-FLPKRT', body, receivedAt: at + dt });
     send('Your Flipkart order for Nike Revolution 6 has been shipped. Track: fkrt.it/Ab12Cd Order ID OD128765432109876', 0);
     send('739204 is the OTP for your Flipkart order OD128765432109876 delivery. Share it only on receiving the package.', 3_600_000);
     const [d] = os.records.query<{ status: string; otp?: string; trackingUrl?: string }>('delivery');

@@ -2,8 +2,8 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
-import { ingestMail } from '@core/ingest/ingest';
-import { mailKind, type Mail } from '@core/ingest/mail';
+import { fileMail } from '@core/filing/messages';
+import { mailKind, type Mail } from '@core/filing/parsers/mail';
 import { quietly } from '@ui/hooks';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 
@@ -116,7 +116,7 @@ async function syncOne(os: LifeOSContext, a: MailAccount) {
             const h = byUid.get(b.uid);
             if (!h) continue;
             const mail: Mail = { ...h, text: b.text };
-            const r = ingestMail(os, mail, a.email);
+            const r = fileMail(os, mail, a.email);
             if (r.status === 'confirmed' || r.status === 'duplicate') filed++;
           }
         });

@@ -1,8 +1,8 @@
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { Extraction } from '@core/repo/dumpRepo';
-import { undoExtraction } from '@core/dumps/extract';
-import { ingestItem, sourceLabel } from '@core/ingest/ingest';
+import type { Filing } from '@core/repo/filingRepo';
+import { undoFiling } from '@core/filing/dumps';
+import { messageItem, sourceLabel } from '@core/filing/messages';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, EmptyState, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
@@ -18,26 +18,26 @@ export default function ToCheckScreen() {
   const t = useTheme();
   const router = useRouter();
   const toast = useToast();
-  const items = useLive((o) => o.dumps.toCheck(), []);
+  const items = useLive((o) => o.filings.toCheck(), []);
   // Group by what was said, keeping the list order (flagged first, newest first).
   // By what it came from: a dump, or one SMS / notification / other source item.
-  const groups: Array<{ key: string; dumpId: string | null; source: string; sourceRef: string | null; items: Extraction[] }> = [];
+  const groups: Array<{ key: string; dumpId: string | null; source: string; sourceRef: string | null; items: Filing[] }> = [];
   for (const x of items) {
     const key = x.dumpId ?? `${x.source}:${x.sourceRef ?? x.id}`;
     const g = groups.find((y) => y.key === key);
     if (g) g.items.push(x);
     else groups.push({ key, dumpId: x.dumpId, source: x.source, sourceRef: x.sourceRef, items: [x] });
   }
-  const tick = (ids: string[]) => os.dumps.setChecked(ids);
-  const cancel = (x: Extraction) => {
-    if (undoExtraction(os, x.id)) toast.show({ message: `Cancelled · ${x.label}`, icon: 'undo' });
+  const tick = (ids: string[]) => os.filings.setChecked(ids);
+  const cancel = (x: Filing) => {
+    if (undoFiling(os, x.id)) toast.show({ message: `Cancelled · ${x.label}`, icon: 'undo' });
     else toast.show({ message: 'This one can’t be cancelled from here — open it to change it', icon: 'info' });
   };
-  const edit = (x: Extraction) => {
+  const edit = (x: Filing) => {
     const e = x.entityId ? os.records.get(x.entityId) : undefined;
     if (e) router.push(`/entity/${e.object}/${e.id}${x.kind === 'link' || x.flag ? '' : '/edit'}` as never);
     else if (x.factId) router.push('/memory');
-    os.dumps.setChecked(x.id);
+    os.filings.setChecked(x.id);
   };
 
   return (
@@ -48,7 +48,7 @@ export default function ToCheckScreen() {
         <View style={{ gap: 14 }}>
           {groups.map((g) => {
             const dump = g.dumpId ? os.dumps.get(g.dumpId) : null;
-            const msg = !g.dumpId && g.sourceRef ? ingestItem(os, g.sourceRef) : null;
+            const msg = !g.dumpId && g.sourceRef ? messageItem(os, g.sourceRef) : null;
             const when = dump?.createdAt ?? msg?.receivedAt ?? g.items[0]!.createdAt;
             const head = dump ? `${dumpWhen(when)}${dump.subjectId ? ` · on ${os.records.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : `${dumpWhen(when)} · ${msg ? sourceLabel(msg) : g.source}`;
             const quote = dump?.body ?? msg?.text ?? null;

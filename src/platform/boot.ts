@@ -11,7 +11,7 @@ import { notifications } from './notifications';
 import { syncReminderNotifications } from './notifySync';
 export { syncReminderNotifications };
 import { openDatabase } from './openDatabase';
-import { runDumpExtraction } from './dumpExtraction';
+import { runFiling } from './filing';
 import { listenLive, syncSources } from './sources';
 
 let instance: LifeOSContext | null = null;
@@ -90,7 +90,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   bus.on('entity.deleted', resync);
   bus.on('app.foreground', resync);
   // Dumps saved offline or before a key was added get extracted now.
-  bus.on('app.foreground', () => void runDumpExtraction(os));
+  bus.on('app.foreground', () => void runFiling(os));
   // Phone data (bank SMS, payment notifications, screen time, Health Connect): on every foreground and live.
   bus.on('app.foreground', () => void syncSources(os));
   listenLive(os);
@@ -98,7 +98,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   // Run any due scheduled jobs now, then hand off to the background task.
   await os.scheduler.tick();
   registerBackgroundTick(os);
-  void runDumpExtraction(os);
+  void runFiling(os);
   void syncSources(os);
 
   // TEMP diagnostics (counts only, no content): what's in the database on this phone.

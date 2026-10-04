@@ -1,6 +1,6 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { DumpSource } from '@core/repo/dumpRepo';
-import { extractPending } from '@core/dumps/extract';
+import { filePending } from '@core/filing/dumps';
 import { answerQueued } from '@core/ai/questionQueue';
 import { pruneIfDue } from '@core/sources/retention';
 import { budgetLow, providerLimits } from '@core/ai/limits';
@@ -10,7 +10,7 @@ import { buildAgentFromSettings } from './agentProvider';
 
 /**
  * Brain-dump extraction on the phone (M4.1): saving a dump never waits for
- * it. Extraction runs right after a save, on every app foreground, from the
+ * it. Filing runs right after a save, on every app foreground, from the
  * OS background task, and again a little later after a failure (offline, a
  * rate limit), using the main model chain; the parser handles everyday
  * sentences with no key at all.
@@ -24,7 +24,7 @@ let failures = 0;
 /** Keep what was said and file it in the background; `subjectId` = said on that record's page. */
 export function saveDump(os: LifeOSContext, body: string, source: DumpSource = 'typed', subjectId?: string) {
   const d = os.dumps.add({ body, source, subjectId });
-  void runDumpExtraction(os);
+  void runFiling(os);
   return d;
 }
 
@@ -33,12 +33,12 @@ export function saveDump(os: LifeOSContext, body: string, source: DumpSource = '
  * then sleeps until the earliest waiting item is due (a rate limit lifting, a daily quota
  * resetting). Also runs on every app foreground and from the background task.
  */
-export function runDumpExtraction(os: LifeOSContext): Promise<void> {
+export function runFiling(os: LifeOSContext): Promise<void> {
   if (running) return running;
   running = (async () => {
     try {
       // To check: what you haven't touched in 15 days is approved as filed.
-      os.dumps.autoApprove(15);
+      os.filings.autoApprove(15);
       // Once a day: the 60-day clean-up (ignored messages, raw wording, per-app screen time, past calendar events).
       pruneIfDue(os);
       const dumpsDue = os.dumps.pending().length > 0;
@@ -49,11 +49,11 @@ export function runDumpExtraction(os: LifeOSContext): Promise<void> {
         if (questionsDue) await answerQueued(os, agent?.main, { smart: agent?.smart });
         const first = agent?.active[0]?.kind;
         const low = first ? budgetLow(providerTokensToday(os, first), PROVIDER_PRESETS[first].freeDailyTokens, !!providerLimits(os).get(first)) : false;
-        const results = dumpsDue ? await extractPending(os, agent?.main ?? null, { newestFirst: low }) : [];
+        const results = dumpsDue ? await filePending(os, agent?.main ?? null, { newestFirst: low }) : [];
         const failed = results.some((r) => r.status === 'failed');
         failures = failed ? failures + 1 : 0;
         if (retry) clearTimeout(retry);
-        retry = failed && failures <= RETRY_MS.length ? setTimeout(() => void runDumpExtraction(os), RETRY_MS[failures - 1]) : null;
+        retry = failed && failures <= RETRY_MS.length ? setTimeout(() => void runFiling(os), RETRY_MS[failures - 1]) : null;
       }
       scheduleWake(os);
     } catch (e) {
@@ -73,5 +73,5 @@ function scheduleWake(os: LifeOSContext) {
   if (!times.length) return;
   const at = Math.min(...times);
   const ms = Math.min(Math.max(at - Date.now(), 1_000) + 500, 30 * 60_000);
-  wake = setTimeout(() => void runDumpExtraction(os), ms);
+  wake = setTimeout(() => void runFiling(os), ms);
 }

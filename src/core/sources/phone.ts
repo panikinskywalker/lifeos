@@ -65,7 +65,7 @@ export function importContacts(os: LifeOSContext, picked: DeviceContact[]): { cr
     const id = personForContact(os, c);
     if (!id) {
       const e = os.records.create({ object: 'person', title: c.name.trim(), data }, 'user');
-      os.dumps.addExtraction({ source: 'contacts', sourceRef: c.id, kind: 'person', entityId: e.id, label: `Person: ${e.title} (from contacts)` });
+      os.filings.add({ source: 'contacts', sourceRef: c.id, kind: 'person', entityId: e.id, label: `Person: ${e.title} (from contacts)` });
       created++;
       continue;
     }
@@ -73,7 +73,7 @@ export function importContacts(os: LifeOSContext, picked: DeviceContact[]): { cr
     const fill = Object.fromEntries(Object.entries(data).filter(([k]) => cur.data[k] == null || cur.data[k] === ''));
     if (Object.keys(fill).length) {
       os.records.update(id, { data: fill }, 'user');
-      os.dumps.addExtraction({ source: 'contacts', sourceRef: c.id, kind: 'person', action: 'updated', entityId: id, label: `${cur.title} · ${Object.keys(fill).filter((k) => k !== 'contactId').join(', ') || 'linked to contact'} from contacts`, before: Object.fromEntries(Object.keys(fill).map((k) => [k, null])) });
+      os.filings.add({ source: 'contacts', sourceRef: c.id, kind: 'person', action: 'updated', entityId: id, label: `${cur.title} · ${Object.keys(fill).filter((k) => k !== 'contactId').join(', ') || 'linked to contact'} from contacts`, before: Object.fromEntries(Object.keys(fill).map((k) => [k, null])) });
       updated++;
     }
   }

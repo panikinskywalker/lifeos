@@ -6,10 +6,10 @@
  * what the app did (the ingest queue), so it runs in tests.
  */
 
-import type { LifeOSContext } from '../registry/context';
+import type { LifeOSContext } from '../../registry/context';
 import { bankOf, parseBankSms, parsePaymentNotification } from './bankSms';
 import { parseDeliverySms } from './delivery';
-import { ingestOutcome } from './ingest';
+import { messageOutcome } from '../messages';
 
 export interface DatasetSms {
   from: string;
@@ -103,7 +103,7 @@ export function buildSmsDataset(os: LifeOSContext, inbox: DatasetSms[], opts: { 
       text: m.body,
       parser,
       delivery,
-      app: ingestOutcome(os, { source: 'sms', from: m.from, body: m.body, receivedAt: m.at }),
+      app: messageOutcome(os, { source: 'sms', from: m.from, body: m.body, receivedAt: m.at }),
     });
   }
 

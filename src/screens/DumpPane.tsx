@@ -2,13 +2,14 @@ import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
-import type { Dump, Extraction } from '@core/repo/dumpRepo';
-import { NO_PROVIDER, undoExtraction } from '@core/dumps/extract';
+import type { Dump } from '@core/repo/dumpRepo';
+import type { Filing } from '@core/repo/filingRepo';
+import { NO_PROVIDER, undoFiling } from '@core/filing/dumps';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Chip, Icon, IconButton, Text, useToast } from '@ui/kit';
 import type { IconName } from '@ui/icons';
-import { runDumpExtraction } from '../platform/dumpExtraction';
+import { runFiling } from '../platform/filing';
 
 const KIND_ICON: Record<string, IconName> = { delivery: 'box', account: 'bank', link: 'link', place: 'location', org: 'briefcase', person: 'user', fact: 'sparkle', task: 'check-circle', transaction: 'rupee', asset: 'box', vehicle: 'car', cycle: 'repeat', routine: 'repeat', reminder: 'bell', subscription: 'card', note: 'file', trip: 'plane', event: 'calendar' };
 export const kindIcon = (k: string): IconName => KIND_ICON[k] ?? 'file';
@@ -17,7 +18,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 const KIND_WORD: Record<string, [string, string?]> = { person: ['person', 'people'], fact: ['fact'], task: ['task'], transaction: ['expense'], cycle: ['update'], entity: ['record'], link: ['link'], event: ['event'], place: ['place'], org: ['organisation'], trip: ['trip'] };
 
 /** "extracted: 1 person · 2 facts · 1 task" */
-export function extractedSummary(xs: Extraction[]): string {
+export function extractedSummary(xs: Filing[]): string {
   const live = xs.filter((x) => !x.undone);
   const counts = new Map<string, number>();
   for (const x of live) counts.set(x.kind, (counts.get(x.kind) ?? 0) + 1);
@@ -37,7 +38,7 @@ export function waitText(at: number): string {
   return isToday(at) ? `around ${t}` : `tomorrow around ${t}`;
 }
 
-export function dumpStatusLine(d: Dump, xs: Extraction[]): string {
+export function dumpStatusLine(d: Dump, xs: Filing[]): string {
   const filedSoFar = extractedSummary(xs);
   if (d.status === 'pending' && d.error === NO_PROVIDER) return `${filedSoFar ? `Filed ${filedSoFar} · ` : 'Saved · '}add a free key in You › Agent to file the rest`;
   if (d.status === 'pending' && d.retryAt && d.retryAt > Date.now()) return `Waiting to file · ${d.error ?? 'provider busy'} · ${waitText(d.retryAt)}${filedSoFar ? ` · filed so far: ${filedSoFar}` : ''}`;
@@ -52,13 +53,13 @@ export function DumpCard({ dump: d, os, onOpen, full }: { dump: Dump; os: LifeOS
   const t = useTheme();
   const router = useRouter();
   const toast = useToast();
-  const xs = useLive((o) => o.dumps.extractions(d.id), [d.id]);
+  const xs = useLive((o) => o.filings.forDump(d.id), [d.id]);
   const shown = full ? xs : xs.slice(0, 4);
-  const undo = (x: Extraction) => {
-    if (undoExtraction(os, x.id)) toast.show({ message: `Undone · ${x.label}`, icon: 'undo' });
+  const undo = (x: Filing) => {
+    if (undoFiling(os, x.id)) toast.show({ message: `Undone · ${x.label}`, icon: 'undo' });
     else toast.show({ message: 'This one can’t be undone from here — open the record to change it', icon: 'info' });
   };
-  const open = (x: Extraction) => {
+  const open = (x: Filing) => {
     if (x.undone) return;
     if (x.factId && !x.entityId) return router.push('/memory');
     const e = x.entityId ? os.records.get(x.entityId) : undefined;
@@ -85,7 +86,7 @@ export function DumpCard({ dump: d, os, onOpen, full }: { dump: Dump; os: LifeOS
           {dumpStatusLine(d, xs)}
         </Text>
         {d.status === 'pending' && d.error === NO_PROVIDER ? <Chip label="Add key" icon="key" small onPress={() => router.push('/settings/ai')} /> : null}
-        {d.status === 'failed' ? <Chip label="Retry" icon="refresh" small onPress={() => { os.dumps.setStatus(d.id, 'pending'); void runDumpExtraction(os); }} /> : null}
+        {d.status === 'failed' ? <Chip label="Retry" icon="refresh" small onPress={() => { os.dumps.setStatus(d.id, 'pending'); void runFiling(os); }} /> : null}
       </View>
       {shown.length ? (
         <View style={{ backgroundColor: t.c.bg.tileRaised, borderRadius: 16, paddingVertical: 4 }}>

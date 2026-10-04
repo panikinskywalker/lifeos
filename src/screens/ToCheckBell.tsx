@@ -8,7 +8,7 @@ import { IconButton, Text } from '@ui/kit';
 export function ToCheckBell() {
   const t = useTheme();
   const router = useRouter();
-  const n = useLive((o) => o.dumps.toCheckCount(), []);
+  const n = useLive((o) => o.filings.toCheckCount(), []);
   return (
     <View>
       <IconButton icon="bell" accessibilityLabel={n ? `To check, ${n} item${n === 1 ? '' : 's'}` : 'To check'} filled onPress={() => router.push('/check' as never)} />

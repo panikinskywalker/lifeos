@@ -13,7 +13,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Chip, EmptyState, Icon, IconButton, ScreenHeader, Text, useBottomBarInset, useToast } from '@ui/kit';
 import { ReplyCardView } from '@ui/components/ReplyCard';
 import { buildAgentFromSettings, type AgentProviders } from '../platform/agentProvider';
-import { runDumpExtraction, saveDump } from '../platform/dumpExtraction';
+import { runFiling, saveDump } from '../platform/filing';
 import { listen } from '../platform/voice';
 import { DumpCard, waitText } from './DumpPane';
 import { ToCheckBell } from './ToCheckBell';
@@ -74,7 +74,7 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
   useEffect(() => {
     let alive = true;
     buildAgentFromSettings(os).then((a) => alive && setAgent(a));
-    void runDumpExtraction(os);
+    void runFiling(os);
     return () => {
       alive = false;
     };
@@ -99,7 +99,7 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
   /** No model free: answer from the phone now, queue the full answer. */
   const queueQuestion = (question: string, until?: number | null) => {
     os.questions.add(question, until ?? null);
-    void runDumpExtraction(os);
+    void runFiling(os);
   };
   const ask = async (question: string) => {
     if (!assistant) return;

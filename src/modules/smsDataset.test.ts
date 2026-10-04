@@ -6,8 +6,8 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ModuleManifest } from '@core/registry/types';
 import { bus } from '@core/events/bus';
-import { ingestMessage } from '@core/ingest/ingest';
-import { buildSmsDataset, isOtpText, isPersonalSender } from '@core/ingest/smsDataset';
+import { fileMessage } from '@core/filing/messages';
+import { buildSmsDataset, isOtpText, isPersonalSender } from '@core/filing/parsers/smsDataset';
 import { accountType, transactionType } from './finance/types';
 import { deliveryType } from './deliveries/types';
 
@@ -44,7 +44,7 @@ describe('what counts as an OTP or a personal text', () => {
 describe('buildSmsDataset', () => {
   it('keeps bank, shop and service texts with the parser reading and what the app filed; leaves out codes and friends', () => {
     const filed = { from: 'AD-HDFCBK', body: SPENT, at };
-    ingestMessage(os, { source: 'sms', from: filed.from, body: filed.body, receivedAt: filed.at });
+    fileMessage(os, { source: 'sms', from: filed.from, body: filed.body, receivedAt: filed.at });
     const inbox = [
       filed,
       { from: 'VM-HDFCBK', body: 'Dear Customer, your account statement for Sep is ready.', at: at + 1000 },
@@ -65,7 +65,7 @@ describe('buildSmsDataset', () => {
   });
 
   it('payment-app notifications the app kept come along, codes left out', () => {
-    ingestMessage(os, { source: 'notification', from: 'com.google.android.apps.nbu.paisa.user', title: 'Payment sent', body: '₹450 paid to Swiggy', receivedAt: at });
+    fileMessage(os, { source: 'notification', from: 'com.google.android.apps.nbu.paisa.user', title: 'Payment sent', body: '₹450 paid to Swiggy', receivedAt: at });
     const ds = buildSmsDataset(os, [], { since: at - 1000, now: at });
     expect(ds.notifications).toHaveLength(1);
     expect(ds.notifications[0]).toMatchObject({ title: 'Payment sent', text: '₹450 paid to Swiggy', filed: { status: 'confirmed' } });
