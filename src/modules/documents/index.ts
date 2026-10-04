@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
 import { dateField } from '@core/cycles/schedule';
-import { documentsOverview } from './overview';
 
-export const DOCUMENTS_COLOR = palette.indigo;
+export const DOCUMENTS_COLOR = 'indigo';
 
 export interface DocumentData { kind: string; number?: string; issuedOn?: string; expiresOn?: string; issuer?: string; notes?: string; personId?: string; tripId?: string; assetId?: string }
 export const documentType: EntityTypeDef<DocumentData> = {
@@ -29,10 +27,8 @@ export const documentType: EntityTypeDef<DocumentData> = {
 };
 
 export const documentsModule: ModuleManifest = {
-  overview: documentsOverview,
   id: 'documents', name: 'Documents', version: '1.0.0', description: 'IDs, insurance, contracts and receipts — attach the scan, track the expiry.', icon: 'folder', color: DOCUMENTS_COLOR,
   dependencies: ['crm', 'travel', 'assets'], entityTypes: [documentType],
-  quickActions: [{ id: 'documents.add', label: 'Document', icon: 'doc.text', route: '/entity/document/new' }],
   aiTools: [{
     name: 'expiring_documents', description: 'Documents expiring within N days (default 90).', input: z.object({ days: z.number().optional() }),
     run: async (i, os) => { const days = (i as { days?: number }).days ?? 90; const until = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10); return os.entities.query<DocumentData>('document', { filter: { and: [{ field: 'data.expiresOn', op: 'notNull' }, { field: 'data.expiresOn', op: 'lte', value: until }] }, sort: [{ field: 'data.expiresOn', dir: 'asc' }] }).map((d) => ({ id: d.id, title: d.title, kind: d.data.kind, expiresOn: d.data.expiresOn })); },

@@ -1,11 +1,10 @@
 import { z } from 'zod';
 import type { EntityTypeDef } from '@core/domain/types';
 import type { AiToolDef } from '@core/registry/types';
-import { palette } from '@ui/theme/tokens';
 import { dateField, nextWeekday, startOfDay } from '@core/cycles/schedule';
 import { withExtras } from '@core/ai/cards';
 
-export const ASSETS_COLOR = palette.brown;
+export const ASSETS_COLOR = 'brown';
 
 export interface AssetData { category: string; purchaseDate?: string; purchasePrice?: number; currentValue?: number; serial?: string; warrantyUntil?: string; location?: string; notes?: string; vendorId?: string }
 export const assetType: EntityTypeDef<AssetData> = {
@@ -24,7 +23,7 @@ export const assetType: EntityTypeDef<AssetData> = {
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   indexed: ['category'], occurredAtField: 'purchaseDate',
-  statuses: [{ value: 'owned', label: 'Owned' }, { value: 'sold', label: 'Sold', color: palette.gray }, { value: 'lost', label: 'Lost / broken', color: palette.red }],
+  statuses: [{ value: 'owned', label: 'Owned' }, { value: 'sold', label: 'Sold', color: 'gray' }, { value: 'lost', label: 'Lost / broken', color: 'red' }],
   searchText: (d) => [d.serial, d.location, d.notes].filter(Boolean).join(' '),
 };
 

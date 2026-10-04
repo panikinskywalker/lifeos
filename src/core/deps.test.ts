@@ -84,16 +84,11 @@ const ALLOWED = new Set<string>([
   'core/registry/types.ts',
   // modules → ui: colours and screens still inside modules until stage B moves them to boards
   ...[
-    'assets/hero.tsx', 'assets/types.ts',
     'crm/index.tsx', 'crm/types.ts',
-    'deliveries/hero.tsx', 'deliveries/types.ts',
-    'documents/index.tsx',
     'finance/categories.ts', 'finance/types.ts', 'finance/reportsScreen.tsx', 'finance/screens.tsx', 'finance/subscriptionHero.tsx', 'finance/splitScreens.tsx',
     'habits/index.tsx', 'habits/types.ts',
-    'inventory/index.tsx',
-    'knowledge/index.tsx',
     'projects/types.ts', 'projects/index.tsx',
-    'travel/index.tsx', 'travel/types.ts', 'places/types.ts',
+    'travel/index.tsx', 'travel/types.ts',
     'automation/index.tsx',
   ].map((f) => `modules/${f}`),
 ]);

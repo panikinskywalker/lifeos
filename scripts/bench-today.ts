@@ -24,7 +24,7 @@ import { peopleOverview } from '../src/modules/crm/overview';
 import { projectsOverview } from '../src/modules/projects/overview';
 import { habitsOverview } from '../src/modules/habits/overview';
 import { travelOverview } from '../src/modules/travel/overview';
-import { deliveriesOverview } from '../src/modules/deliveries/overview';
+import { deliveriesOverview } from '../src/boards/deliveries/overview';
 
 const DAY = 86_400_000;
 const iso = (t: number) => new Date(t).toISOString().slice(0, 10);

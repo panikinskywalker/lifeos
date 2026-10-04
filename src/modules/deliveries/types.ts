@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
 
 /** A parcel on its way (M4.2c): one record per order, updated by each shipping text. */
 export interface DeliveryData {
@@ -35,7 +34,7 @@ export const deliveryType: EntityTypeDef<DeliveryData> = {
   label: 'Delivery',
   labelPlural: 'Deliveries',
   icon: 'box',
-  color: palette.brown,
+  color: 'brown',
   schema: z.object({
     shop: z.string().optional(),
     item: z.string().optional(),

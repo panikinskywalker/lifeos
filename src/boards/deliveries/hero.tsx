@@ -4,7 +4,7 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import type { Entity } from '@core/domain/types';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Text } from '@ui/kit';
-import { DELIVERY_STATUSES, type DeliveryData } from './types';
+import { DELIVERY_STATUSES, type DeliveryData } from '@modules/deliveries/types';
 
 /** A delivery on its way: the code for the agent (big), and the tracking page one tap away. */
 export function DeliveryHero({ entity }: { entity: Entity<any> }) {

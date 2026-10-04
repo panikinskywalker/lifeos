@@ -1,10 +1,8 @@
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
-import { notesOverview } from './overview';
 
-export const KNOWLEDGE_COLOR = palette.purple;
+export const KNOWLEDGE_COLOR = 'purple';
 
 export interface NoteData { body: string; kind?: string; source?: string; projectId?: string; personIds?: string[] }
 export const noteType: EntityTypeDef<NoteData> = {
@@ -23,8 +21,6 @@ export const noteType: EntityTypeDef<NoteData> = {
 };
 
 export const knowledgeModule: ModuleManifest = {
-  overview: notesOverview,
   id: 'knowledge', name: 'Second Brain', version: '1.0.0', description: 'Notes, ideas, journal and references — searchable and linked to everything.', icon: 'brain', color: KNOWLEDGE_COLOR,
   dependencies: ['crm', 'projects'], entityTypes: [noteType],
-  quickActions: [{ id: 'knowledge.addNote', label: 'Note', icon: 'note.text', route: '/entity/note/new', global: true }],
 };

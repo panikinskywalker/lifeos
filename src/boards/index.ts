@@ -1,5 +1,11 @@
 import type { BoardManifest } from '@core/registry/types';
 import { healthBoard } from './health';
+import { placesBoard } from './places';
+import { assetsBoard } from './assets';
+import { deliveriesBoard } from './deliveries';
+import { documentsBoard } from './documents';
+import { inventoryBoard } from './inventory';
+import { knowledgeBoard } from './knowledge';
 
 /**
  * The boards (docs/MODEL.md §3): what you see on screen. Companion boards
@@ -9,4 +15,10 @@ import { healthBoard } from './health';
  */
 export const installedBoards: BoardManifest[] = [
   healthBoard,
+  placesBoard,
+  assetsBoard,
+  deliveriesBoard,
+  documentsBoard,
+  inventoryBoard,
+  knowledgeBoard,
 ];

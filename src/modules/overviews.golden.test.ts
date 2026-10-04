@@ -20,7 +20,7 @@ import { financeOverview } from './finance/overview';
 import { peopleOverview } from './crm/overview';
 import { projectsOverview } from './projects/overview';
 import { travelOverview } from './travel/overview';
-import { deliveriesOverview } from './deliveries/overview';
+import { deliveriesOverview } from '@boards/deliveries/overview';
 import { healthOverview } from '@boards/health/overview';
 
 let os: LifeOSContext;

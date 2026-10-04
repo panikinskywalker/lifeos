@@ -1,6 +1,6 @@
 import type { LifeOSContext } from '@core/registry/context';
 import { daysUntil, inDays, lastMonths, type ModuleOverview, type OverviewBlock } from '@core/dashboard/overview';
-import type { DeliveryData } from './types';
+import type { DeliveryData } from '@modules/deliveries/types';
 
 /** Parcels at a glance: what's on the way (with its OTP), delivered this month, by month and by shop. */
 export function deliveriesOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {

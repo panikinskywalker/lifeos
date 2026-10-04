@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
 import { dateField } from '@core/cycles/schedule';
-import { inventoryOverview } from './overview';
 
-export const INVENTORY_COLOR = palette.teal;
+export const INVENTORY_COLOR = 'teal';
 
 export interface ItemData { quantity: number; unit?: string; location?: string; minQuantity?: number; expiresOn?: string; category?: string; notes?: string }
 export const itemType: EntityTypeDef<ItemData> = {
@@ -27,10 +25,8 @@ export const itemType: EntityTypeDef<ItemData> = {
 };
 
 export const inventoryModule: ModuleManifest = {
-  overview: inventoryOverview,
   id: 'inventory', name: 'Inventory', version: '1.0.0', description: 'What you have, where it is, and when to restock.', icon: 'shippingbox', color: INVENTORY_COLOR,
   entityTypes: [itemType],
-  quickActions: [{ id: 'inventory.add', label: 'Item', icon: 'shippingbox', route: '/entity/item/new' }],
   aiTools: [{
     name: 'low_stock', description: 'Inventory items at or below their restock threshold.', input: z.object({}),
     run: async (_i, os) => os.entities.query<ItemData>('item').filter((i) => i.data.minQuantity != null && i.data.quantity <= i.data.minQuantity).map((i) => ({ id: i.id, title: i.title, quantity: i.data.quantity, min: i.data.minQuantity, location: i.data.location })),
