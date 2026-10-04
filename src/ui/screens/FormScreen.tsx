@@ -12,7 +12,7 @@ import { useLive, useOS } from '../hooks';
  * One form for every entity type. Fields come from the type definition plus
  * the user's custom fields; validation from the zod schema.
  */
-export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type: string; id?: string; initial?: Record<string, unknown>; onSaved?: (e: ObjectRecord) => void; linkTo?: { id: string; kind: string } }) {
+export function FormScreen({ type, id, initial, onSaved, linkTo }: { type: string; id?: string; initial?: Record<string, unknown>; onSaved?: (e: ObjectRecord) => void; linkTo?: { id: string; kind: string } }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();

@@ -1,9 +1,9 @@
 import type { DatabaseAdapter, Row } from '../db/adapter';
 import type { LifeEvent } from '../domain/types';
 import { newId } from '../domain/ids';
-import { safeJson } from './entityRepo';
+import { safeJson } from './recordRepo';
 
-export class TimelineRepo {
+export class EventRepo {
   constructor(private db: DatabaseAdapter) {}
 
   add(ev: Omit<LifeEvent, 'id' | 'createdAt' | 'meta'> & { meta?: Record<string, unknown> }): LifeEvent {

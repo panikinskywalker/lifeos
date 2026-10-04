@@ -8,7 +8,7 @@ import { categoryOf } from '../../src/modules/finance/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Card, EmptyState, Icon, IconButton, RowItem, RowList, Screen, Section, Segmented, StackedBar, Stat, Text } from '@ui/kit';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 
 const fmtHours = (h: number) => `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}m`;
 const firstLine = (s: string) => s.trim().split('\n')[0]!;
@@ -76,7 +76,7 @@ export default function TimeScreen() {
             {span === 'day' && txs.length ? (
               <RowList>
                 {txs.map((e) => (
-                  <EntityRow key={e.id} entity={e} value={money(Number((e.data as { amount?: number }).amount ?? 0))} />
+                  <RecordRow key={e.id} entity={e} value={money(Number((e.data as { amount?: number }).amount ?? 0))} />
                 ))}
               </RowList>
             ) : p.current && span !== 'day' && cats.length ? (
@@ -102,7 +102,7 @@ export default function TimeScreen() {
         <Section title="What happened" meta={String(s.happened.length)}>
           <RowList>
             {s.happened.slice(0, 30).map((e) => (
-              <EntityRow key={e.id} entity={e} showType />
+              <RecordRow key={e.id} entity={e} showType />
             ))}
           </RowList>
         </Section>
@@ -133,7 +133,7 @@ export default function TimeScreen() {
         <Section title="Added">
           <RowList>
             {s.newPeople.slice(0, 10).map((e) => (
-              <EntityRow key={e.id} entity={e} subtitle={`New · ${format(new Date(e.createdAt), 'd MMM')}`} />
+              <RecordRow key={e.id} entity={e} subtitle={`New · ${format(new Date(e.createdAt), 'd MMM')}`} />
             ))}
             {s.created.filter((c) => c.type !== 'person').slice(0, 8).map((c) => {
               const def = os.registry.objects.get(c.type)!;

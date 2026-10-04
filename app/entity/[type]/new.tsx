@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { EntityFormScreen } from '@ui/screens/EntityFormScreen';
+import { FormScreen } from '@ui/screens/FormScreen';
 import { useOS } from '@ui/hooks';
 import { EmptyState, Screen } from '@ui/kit';
 
@@ -21,5 +21,5 @@ export default function NewEntityRoute() {
     if (!f) continue;
     initial[k] = f.type === 'number' || f.type === 'currency' ? Number(v) : f.type === 'boolean' ? v === 'true' : f.type === 'relation' && Array.isArray(f.defaultValue) ? [v] : v;
   }
-  return <EntityFormScreen type={type} initial={initial} linkTo={linkId && linkKind ? { id: linkId, kind: linkKind } : undefined} />;
+  return <FormScreen type={type} initial={initial} linkTo={linkId && linkKind ? { id: linkId, kind: linkKind } : undefined} />;
 }

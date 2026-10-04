@@ -7,7 +7,7 @@ import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Card, Chip, IconButton, Row, Screen, SectionHeader, Stat, Text, Button } from '@ui/components/primitives';
 import { Bars, ProgressBar, StackedBar } from '@ui/components/charts';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 import { accountBalance, budgetStatus, dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange } from '@modules/finance/lib';
 import { categoryOf, type AccountData, type BudgetData } from '@modules/finance/types';
 import { palette } from '@ui/theme/tokens';
@@ -125,7 +125,7 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
                 <Text color="tertiary">Add your first transaction — or ask the assistant: "spent 450 on lunch".</Text>
               </View>
             ) : (
-              data.recent.map((e: ObjectRecord, i) => <EntityRow key={e.id} entity={e} last={i === data.recent.length - 1} />)
+              data.recent.map((e: ObjectRecord, i) => <RecordRow key={e.id} entity={e} last={i === data.recent.length - 1} />)
             )}
           </Card>
         </View>
@@ -160,7 +160,7 @@ export function AccountSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx
       <View>
         <SectionHeader title="Transactions" icon="arrow.up.arrow.down" color={FINANCE_COLOR} action="Add" onAction={() => router.push({ pathname: '/entity/[type]/new', params: { type: 'transaction', accountId: entity.id } })} />
         <Card padded={false}>
-          {txns.length === 0 ? <Text color="tertiary" style={{ padding: 16 }}>No transactions on this account.</Text> : txns.map((e, i) => <EntityRow key={e.id} entity={e} last={i === txns.length - 1} />)}
+          {txns.length === 0 ? <Text color="tertiary" style={{ padding: 16 }}>No transactions on this account.</Text> : txns.map((e, i) => <RecordRow key={e.id} entity={e} last={i === txns.length - 1} />)}
         </Card>
       </View>
     </View>
@@ -184,7 +184,7 @@ export function BudgetSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx:
       </Card>
       <View>
         <SectionHeader title="Recent in category" icon="list.bullet" color={FINANCE_COLOR} action="All" onAction={() => router.push({ pathname: '/entity/[type]', params: { type: 'transaction', category: b.data.category } })} />
-        <Card padded={false}>{txns.map((e, i) => <EntityRow key={e.id} entity={e} last={i === txns.length - 1} />)}</Card>
+        <Card padded={false}>{txns.map((e, i) => <RecordRow key={e.id} entity={e} last={i === txns.length - 1} />)}</Card>
       </View>
     </View>
   );

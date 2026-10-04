@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 import { EmptyState, ListGroup, Screen } from '@ui/kit';
 
 /** Everything with one tag, grouped by record type. */
@@ -20,7 +20,7 @@ export default function TagRoute() {
       {[...byType.entries()].map(([type, list]) => (
         <ListGroup key={type} title={os.registry.objects.get(type)?.labelPlural ?? type} meta={String(list.length)}>
           {list.map((e) => (
-            <EntityRow key={e.id} entity={e} />
+            <RecordRow key={e.id} entity={e} />
           ))}
         </ListGroup>
       ))}

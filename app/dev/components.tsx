@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GraphView } from '@ui/components/GraphView';
+import { LinksView } from '@ui/components/LinksView';
 import { ConfirmCard, ReplyCardView } from '@ui/components/ReplyCard';
 import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -654,12 +654,12 @@ function TodayChartsDemo() {
 }
 
 function GraphDemo() {
-  return <GraphView nodes={DEMO_GRAPH.nodes} edges={DEMO_GRAPH.edges} height={340} />;
+  return <LinksView nodes={DEMO_GRAPH.nodes} edges={DEMO_GRAPH.edges} height={340} />;
 }
 
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
   ['Today charts', 'mini bars · delta chip (good/bad by metric) · heat map', TodayChartsDemo],
-  ['Graph view', 'around a record · 2 hops · module tints · link words (d3-force)', GraphDemo],
+  ['Links', 'the network around a record · 2 hops · module tints · link words (d3-force)', GraphDemo],
   ['Progress bar', '8 tall · pill · optional target tick', Progress],
   ['Charts', 'sparkline · line · columns · legend (Stitch)', ChartsDemo],
   ['Record insights', 'stat trio · attention · quick actions · day timeline (Stitch)', InsightDemo],

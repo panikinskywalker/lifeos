@@ -8,7 +8,7 @@ import type { SavedView } from '@core/repo/sideRepos';
 import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
 import { Button, ChipRow, EmptyState, FilterChip, IconButton, ListGroup, RowList, ScreenHeader, Sheet, Text, TextField } from '../kit';
-import { EntityRow } from '../components/EntityRow';
+import { RecordRow } from '../components/RecordRow';
 import { FilterEditor, describeFilter } from '../components/FilterEditor';
 import { useLive, useOS } from '../hooks';
 
@@ -16,7 +16,7 @@ import { useLive, useOS } from '../hooks';
  * Universal list for any entity type: saved views, search, filter/sort/group,
  * list or board layout, quick add. Works for transactions, tasks, people…
  */
-export function EntityListScreen({ type, title, initialView, embedded, linkTo }: { type: string; title?: string; initialView?: ViewDefinition; embedded?: boolean; linkTo?: { id: string; kind: string } }) {
+export function ListScreen({ type, title, initialView, embedded, linkTo }: { type: string; title?: string; initialView?: ViewDefinition; embedded?: boolean; linkTo?: { id: string; kind: string } }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
@@ -92,13 +92,13 @@ export function EntityListScreen({ type, title, initialView, embedded, linkTo }:
     c.label ? (
       <ListGroup key={c.key} title={c.label} meta={c.meta}>
         {c.items.map((e) => (
-          <EntityRow key={e.id} entity={e} />
+          <RecordRow key={e.id} entity={e} />
         ))}
       </ListGroup>
     ) : (
       <RowList key={c.key}>
         {c.items.map((e) => (
-          <EntityRow key={e.id} entity={e} />
+          <RecordRow key={e.id} entity={e} />
         ))}
       </RowList>
     );

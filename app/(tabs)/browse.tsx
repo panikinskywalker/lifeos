@@ -6,7 +6,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { ToCheckBell } from '../../src/screens/ToCheckBell';
 import { shortNameForModule, tintForModule } from '@ui/theme/moduleTint';
 import { Icon, IconBox, IconButton, RowList, Screen, Section, Text, RowItem } from '@ui/kit';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 
 /** Browse (docs/MODEL.md §5): search, Boards, Modules in their tints, Memory, Recent. */
 export default function BrowseTab() {
@@ -75,7 +75,7 @@ export default function BrowseTab() {
         <Section title="Recent" action="Tags" onAction={() => router.push('/tag')}>
           <RowList>
             {recent.map((e) => (
-              <EntityRow key={e.id} entity={e} showType />
+              <RecordRow key={e.id} entity={e} showType />
             ))}
           </RowList>
         </Section>

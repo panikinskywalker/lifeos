@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLive, useOS } from '@ui/hooks';
 import { tintForModule } from '@ui/theme/moduleTint';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 import { Chip, ChipRow, EmptyState, FilterChip, RowItem, RowList, Screen, Section, TextField } from '@ui/kit';
 
 /** Global search across every record, plus quick-add actions and recent records. */
@@ -77,7 +77,7 @@ export default function SearchRoute() {
             <Section title="Recent">
               <RowList>
                 {recent.map((e) => (
-                  <EntityRow key={e.id} entity={e} showType />
+                  <RecordRow key={e.id} entity={e} showType />
                 ))}
               </RowList>
             </Section>

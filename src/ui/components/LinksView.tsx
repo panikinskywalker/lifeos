@@ -44,7 +44,7 @@ function layout(nodes: GraphNode[], edges: GraphEdge[]) {
  * link words on the centre's lines. Tap a node to re-centre, long-press to
  * open it.
  */
-export function GraphView({ nodes, edges, height = 360, onSelect, onOpen, labels = true }: { nodes: GraphNode[]; edges: GraphEdge[]; height?: number; onSelect?: (id: string) => void; onOpen?: (n: GraphNode) => void; labels?: boolean }) {
+export function LinksView({ nodes, edges, height = 360, onSelect, onOpen, labels = true }: { nodes: GraphNode[]; edges: GraphEdge[]; height?: number; onSelect?: (id: string) => void; onOpen?: (n: GraphNode) => void; labels?: boolean }) {
   const t = useTheme();
   const { sim, links } = useMemo(() => layout(nodes, edges), [nodes, edges]);
   const centre = nodes.find((n) => n.hop === 0);

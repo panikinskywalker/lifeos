@@ -5,7 +5,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { Card, Row, SectionHeader, Stat, Text } from '@ui/components/primitives';
 import { ProgressBar, StackedBar } from '@ui/components/charts';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 import { categoryOf } from '@modules/finance/types';
 import { type TripData } from '@modules/travel';
 import { palette, paletteColor } from '@ui/theme/tokens';
@@ -58,7 +58,7 @@ export function TripSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: L
       <View>
         <SectionHeader title="Expenses" icon="banknote" color={palette.green} action="Add" onAction={() => router.push({ pathname: '/entity/[type]/new', params: { type: 'transaction', tripId: entity.id, currency: trip.data.localCurrency ?? '' } })} />
         <Card padded={false}>
-          {data.recent.length === 0 ? <Text color="tertiary" style={{ padding: 16 }}>No expenses linked yet. New transactions with this trip selected show up here.</Text> : data.recent.map((e, i) => <EntityRow key={e.id} entity={e} last={i === data.recent.length - 1} />)}
+          {data.recent.length === 0 ? <Text color="tertiary" style={{ padding: 16 }}>No expenses linked yet. New transactions with this trip selected show up here.</Text> : data.recent.map((e, i) => <RecordRow key={e.id} entity={e} last={i === data.recent.length - 1} />)}
         </Card>
       </View>
       {data.docs.length ? (

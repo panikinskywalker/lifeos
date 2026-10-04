@@ -3,7 +3,7 @@ import { newId } from '../domain/ids';
 import { bus } from '../events/bus';
 import type { LifeOSContext } from '../registry/context';
 import { nextOccurrence } from './recurrence';
-import { safeJson } from '../repo/entityRepo';
+import { safeJson } from '../repo/recordRepo';
 
 export interface ScheduledJob {
   id: string;

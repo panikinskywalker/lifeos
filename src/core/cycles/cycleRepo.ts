@@ -2,9 +2,9 @@ import type { DatabaseAdapter, Row, SqlParam } from '../db/adapter';
 import type { ObjectRecord, ObjectDef } from '../domain/types';
 import { newId } from '../domain/ids';
 import { bus, type Actor } from '../events/bus';
-import type { TimelineRepo } from '../repo/timelineRepo';
+import type { EventRepo } from '../repo/eventRepo';
 import type { ChangeLog } from '../sync/changeLog';
-import { safeJson } from '../repo/entityRepo';
+import { safeJson } from '../repo/recordRepo';
 import { cycleStatus, DAY, nextAfterDone, nextAfterSkip, startOfDay, type CycleDue, type CycleKind, type CycleStatus, type CycleUnit } from './schedule';
 
 export interface Cycle {
@@ -74,7 +74,7 @@ const COLS: Array<[keyof Cycle, string]> = [
  * meta.cycleId, which is also the cycle's history (stats read it back).
  */
 export class CycleRepo {
-  constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
+  constructor(private db: DatabaseAdapter, private timeline: EventRepo, private changes: ChangeLog) {}
 
   /** Set by the core: writes a cycle's dates back into its record's fields (ObjectDef.cycleFields). */
   onChanged?: (cycle: Cycle) => void;

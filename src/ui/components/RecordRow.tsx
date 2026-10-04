@@ -11,7 +11,7 @@ import { tintForModule } from '../theme/moduleTint';
  * from summary fields, amount on the right when the type has a currency
  * field, and a status chip when the record is past its first status.
  */
-export function EntityRow({ entity, onPress, showType, value, subtitle, swipe = true }: { entity: ObjectRecord; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null; /** Swipe left to delete (with Undo). */ swipe?: boolean }) {
+export function RecordRow({ entity, onPress, showType, value, subtitle, swipe = true }: { entity: ObjectRecord; first?: boolean; last?: boolean; onPress?: () => void; showType?: boolean; value?: string | null; subtitle?: string | null; /** Swipe left to delete (with Undo). */ swipe?: boolean }) {
   const os = useOS();
   const router = useRouter();
   const toast = useToast();

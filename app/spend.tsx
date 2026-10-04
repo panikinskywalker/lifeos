@@ -8,7 +8,7 @@ import { categoryOf } from '@modules/finance/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ChipRow, DeltaChip, FilterChip, Icon, IconButton, ScreenHeader, StackedBar, Stat, Text } from '@ui/kit';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 
 const PERIODS: Array<[SpendPeriod, string]> = [['month', 'This month'], ['last_month', 'Last month'], ['3_months', '3 months'], ['year', 'This year'], ['all', 'All time']];
 const KINDS: Array<[SpendKind, string]> = [['spending', 'Spending'], ['income', 'Income'], ['investments', 'Investments'], ['all', 'Everything']];
@@ -131,7 +131,7 @@ export default function SpendScreen() {
                   {format(new Date(`${item.data.date}T12:00:00`), 'EEE d MMM')}
                 </Text>
               ) : null}
-              <EntityRow entity={item as never} subtitle={[categoryOf(item.data.category).label, item.data.originalCurrency ? `${item.data.originalCurrency} ${item.data.originalAmount}` : null, byDate ? null : format(new Date(`${item.data.date}T12:00:00`), 'd MMM')].filter(Boolean).join(' · ')} />
+              <RecordRow entity={item as never} subtitle={[categoryOf(item.data.category).label, item.data.originalCurrency ? `${item.data.originalCurrency} ${item.data.originalAmount}` : null, byDate ? null : format(new Date(`${item.data.date}T12:00:00`), 'd MMM')].filter(Boolean).join(' · ')} />
             </View>
           );
         }}

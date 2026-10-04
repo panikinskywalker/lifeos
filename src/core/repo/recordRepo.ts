@@ -5,7 +5,7 @@ import { bus, type Actor } from '../events/bus';
 import type { Registry } from '../registry/registry';
 import { compileGroup, compileSort, fieldExpr } from '../query/filter';
 import { ChangeLog } from '../sync/changeLog';
-import { TimelineRepo } from './timelineRepo';
+import { EventRepo } from './eventRepo';
 import { SearchIndex } from '../search/searchIndex';
 
 export interface CreateInput<T = Record<string, unknown>> {
@@ -44,7 +44,7 @@ export interface AggregateSpec {
   max?: string[];
 }
 
-function rowToEntity(r: Row): ObjectRecord {
+function rowToRecord(r: Row): ObjectRecord {
   return {
     id: r.id as string,
     object: r.object as string,
@@ -81,7 +81,7 @@ export function safeJson(s: string | null | undefined): Record<string, unknown> 
  *  6. emits a bus event (automation, UI cache, AI all listen).
  */
 export class RecordRepo {
-  readonly timeline: TimelineRepo;
+  readonly timeline: EventRepo;
   readonly search: SearchIndex;
   private changes: ChangeLog;
   formatCurrency: (n: number, c?: string) => string = (n, c = 'INR') => `${c} ${n.toFixed(2)}`;
@@ -89,7 +89,7 @@ export class RecordRepo {
   syncRelations: ((entity: ObjectRecord, def: ObjectDef, actor: Actor) => void) | null = null;
 
   constructor(private db: DatabaseAdapter, private registry: Registry) {
-    this.timeline = new TimelineRepo(db);
+    this.timeline = new EventRepo(db);
     this.search = new SearchIndex(db);
     this.changes = new ChangeLog(db);
   }
@@ -148,13 +148,13 @@ export class RecordRepo {
 
   get<T = Record<string, unknown>>(id: string): ObjectRecord<T> | undefined {
     const r = this.db.get(`SELECT * FROM records WHERE id = ? AND deleted_at IS NULL`, [id]);
-    return r ? (rowToEntity(r) as ObjectRecord<T>) : undefined;
+    return r ? (rowToRecord(r) as ObjectRecord<T>) : undefined;
   }
 
   getMany(ids: string[]): ObjectRecord[] {
     if (!ids.length) return [];
     const rows = this.db.all(`SELECT * FROM records WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`, ids);
-    const map = new Map(rows.map((r) => [r.id as string, rowToEntity(r)]));
+    const map = new Map(rows.map((r) => [r.id as string, rowToRecord(r)]));
     return ids.map((i) => map.get(i)).filter((x): x is ObjectRecord => !!x);
   }
 
@@ -249,7 +249,7 @@ export class RecordRepo {
     const limit = opts.limit ?? 200;
     const offset = opts.offset ?? 0;
     const rows = this.db.all(`SELECT e.* FROM records e WHERE ${where} ORDER BY ${sort} LIMIT ? OFFSET ?`, [...params, limit, offset]);
-    return rows.map(rowToEntity) as ObjectRecord<T>[];
+    return rows.map(rowToRecord) as ObjectRecord<T>[];
   }
 
   count(type: string | string[] | null, view: ViewDefinition = {}): number {
@@ -327,7 +327,7 @@ export class RecordRepo {
       params.push(...types);
     }
     params.push(limit);
-    return this.db.all(`SELECT * FROM records WHERE ${where} ORDER BY updated_at DESC LIMIT ?`, params).map(rowToEntity);
+    return this.db.all(`SELECT * FROM records WHERE ${where} ORDER BY updated_at DESC LIMIT ?`, params).map(rowToRecord);
   }
 
   countsByType(): Record<string, number> {

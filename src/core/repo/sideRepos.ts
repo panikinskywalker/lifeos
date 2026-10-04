@@ -2,8 +2,8 @@ import type { DatabaseAdapter, Row } from '../db/adapter';
 import type {Attachment, Comment, CustomFieldDef, EntityRef, Link, Reminder, SavedViewDef, Tag, ViewDefinition} from '../domain/types';
 import { newId } from '../domain/ids';
 import { bus, type Actor } from '../events/bus';
-import { safeJson } from './entityRepo';
-import { TimelineRepo } from './timelineRepo';
+import { safeJson } from './recordRepo';
+import { EventRepo } from './eventRepo';
 import { ChangeLog } from '../sync/changeLog';
 import { nextOccurrence } from '../automation/recurrence';
 import type { Provenance } from '../graph/edges';
@@ -13,7 +13,7 @@ import type { Provenance } from '../graph/edges';
 /* ------------------------------------------------------------------ */
 
 export class LinkRepo {
-  constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
+  constructor(private db: DatabaseAdapter, private timeline: EventRepo, private changes: ChangeLog) {}
 
   link(fromId: string, toId: string, kind: string, meta: Record<string, unknown> = {}, actor: Actor = 'user', prov: Provenance = {}): Link {
     const now = Date.now();
@@ -94,7 +94,7 @@ function toRelation(r: Row): Link {
 /* ------------------------------------------------------------------ */
 
 export class TagRepo {
-  constructor(private db: DatabaseAdapter, private timeline: TimelineRepo) {}
+  constructor(private db: DatabaseAdapter, private timeline: EventRepo) {}
 
   all(): Tag[] {
     return this.db.all<Row>(`SELECT * FROM tags ORDER BY name`).map(toTag);
@@ -143,7 +143,7 @@ function toTag(r: Row): Tag {
 /* ------------------------------------------------------------------ */
 
 export class AttachmentRepo {
-  constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
+  constructor(private db: DatabaseAdapter, private timeline: EventRepo, private changes: ChangeLog) {}
   add(a: Omit<Attachment, 'id' | 'createdAt'>, actor: Actor = 'user'): Attachment {
     const now = Date.now();
     const id = newId(now);
@@ -183,7 +183,7 @@ function toAttachment(r: Row): Attachment {
 /* ------------------------------------------------------------------ */
 
 export class CommentRepo {
-  constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
+  constructor(private db: DatabaseAdapter, private timeline: EventRepo, private changes: ChangeLog) {}
   add(entityId: string, body: string, author: Comment['author'] = 'user'): Comment {
     const now = Date.now();
     const id = newId(now);
@@ -210,7 +210,7 @@ export class CommentRepo {
 /* ------------------------------------------------------------------ */
 
 export class ReminderRepo {
-  constructor(private db: DatabaseAdapter, private timeline: TimelineRepo, private changes: ChangeLog) {}
+  constructor(private db: DatabaseAdapter, private timeline: EventRepo, private changes: ChangeLog) {}
 
   create(r: { entityId?: string | null; title: string; body?: string | null; dueAt: number; rrule?: string | null }, actor: Actor = 'user'): Reminder {
     const now = Date.now();

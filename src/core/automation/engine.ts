@@ -5,7 +5,7 @@ import { bus, type CoreEvents, type EventName } from '../events/bus';
 import type { Registry } from '../registry/registry';
 import type { AutomationContext } from '../registry/types';
 import type { LifeOSContext } from '../registry/context';
-import { safeJson } from '../repo/entityRepo';
+import { safeJson } from '../repo/recordRepo';
 import { evaluateCondition, renderTemplate } from './conditions';
 
 /* ------------------------------------------------------------------ */

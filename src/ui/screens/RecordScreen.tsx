@@ -20,7 +20,7 @@ import { CyclesSection, MeterSheet } from '../components/cycles';
 import { backlinks } from '@core/links';
 import { egoGraph, neighbours } from '@core/graph/read';
 import { confirmPayee, rejectPayee } from '@core/ingest/payee';
-import { GraphView } from '../components/GraphView';
+import { LinksView } from '../components/LinksView';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
 
@@ -30,7 +30,7 @@ type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 
  * timeline. Modules add sections via manifest.detailSections.
  */
 /** `say` renders the "Tell me about …" bar (it lives in the app shell: voice + filing). */
-export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: ObjectRecord) => React.ReactNode }) {
+export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRecord) => React.ReactNode }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
@@ -288,7 +288,7 @@ function BacklinksCard({ entity }: { entity: ObjectRecord }) {
   );
 }
 
-/** Connections (docs/GRAPH.md §5): everything linked, grouped by link word; events dated, with who/where. */
+/** Links card (docs/MODEL.md §5): everything linked, grouped by link word; events dated, with who/where. */
 function RelationsCard({ entity, onLink }: { entity: ObjectRecord; onLink: () => void }) {
   const os = useOS();
   const router = useRouter();
@@ -309,7 +309,7 @@ function RelationsCard({ entity, onLink }: { entity: ObjectRecord; onLink: () =>
     toast.show({ message: `Unlinked ${n.title}`, icon: 'link', undo: () => void os.links.link(entity.id, n.id, n.kind) });
   };
   return (
-    <Section title="Connections" meta={String(items.length)} action="Link" onAction={onLink}>
+    <Section title="Links" meta={String(items.length)} action="Link" onAction={onLink}>
       <View style={{ gap: 12 }}>
         {groups.map((g) => (
           <View key={g.label} style={{ gap: 6 }}>
@@ -386,10 +386,10 @@ function GraphCard({ entity }: { entity: ObjectRecord }) {
   const router = useRouter();
   const g = useLive((o) => egoGraph(o, entity.id, { hops: 1, limit: 14 }), [entity.id]);
   if (g.nodes.length < 3) return null;
-  const explore = () => router.push(`/graph/${entity.id}` as never);
+  const explore = () => router.push(`/links/${entity.id}` as never);
   return (
-    <Section title="Graph" meta={`${g.nodes.length - 1} linked`} action="Explore" onAction={explore}>
-      <GraphView nodes={g.nodes} edges={g.edges} height={240} labels={false} onSelect={explore} onOpen={(n) => router.push(`/entity/${n.type}/${n.id}` as never)} />
+    <Section title="Around this record" meta={`${g.nodes.length - 1} linked`} action="Explore" onAction={explore}>
+      <LinksView nodes={g.nodes} edges={g.edges} height={240} labels={false} onSelect={explore} onOpen={(n) => router.push(`/entity/${n.type}/${n.id}` as never)} />
     </Section>
   );
 }

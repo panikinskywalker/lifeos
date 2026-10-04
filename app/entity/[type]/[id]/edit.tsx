@@ -1,8 +1,8 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { EntityFormScreen } from '@ui/screens/EntityFormScreen';
+import { FormScreen } from '@ui/screens/FormScreen';
 
 export default function EditEntityRoute() {
   const { type, id } = useLocalSearchParams<{ type: string; id: string }>();
-  return <EntityFormScreen type={type!} id={id!} />;
+  return <FormScreen type={type!} id={id!} />;
 }

@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from '../db/adapter';
 import type { Registry } from './registry';
-import type { RecordRepo } from '../repo/entityRepo';
+import type { RecordRepo } from '../repo/recordRepo';
 import type { AttachmentRepo, CommentRepo, CustomFieldRepo, ModuleRepo, LinkRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from '../repo/sideRepos';
 import type { AutomationEngine } from '../automation/engine';
 import type { CycleRepo } from '../cycles/cycleRepo';

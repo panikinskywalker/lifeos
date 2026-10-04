@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import type { FilterClause } from '@core/domain/types';
-import { EntityListScreen } from '@ui/screens/EntityListScreen';
+import { ListScreen } from '@ui/screens/ListScreen';
 import { useOS } from '@ui/hooks';
 import { EmptyState, Screen } from '@ui/kit';
 
@@ -27,5 +27,5 @@ export default function EntityListRoute() {
     else if (k === 'status') and.push({ field: 'status', op: 'eq', value: v });
     else and.push({ field: `data.${k}`, op: 'eq', value: v });
   }
-  return <EntityListScreen type={type} initialView={and.length ? { filter: { and } } : undefined} />;
+  return <ListScreen type={type} initialView={and.length ? { filter: { and } } : undefined} />;
 }

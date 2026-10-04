@@ -4,7 +4,7 @@ import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { AttentionCard, QuickActions, RowList, Section, StatTrio, Text, useToast } from '@ui/kit';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 import { nextBirthday, type PersonData } from '@modules/crm';
 
 
@@ -66,7 +66,7 @@ export function PersonSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx:
           <RowList>
             {txns.map((r) => {
               const e = ctx.records.get(r.other.id);
-              return e ? <EntityRow key={e.id} entity={e} /> : null;
+              return e ? <RecordRow key={e.id} entity={e} /> : null;
             })}
           </RowList>
         </Section>

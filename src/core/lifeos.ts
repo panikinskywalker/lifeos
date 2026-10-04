@@ -3,7 +3,7 @@ import { migrate } from './db/migrate';
 import { registry as defaultRegistry, Registry } from './registry/registry';
 import type { LifeOSContext } from './registry/context';
 import type { BoardManifest, ModuleManifest } from './registry/types';
-import { RecordRepo } from './repo/entityRepo';
+import { RecordRepo } from './repo/recordRepo';
 import { AttachmentRepo, CommentRepo, CustomFieldRepo, ModuleRepo, LinkRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from './repo/sideRepos';
 import { ChangeLog } from './sync/changeLog';
 import { CycleRepo } from './cycles/cycleRepo';

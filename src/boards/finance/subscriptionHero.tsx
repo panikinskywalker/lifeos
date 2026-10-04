@@ -6,7 +6,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { logDone, undoLoggedDone } from '@core/cycles/upkeep';
 import { useLive } from '@ui/hooks';
 import { AttentionCard, QuickActions, RowList, Section, StatTrio, useToast } from '@ui/kit';
-import { EntityRow } from '@ui/components/EntityRow';
+import { RecordRow } from '@ui/components/RecordRow';
 import type { SubscriptionData } from '@modules/finance/types';
 import { perMonth } from '@modules/finance/reports';
 
@@ -72,7 +72,7 @@ export function SubscriptionHero({ entity, ctx }: { entity: ObjectRecord<any>; c
         <Section title="Billing history" meta={`${posted.length}`}>
           <RowList>
             {posted.slice(0, 8).map((e) => (
-              <EntityRow key={e.id} entity={e} />
+              <RecordRow key={e.id} entity={e} />
             ))}
           </RowList>
         </Section>
