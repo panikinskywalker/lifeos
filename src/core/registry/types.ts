@@ -102,6 +102,77 @@ export interface EntityDetailSection {
   placement?: 'top' | 'body';
 }
 
+/* ------------------------------------------------------------------ */
+/* Boards — the top tier (docs/MODEL.md §3): what you see on screen.   */
+/* A board connects modules; it owns tiles, screens and per-Object      */
+/* overrides, and defines no Objects. Every module has a companion      */
+/* board of the same id holding its overrides.                          */
+/* ------------------------------------------------------------------ */
+
+export interface TileDef {
+  /** Globally unique, e.g. "finance.spend-this-month". */
+  type: string;
+  board: string;
+  name: string;
+  description?: string;
+  icon: string;
+  sizes: WidgetSize[];
+  defaultSize: WidgetSize;
+  configFields?: EntityTypeDef['fields'];
+  component: ComponentType<WidgetProps>;
+}
+
+export interface BoardScreen {
+  /** Route segment under /board/<boardId>/<key>; "index" is the board's home. */
+  key: string;
+  title: string;
+  component: ComponentType<{ ctx: LifeOSContext; params: Record<string, string> }>;
+}
+
+/** Per-Object overrides of the six generic screens (Overview, List, Record, Form, Metric, Links). */
+export interface ObjectOverride {
+  object: string | '*';
+  /** Extra sections on the Record screen (hero at the top, cards in the body). */
+  record?: EntityDetailSection[];
+  /** The Overview screen's blocks for the module (numbers, charts, what needs you). Pure. */
+  overview?: (os: LifeOSContext, now?: number, opts?: { cardOnly?: boolean }) => import('../dashboard/overview').ModuleOverview;
+}
+
+export interface ManualRun {
+  id: string;
+  label: string;
+  icon: string;
+  /** Automation rule id to run, or a route to open. */
+  ruleId?: string;
+  route?: string;
+}
+
+export interface BoardManifest {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  /** Pinned in the bottom bar (today, upkeep) or a tile in Browse › Boards (everything else). */
+  placement: 'bar' | 'browse';
+  /** The module this board is the companion of (its overrides); absent for cross-module boards (today, turf). */
+  module?: string;
+  tiles?: TileDef[];
+  screens?: BoardScreen[];
+  overrides?: ObjectOverride[];
+  /** @deprecated R0: moves to the companion board. */
+  quickActions?: QuickAction[];
+  buttons?: ManualRun[];
+  /** Default tiles added to Today on install. */
+  defaultTiles?: Array<{ type: string; size?: WidgetSize; config?: Record<string, unknown> }>;
+}
+
+/* ------------------------------------------------------------------ */
+/* Modules — one domain of data each. Objects, filing, sources, AI     */
+/* tools, triggers, actions. Nothing visual (that is the board's).     */
+/* The visual fields below are @deprecated and move to the companion   */
+/* board in R0 stage B.                                                 */
+/* ------------------------------------------------------------------ */
+
 export interface ModuleManifest {
   id: string;
   name: string;
@@ -113,19 +184,23 @@ export interface ModuleManifest {
   /** Module ids that must be installed first. */
   dependencies?: string[];
   entityTypes?: EntityTypeDef<any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** @deprecated R0: moves to the companion board. */
   screens?: ModuleScreen[];
+  /** @deprecated R0: moves to the companion board. */
   widgets?: WidgetDef[];
+  /** @deprecated R0: moves to the companion board. */
   quickActions?: QuickAction[];
   triggers?: TriggerDef[];
   actions?: ActionDef[];
   aiTools?: AiToolDef[];
+  /** @deprecated R0: moves to the companion board. */
   detailSections?: EntityDetailSection[];
   /** Runs once when installed: seed default views/dashboards/rules. */
   onInstall?: (os: LifeOSContext) => void | Promise<void>;
-  /** Runs every app start after install. */
-  /** The module's overview (Browse page and Today's area card): numbers, charts, what needs you. Pure. */
+  /** @deprecated R0: moves to the companion board's overrides. */
   overview?: (os: LifeOSContext, now?: number, opts?: { cardOnly?: boolean }) => import('../dashboard/overview').ModuleOverview;
+  /** Runs every app start after install. */
   onStart?: (os: LifeOSContext) => void | Promise<void>;
-  /** Default widgets added to the home dashboard on install. */
+  /** @deprecated R0: moves to the companion board (defaultTiles). */
   defaultWidgets?: Array<{ type: string; size?: WidgetSize; config?: Record<string, unknown> }>;
 }

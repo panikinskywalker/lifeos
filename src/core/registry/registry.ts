@@ -1,5 +1,5 @@
 import type { EntityTypeDef } from '../domain/types';
-import type { ActionDef, AiToolDef, EntityDetailSection, ModuleManifest, QuickAction, TriggerDef, WidgetDef } from './types';
+import type { ActionDef, AiToolDef, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, TriggerDef, WidgetDef } from './types';
 
 /**
  * Central registry. Modules register manifests; every other subsystem looks
@@ -7,6 +7,7 @@ import type { ActionDef, AiToolDef, EntityDetailSection, ModuleManifest, QuickAc
  */
 export class Registry {
   readonly modules = new Map<string, ModuleManifest>();
+  readonly boards = new Map<string, BoardManifest>();
   readonly entityTypes = new Map<string, EntityTypeDef>();
   readonly widgets = new Map<string, WidgetDef>();
   readonly triggers = new Map<string, TriggerDef>();
@@ -36,6 +37,37 @@ export class Registry {
       else this.detailSections.push(s);
     }
     this.detailSections.sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+  }
+
+  /** Boards register after modules; their tiles, overrides and quick actions join the same lookups. */
+  registerBoard(b: BoardManifest) {
+    if (b.module && !this.modules.has(b.module)) throw new Error(`Board "${b.id}" is the companion of "${b.module}" which is not registered`);
+    this.boards.set(b.id, b);
+    for (const t of b.tiles ?? []) this.widgets.set(t.type, { ...t, module: b.module ?? b.id });
+    for (const q of b.quickActions ?? []) {
+      const i = this.quickActions.findIndex((x) => x.id === q.id);
+      if (i >= 0) this.quickActions[i] = q;
+      else this.quickActions.push(q);
+    }
+    for (const o of b.overrides ?? []) {
+      for (const s of o.record ?? []) {
+        const sec = { ...s, entityType: o.object };
+        const i = this.detailSections.findIndex((x) => x.key === sec.key && x.entityType === sec.entityType);
+        if (i >= 0) this.detailSections[i] = sec;
+        else this.detailSections.push(sec);
+      }
+    }
+    this.detailSections.sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+  }
+
+  /** The overview for a module: its companion board's override, else the module's own (deprecated) one. */
+  overviewFor(moduleId: string) {
+    for (const b of this.boards.values()) {
+      if (b.module !== moduleId) continue;
+      const o = b.overrides?.find((x) => x.overview)?.overview;
+      if (o) return o;
+    }
+    return this.modules.get(moduleId)?.overview;
   }
 
   type(type: string): EntityTypeDef {

@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import type { DatabaseAdapter, Row, SqlParam } from './adapter';
+import type { DatabaseAdapter, Row, SqlParam } from '@core/db/adapter';
 
 /** Device adapter backed by expo-sqlite's synchronous API. */
 function wrap<T>(sql: string, fn: () => T): T {

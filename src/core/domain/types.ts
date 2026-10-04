@@ -1,11 +1,16 @@
 import type { ZodTypeAny } from 'zod';
+import type { Field, FieldOption as FieldOptionNew, FieldType as FieldTypeNew, FilterOp as FilterOpNew } from './fields';
 
 /* ------------------------------------------------------------------ */
-/* Entity envelope                                                     */
+/* Record envelope (docs/MODEL.md: Object / Field / Record)            */
+/* R0 stage A: the vocabulary names exist alongside the old ones; the  */
+/* old names are removed in stage C. TypeScript owns `Record`, so a    */
+/* record in code is an ObjectRecord; DOM owns `Event`, so a timeline  */
+/* event in code is a LifeEvent.                                       */
 /* ------------------------------------------------------------------ */
 
-/** The shared envelope every record in LifeOS carries. */
-export interface Entity<TData = Record<string, unknown>> {
+/** One row of an Object: the shared envelope every record carries. */
+export interface ObjectRecord<TData = Record<string, unknown>> {
   id: string;
   type: string;
   title: string;
@@ -22,6 +27,9 @@ export interface Entity<TData = Record<string, unknown>> {
   version: number;
 }
 
+/** @deprecated R0: use ObjectRecord. */
+export type Entity<TData = Record<string, unknown>> = ObjectRecord<TData>;
+
 export interface EntityRef {
   id: string;
   type: string;
@@ -32,24 +40,11 @@ export interface EntityRef {
 /* Field definitions — drive forms, filters, AI tools, custom fields   */
 /* ------------------------------------------------------------------ */
 
-export type FieldType =
-  | 'text'
-  | 'longtext'
-  | 'number'
-  | 'currency'
-  | 'boolean'
-  | 'date'
-  | 'datetime'
-  | 'select'
-  | 'multiselect'
-  | 'relation'
-  | 'json';
+/** @deprecated R0 stage E replaces 'currency' → 'money', 'relation' → 'link', removes 'json'; see fields.ts. */
+export type FieldType = FieldTypeNew | 'currency' | 'relation' | 'json';
 
-export interface FieldOption {
-  value: string;
-  label: string;
-  color?: string;
-}
+export type FieldOption = FieldOptionNew;
+export type { Field };
 
 export interface FieldDef {
   key: string;
@@ -78,6 +73,7 @@ export interface FieldDef {
 /* Entity type definition — registered once, used everywhere           */
 /* ------------------------------------------------------------------ */
 
+/** An Object: the definition of a storage unit — name, Fields, cycles. (ObjectDef; `EntityTypeDef` is the old name.) */
 export interface EntityTypeDef<TData = Record<string, unknown>> {
   /** Stable id, e.g. "transaction". Never rename. */
   type: string;
@@ -117,6 +113,9 @@ export interface EntityTypeDef<TData = Record<string, unknown>> {
   cycleTemplates?: (data: TData) => CycleSeed[];
 }
 
+/** The vocabulary name; identical to EntityTypeDef until stage C renames the properties (`type` → `id`). */
+export type ObjectDef<TData = Record<string, unknown>> = EntityTypeDef<TData>;
+
 /** A default cycle from a type's template; `template` keeps it from being added twice. */
 export interface CycleSeed {
   template: string;
@@ -146,11 +145,7 @@ export interface RelationKindDef {
 /* Universal filtering + saved views                                   */
 /* ------------------------------------------------------------------ */
 
-export type FilterOp =
-  | 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte'
-  | 'contains' | 'startsWith' | 'in' | 'notIn'
-  | 'isNull' | 'notNull' | 'between'
-  | 'hasTag' | 'relatedTo';
+export type FilterOp = FilterOpNew;
 
 export interface FilterClause {
   /** Envelope field ("title","status","occurredAt","createdAt") or "data.<key>". */
@@ -192,6 +187,7 @@ export interface SavedViewDef {
 /* Side objects                                                        */
 /* ------------------------------------------------------------------ */
 
+/** A Link: one typed connection between two records (`Relation` is the old name). */
 export interface Relation {
   id: string;
   fromId: string;
@@ -205,6 +201,9 @@ export interface Relation {
   confidence?: number;
 }
 
+export type Link = Relation;
+
+/** An Event: something that happened at a time, attached to a record (`TimelineEvent` is the old name). */
 export interface TimelineEvent {
   id: string;
   entityId: string;
@@ -216,6 +215,8 @@ export interface TimelineEvent {
   occurredAt: number;
   createdAt: number;
 }
+
+export type LifeEvent = TimelineEvent;
 
 export interface Attachment {
   id: string;

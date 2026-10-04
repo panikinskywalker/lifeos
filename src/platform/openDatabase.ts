@@ -1,5 +1,5 @@
 import { openDatabaseSync } from 'expo-sqlite';
-import { createExpoAdapter } from '@core/db/expoAdapter';
+import { createExpoAdapter } from './expoSqliteAdapter';
 import type { DatabaseAdapter } from '@core/db/adapter';
 
 /** Native (Android/iOS): on-device SQLite. The web build uses openDatabase.web.ts instead. */
