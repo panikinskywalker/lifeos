@@ -85,8 +85,6 @@ const ALLOWED = new Set<string>([
   // modules → ui: colours and screens still inside modules until stage B moves them to boards
   ...[
     'finance/categories.ts', 'finance/types.ts', 'finance/reportsScreen.tsx', 'finance/screens.tsx', 'finance/subscriptionHero.tsx', 'finance/splitScreens.tsx',
-    'habits/index.tsx', 'habits/types.ts',
-    'projects/types.ts', 'projects/index.tsx',
     'automation/index.tsx',
   ].map((f) => `modules/${f}`),
 ]);

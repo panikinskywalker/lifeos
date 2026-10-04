@@ -8,6 +8,8 @@ import { inventoryBoard } from './inventory';
 import { knowledgeBoard } from './knowledge';
 import { crmBoard } from './crm';
 import { travelBoard } from './travel';
+import { habitsBoard } from './habits';
+import { projectsBoard } from './projects';
 
 /**
  * The boards (docs/MODEL.md §3): what you see on screen. Companion boards
@@ -25,4 +27,6 @@ export const installedBoards: BoardManifest[] = [
   knowledgeBoard,
   crmBoard,
   travelBoard,
+  habitsBoard,
+  projectsBoard,
 ];

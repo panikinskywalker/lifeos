@@ -1,20 +1,17 @@
 import { Pressable, View } from 'react-native';
-import { z } from 'zod';
-import type { ModuleManifest } from '@core/registry/types';
 import type { Entity } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { useLive, useOS } from '@ui/hooks';
 import { Button, HeatMap, Icon, Ring, Section, StatTrio, Text } from '@ui/kit';
-import { activeHabits, checkIn, doneDays, dueOn, findHabit, isoOf, streakOf, toggleCheckIn, type Habit } from '@core/habits/habits';
-import { habitsOverview } from './overview';
+import { activeHabits, doneDays, dueOn, isoOf, streakOf, toggleCheckIn, type Habit } from '@core/habits/habits';
+import type { HabitData } from '@modules/habits';
 
-export const HABITS_COLOR = palette.orange;
-export * from './types';
-import { habitLogType, habitType, type HabitData } from './types';
+const HABITS_COLOR = palette.orange;
 const today = () => isoOf(Date.now());
 const DAY = 86_400_000;
+
 
 /**
  * This week, Monday to Sunday: a row per habit, a circle per day — ticked
@@ -120,7 +117,7 @@ export function HabitChecklist({ limit = 8 }: { limit?: number }) {
 }
 
 /** A habit's page: the streak, a big check-in, the last week (tap a day to fix it), 13 weeks as a heat map. */
-function HabitSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function HabitSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
   const os = useOS();
   const h: Habit = useLive((o) => activeHabits(o).find((x) => x.id === entity.id) ?? { id: entity.id, title: entity.title, frequency: (entity.data as HabitData).frequency ?? 'daily', perWeek: (entity.data as HabitData).targetPerWeek ?? 7 }, [entity.id, entity.updatedAt]);
   const done = useLive((o) => doneDays(o, entity.id, isoOf(Date.now() - 400 * DAY)), [entity.id]);
@@ -157,41 +154,3 @@ function HabitSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
   );
 }
 
-export const habitsModule: ModuleManifest = {
-  overview: habitsOverview,
-  id: 'habits',
-  name: 'Habits',
-  version: '1.0.0',
-  description: 'Daily habits with streaks and a heat map.',
-  icon: 'flame',
-  color: HABITS_COLOR,
-  entityTypes: [habitType, habitLogType],
-  quickActions: [{ id: 'habits.add', label: 'Habit', icon: 'flame', route: '/entity/habit/new' }],
-  detailSections: [{ entityType: 'habit', key: 'habits.habit', title: 'Streak', component: HabitSection, order: 10 }],
-  aiTools: [
-    {
-      name: 'habits_status',
-      description: 'Active habits with whether each is done today and its current streak.',
-      input: z.object({}),
-      run: async (_i, os) =>
-        activeHabits(os).map((h) => {
-          const done = doneDays(os, h.id, isoOf(Date.now() - 400 * DAY));
-          const s = streakOf(h, done);
-          return { id: h.id, title: h.title, doneToday: done.has(today()), streak: `${s.count} ${s.unit}${s.count === 1 ? '' : 's'}` };
-        }),
-    },
-    {
-      name: 'habit_check_in',
-      description: 'Tick a habit the user tracks as done for a day (default today). Name it as they said it.',
-      input: z.object({ habit: z.string(), date: z.string().optional(), entityId: z.string().optional() }),
-      run: async (i, os) => {
-        const x = i as { habit: string; date?: string; entityId?: string };
-        const h = x.entityId ? activeHabits(os).find((y) => y.id === x.entityId) : findHabit(os, x.habit);
-        if (!h) return { error: `no habit called ${x.habit}` };
-        const date = x.date ?? today();
-        const logId = checkIn(os, h.id, date);
-        return { logged: `${h.title} ✓ ${date === today() ? 'today' : date.slice(8) + '/' + date.slice(5, 7)}`, entityId: h.id, logId, already: !logId };
-      },
-    },
-  ],
-};

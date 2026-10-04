@@ -17,7 +17,7 @@ import { tintForModule } from '@ui/theme/moduleTint';
 import { activeHabits } from '@core/habits/habits';
 import { trackerSummary, trackers } from '@core/activity/trackers';
 import { ActivityRow } from '../../src/screens/ActivityGrid';
-import { HabitChecklist, HabitWeek } from '@modules/habits';
+import { HabitChecklist, HabitWeek } from '@boards/habits';
 
 function greeting(d = new Date()) {
   const h = d.getHours();

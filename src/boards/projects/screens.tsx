@@ -1,44 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { z } from 'zod';
-import type { ModuleManifest } from '@core/registry/types';
-import type { Entity, EntityTypeDef } from '@core/domain/types';
+import type { Entity } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { useLive } from '@ui/hooks';
+import { useLive, useOS } from '@ui/hooks';
 import { Button, Card, Chip, Icon, IconButton, Input, Row, Screen, SectionHeader, Stat, Text } from '@ui/components/primitives';
 import { ProgressBar, ProgressRing } from '@ui/components/charts';
-import { EntityRow } from '@ui/components/EntityRow';
+import { PRIORITIES, projectProgress, toggleTask, type TaskData, type ProjectData, type GoalData, type EventData } from '@modules/projects';
 
-export const PROJECTS_COLOR = palette.blue;
-
-/* ------------------------------------------------------------------ */
-/* Entity types                                                        */
-/* ------------------------------------------------------------------ */
-
-import { PRIORITIES, taskType, projectType, goalType, eventType, type TaskData, type ProjectData, type GoalData, type EventData } from './types';
-export { taskType, projectType, goalType, eventType, type TaskData, type ProjectData, type GoalData, type EventData };
+const PROJECTS_COLOR = palette.blue;
 const today = () => new Date().toISOString().slice(0, 10);
-
-export function projectProgress(os: LifeOSContext, projectId: string) {
-  const total = os.entities.count('task', { filter: { and: [{ field: 'data.projectId', op: 'eq', value: projectId }] } });
-  const done = os.entities.count('task', { filter: { and: [{ field: 'data.projectId', op: 'eq', value: projectId }, { field: 'status', op: 'eq', value: 'done' }] } });
-  return { total, done, progress: total ? done / total : 0 };
-}
-
-export function toggleTask(os: LifeOSContext, task: Entity<TaskData>) {
-  const done = task.status === 'done';
-  os.entities.update<TaskData>(task.id, { status: done ? 'todo' : 'done', data: { completedAt: done ? undefined : Date.now() } as Partial<TaskData> });
-}
-
-/* ------------------------------------------------------------------ */
-/* Components                                                          */
-/* ------------------------------------------------------------------ */
-
-import { useOS } from '@ui/hooks';
-import { projectsOverview } from './overview';
 
 export function TaskList({ tasks, showProject, empty }: { tasks: Entity<TaskData>[]; showProject?: boolean; empty?: string }) {
   const t = useTheme();
@@ -91,7 +64,7 @@ function QuickAdd({ projectId, accent }: { projectId?: string; accent: string })
 /* Module home                                                         */
 /* ------------------------------------------------------------------ */
 
-function ProjectsHome({ ctx }: { ctx: LifeOSContext; params: Record<string, string> }) {
+export function ProjectsHome({ ctx }: { ctx: LifeOSContext; params: Record<string, string> }) {
   const router = useRouter();
   const t = useTheme();
   const data = useLive(
@@ -195,7 +168,7 @@ function ProjectsHome({ ctx }: { ctx: LifeOSContext; params: Record<string, stri
 /* Detail sections                                                     */
 /* ------------------------------------------------------------------ */
 
-function ProjectSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function ProjectSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
   const router = useRouter();
   const tasks = useLive((os) => os.entities.query<TaskData>('task', { filter: { and: [{ field: 'data.projectId', op: 'eq', value: entity.id }] }, sort: [{ field: 'status', dir: 'desc' }, { field: 'data.dueDate', dir: 'asc' }] }), [entity.id]);
   const prog = useLive((os) => projectProgress(os, entity.id), [entity.id]);
@@ -232,7 +205,7 @@ function ProjectSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext })
   );
 }
 
-function GoalSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
+export function GoalSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
   const os = useOS();
   const g = entity as Entity<GoalData>;
   const prog = g.data.targetValue ? (g.data.currentValue ?? 0) / g.data.targetValue : null;
@@ -272,60 +245,3 @@ function GoalSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
 /* Manifest                                                            */
 /* ------------------------------------------------------------------ */
 
-export const projectsModule: ModuleManifest = {
-  overview: projectsOverview,
-  id: 'projects',
-  name: 'Projects & Tasks',
-  version: '1.0.0',
-  description: 'Projects, tasks, goals and events. Everything else links to them.',
-  icon: 'checkmark.circle',
-  color: PROJECTS_COLOR,
-  dependencies: ['crm', 'travel'],
-  entityTypes: [projectType, taskType, goalType, eventType],
-  screens: [{ key: 'index', title: 'Projects', component: ProjectsHome }],
-  quickActions: [
-    { id: 'projects.addTask', label: 'Task', icon: 'checkmark.circle', route: '/entity/task/new', global: true },
-    { id: 'projects.addEvent', label: 'Event', icon: 'calendar', route: '/entity/event/new', global: true },
-    { id: 'projects.addProject', label: 'Project', icon: 'folder', route: '/entity/project/new' },
-    { id: 'projects.addGoal', label: 'Goal', icon: 'target', route: '/entity/goal/new' },
-  ],
-  detailSections: [
-    { entityType: 'project', key: 'projects.project', title: 'Tasks', component: ProjectSection, order: 10 },
-    { entityType: 'goal', key: 'projects.goal', title: 'Progress', component: GoalSection, order: 10 },
-  ],
-  triggers: [
-    {
-      id: 'projects.task.completed', module: 'projects', label: 'Task completed', event: 'entity.status',
-      toContext: (p) => {
-        const e = p as { entity: Entity; to: string | null };
-        if (e.entity.type !== 'task' || e.to !== 'done') return null;
-        return { entity: e.entity, vars: { projectId: e.entity.data.projectId } };
-      },
-    },
-  ],
-  actions: [
-    {
-      id: 'projects.createTask', module: 'projects', label: 'Create task',
-      configFields: [{ key: 'title', label: 'Title', type: 'text', required: true }, { key: 'inDays', label: 'Due in (days)', type: 'number' }, { key: 'priority', label: 'Priority', type: 'select', options: PRIORITIES }],
-      run: async (cfg, ctx, os) => {
-        const due = cfg.inDays != null && cfg.inDays !== '' ? new Date(Date.now() + Number(cfg.inDays) * 86400000).toISOString().slice(0, 10) : undefined;
-        const task = os.entities.create<TaskData>({ type: 'task', title: String(cfg.title), data: { priority: (cfg.priority as TaskData['priority']) || 'medium', dueDate: due, projectId: ctx.entity?.type === 'project' ? ctx.entity.id : undefined } }, 'automation');
-        if (ctx.entity && ctx.entity.type !== 'project') os.relations.link(task.id, ctx.entity.id, 'related', {}, 'automation');
-        return task.title;
-      },
-    },
-  ],
-  aiTools: [
-    {
-      name: 'tasks_overview',
-      description: 'Open tasks due today/overdue, upcoming tasks, active projects with progress, and active goals.',
-      input: z.object({}),
-      run: async (_i, os) => ({
-        dueOrOverdue: os.entities.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'lte', value: today() }] } }).map((x) => ({ id: x.id, title: x.title, due: x.data.dueDate, priority: x.data.priority, status: x.status })),
-        upcoming: os.entities.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'gt', value: today() }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }] }, { limit: 15 }).map((x) => ({ id: x.id, title: x.title, due: x.data.dueDate })),
-        projects: os.entities.query<ProjectData>('project', { filter: { and: [{ field: 'status', op: 'in', value: ['active', 'planning'] }] } }).map((p) => ({ id: p.id, title: p.title, status: p.status, ...projectProgress(os, p.id) })),
-        goals: os.entities.query<GoalData>('goal', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }).map((g) => ({ id: g.id, title: g.title, target: g.data.targetValue, current: g.data.currentValue, unit: g.data.unit, by: g.data.targetDate })),
-      }),
-    },
-  ],
-};

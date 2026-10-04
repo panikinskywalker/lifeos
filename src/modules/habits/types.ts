@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
 
 export interface HabitData {
   frequency: 'daily' | 'weekdays' | 'weekly';
@@ -28,7 +27,7 @@ export const habitType: EntityTypeDef<HabitData> = {
     { key: 'targetPerWeek', label: 'Target per week', type: 'number', description: 'For "times per week" habits' },
     { key: 'why', label: 'Why', type: 'longtext', section: 'Details' },
   ],
-  statuses: [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused', color: palette.gray }],
+  statuses: [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused', color: 'gray' }],
   relations: [{ kind: 'habit', label: 'Logs', to: 'habit_log', cardinality: 'many' }],
 };
 

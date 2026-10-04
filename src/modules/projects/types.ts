@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
 
 /** Projects record types (no React Native — unit-tested). */
 
-export const PRIORITIES = [{ value: 'low', label: 'Low', color: palette.gray }, { value: 'medium', label: 'Medium', color: palette.blue }, { value: 'high', label: 'High', color: palette.orange }, { value: 'urgent', label: 'Urgent', color: palette.red }];
+export const PRIORITIES = [{ value: 'low', label: 'Low', color: 'gray' }, { value: 'medium', label: 'Medium', color: 'blue' }, { value: 'high', label: 'High', color: 'orange' }, { value: 'urgent', label: 'Urgent', color: 'red' }];
 
 export interface TaskData {
   notes?: string;
@@ -35,7 +34,7 @@ export const taskType: EntityTypeDef<TaskData> = {
   ],
   indexed: ['dueDate', 'projectId', 'priority'],
   occurredAtField: 'dueDate',
-  statuses: [{ value: 'todo', label: 'To do' }, { value: 'doing', label: 'In progress', color: palette.orange }, { value: 'done', label: 'Done', color: palette.green }, { value: 'blocked', label: 'Blocked', color: palette.red }],
+  statuses: [{ value: 'todo', label: 'To do' }, { value: 'doing', label: 'In progress', color: 'orange' }, { value: 'done', label: 'Done', color: 'green' }, { value: 'blocked', label: 'Blocked', color: 'red' }],
   searchText: (d) => d.notes ?? '',
   relations: [{ kind: 'project', label: 'Project', to: 'project', cardinality: 'one' }, { kind: 'goal', label: 'Goal', to: 'goal', cardinality: 'one' }],
   defaultViews: [
@@ -65,7 +64,7 @@ export const projectType: EntityTypeDef<ProjectData> = {
     { key: 'dueDate', label: 'Target date', type: 'date', summary: true },
     { key: 'area', label: 'Area', type: 'select', summary: true, options: [{ value: 'work', label: 'Work' }, { value: 'personal', label: 'Personal' }, { value: 'home', label: 'Home' }, { value: 'side', label: 'Side project' }, { value: 'learning', label: 'Learning' }] },
   ],
-  statuses: [{ value: 'active', label: 'Active' }, { value: 'planning', label: 'Planning', color: palette.gray }, { value: 'on_hold', label: 'On hold', color: palette.orange }, { value: 'done', label: 'Done', color: palette.green }],
+  statuses: [{ value: 'active', label: 'Active' }, { value: 'planning', label: 'Planning', color: 'gray' }, { value: 'on_hold', label: 'On hold', color: 'orange' }, { value: 'done', label: 'Done', color: 'green' }],
   searchText: (d) => d.description ?? '',
   relations: [{ kind: 'project', label: 'Tasks', to: 'task', cardinality: 'many' }, { kind: 'goal', label: 'Goal', to: 'goal', cardinality: 'one' }],
 };
@@ -85,7 +84,7 @@ export const goalType: EntityTypeDef<GoalData> = {
   label: 'Goal',
   labelPlural: 'Goals',
   icon: 'target',
-  color: palette.indigo,
+  color: 'indigo',
   schema: z.object({ description: z.string().optional(), targetDate: z.string().optional(), targetValue: z.coerce.number().optional(), currentValue: z.coerce.number().optional(), unit: z.string().optional(), area: z.string().optional() }),
   fields: [
     { key: 'description', label: 'Why this matters', type: 'longtext' },
@@ -95,7 +94,7 @@ export const goalType: EntityTypeDef<GoalData> = {
     { key: 'unit', label: 'Unit', type: 'text', placeholder: 'kg, ₹, books…', section: 'Progress' },
     { key: 'area', label: 'Area', type: 'select', options: [{ value: 'health', label: 'Health' }, { value: 'money', label: 'Money' }, { value: 'career', label: 'Career' }, { value: 'learning', label: 'Learning' }, { value: 'relationships', label: 'Relationships' }, { value: 'other', label: 'Other' }] },
   ],
-  statuses: [{ value: 'active', label: 'Active' }, { value: 'achieved', label: 'Achieved', color: palette.green }, { value: 'dropped', label: 'Dropped', color: palette.gray }],
+  statuses: [{ value: 'active', label: 'Active' }, { value: 'achieved', label: 'Achieved', color: 'green' }, { value: 'dropped', label: 'Dropped', color: 'gray' }],
   occurredAtField: 'targetDate',
 };
 
@@ -124,7 +123,7 @@ export const eventType: EntityTypeDef<EventData> = {
   label: 'Event',
   labelPlural: 'Events',
   icon: 'calendar',
-  color: palette.red,
+  color: 'red',
   schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), tripId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional(), source: z.string().optional(), sourceKey: z.string().optional(), calendars: z.array(z.string()).optional() }),
   fields: [
     { key: 'kind', label: 'Kind', type: 'text', summary: true, placeholder: 'flight, dinner, meeting, concert…' },

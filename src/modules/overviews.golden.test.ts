@@ -18,7 +18,7 @@ import { tripType } from './travel/types';
 import { deliveryType } from './deliveries/types';
 import { financeOverview } from './finance/overview';
 import { peopleOverview } from '@boards/crm/overview';
-import { projectsOverview } from './projects/overview';
+import { projectsOverview } from '@boards/projects/overview';
 import { travelOverview } from '@boards/travel/overview';
 import { deliveriesOverview } from '@boards/deliveries/overview';
 import { healthOverview } from '@boards/health/overview';
