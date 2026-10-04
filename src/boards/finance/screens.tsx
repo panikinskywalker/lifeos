@@ -38,6 +38,7 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
       <View style={{ gap: 16 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
           <Chip label="Spend" icon="chart.pie" color={FINANCE_COLOR} onPress={() => router.push('/spend' as never)} />
+          <Chip label="Investments" icon="chart.line" color={FINANCE_COLOR} onPress={() => router.push('/entity/investment')} />
           <Chip label="Transactions" icon="arrow.up.arrow.down" color={FINANCE_COLOR} onPress={() => router.push('/entity/transaction')} />
           <Chip label="Accounts" icon="creditcard" color={FINANCE_COLOR} onPress={() => router.push('/entity/account')} />
           <Chip label="Subscriptions" icon="repeat" color={FINANCE_COLOR} onPress={() => router.push('/entity/subscription')} />
