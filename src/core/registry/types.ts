@@ -9,21 +9,7 @@ import type { LifeOSContext } from './context';
 /* A module is a plain object; nothing in core imports a module.       */
 /* ------------------------------------------------------------------ */
 
-export interface WidgetDef {
-  /** Globally unique, e.g. "finance.spend-this-month". */
-  type: string;
-  module: string;
-  name: string;
-  description?: string;
-  icon: string;
-  sizes: WidgetSize[];
-  defaultSize: WidgetSize;
-  /** JSON-schema-ish config the dashboard editor renders. */
-  configFields?: EntityTypeDef['fields'];
-  component: ComponentType<WidgetProps>;
-}
-
-export interface WidgetProps {
+export interface TileProps {
   size: WidgetSize;
   config: Record<string, unknown>;
   ctx: LifeOSContext;
@@ -119,7 +105,7 @@ export interface TileDef {
   sizes: WidgetSize[];
   defaultSize: WidgetSize;
   configFields?: EntityTypeDef['fields'];
-  component: ComponentType<WidgetProps>;
+  component: ComponentType<TileProps>;
 }
 
 export interface BoardScreen {
@@ -129,14 +115,15 @@ export interface BoardScreen {
   component: ComponentType<{ ctx: LifeOSContext; params: Record<string, string> }>;
 }
 
-/** Per-Object overrides of the six generic screens (Overview, List, Record, Form, Metric, Links). */
+/** Per-Object overrides of the generic screens (List, Record, Form, Metric, Links). */
 export interface ObjectOverride {
   object: string | '*';
   /** Extra sections on the Record screen (hero at the top, cards in the body). */
   record?: EntityDetailSection[];
-  /** The Overview screen's blocks for the module (numbers, charts, what needs you). Pure. */
-  overview?: (os: LifeOSContext, now?: number, opts?: { cardOnly?: boolean }) => import('../dashboard/overview').ModuleOverview;
 }
+
+/** The Overview screen's content for a module: numbers, charts, what needs you. Pure. */
+export type OverviewFn = (os: LifeOSContext, now?: number, opts?: { cardOnly?: boolean }) => import('../dashboard/overview').ModuleOverview;
 
 export interface ManualRun {
   id: string;
@@ -152,18 +139,18 @@ export interface BoardManifest {
   name: string;
   icon: string;
   color: string;
-  /** Pinned in the bottom bar (today, upkeep) or a tile in Browse › Boards (everything else). */
-  placement: 'bar' | 'browse';
+  /** 'bar': pinned in the bottom bar (today, upkeep) · 'browse': a tile in Browse › Boards · 'module': a module's companion, reached through the module. */
+  placement: 'bar' | 'browse' | 'module';
   /** The module this board is the companion of (its overrides); absent for cross-module boards (today, turf). */
   module?: string;
   tiles?: TileDef[];
   screens?: BoardScreen[];
+  /** Companion boards: the module's Overview (Browse › module, Today's area card). */
+  overview?: OverviewFn;
   overrides?: ObjectOverride[];
   /** @deprecated R0: moves to the companion board. */
   quickActions?: QuickAction[];
   buttons?: ManualRun[];
-  /** Default tiles added to Today on install. */
-  defaultTiles?: Array<{ type: string; size?: WidgetSize; config?: Record<string, unknown> }>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -187,8 +174,6 @@ export interface ModuleManifest {
   /** @deprecated R0: moves to the companion board. */
   screens?: ModuleScreen[];
   /** @deprecated R0: moves to the companion board. */
-  widgets?: WidgetDef[];
-  /** @deprecated R0: moves to the companion board. */
   quickActions?: QuickAction[];
   triggers?: TriggerDef[];
   actions?: ActionDef[];
@@ -197,10 +182,8 @@ export interface ModuleManifest {
   detailSections?: EntityDetailSection[];
   /** Runs once when installed: seed default views/dashboards/rules. */
   onInstall?: (os: LifeOSContext) => void | Promise<void>;
-  /** @deprecated R0: moves to the companion board's overrides. */
-  overview?: (os: LifeOSContext, now?: number, opts?: { cardOnly?: boolean }) => import('../dashboard/overview').ModuleOverview;
+  /** @deprecated R0: moves to the companion board. */
+  overview?: OverviewFn;
   /** Runs every app start after install. */
   onStart?: (os: LifeOSContext) => void | Promise<void>;
-  /** @deprecated R0: moves to the companion board (defaultTiles). */
-  defaultWidgets?: Array<{ type: string; size?: WidgetSize; config?: Record<string, unknown> }>;
 }

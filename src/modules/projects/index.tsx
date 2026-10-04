@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { z } from 'zod';
-import type { ModuleManifest, WidgetDef, WidgetProps } from '@core/registry/types';
+import type { ModuleManifest } from '@core/registry/types';
 import type { Entity, EntityTypeDef } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
@@ -264,111 +264,9 @@ function GoalSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
 /* Widgets                                                             */
 /* ------------------------------------------------------------------ */
 
-function TodayWidget({ size }: WidgetProps) {
-  const router = useRouter();
-  const tasks = useLive((os) => os.entities.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'lte', value: today() }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }] }, { limit: size === 'small' ? 3 : size === 'medium' ? 5 : 10 }), [size]);
-  const overdue = tasks.filter((x) => x.data.dueDate && x.data.dueDate < today()).length;
-  return (
-    <View>
-      <Card padded={false}>
-        <View style={{ padding: 16, paddingBottom: 6 }}>
-          <SectionHeader title="Today" icon="checkmark.circle" color={PROJECTS_COLOR} action="All tasks" onAction={() => router.push('/entity/task')} />
-          <Stat value={`${tasks.length}`} unit={tasks.length === 1 ? 'task' : 'tasks'} small />
-          {overdue ? (
-            <Text variant="caption" color={palette.red}>
-              {overdue} overdue
-            </Text>
-          ) : null}
-        </View>
-        {size !== 'small' ? <View style={{ paddingHorizontal: 0 }}><TaskListInline tasks={tasks} /></View> : null}
-      </Card>
-    </View>
-  );
-}
-function TaskListInline({ tasks }: { tasks: Entity<TaskData>[] }) {
-  const os = useOS();
-  const t = useTheme();
-  const router = useRouter();
-  if (!tasks.length) return <Text color="tertiary" style={{ padding: 16, paddingTop: 4 }}>All clear.</Text>;
-  return (
-    <View>
-      {tasks.map((task, i) => (
-        <View key={task.id} style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 12 }}>
-          <Pressable onPress={() => toggleTask(os, task)} hitSlop={10} style={{ padding: 6 }}>
-            <Icon name="circle" size={22} color={t.colors.textTertiary} />
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <Row title={task.title} subtitle={task.data.dueDate ? os.format.date(task.data.dueDate, 'relative') : null} last={i === tasks.length - 1} chevron={false} onPress={() => router.push(`/entity/task/${task.id}`)} style={{ marginLeft: -12 }} />
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
 
-function ProjectsWidget({ size }: WidgetProps) {
-  const router = useRouter();
-  const projects = useLive((os) => os.entities.query<ProjectData>('project', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: size === 'small' ? 2 : 5 }).map((p) => ({ p, ...projectProgress(os, p.id) })), [size]);
-  return (
-    <Card onPress={() => router.push('/module/projects')}>
-      <SectionHeader title="Projects" icon="folder" color={PROJECTS_COLOR} action="Open" />
-      {projects.length === 0 ? (
-        <Text color="tertiary">No active projects.</Text>
-      ) : (
-        <View style={{ gap: 10 }}>
-          {projects.map(({ p, done, total, progress }) => (
-            <View key={p.id} style={{ gap: 4 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text variant="subhead" numberOfLines={1} style={{ flex: 1 }}>
-                  {p.title}
-                </Text>
-                <Text variant="caption" color="secondary">
-                  {done}/{total}
-                </Text>
-              </View>
-              <ProgressBar progress={progress} color={PROJECTS_COLOR} height={6} />
-            </View>
-          ))}
-        </View>
-      )}
-    </Card>
-  );
-}
 
-function GoalsWidget() {
-  const router = useRouter();
-  const goals = useLive((os) => os.entities.query<GoalData>('goal', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 4 }), []);
-  return (
-    <Card onPress={() => router.push('/entity/goal')}>
-      <SectionHeader title="Goals" icon="target" color={palette.indigo} action="All" />
-      {goals.length === 0 ? (
-        <Text color="tertiary">Set a goal to track it here.</Text>
-      ) : (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-          {goals.map((g) => {
-            const prog = g.data.targetValue ? (g.data.currentValue ?? 0) / g.data.targetValue : 0;
-            return (
-              <View key={g.id} style={{ alignItems: 'center', width: 72, gap: 4 }}>
-                <ProgressRing progress={prog} size={56} stroke={7} color={palette.indigo}>
-                  <Text variant="caption2">{Math.round(prog * 100)}%</Text>
-                </ProgressRing>
-                <Text variant="caption" numberOfLines={2} style={{ textAlign: 'center' }}>
-                  {g.title}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </Card>
-  );
-}
 
-const widgets: WidgetDef[] = [
-  { type: 'projects.today', module: 'projects', name: 'Today\'s tasks', icon: 'checkmark.circle', sizes: ['small', 'medium', 'large'], defaultSize: 'medium', component: TodayWidget },
-  { type: 'projects.projects', module: 'projects', name: 'Active projects', icon: 'folder', sizes: ['small', 'medium'], defaultSize: 'medium', component: ProjectsWidget },
-  { type: 'projects.goals', module: 'projects', name: 'Goals', icon: 'target', sizes: ['medium', 'large'], defaultSize: 'medium', component: GoalsWidget },
-];
 
 /* ------------------------------------------------------------------ */
 /* Manifest                                                            */
@@ -385,8 +283,6 @@ export const projectsModule: ModuleManifest = {
   dependencies: ['crm', 'travel'],
   entityTypes: [projectType, taskType, goalType, eventType],
   screens: [{ key: 'index', title: 'Projects', component: ProjectsHome }],
-  widgets,
-  defaultWidgets: [{ type: 'projects.today', size: 'medium' }],
   quickActions: [
     { id: 'projects.addTask', label: 'Task', icon: 'checkmark.circle', route: '/entity/task/new', global: true },
     { id: 'projects.addEvent', label: 'Event', icon: 'calendar', route: '/entity/event/new', global: true },

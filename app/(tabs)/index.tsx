@@ -526,7 +526,7 @@ function AreasTile() {
       homeAreas(o)
         .map((id) => {
           const m = o.registry.modules.get(id);
-          const card = m?.overview?.(o, Date.now(), { cardOnly: true }).card;
+          const card = o.registry.overviewFor(id)?.(o, Date.now(), { cardOnly: true }).card;
           return m && card ? { id, name: m.name, icon: m.icon, card } : null;
         })
         .filter((x): x is NonNullable<typeof x> => !!x),

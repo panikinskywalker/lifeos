@@ -2,9 +2,9 @@ import type { DatabaseAdapter } from './db/adapter';
 import { migrate } from './db/migrate';
 import { registry as defaultRegistry, Registry } from './registry/registry';
 import type { LifeOSContext } from './registry/context';
-import type { ModuleManifest } from './registry/types';
+import type { BoardManifest, ModuleManifest } from './registry/types';
 import { EntityRepo } from './repo/entityRepo';
-import { AttachmentRepo, CommentRepo, CustomFieldRepo, DashboardRepo, ModuleRepo, RelationRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from './repo/sideRepos';
+import { AttachmentRepo, CommentRepo, CustomFieldRepo, ModuleRepo, RelationRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from './repo/sideRepos';
 import { ChangeLog } from './sync/changeLog';
 import { CycleRepo } from './cycles/cycleRepo';
 import { GroupRepo } from './repo/groupRepo';
@@ -25,6 +25,8 @@ import { linkMissingPayees } from './ingest/payee';
 export interface LifeOSOptions {
   db: DatabaseAdapter;
   modules: ModuleManifest[];
+  /** Boards register after modules (docs/MODEL.md §3). */
+  boards?: BoardManifest[];
   registry?: Registry;
   navigate?: LifeOSContext['navigate'];
   notify?: LifeOSContext['notify'];
@@ -68,7 +70,6 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     reminders: new ReminderRepo(db, timeline, changes),
     customFields: new CustomFieldRepo(db),
     views: new ViewRepo(db),
-    dashboards: new DashboardRepo(db),
     settings,
     modules: new ModuleRepo(db),
     automation: null as unknown as AutomationEngine,
@@ -123,10 +124,9 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   // dependency order.
   const all = [coreModule, ...topoSort(opts.modules)];
   for (const m of all) registry.register(m);
+  for (const b of opts.boards ?? []) registry.registerBoard(b);
 
   // Install / start
-  let home = ctx.dashboards.all()[0];
-  if (!home) home = ctx.dashboards.create('Home', 'house');
   for (const m of all) {
     for (const t of m.entityTypes ?? []) entities.ensureIndexes(t);
     if (!ctx.modules.isInstalled(m.id)) {
@@ -136,16 +136,6 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
         }
       });
       await m.onInstall?.(ctx);
-      if (m.defaultWidgets?.length) {
-        const d = ctx.dashboards.get(home.id)!;
-        const existing = new Set(d.layout.map((w) => w.widgetType));
-        for (const w of m.defaultWidgets) {
-          if (existing.has(w.type)) continue;
-          const def = registry.widgets.get(w.type);
-          if (!def) continue;
-          ctx.dashboards.addWidget(home.id, { widgetType: w.type, size: w.size ?? def.defaultSize, config: w.config ?? {} });
-        }
-      }
       ctx.modules.install(m.id, m.version);
       bus.emit('module.installed', { moduleId: m.id });
     }

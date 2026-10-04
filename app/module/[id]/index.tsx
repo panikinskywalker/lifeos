@@ -14,7 +14,7 @@ export default function ModuleRoute() {
   const counts = useLive((o) => o.entities.countsByType(), []);
   const m = os.registry.modules.get(id ?? "");
   const overview = useLive(
-    (o) => o.registry.modules.get(id ?? "")?.overview?.(o) ?? null,
+    (o) => o.registry.overviewFor(id ?? "")?.(o) ?? null,
     [id],
   );
   const back = () =>

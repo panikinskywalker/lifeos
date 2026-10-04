@@ -272,22 +272,9 @@ export interface CustomFieldDef {
 }
 
 /* ------------------------------------------------------------------ */
-/* Dashboards & widgets                                                */
+/* Tiles (boards)                                                      */
 /* ------------------------------------------------------------------ */
 
-export type WidgetSize = 'small' | 'medium' | 'large';
-
-export interface WidgetInstance {
-  id: string;
-  widgetType: string;
-  size: WidgetSize;
-  config: Record<string, unknown>;
-}
-
-export interface Dashboard {
-  id: string;
-  name: string;
-  icon?: string | null;
-  layout: WidgetInstance[];
-  sortOrder: number;
-}
+export type TileSize = 'small' | 'medium' | 'large';
+/** @deprecated R0: TileSize. */
+export type WidgetSize = TileSize;

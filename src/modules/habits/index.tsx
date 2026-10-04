@@ -1,14 +1,12 @@
-import React from 'react';
 import { Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { z } from 'zod';
-import type { ModuleManifest, WidgetDef, WidgetProps } from '@core/registry/types';
+import type { ModuleManifest } from '@core/registry/types';
 import type { Entity } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { palette } from '@ui/theme/tokens';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { useLive, useOS } from '@ui/hooks';
-import { Button, HeatMap, Icon, Ring, Section, StatTrio, Text, Tile } from '@ui/kit';
+import { Button, HeatMap, Icon, Ring, Section, StatTrio, Text } from '@ui/kit';
 import { activeHabits, checkIn, doneDays, dueOn, findHabit, isoOf, streakOf, toggleCheckIn, type Habit } from '@core/habits/habits';
 import { habitsOverview } from './overview';
 
@@ -121,17 +119,6 @@ export function HabitChecklist({ limit = 8 }: { limit?: number }) {
   );
 }
 
-function HabitsWidget(_: WidgetProps) {
-  const router = useRouter();
-  const n = useLive((o) => activeHabits(o).filter((h) => dueOn(h, today())), []);
-  const done = useLive((o) => n.filter((h) => doneDays(o, h.id, today()).has(today())).length, [n.length]);
-  return (
-    <Tile size="2x1" tint="health" icon="flame" label="Habits" meta={n.length ? `${done}/${n.length} today` : undefined} onPress={() => router.push('/module/habits' as never)}>
-      <HabitChecklist limit={5} />
-    </Tile>
-  );
-}
-
 /** A habit's page: the streak, a big check-in, the last week (tap a day to fix it), 13 weeks as a heat map. */
 function HabitSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
   const os = useOS();
@@ -170,8 +157,6 @@ function HabitSection({ entity }: { entity: Entity<any>; ctx: LifeOSContext }) {
   );
 }
 
-const widgets: WidgetDef[] = [{ type: 'habits.today', module: 'habits', name: 'Habits today', icon: 'flame', sizes: ['small', 'medium', 'large'], defaultSize: 'medium', component: HabitsWidget }];
-
 export const habitsModule: ModuleManifest = {
   overview: habitsOverview,
   id: 'habits',
@@ -181,8 +166,6 @@ export const habitsModule: ModuleManifest = {
   icon: 'flame',
   color: HABITS_COLOR,
   entityTypes: [habitType, habitLogType],
-  widgets,
-  defaultWidgets: [{ type: 'habits.today', size: 'medium' }],
   quickActions: [{ id: 'habits.add', label: 'Habit', icon: 'flame', route: '/entity/habit/new' }],
   detailSections: [{ entityType: 'habit', key: 'habits.habit', title: 'Streak', component: HabitSection, order: 10 }],
   aiTools: [

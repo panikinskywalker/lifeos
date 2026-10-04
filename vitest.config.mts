@@ -7,6 +7,7 @@ export default defineConfig({
       '@core': path.resolve(__dirname, 'src/core'),
       '@ui': path.resolve(__dirname, 'src/ui'),
       '@modules': path.resolve(__dirname, 'src/modules'),
+      '@boards': path.resolve(__dirname, 'src/boards'),
     },
   },
 });

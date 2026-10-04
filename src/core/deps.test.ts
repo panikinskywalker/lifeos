@@ -88,14 +88,13 @@ const ALLOWED = new Set<string>([
     'crm/index.tsx', 'crm/types.ts',
     'deliveries/hero.tsx', 'deliveries/types.ts',
     'documents/index.tsx',
-    'finance/categories.ts', 'finance/types.ts', 'finance/reportsScreen.tsx', 'finance/screens.tsx', 'finance/subscriptionHero.tsx', 'finance/widgets.tsx', 'finance/splitScreens.tsx',
+    'finance/categories.ts', 'finance/types.ts', 'finance/reportsScreen.tsx', 'finance/screens.tsx', 'finance/subscriptionHero.tsx', 'finance/splitScreens.tsx',
     'habits/index.tsx', 'habits/types.ts',
-    'health/index.tsx', 'health/types.ts',
     'inventory/index.tsx',
     'knowledge/index.tsx',
     'projects/types.ts', 'projects/index.tsx',
     'travel/index.tsx', 'travel/types.ts', 'places/types.ts',
-    'automation/index.tsx', 'dashboard/index.tsx', 'dashboard/DashboardScreen.tsx',
+    'automation/index.tsx',
   ].map((f) => `modules/${f}`),
 ]);
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { EntityTypeDef } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
+
 
 /** Health record types (no React Native — unit-tested). */
 

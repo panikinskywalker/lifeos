@@ -1,5 +1,5 @@
 import type { DatabaseAdapter, Row } from '../db/adapter';
-import type { Attachment, Comment, CustomFieldDef, Dashboard, EntityRef, Relation, Reminder, SavedViewDef, Tag, ViewDefinition, WidgetInstance } from '../domain/types';
+import type {Attachment, Comment, CustomFieldDef, EntityRef, Relation, Reminder, SavedViewDef, Tag, ViewDefinition} from '../domain/types';
 import { newId } from '../domain/ids';
 import { bus, type Actor } from '../events/bus';
 import { safeJson } from './entityRepo';
@@ -347,57 +347,6 @@ function toView(r: Row): SavedView {
 
 /* ------------------------------------------------------------------ */
 /* Dashboards                                                          */
-/* ------------------------------------------------------------------ */
-
-export class DashboardRepo {
-  constructor(private db: DatabaseAdapter) {}
-  all(): Dashboard[] {
-    return this.db.all<Row>(`SELECT * FROM dashboards WHERE deleted_at IS NULL ORDER BY sort_order, created_at`).map(toDashboard);
-  }
-  get(id: string): Dashboard | undefined {
-    const r = this.db.get<Row>(`SELECT * FROM dashboards WHERE id=? AND deleted_at IS NULL`, [id]);
-    return r ? toDashboard(r) : undefined;
-  }
-  create(name: string, icon?: string, layout: WidgetInstance[] = []): Dashboard {
-    const now = Date.now();
-    const id = newId(now);
-    const order = Number(this.db.get<{ n: number }>(`SELECT COALESCE(MAX(sort_order),-1)+1 AS n FROM dashboards`)?.n ?? 0);
-    this.db.run(`INSERT INTO dashboards(id,name,icon,layout,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`, [id, name, icon ?? null, JSON.stringify(layout), order, now, now]);
-    bus.emit('data.changed', { table: 'dashboards', id: id });
-    return { id, name, icon: icon ?? null, layout, sortOrder: order };
-  }
-  setLayout(id: string, layout: WidgetInstance[]) {
-    this.db.run(`UPDATE dashboards SET layout=?, updated_at=? WHERE id=?`, [JSON.stringify(layout), Date.now(), id]);
-    bus.emit('data.changed', { table: 'dashboards', id: id });
-  }
-  rename(id: string, name: string, icon?: string) {
-    this.db.run(`UPDATE dashboards SET name=?, icon=COALESCE(?, icon), updated_at=? WHERE id=?`, [name, icon ?? null, Date.now(), id]);
-    bus.emit('data.changed', { table: 'dashboards', id: id });
-  }
-  remove(id: string) {
-    this.db.run(`UPDATE dashboards SET deleted_at=? WHERE id=?`, [Date.now(), id]);
-    bus.emit('data.changed', { table: 'dashboards', id: id });
-  }
-  addWidget(id: string, w: Omit<WidgetInstance, 'id'>): WidgetInstance {
-    const d = this.get(id);
-    if (!d) throw new Error('dashboard missing');
-    const inst: WidgetInstance = { ...w, id: newId() };
-    this.setLayout(id, [...d.layout, inst]);
-    return inst;
-  }
-}
-function toDashboard(r: Row): Dashboard {
-  let layout: WidgetInstance[] = [];
-  try {
-    layout = JSON.parse(r.layout as string) as WidgetInstance[];
-  } catch {
-    layout = [];
-  }
-  return { id: r.id as string, name: r.name as string, icon: (r.icon as string | null) ?? null, layout, sortOrder: r.sort_order as number };
-}
-
-/* ------------------------------------------------------------------ */
-/* Key-value settings                                                  */
 /* ------------------------------------------------------------------ */
 
 export class SettingsRepo {

@@ -4,6 +4,7 @@ import { createLifeOS } from '@core/lifeos';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { installedModules } from '@modules/index';
+import { installedBoards } from '@boards/index';
 import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
 import { registerBackgroundTick } from './background';
 import { notifications } from './notifications';
@@ -31,6 +32,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   const os = await createLifeOS({
     db,
     modules: installedModules,
+    boards: installedBoards,
     navigate: (p) => navigateRef(p),
     notify: async (n) => {
       const Notifications = notifications();

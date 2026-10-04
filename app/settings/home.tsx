@@ -12,7 +12,7 @@ export default function HomeSettings() {
   const layout = useLive((o) => homeLayout(o), []);
   const areas = useLive((o) => homeAreas(o), []);
   const styles = useLive((o) => Object.fromEntries((Object.keys(TILE_STYLES) as TileId[]).map((id) => [id, tileStyle(o, id)])), []);
-  const modules = [...os.registry.modules.values()].filter((m) => m.overview);
+  const modules = [...os.registry.modules.values()].filter((m) => os.registry.overviewFor(m.id));
   const move = (i: number, by: number) => {
     const next = [...layout];
     const [x] = next.splice(i, 1);

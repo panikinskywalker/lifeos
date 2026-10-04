@@ -46,7 +46,7 @@ export function saveHomeLayout(os: LifeOSContext, next: TileSetting[]) {
 
 /** Which modules get an area card (default: all that have an overview). */
 export function homeAreas(os: LifeOSContext): string[] {
-  const all = [...os.registry.modules.values()].filter((m) => m.overview).map((m) => m.id);
+  const all = [...os.registry.modules.values()].filter((m) => os.registry.overviewFor(m.id)).map((m) => m.id);
   const saved = os.settings.get<string[] | null>('today.areas', null);
   return saved ? saved.filter((id) => all.includes(id)) : all;
 }

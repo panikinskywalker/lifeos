@@ -1,5 +1,5 @@
 import type { EntityTypeDef } from '../domain/types';
-import type { ActionDef, AiToolDef, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, TriggerDef, WidgetDef } from './types';
+import type { ActionDef, AiToolDef, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, TileDef, TriggerDef } from './types';
 
 /**
  * Central registry. Modules register manifests; every other subsystem looks
@@ -9,7 +9,7 @@ export class Registry {
   readonly modules = new Map<string, ModuleManifest>();
   readonly boards = new Map<string, BoardManifest>();
   readonly entityTypes = new Map<string, EntityTypeDef>();
-  readonly widgets = new Map<string, WidgetDef>();
+  readonly tiles = new Map<string, TileDef>();
   readonly triggers = new Map<string, TriggerDef>();
   readonly actions = new Map<string, ActionDef>();
   readonly aiTools = new Map<string, AiToolDef>();
@@ -22,7 +22,6 @@ export class Registry {
     }
     this.modules.set(m.id, m);
     for (const t of m.entityTypes ?? []) this.entityTypes.set(t.type, { ...t, module: m.id });
-    for (const w of m.widgets ?? []) this.widgets.set(w.type, { ...w, module: m.id });
     for (const t of m.triggers ?? []) this.triggers.set(t.id, { ...t, module: m.id });
     for (const a of m.actions ?? []) this.actions.set(a.id, { ...a, module: m.id });
     for (const t of m.aiTools ?? []) this.aiTools.set(t.name, t);
@@ -43,7 +42,7 @@ export class Registry {
   registerBoard(b: BoardManifest) {
     if (b.module && !this.modules.has(b.module)) throw new Error(`Board "${b.id}" is the companion of "${b.module}" which is not registered`);
     this.boards.set(b.id, b);
-    for (const t of b.tiles ?? []) this.widgets.set(t.type, { ...t, module: b.module ?? b.id });
+    for (const t of b.tiles ?? []) this.tiles.set(t.type, { ...t, board: b.id });
     for (const q of b.quickActions ?? []) {
       const i = this.quickActions.findIndex((x) => x.id === q.id);
       if (i >= 0) this.quickActions[i] = q;
@@ -62,11 +61,7 @@ export class Registry {
 
   /** The overview for a module: its companion board's override, else the module's own (deprecated) one. */
   overviewFor(moduleId: string) {
-    for (const b of this.boards.values()) {
-      if (b.module !== moduleId) continue;
-      const o = b.overrides?.find((x) => x.overview)?.overview;
-      if (o) return o;
-    }
+    for (const b of this.boards.values()) if (b.module === moduleId && b.overview) return b.overview;
     return this.modules.get(moduleId)?.overview;
   }
 

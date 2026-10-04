@@ -1,5 +1,4 @@
 import type { ModuleManifest } from '@core/registry/types';
-import { dashboardModule } from './dashboard';
 import { financeModule } from './finance';
 import { projectsModule } from './projects';
 import { healthModule } from './health';
@@ -20,7 +19,6 @@ import { deliveriesModule } from './deliveries';
  * care where a manifest comes from).
  */
 export const installedModules: ModuleManifest[] = [
-  dashboardModule,
   crmModule,
   travelModule,
   projectsModule,

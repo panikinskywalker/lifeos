@@ -11,6 +11,7 @@ module.exports = function (api) {
             '@core': './src/core',
             '@ui': './src/ui',
             '@modules': './src/modules',
+            '@boards': './src/boards',
             '@': './',
           },
         },

@@ -16,7 +16,7 @@ export default function BrowseTab() {
   const counts = useLive((o) => o.entities.countsByType(), []);
   const facts = useLive((o) => o.facts.list({ limit: 10000 }).length, []);
   const recent = useLive((o) => o.entities.recent(6), []);
-  const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core' && m.id !== 'dashboard');
+  const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core');
   return (
     <Screen tab title="Browse" right={<View style={{ flexDirection: 'row', gap: 8 }}><ToCheckBell /><IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} /></View>}>
       <Pressable accessibilityRole="search" accessibilityLabel="Search everything" onPress={() => router.push('/search')} style={{ height: 50, borderRadius: t.radius.card, backgroundColor: t.c.bg.tile, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 }}>

@@ -13,7 +13,6 @@ export const BACKUP_TABLES = [
   'custom_field_defs',
   'comments',
   'saved_views',
-  'dashboards',
   'automation_rules',
   'scheduled_jobs',
   'settings',
@@ -34,4 +33,5 @@ export const BACKUP_TABLES = [
 ] as const;
 
 /** Rebuilt or re-derived on this device, so not worth carrying in a backup. */
-export const BACKUP_EXCLUDED = ['_migrations', 'modules', 'automation_runs', 'ai_messages', 'changes', 'entities_fts', 'ai_usage'] as const;
+/** `dashboards`: the old widget dashboards, unused since R0; the table stays until migration v11 drops it. */
+export const BACKUP_EXCLUDED = ['_migrations', 'modules', 'automation_runs', 'ai_messages', 'changes', 'entities_fts', 'ai_usage', 'dashboards'] as const;

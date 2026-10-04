@@ -2,7 +2,6 @@ import type { ModuleManifest } from '@core/registry/types';
 import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES, debtType } from './types';
 import { applyCategories, trackCategoryField } from './categories';
 import { financeOverview } from './overview';
-import { financeWidgets } from './widgets';
 import { AccountSection, BudgetSection, FinanceHome } from './screens';
 import { postDueSubscriptions } from './lib';
 import { GroupBalanceSection, PersonBalanceSection, SplitSection } from './splitScreens';
@@ -19,8 +18,6 @@ export const financeModule: ModuleManifest = {
   color: FINANCE_COLOR,
   entityTypes: [accountType, transactionType, budgetType, subscriptionType, debtType],
   screens: [{ key: 'index', title: 'Finance', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }],
-  widgets: financeWidgets,
-  defaultWidgets: [{ type: 'finance.spend', size: 'medium' }, { type: 'finance.networth', size: 'small' }, { type: 'finance.budgets', size: 'small' }],
   quickActions: [
     { id: 'finance.addTransaction', label: 'Transaction', icon: 'arrow.up.arrow.down', route: '/entity/transaction/new', global: true },
     { id: 'finance.addAccount', label: 'Account', icon: 'creditcard', route: '/entity/account/new' },

@@ -176,9 +176,6 @@ describe('live-query events', () => {
     emits('view saved', () => void (viewId = os.views.save('txn', { name: 'Chai', definition: {} }).id));
     emits('view removed', () => os.views.remove(viewId));
     let dashId = '';
-    emits('dashboard created', () => void (dashId = os.dashboards.create('Home').id));
-    emits('dashboard renamed', () => os.dashboards.rename(dashId, 'Today'));
-    emits('dashboard removed', () => os.dashboards.remove(dashId));
     off();
   });
 });

@@ -21,7 +21,7 @@ import { peopleOverview } from './crm/overview';
 import { projectsOverview } from './projects/overview';
 import { travelOverview } from './travel/overview';
 import { deliveriesOverview } from './deliveries/overview';
-import { healthOverview } from './health/overview';
+import { healthOverview } from '@boards/health/overview';
 
 let os: LifeOSContext;
 const NOW = Date.parse('2026-09-26T15:00:00');
