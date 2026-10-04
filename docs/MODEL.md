@@ -32,6 +32,9 @@ Consequences:
 - Everything stored is an Object. Core owns Link, Cycle, Event, Fact and Dump as
   Objects; modules own the domain Objects. One link between two records is a
   record of the Link Object.
+- Two code-only exceptions, because TypeScript and the DOM own the plain names: a
+  record in code is `ObjectRecord`, an event is `LifeEvent`. UI copy and docs
+  say record and event.
 - An Object is a definition, not necessarily its own table. Core decides storage
   (today: one shared table, Object fields in JSON). Nothing above core depends on it.
 - The Link records across every module form one **context graph** (the
@@ -377,30 +380,22 @@ Thin slices, each usable on the phone when done. `docs/MILESTONES.md` M1–M4 st
 as history; new work is tracked here. "Done" means: typecheck and tests green,
 the slice checked on the S22, the box ticked in the same commit.
 
-### R0 — Make the code say what the model says (no new features)
-The restructure. Mechanical, large, and worth doing in one go so nothing is
-built twice.
-- [ ] Vocabulary in code: entity → record, type → object, relation → link,
-  Connections card → Links card, GraphView → Links, comments → facts,
-  reminders → one-off cycles. Names in files, tables (append-only migration with
-  views for old names), UI copy, tests.
-- [ ] **Field types** as a closed registry (layer 2 table): each type with its
-  render (row, record, form, tile), query (filter, sort, aggregate) and filing
-  (how it is parsed) behaviour. Every Object schema declares Fields by type.
-- [ ] **Module manifest split**: a module = Objects + cycles + filing rules +
-  sources + AI tools; no screens, widgets or overviews. Boards and
-  Automations are separate manifests. The twelve data modules keep their names;
-  `dashboard` and `automation` become boards.
-- [ ] Dependency rule enforced by a lint test: modules import only core; boards
-  and automations import modules and core; core imports nothing above it.
-- [ ] Every existing Object moves into its module **unchanged**. Object changes
-  (merges, cuts, new Fields) happen in each module's own milestone, after its
-  discussion — never in R0.
-- [ ] One filing pipeline (layer 4): readings path, messages path, dumps path;
-  leftovers; one To check. The three queues become one.
-- [ ] Fix the one failing test (`overviews.golden`); every golden test green.
-**Done when**: the phone works exactly as before the reset, and `docs/MODEL.md`
-describes every file in `src/`.
+### R0 — Make the code say what the model says (no new features) — done 4 Oct 2026
+The restructure, in one day, as a chain of commits that each kept typecheck,
+309 tests and the web export green.
+- [x] Vocabulary in code: Entity → ObjectRecord (code name; the DOM owns Event, so LifeEvent), EntityTypeDef → ObjectDef (`id`, not `type`), a record's `type` → `object`, Relation → Link, TimelineEvent → LifeEvent, os.entities → os.records, os.relations → os.links, registry.entityTypes → objects; files renamed (recordRepo, eventRepo, RecordScreen, FormScreen, ListScreen, RecordRow, LinksView); tables renamed in migration v11 (records / links / events / record_tags / record_id / object, records_fts); the record page says Links, the network screen is /links/[id]. *(AI tool names keep their old words until R12: the golden fixtures are recorded against them.)*
+- [x] **Field types** as a closed registry (`src/core/domain/fields.ts`): text, longtext, number, money, date, datetime, duration, select, multiselect, boolean, link, contact, file, location, meter — each with parse / format / query / zod; currency → money, relation → link, json removed; `FieldDef` → `Field` (linkTo, linkWord, default). The record page formats unknown types through the registry; forms have inputs for the new types.
+- [x] **Module manifest split**: a module is Objects + cycles + filing + sources + AI tools + triggers + actions, nothing visual. All twelve data modules kept; each has a companion board in `src/boards/<module>` (overview, screens, quick actions, record sections). `dashboard` and `automation` became boards; the dead widget dashboard system was deleted. Browse shows Boards above Modules; /board/[id] routes.
+- [x] Dependency rule enforced by `src/core/deps.test.ts`: boards → modules → core, ui → core, no module imports another module or UI, core has no runtime React Native. Allowlist empty.
+- [x] Every existing Object moved into its module **unchanged**. Object changes happen in each module's own milestone.
+- [x] One home for filing (`src/core/filing`: dumps, messages, parsers); what filing wrote are **Filings** (`os.filings`, table `filings`, migration v13) and the To check list reads them; the Source contract (SourceDef, Reading, Message) on the manifest and registry. Comments became Facts (migration v12): a note on a record is a Fact about it, on its timeline and in its search text.
+- [x] The one failing test fixed (a clock bug); 309 tests green; `docs/ARCHITECTURE.md` retired into this file and PLUGINS.md; AGENTS.md rewritten for the tiers.
+
+**Carried out of R0, deliberately:**
+- *Reminders → one-off Cycles.* Reminders carry RRULE recurrences and drive the notification mirror; folding them into cycles is product work, not a rename. It goes with **R5 habits**, where Upkeep is re-hung on cycles from every module.
+- *AI tool names* (`create_entity`, `connections`, `list_entity_types`…) → the vocabulary, with **R12**, when the local model is tuned and the golden fixtures are re-recorded.
+- *Parsers into modules* (bank SMS → finance, shipping → deliveries, mail → both) → **R1 / R7b** as planned.
+**Phone check pending:** the app has not been opened on the S22 since the reset; migrations v11–v13 run on first open.
 
 ### Then module by module (each: Objects in the new schema → filing rules and
 sources moved in → AI tools with tests → the six generic
