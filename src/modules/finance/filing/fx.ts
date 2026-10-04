@@ -1,4 +1,4 @@
-import type { LifeOSContext } from '../../registry/context';
+import type { LifeOSContext } from '@core/registry/context';
 
 /**
  * Exchange rates for spends in USD / GBP / JPY / AED (M4.2c). The app

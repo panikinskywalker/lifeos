@@ -4,6 +4,7 @@ import { AccountSection, FinanceHome } from './screens';
 import { GroupBalanceSection, PersonBalanceSection, SplitSection } from './splitScreens';
 import { ReportsScreen } from './reportsScreen';
 import { SubscriptionHero } from './subscriptionHero';
+import { PayeeGuess } from './payeeGuess';
 
 /** Companion board of the finance module: Overview, the Finance home and Reports screens, quick actions, record sections (also on Person and Group). */
 export const financeBoard: BoardManifest = {
@@ -23,7 +24,7 @@ export const financeBoard: BoardManifest = {
   overrides: [
     { object: 'account', record: [{ entityType: 'account', key: 'finance.account', title: 'Balance', component: AccountSection, order: 10 }] },
     { object: 'subscription', record: [{ entityType: 'subscription', key: 'finance.subscription', title: 'Billing', component: SubscriptionHero, order: 10, placement: 'top' }] },
-    { object: 'transaction', record: [{ entityType: 'transaction', key: 'finance.split', title: 'Split', component: SplitSection, order: 20 }] },
+    { object: 'transaction', record: [{ entityType: 'transaction', key: 'finance.payeeGuess', title: 'Payee', component: PayeeGuess, order: 5, placement: 'top' }, { entityType: 'transaction', key: 'finance.split', title: 'Split', component: SplitSection, order: 20 }] },
     { object: 'person', record: [{ entityType: 'person', key: 'finance.balance', title: 'Money', component: PersonBalanceSection, order: 20 }] },
     { object: 'group', record: [{ entityType: 'group', key: 'finance.group', title: 'Balances', component: GroupBalanceSection, order: 10 }] },
   ],

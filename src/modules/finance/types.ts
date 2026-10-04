@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ObjectDef, FieldOption } from '@core/domain/types';
-import { dateField, nextAnnual, periodFromRRule } from '@core/cycles/schedule';
+import { dateField, periodFromRRule } from '@core/cycles/schedule';
+import { categoryFor } from './filing/rules';
 
 export const FINANCE_COLOR = 'green';
 
@@ -152,6 +153,8 @@ export const transactionType: ObjectDef<TransactionData> = {
     { key: 'rawText', label: 'Original text', type: 'longtext', section: 'Source', description: 'Kept 60 days after filing' },
   ],
   indexed: ['category', 'kind', 'accountId', 'date', 'payeeId', 'investmentId'],
+  // From a sentence: the category from the merchant, the words and the amount (your rules, what you taught, the built-in list).
+  enrich: (os, d, ctx) => (d.category ? {} : { category: categoryFor(os, d.merchant ?? null, ctx.text ?? '', d.amount ?? null, d.kind === 'income' ? 'credit' : 'debit') }),
   occurredAtField: 'date',
   statuses: [{ value: 'cleared', label: 'Cleared' }, { value: 'pending', label: 'Pending' }, { value: 'reimbursable', label: 'Reimbursable', color: 'orange' }, { value: 'reimbursed', label: 'Reimbursed' }],
   computeTitle: (d) => d.merchant?.trim() || categoryOf(d.category).label,

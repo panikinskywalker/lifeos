@@ -13,14 +13,13 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
 import type { TintKey } from '../theme/tokens';
-import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, FormField, FilterChip, Icon, IconButton, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
+import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, FormField, FilterChip, IconButton, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
 import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 import { CyclesSection, MeterSheet } from '../components/cycles';
 import { backlinks } from '@core/links';
 import { egoGraph, neighbours } from '@core/graph/read';
-import { confirmPayee, rejectPayee } from '@core/filing/parsers/payee';
 import { LinksView } from '../components/LinksView';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
@@ -96,7 +95,6 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
             );
           })}
 
-          <GuessBanner entity={entity} />
           <DetailsCard entity={entity} fields={def.fields} />
           {sections.filter((s) => s.placement !== 'top').map((s) => {
             const C = s.component;
@@ -353,29 +351,6 @@ function txAmount(os: LifeOSContext, id: string): string | undefined {
 }
 
 /** A link the app guessed ("We think JOHN D is John Doe"): confirm it, or say it's someone else. */
-function GuessBanner({ entity }: { entity: ObjectRecord }) {
-  const os = useOS();
-  const t = useTheme();
-  const toast = useToast();
-  const guesses = useLive((o) => o.links.forEntity(entity.id).filter((r) => r.direction === 'out' && (r.relation.confidence ?? 1) < 1 && r.relation.meta.guess), [entity.id]);
-  if (!guesses.length) return null;
-  return (
-    <View style={{ gap: 8 }}>
-      {guesses.map((g) => (
-        <View key={g.relation.id} style={{ backgroundColor: t.c.accent.mustardSoft, borderRadius: 18, padding: 12, gap: 10 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Icon name="people" size={16} color={t.c.accent.gold} />
-            <Text variant="label" style={{ flex: 1 }}>{String(g.relation.meta.guess)}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button title={`Yes, ${g.other.title}`} size="sm" icon="check" onPress={() => { confirmPayee(os, g.relation.id); toast.show({ message: `Linked to ${g.other.title} — next time it’s automatic`, icon: 'check' }); }} style={{ flex: 1 }} />
-            <Button title="Not them" size="sm" variant="secondary" icon="x" onPress={() => { rejectPayee(os, g.relation.id); toast.show({ message: 'Kept as a separate payee', icon: 'people' }); }} style={{ flex: 1 }} />
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
 
 /** A small graph of what's linked to this record; opens the full graph view. */
 function GraphCard({ entity }: { entity: ObjectRecord }) {

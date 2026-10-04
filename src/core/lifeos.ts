@@ -20,8 +20,6 @@ import { bus } from './events/bus';
 import { coreModule } from './coreModule';
 import type { ObjectRecord } from './domain/types';
 import { resolveLink, syncMentions } from './links';
-import { backfillDeliveries, learnCategory, payeeOf } from './filing/messages';
-import { linkMissingPayees } from './filing/parsers/payee';
 
 export interface LifeOSOptions {
   db: DatabaseAdapter;
@@ -239,31 +237,10 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   }
 
   ctx.automation.start();
-  // You recategorised a transaction: that merchant keeps the category next time (SMS, notifications).
-  bus.on('entity.updated', ({ entity, previous, actor }) => {
-    if (actor !== 'user' || entity.object !== 'transaction') return;
-    const d = entity.data as { category?: string; merchant?: string };
-    if (!d.category || d.category === (previous.data as { category?: string }).category) return;
-    const others = learnCategory(ctx, d.merchant, d.category, entity.id);
-    const payee = payeeOf(ctx, entity.id)?.title ?? d.merchant;
-    if (others.length && payee) bus.emit('category.learned', { entityId: entity.id, category: d.category, payee, others });
-  });
   // One-time backfill: records indexed before notes, tags and attachment names were searchable.
   if (!settings.get<boolean>('search.indexV2', false)) {
     for (const e of entities.query(null, { includeArchived: true }, { limit: 100000 })) reindex(e.id);
     settings.set('search.indexV2', true);
-  }
-  // Once: payments filed before payees existed join their payee.
-  // Again once (v2): editing a payment used to drop the link to the person who paid — put those back.
-  if (!settings.get<boolean>('payees.backfilledV2', false)) {
-    linkMissingPayees(ctx);
-    settings.set('payees.backfilled', true);
-    settings.set('payees.backfilledV2', true);
-  }
-  // Once: shipping texts that arrived before deliveries were tracked.
-  if (!settings.get<boolean>('deliveries.backfilled', false)) {
-    backfillDeliveries(ctx);
-    settings.set('deliveries.backfilled', true);
   }
   for (const m of all) await m.onStart?.(ctx);
   return ctx;

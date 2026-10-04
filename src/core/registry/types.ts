@@ -3,6 +3,7 @@ import type { ZodTypeAny } from 'zod';
 import type { ObjectRecord, ObjectDef, WidgetSize } from '../domain/types';
 import type { CoreEvents, EventName } from '../events/bus';
 import type { LifeOSContext } from './context';
+import type { MessageParser } from '../filing/contract';
 
 /* ------------------------------------------------------------------ */
 /* Plugin API — the ONLY contract between core and a module / board.   */
@@ -210,6 +211,8 @@ export interface ModuleManifest {
   aiTools?: AiToolDef[];
   /** The sources that feed this module (contract above). */
   sources?: SourceDef[];
+  /** Filing rules: per-sender message parsers (docs/MODEL.md §4; src/core/filing/contract.ts). */
+  filing?: { parsers?: MessageParser[] };
   /** Runs once when installed: seed default views/dashboards/rules. */
   onInstall?: (os: LifeOSContext) => void | Promise<void>;
   /** Runs every app start after install. */

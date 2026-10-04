@@ -1,5 +1,7 @@
 import type { ModuleManifest } from '@core/registry/types';
 import { deliveryType } from './types';
+import { deliveriesParsers } from './filing/parser';
+import { backfillDeliveries } from './filing/deliveries';
 
 export * from './types';
 
@@ -11,4 +13,12 @@ export const deliveriesModule: ModuleManifest = {
   icon: 'box',
   color: deliveryType.color!,
   objects: [deliveryType],
+  filing: { parsers: deliveriesParsers },
+  onStart: (os) => {
+    // Once: shipping texts that arrived before deliveries were tracked.
+    if (!os.settings.get<boolean>('deliveries.backfilled', false)) {
+      backfillDeliveries(os);
+      os.settings.set('deliveries.backfilled', true);
+    }
+  },
 };

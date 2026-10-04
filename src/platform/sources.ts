@@ -1,9 +1,9 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import type { LifeOSContext } from '@core/registry/context';
 import { fileMessage } from '@core/filing/messages';
-import { PAYMENT_APPS } from '@core/filing/parsers/bankSms';
+import { PAYMENT_APPS } from '@modules/finance/filing/bankSms';
 import { saveHealthDays, saveUsageDays, setSourceState, sourceState } from '@core/sources/deviceData';
-import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@core/filing/parsers/fx';
+import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance/filing/fx';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
 import type { RawMessage } from '@core/filing/messages';

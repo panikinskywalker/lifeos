@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { confirmProposed, messageList, sourceLabel } from '@core/filing/messages';
+import type { ParsedTxn } from '@modules/finance/filing/bankSms';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Checkbox, EmptyState, Screen, Text, useToast } from '@ui/kit';
@@ -28,7 +29,8 @@ export default function SmsReviewScreen() {
     return [...m];
   }, [items]);
   const keep = items.filter((i) => !off.has(i.id));
-  const spend = keep.reduce((s, i) => s + (i.parsed?.kind === 'txn' && i.parsed.txn.direction === 'debit' ? i.parsed.txn.amount : 0), 0);
+  const txnOf = (i: (typeof items)[number]) => (i.parsed?.read.kind === 'txn' ? (i.parsed.read as unknown as { txn: ParsedTxn }).txn : null);
+  const spend = keep.reduce((s, i) => s + ((txnOf(i)?.direction === 'debit' ? txnOf(i)!.amount : 0)), 0);
   const toggle = (id: string) => setOff((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const file = () => {
     const n = confirmProposed(os, keep.map((i) => i.id), [...off]);
@@ -46,7 +48,7 @@ export default function SmsReviewScreen() {
             </Text>
             <View style={{ backgroundColor: t.c.bg.container, borderRadius: 20, paddingVertical: 4 }}>
               {list.map((i) => {
-                const p = i.parsed?.kind === 'txn' ? i.parsed.txn : null;
+                const p = txnOf(i);
                 if (!p) return null;
                 return (
                   <View key={i.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10 }}>
@@ -56,7 +58,7 @@ export default function SmsReviewScreen() {
                         {p.counterparty ?? (p.channel === 'atm' ? 'ATM withdrawal' : 'Transaction')}
                       </Text>
                       <Text variant="caption" color="secondary" numberOfLines={1}>
-                        {format(i.receivedAt, 'd MMM')} · {sourceLabel(i)}{p.last4 ? ` ••${p.last4}` : ''}
+                        {format(i.receivedAt, 'd MMM')} · {sourceLabel(os, i)}{p.last4 ? ` ••${p.last4}` : ''}
                       </Text>
                     </View>
                     <Text variant="label" color={p.direction === 'credit' ? t.c.ok.sageText : undefined} style={{ fontVariant: ['tabular-nums'] }}>

@@ -1,5 +1,43 @@
 import { describe, expect, it } from 'vitest';
-import { mailKind, mailMerchant, parseMail, receiptAmount, type Mail } from './mail';
+import { mailKind, type Mail } from '@core/filing/mail';
+import { mailMerchant, receiptAmount, receiptTxn } from './mail';
+import { parseBankSms, type ParsedTxn } from './bankSms';
+import { parseDeliverySms, type ParsedDelivery } from '../../deliveries/filing/delivery';
+import { parseFlight, parseStay, type ParsedFlight, type ParsedStay } from '../../travel/filing/tickets';
+
+const iso = (at: number) => {
+  const d = new Date(at);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+type MailParse =
+  | { kind: 'txn'; txn: ParsedTxn }
+  | { kind: 'delivery'; delivery: ParsedDelivery }
+  | { kind: 'flight'; flight: ParsedFlight; txn: ParsedTxn | null }
+  | { kind: 'stay'; stay: ParsedStay; txn: ParsedTxn | null }
+  | { kind: 'skip'; reason: string };
+/** The three modules' mail reads, composed the way the old single parser was — so the fixtures keep testing the same behaviour. */
+function parseMail(mail: Mail): MailParse {
+  const kind = mailKind(mail);
+  if (!kind) return { kind: 'skip', reason: 'not a receipt, booking or alert' };
+  if (kind === 'bank') {
+    const r = parseBankSms(`${mail.subject}\n${mail.text}`.slice(0, 2000), mail.fromName || mail.from);
+    return r.kind === 'txn' ? { kind: 'txn', txn: { ...r.txn, date: r.txn.date ?? iso(mail.date) } } : { kind: 'skip', reason: r.reason };
+  }
+  if (kind === 'shipping') {
+    const d = parseDeliverySms(`${mail.subject}. ${mail.text.slice(0, 1500)}`, `${mail.fromName} ${mail.from}`, mail.date);
+    return d ? { kind: 'delivery', delivery: d } : { kind: 'skip', reason: 'shipping mail without an order' };
+  }
+  if (kind === 'flight') {
+    const f = parseFlight(mail);
+    if (f) return { kind: 'flight', flight: f, txn: receiptTxn(mail) };
+  }
+  if (kind === 'stay') {
+    const st = parseStay(mail);
+    if (st) return { kind: 'stay', stay: st, txn: receiptTxn(mail) };
+  }
+  const txn = receiptTxn(mail);
+  return txn ? { kind: 'txn', txn } : { kind: 'skip', reason: 'no amount found' };
+}
 
 const at = Date.parse('2026-09-26T10:00:00');
 const mail = (from: string, fromName: string, subject: string, text: string, date = at): Mail => ({ uid: 1, from, fromName, subject, text, date });

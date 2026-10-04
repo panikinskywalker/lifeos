@@ -9,10 +9,16 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ModuleManifest } from '@core/registry/types';
 import { bus } from '@core/events/bus';
-import { confirmProposed, messageList, fileMessage, learnCategory, senders, setSenderTrusted } from '@core/filing/messages';
+import { confirmProposed, messageList, fileMessage, senders, setSenderTrusted } from '@core/filing/messages';
+import { learnCategory } from './finance/filing/rules';
+import { financeParsers } from './finance/filing/parser';
+import { deliveriesParsers } from './deliveries/filing/parser';
+import { backfillDeliveries } from './deliveries/filing/deliveries';
+import { travelParsers } from './travel/filing/parser';
+import { financeModule } from './finance';
 import { fileDump } from '@core/filing/dumps';
 import { undoFiling } from '@core/filing/dumps';
-import { accountType, subscriptionType, transactionType } from './finance/types';
+import { accountType, investmentType, subscriptionType, transactionType } from './finance/types';
 import { financeAiTools } from './finance/aiTools';
 import { groupType, personType } from './crm/types';
 import { deliveryType } from './deliveries/types';
@@ -21,8 +27,10 @@ import { tripType } from './travel/types';
 
 const modules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType] },
-  { id: 'deliveries', name: 'Deliveries', version: '1', description: '', icon: 'x', color: '#000', objects: [deliveryType] },
-  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType], aiTools: financeAiTools },
+  { id: 'deliveries', name: 'Deliveries', version: '1', description: '', icon: 'x', color: '#000', objects: [deliveryType], filing: { parsers: deliveriesParsers } },
+  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, investmentType], aiTools: financeAiTools, filing: { parsers: financeParsers }, onStart: financeModule.onStart },
+  { id: 'travel', name: 'Travel', version: '1', description: '', icon: 'x', color: '#000', objects: [tripType], filing: { parsers: travelParsers } },
+  { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', objects: [eventType] },
 ];
 
 let os: LifeOSContext;
@@ -119,7 +127,7 @@ describe('learning', () => {
 
 describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
   it('a USD card spend is stored in dollars and rupees at the day\'s rate; the limit is never the amount', async () => {
-    const { setFxRatesFromInrBase, applyPendingFx } = await import('@core/filing/parsers/fx');
+    const { setFxRatesFromInrBase, applyPendingFx } = await import('./finance/filing/fx');
     const body = 'USD 45.00 spent using ICICI Bank Card XX9012 on 26-Sep-26 on AMAZON US. Avl Limit: INR 1,20,000.00.';
     // No rate yet: filed in dollars, flagged, converted when rates arrive.
     fileMessage(os, { source: 'sms', from: 'AX-ICICIB', body, receivedAt: at });
@@ -135,20 +143,24 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
     expect(txs().find((t) => t.data.merchant === 'DUBAI MALL')!.data.amount).toBeCloseTo(3435, 0);
   });
 
-  it('a mutual fund SIP is an investment transfer into the fund; the registrar\'s confirmation is skipped; no fake bank account', () => {
+  it('a mutual fund SIP is an investment transaction on its Investment (R1), out of the bank account; the registrar\'s confirmation is skipped; no fund account', () => {
     const r = fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Rs.5,000.00 debited from A/c XX1234 on 05-09-26 towards Parag Parikh Flexi Cap Fund SIP. Avl Bal Rs.40,000', receivedAt: at });
     expect(r.status).toBe('confirmed');
     const t = txs()[0]!;
-    expect(t.data).toMatchObject({ amount: 5000, kind: 'transfer', category: 'investment' });
-    const fund = os.records.get(t.data.toAccountId as string)!;
-    expect(fund).toMatchObject({ title: 'Parag Parikh Flexi Cap Fund', data: { kind: 'investment' } });
-    expect(fileMessage(os, { source: 'sms', from: 'CP-CAMSPM', body: 'Dear Investor, units allotted in Folio No XX7788 for Rs 5000 under Parag Parikh Flexi Cap Fund at NAV 78.12. CAMS', receivedAt: at + 86_400_000 })).toMatchObject({ status: 'dismissed' });
-    expect(os.records.query('account').map((a) => a.title).sort()).toEqual(['HDFC Bank ••1234', 'Parag Parikh Flexi Cap Fund']);
+    expect(t.data).toMatchObject({ amount: 5000, kind: 'investment', category: 'investment', source: 'sms' });
+    const inv = os.records.get<{ instrument: string; invested: number }>(t.data.investmentId as string)!;
+    expect(inv).toMatchObject({ title: 'Parag Parikh Flexi Cap Fund', data: { instrument: 'mutual_fund', invested: 5000 } });
+    expect(os.links.forEntity(inv.id).some((l) => l.other.id === t.id)).toBe(true);
+    expect(fileMessage(os, { source: 'sms', from: 'CP-CAMSPM', body: 'Dear Investor, units allotted in Folio No XX7788 for Rs 5000 under Parag Parikh Flexi Cap Fund at NAV 78.12. CAMS', receivedAt: at + 86_400_000 }).status).toBe('dismissed');
+    expect(os.records.query('account').map((a) => a.title)).toEqual(['HDFC Bank ••1234']);
+    expect(os.records.query('investment')).toHaveLength(1);
     expect(os.filings.toCheck().map((x) => x.label)).toContain('Invested ₹5,000 · Parag Parikh Flexi Cap Fund');
+    // Spend reports never see it.
+    expect(os.records.query('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }] } })).toHaveLength(0);
   });
 
   it('your keyword rules win: ZOMATO → food, a word in the message text too', async () => {
-    const { setCategoryRules, categoryFor } = await import('@core/filing/messages');
+    const { setCategoryRules, categoryFor } = await import('./finance/filing/rules');
     setCategoryRules(os, [{ keyword: 'guru tailors', category: 'shopping' }, { keyword: 'rent', category: 'housing' }]);
     fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.300.00 From HDFC Bank A/C *1234 To GURU TAILORS On 26/09/26', receivedAt: at });
     expect(txs()[0]!.data.category).toBe('shopping');
@@ -158,7 +170,7 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
   });
 
   it('amount rules: exactly ₹28 is the water bottle; keyword + amount beats either alone; credits never match', async () => {
-    const { setCategoryRules, categoryFor } = await import('@core/filing/messages');
+    const { setCategoryRules, categoryFor } = await import('./finance/filing/rules');
     setCategoryRules(os, [{ keyword: '', amount: 28, category: 'c_water' }, { keyword: 'SWIGGY', category: 'food' }, { keyword: 'SWIGGY', amount: 149, category: 'subscriptions' }]);
     fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.28.00 From HDFC Bank A/C *1234 To RAMESH STORE On 26/09/26', receivedAt: at });
     expect(txs()[0]!.data.category).toBe('c_water');
@@ -172,7 +184,7 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
   });
 
   it('amount rules for money in, with multiples: football shares ₹147 / ₹131, or a friend’s share too', async () => {
-    const { setCategoryRules, categoryFor, ruleText } = await import('@core/filing/messages');
+    const { setCategoryRules, categoryFor, ruleText } = await import('./finance/filing/rules');
     const rule = { keyword: '', amounts: [147, 131], multiples: true, direction: 'received' as const, category: 'c_football' };
     setCategoryRules(os, [rule, { keyword: '', amounts: [28], multiples: true, category: 'c_water' }]);
     expect(ruleText(rule)).toBe('₹147 / ₹131 (or multiples) · received');
@@ -186,7 +198,7 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
   });
 
   it('a range rule is sure only with a second signal (from the group, or soon after the turf payment); otherwise a flagged guess, and never again for a payer you corrected', async () => {
-    const { setCategoryRules } = await import('@core/filing/messages');
+    const { setCategoryRules } = await import('./finance/filing/rules');
     os.registry.objects.set('group', groupType as never);
     const arjun = os.records.create({ object: 'person', title: 'Arjun Mehta', data: { upi: 'arjun.m@okaxis' } });
     os.records.create({ object: 'person', title: 'Priya Nair', data: { upi: 'priya.n@okaxis' } });
@@ -263,7 +275,7 @@ describe('60-day clean-up', () => {
 
 describe('payees: one record per person or shop you pay', () => {
   it('two payments to John land on your John; "JOHN D" is a flagged guess until you confirm; shops become one payee each', async () => {
-    const { confirmPayee, rejectPayee } = await import('@core/filing/parsers/payee');
+    const { confirmPayee, rejectPayee } = await import('./finance/filing/payee');
     const { placeType, orgType } = await import('./places/types');
     void placeType;
     os.registry.objects.set('org', orgType as never);
@@ -346,8 +358,6 @@ describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox
 
   it('a ticket → a flight in a trip, with its fare; the web check-in mail updates the same flight', async () => {
     const { fileMail } = await import('@core/filing/messages');
-    os.registry.objects.set('event', eventType as never);
-    os.registry.objects.set('trip', tripType as never);
     fileMail(os, mail('reservations@customer.goindigo.in', 'IndiGo', 'Your IndiGo Itinerary - PNR K7XQ2M', 'PNR: K7XQ2M\nFlight 6E 2134\nBLR → GOI\nDeparture: Sat, 10 Oct 2026, 06:15 hrs\nTotal fare: ₹5,842', '2026-09-20T09:00:00'), 'rutvij@gmail.com');
     const [flight] = os.records.query<{ kind: string; flightNo: string; notes: string }>('event');
     expect(flight).toMatchObject({ title: 'Flight Bengaluru → Goa', data: { kind: 'flight', flightNo: '6E 2134' } });
@@ -362,7 +372,7 @@ describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox
   });
 
   it('learning: by payee (any name the bank uses), offers to fix the earlier ones, never learns a person; dumps use it too', async () => {
-    const { recategorise } = await import('@core/filing/messages');
+    const { recategorise } = await import('./finance/filing/rules');
     os.registry.objects.set('org', (await import('./places/types')).orgType as never);
     const learned: Array<{ payee: string; others: string[] }> = [];
     const off = bus.on('category.learned', (e) => void learned.push({ payee: e.payee, others: e.others }));
@@ -392,7 +402,7 @@ describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox
 
 describe('deliveries from texts read before tracking existed', () => {
   it('re-reads set-aside texts once: orders move forward in order; a stale one is assumed delivered, flagged', async () => {
-    const { backfillDeliveries } = await import('@core/filing/messages');
+
     const now = Date.parse('2026-09-26T12:00:00');
     const day = 86_400_000;
     // Stored as they were before: set aside, not parsed.

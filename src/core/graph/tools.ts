@@ -1,4 +1,3 @@
-import { categoryFor } from '../filing/messages';
 import { z } from 'zod';
 import type { ObjectDef, Field } from '../domain/types';
 import type { LifeOSContext } from '../registry/context';
@@ -514,7 +513,12 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         const amount = typeof i.amount === 'number' ? i.amount : parseAmount(i.amount);
         if (!amount) return { error: 'no amount' };
         const account = i.account ? resolveCandidates(os, i.account, ['account']).find((c) => c.score >= 0.8) : undefined;
-        const data = { amount, kind: i.kind ?? 'expense', category: i.category ? categoryValue(os, i.category) : categoryFor(os, i.merchant ?? (i.for ? nameOf(i.for) : null), i.note ?? '', typeof amount === 'number' ? amount : null), merchant: i.merchant ?? (i.for ? nameOf(i.for) : undefined), date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined) };
+        const merchant = i.merchant ?? (i.for ? nameOf(i.for) : undefined);
+        const partial: Record<string, unknown> = { amount, kind: i.kind ?? 'expense', merchant, date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined), source: 'dump' };
+        if (i.category) partial.category = categoryValue(os, i.category);
+        // The Object fills what the sentence left out (finance: the category from merchant and text).
+        const filled = os.registry.object('transaction').enrich?.(os, partial as never, { text: i.note ?? '' }) ?? {};
+        const data = { ...filled, ...partial, category: (partial.category as string | undefined) ?? (filled as { category?: string }).category ?? 'other' } as { amount: number; kind: 'expense' | 'income'; category: string; merchant?: string; date: string; accountId?: string; note?: string };
         const tx = os.records.create({ object: 'transaction', data }, 'assistant');
         log(os, s, { kind: 'transaction', action: 'created', entityId: tx.id, label: `${data.kind === 'income' ? 'Income' : 'Spent'}: ${os.format.currency(amount)}${data.merchant ? ` · ${data.merchant}` : ''}` });
         if (i.for) {

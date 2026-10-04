@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { fileMail } from '@core/filing/messages';
-import { mailKind, type Mail } from '@core/filing/parsers/mail';
+import { mailKind, type Mail } from '@core/filing/mail';
 import { quietly } from '@ui/hooks';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 

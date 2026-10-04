@@ -31,6 +31,11 @@ export function pruneOldData(os: LifeOSContext, opts: { days?: number; now?: num
 
     r.rawTexts = count(`SELECT COUNT(*) AS n FROM ingest_queue WHERE status IN ('confirmed','proposed') AND received_at < ? AND raw_text <> ''`, [cutoff]);
     os.db.run(`UPDATE ingest_queue SET raw_text='', raw_title=NULL, raw_extra='{}' WHERE status IN ('confirmed','proposed') AND received_at < ? AND raw_text <> ''`, [cutoff]);
+    // R1: the raw text kept on the transaction itself (docs/MODEL.md §4) follows the same rule.
+    os.db.run(
+      `UPDATE records SET data = json_remove(data, '$.rawText'), updated_at = ? WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.rawText') IS NOT NULL AND COALESCE(occurred_at, created_at) < ?`,
+      [now, cutoff],
+    );
     // The copy of the wording on the record's timeline goes too.
     os.db.run(`UPDATE events SET body=NULL WHERE kind IN ('sms','notification') AND occurred_at < ? AND body IS NOT NULL`, [cutoff]);
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import { withExtras } from '@core/ai/cards';
 import { TRAVEL_COLOR, tripType, type TripData } from './types';
+import { travelParsers } from './filing/parser';
 
 export { TRAVEL_COLOR, tripType, type TripData };
 
@@ -14,6 +15,7 @@ export const travelModule: ModuleManifest = {
   color: TRAVEL_COLOR,
   dependencies: ['crm'],
   objects: [tripType],
+  filing: { parsers: travelParsers },
   aiTools: [
     {
       name: 'plan_trip',

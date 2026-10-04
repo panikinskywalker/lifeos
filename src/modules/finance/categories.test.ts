@@ -4,7 +4,7 @@ import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
-import { setCategoryRules } from '@core/filing/messages';
+import { setCategoryRules } from './filing/rules';
 import { CATEGORIES, categoryOf, subscriptionType, transactionType } from './types';
 import { addCategory, applyCategories, customCategories, deleteCategory, trackCategoryField, updateCategory } from './categories';
 

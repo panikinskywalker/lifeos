@@ -1,5 +1,5 @@
-import type { LifeOSContext } from '../../registry/context';
-import { bus } from '../../events/bus';
+import type { LifeOSContext } from '@core/registry/context';
+import { bus } from '@core/events/bus';
 
 /**
  * Payees (M4.2c): everyone you pay or get paid by is one record, and every

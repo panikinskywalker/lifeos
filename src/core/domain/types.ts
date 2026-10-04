@@ -85,6 +85,12 @@ export interface ObjectDef<TData = Record<string, unknown>> {
   cycleActiveStatuses?: string[];
   /** Default cycles a new record of this type gets (Upkeep), derived from its data. */
   cycleTemplates?: (data: TData) => CycleSeed[];
+  /**
+   * Fill sensible defaults for a record made from a sentence or a message (the
+   * category of a spend from its merchant and text). Returns only the fields to
+   * add; never overwrites what was given. Core calls it from its generic tools.
+   */
+  enrich?: (os: import('../registry/context').LifeOSContext, data: Partial<TData>, context: { text?: string }) => Partial<TData>;
 }
 
 /** A default cycle from a type's template; `template` keeps it from being added twice. */

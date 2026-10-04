@@ -3,6 +3,10 @@ import { accountType, investmentType, subscriptionType, transactionType, FINANCE
 import { applyCategories, foldBudgetsIntoTargets, trackCategoryField } from './categories';
 import { foldInstitutions, postDueSubscriptions } from './lib';
 import { financeAiTools } from './aiTools';
+import { financeParsers } from './filing/parser';
+import { linkMissingPayees } from './filing/payee';
+import { learnCategory, payeeOf } from './filing/rules';
+import { bus } from '@core/events/bus';
 
 export const financeModule: ModuleManifest = {
   id: 'finance',
@@ -41,6 +45,7 @@ export const financeModule: ModuleManifest = {
     },
   ],
   aiTools: financeAiTools,
+  filing: { parsers: financeParsers },
   onStart: async (os) => {
     // Your own categories join the built-in list in every category picker.
     for (const def of [transactionType, subscriptionType]) trackCategoryField(def.fields.find((f) => f.key === 'category'));
@@ -48,6 +53,21 @@ export const financeModule: ModuleManifest = {
     // R1: Budget records became monthly targets on their categories; a bank name becomes an Organisation. Both fold once.
     foldBudgetsIntoTargets(os);
     foldInstitutions(os);
+    // You recategorised a payment: that payee keeps the category next time (SMS, notifications, mail).
+    bus.on('entity.updated', ({ entity, previous, actor }) => {
+      if (actor !== 'user' || entity.object !== 'transaction') return;
+      const d = entity.data as { category?: string; merchant?: string };
+      if (!d.category || d.category === (previous.data as { category?: string }).category) return;
+      const others = learnCategory(os, d.merchant, d.category, entity.id);
+      const payee = payeeOf(os, entity.id)?.title ?? d.merchant;
+      if (others.length && payee) bus.emit('category.learned', { entityId: entity.id, category: d.category, payee, others });
+    });
+    // Once: payments filed before payees existed join their payee (v2: links to the payer put back after edits).
+    if (!os.settings.get<boolean>('payees.backfilledV2', false)) {
+      linkMissingPayees(os);
+      os.settings.set('payees.backfilled', true);
+      os.settings.set('payees.backfilledV2', true);
+    }
     // Post due subscription bills daily (and on every app start).
     os.scheduler.registerHandler('finance.subscriptions', (_j, o) => void postDueSubscriptions(o));
     if (!os.scheduler.get('finance.subscriptions')) os.scheduler.schedule({ id: 'finance.subscriptions', kind: 'finance.subscriptions', at: Date.now(), rrule: 'FREQ=DAILY;INTERVAL=1' });

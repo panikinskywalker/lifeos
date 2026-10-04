@@ -50,7 +50,7 @@ export default function ToCheckScreen() {
             const dump = g.dumpId ? os.dumps.get(g.dumpId) : null;
             const msg = !g.dumpId && g.sourceRef ? messageItem(os, g.sourceRef) : null;
             const when = dump?.createdAt ?? msg?.receivedAt ?? g.items[0]!.createdAt;
-            const head = dump ? `${dumpWhen(when)}${dump.subjectId ? ` · on ${os.records.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : `${dumpWhen(when)} · ${msg ? sourceLabel(msg) : g.source}`;
+            const head = dump ? `${dumpWhen(when)}${dump.subjectId ? ` · on ${os.records.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : `${dumpWhen(when)} · ${msg ? sourceLabel(os, msg) : g.source}`;
             const quote = dump?.body ?? msg?.text ?? null;
             return (
               <View key={g.key} style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>
