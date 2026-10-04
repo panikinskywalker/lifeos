@@ -43,7 +43,7 @@ export function periodRange(p: SpendPeriod, now = new Date()): { from: string | 
 }
 
 const matchesKind = (t: TransactionData, k: SpendKind) =>
-  k === 'all' ? true : k === 'spending' ? t.kind === 'expense' : k === 'income' ? t.kind === 'income' : t.category === 'investment';
+  k === 'all' ? true : k === 'spending' ? t.kind === 'expense' : k === 'income' ? t.kind === 'income' : t.kind === 'investment' || t.category === 'investment';
 
 export interface SpendResult {
   items: Array<ObjectRecord<TransactionData>>;

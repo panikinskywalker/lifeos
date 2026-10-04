@@ -121,3 +121,33 @@ describe('R1 finance Objects', () => {
     expect(os.records.query('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }] } })).toHaveLength(0);
   });
 });
+
+describe('R1 finance tools', () => {
+  const run = async (name: string, input: Record<string, unknown> = {}) => {
+    const { financeAiTools } = await import('./aiTools');
+    return financeAiTools.find((t) => t.name === name)!.run(input, os) as Promise<Record<string, unknown>>;
+  };
+  it('spend: a period total with change, by category and the transactions; investments are not spend', async () => {
+    const now = new Date();
+    const d = (day: number) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(Math.min(day, now.getDate())).padStart(2, '0')}`;
+    os.records.create({ object: 'transaction', data: { amount: 1200, kind: 'expense', category: 'food', date: d(2) } });
+    os.records.create({ object: 'transaction', data: { amount: 300, kind: 'expense', category: 'transport', date: d(3) } });
+    os.records.create({ object: 'transaction', data: { amount: 5000, kind: 'investment', category: 'investment', date: d(3) } });
+    const r = await run('spend', { period: 'month', kind: 'spending' });
+    expect(r).toMatchObject({ total: 1500 });
+    expect((r.byCategory as Array<{ category: string }>).map((c) => c.category)).toEqual(['food', 'transport']);
+    expect((await run('spend', { period: 'month', kind: 'investments' })).total).toBe(5000);
+  });
+  it('portfolio and net worth count holdings at their latest value', async () => {
+    os.records.create({ object: 'investment', title: 'PPFAS', data: { instrument: 'mutual_fund', invested: 50000, currentValue: 56000, sip: 5000 }, status: 'active' });
+    os.records.create({ object: 'investment', title: 'SBI FD', data: { instrument: 'fd', invested: 100000, maturesOn: '2026-10-20' }, status: 'active' });
+    os.records.create({ object: 'account', title: 'HDFC', data: { kind: 'bank', openingBalance: 20000 } });
+    const p = await run('portfolio');
+    expect(p).toMatchObject({ invested: 150000, value: 156000 });
+    expect((p.sips as unknown[]).length).toBe(1);
+    expect((p.maturing as Array<{ name: string }>).map((m) => m.name)).toEqual(['SBI FD']);
+    const nw = await run('net_worth', { months: 3 });
+    expect(nw).toMatchObject({ total: 176000, investments: 156000, assets: 20000 });
+    expect((nw.series as unknown[]).length).toBe(3);
+  });
+});

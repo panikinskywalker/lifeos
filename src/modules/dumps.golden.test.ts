@@ -19,6 +19,7 @@ import { fillDefaults, parseDateish } from '@core/ai/createAnything';
 import { edgeLabel } from '@core/graph/edges';
 import { accountType, debtType, subscriptionType, transactionType } from './finance/types';
 import { financeAiTools } from './finance/aiTools';
+import { financeFilingTools } from './finance/filing/tools';
 import { assetsAiTools, assetType, routineType, vehicleType } from './assets/types';
 import { groupType, personType } from './crm/types';
 import { eventType, projectType, taskType } from './projects/types';
@@ -27,7 +28,7 @@ import { tripType } from './travel/types';
 
 const modules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, groupType] },
-  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools },
+  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools, filingTools: financeFilingTools },
   { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
   { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', objects: [taskType, projectType, eventType] },
   { id: 'places', name: 'Places', version: '1', description: '', icon: 'x', color: '#000', objects: [placeType, orgType] },

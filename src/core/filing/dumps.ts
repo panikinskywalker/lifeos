@@ -115,7 +115,7 @@ export async function fileDump(os: LifeOSContext, dumpId: string, provider?: LLM
   }
   const subject = dump.subjectId ? os.records.get(dump.subjectId) : undefined;
   const system = filingPrompt(os, subject ? { type: os.registry.objects.get(subject.object)?.label.toLowerCase() ?? subject.object, title: subject.title } : null);
-  const tools = graphTools(session);
+  const tools = graphTools(session, os);
   const byName = new Map(tools.map((t) => [t.name, t]));
   const specs = tools.map(toolSpec);
   const parts = chunks(rest);

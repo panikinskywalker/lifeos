@@ -42,7 +42,7 @@ export function newSession(dumpId: string, opts: { source?: GraphSession['source
   return { dumpId, source: opts.source ?? 'dump', subjectId: opts.subjectId ?? null, seen: new Map(), flags: new Map(), writes: 0, saidNew: !!opts.saidNew };
 }
 
-function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['filings']['add']>[0] extends infer T ? Omit<T & object, 'dumpId'> : never) {
+export function log(os: LifeOSContext, s: GraphSession, x: Parameters<LifeOSContext['filings']['add']>[0] extends infer T ? Omit<T & object, 'dumpId'> : never) {
   const flag = x.flag ?? (x.entityId ? s.flags.get(x.entityId) : undefined) ?? null;
   s.writes++;
   const row = os.filings.add({ ...x, dumpId: s.dumpId, flag });
@@ -283,7 +283,7 @@ function nodeLabel(os: LifeOSContext, id: string): string {
 }
 
 /** A category as the model said it ("Pets", "food") → the category's stored value (your own ones included); unknown words kept as said. */
-function categoryValue(os: LifeOSContext, said: string | undefined): string {
+export function categoryValue(os: LifeOSContext, said: string | undefined): string {
   if (!said) return 'other';
   const opts = os.registry.objects.get('transaction')?.fields.find((f) => f.key === 'category')?.options ?? [];
   const k = said.trim().toLowerCase();
@@ -394,10 +394,16 @@ export function reverseWrite(os: LifeOSContext, extractionId: string): boolean {
 const Attr = z.record(z.string(), z.unknown());
 /** A name plus an optional separate type hint (models handle flat strings far better than unions). */
 const withType = (r: NodeRef, type?: string): NodeRef => (typeof r === 'string' && type ? { name: r, type } : r);
-const nameOf = (r: NodeRef) => (typeof r === 'string' ? r : r.name);
+export const nameOf = (r: NodeRef) => (typeof r === 'string' ? r : r.name);
 
 /** Graph tools bound to one filing session (a dump). */
-export function graphTools(s: GraphSession): AiToolDef[] {
+/** The filing tools for a dump: core's graph tools plus every module's own, bound to this session (finance: log_spend). */
+export function graphTools(s: GraphSession, os?: LifeOSContext): AiToolDef[] {
+  const fromModules = os ? [...os.registry.modules.values()].flatMap((m) => m.filingTools?.(s) ?? []) : [];
+  return [...fromModules, ...coreGraphTools(s)];
+}
+
+function coreGraphTools(s: GraphSession): AiToolDef[] {
   return [
     {
       name: 'upsert_node',
@@ -501,42 +507,6 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         const row = log(os, s, { kind: 'habit', action: 'logged', entityId: String(out.entityId), label: String(out.logged) });
         if (out.logId) exactUndo.set(row.id, () => os.records.delete(String(out.logId), 'user'));
         return { done: out.logged };
-      },
-    },
-    {
-      name: 'log_spend',
-      description: 'Money spent or received: amount, merchant, what it was for (a record, e.g. the Dyson just bought), who with, which card/account, date.',
-      input: z.object({ amount: z.union([z.number(), z.string()]), kind: z.enum(['expense', 'income']).optional(), merchant: z.string().optional(), category: z.string().optional(), date: z.string().optional(), for: NodeRef.optional(), with: z.array(NodeRef).optional(), account: z.string().optional(), note: z.string().optional() }),
-      run: async (input, os) => {
-        const i = input as { amount: number | string; kind?: 'expense' | 'income'; merchant?: string; category?: string; date?: string; for?: NodeRef; with?: NodeRef[]; account?: string; note?: string };
-        if (!os.registry.objects.has('transaction')) return { error: 'no finance module installed' };
-        const amount = typeof i.amount === 'number' ? i.amount : parseAmount(i.amount);
-        if (!amount) return { error: 'no amount' };
-        const account = i.account ? resolveCandidates(os, i.account, ['account']).find((c) => c.score >= 0.8) : undefined;
-        const merchant = i.merchant ?? (i.for ? nameOf(i.for) : undefined);
-        const partial: Record<string, unknown> = { amount, kind: i.kind ?? 'expense', merchant, date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined), source: 'dump' };
-        if (i.category) partial.category = categoryValue(os, i.category);
-        // The Object fills what the sentence left out (finance: the category from merchant and text).
-        const filled = os.registry.object('transaction').enrich?.(os, partial as never, { text: i.note ?? '' }) ?? {};
-        const data = { ...filled, ...partial, category: (partial.category as string | undefined) ?? (filled as { category?: string }).category ?? 'other' } as { amount: number; kind: 'expense' | 'income'; category: string; merchant?: string; date: string; accountId?: string; note?: string };
-        const tx = os.records.create({ object: 'transaction', data }, 'assistant');
-        log(os, s, { kind: 'transaction', action: 'created', entityId: tx.id, label: `${data.kind === 'income' ? 'Income' : 'Spent'}: ${os.format.currency(amount)}${data.merchant ? ` · ${data.merchant}` : ''}` });
-        if (i.for) {
-          const n = upsertNode(os, s, i.for);
-          if (n) link(os, s, tx.id, n.id, 'paid_for');
-        }
-        for (const w of i.with ?? []) {
-          const r = resolveNode(os, s, w, { type: 'person' });
-          const hit = r.id ? os.records.get(r.id) : undefined;
-          // "…on the HDFC card" said as "with": it's how it was paid, not who was there.
-          if (hit?.object === 'account') {
-            if (!data.accountId) os.records.update(tx.id, { data: { accountId: hit.id } }, 'assistant');
-            continue;
-          }
-          const n = upsertNode(os, s, w, { type: 'person' });
-          if (n) link(os, s, tx.id, n.id, 'with');
-        }
-        return { id: tx.id };
       },
     },
   ];

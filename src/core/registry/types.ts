@@ -224,6 +224,8 @@ export interface ModuleManifest {
   sources?: SourceDef[];
   /** Filing rules: per-sender message parsers (docs/MODEL.md §4; src/core/filing/contract.ts). */
   filing?: { parsers?: MessageParser[] };
+  /** Tools the model gets while filing a dump, bound to the session (provenance, undo): finance's log_spend. */
+  filingTools?: (session: import('../graph/tools').GraphSession) => AiToolDef[];
   /** Runs once when installed: seed default views/dashboards/rules. */
   onInstall?: (os: LifeOSContext) => void | Promise<void>;
   /** Runs every app start after install. */

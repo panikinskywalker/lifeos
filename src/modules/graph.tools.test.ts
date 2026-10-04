@@ -19,10 +19,11 @@ import { groupType, personType } from './crm/types';
 import { eventType, taskType } from './projects/types';
 import { orgType, placeType } from './places/types';
 import { tripType } from './travel/types';
+import { financeFilingTools } from './finance/filing/tools';
 
 export const graphModules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, groupType] },
-  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType] },
+  { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType], filingTools: financeFilingTools },
   { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', objects: [taskType, eventType] },
   { id: 'places', name: 'Places', version: '1', description: '', icon: 'x', color: '#000', objects: [placeType, orgType] },
   { id: 'travel', name: 'Travel', version: '1', description: '', icon: 'x', color: '#000', objects: [tripType] },
@@ -37,7 +38,7 @@ afterEach(() => os.db.close());
 
 const session = (body: string, subjectId?: string) => newSession(os.dumps.add({ body, subjectId }).id, { subjectId });
 const call = async (s: GraphSession, name: string, input: Record<string, unknown>) => {
-  const t = graphTools(s).find((x) => x.name === name)!;
+  const t = graphTools(s, os).find((x) => x.name === name)!;
   return (await t.run(t.input.parse(input), os)) as Record<string, unknown>;
 };
 const linksOf = (id: string) => os.links.forEntity(id).map((l) => `${edgeLabel(l.relation.kind, l.direction)} ${l.other.title}`).sort();
