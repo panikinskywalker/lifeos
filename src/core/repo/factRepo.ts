@@ -4,7 +4,7 @@ import { bus } from '../events/bus';
 import type { ChangeLog } from '../sync/changeLog';
 import { normAlias } from './aliasRepo';
 
-export type FactSource = 'talk' | 'notification' | 'note' | 'correction' | 'user' | 'dump';
+export type FactSource = 'talk' | 'notification' | 'note' | 'correction' | 'user' | 'dump' | 'automation';
 
 export interface Fact {
   id: string;
@@ -41,7 +41,8 @@ const toFact = (r: Row): Fact => ({
  * to records. Newer facts can supersede older ones; forgetting is soft.
  */
 export class FactRepo {
-  constructor(private db: DatabaseAdapter, private changes: ChangeLog) {}
+  /** `events`: a fact about a record also lands on that record's timeline (kind 'fact'). */
+  constructor(private db: DatabaseAdapter, private changes: ChangeLog, private events?: { add(e: { entityId: string; kind: string; title: string; body?: string | null; actor: 'user' | 'automation' | 'assistant' | 'system'; occurredAt: number; meta: Record<string, unknown> }): unknown }) {}
 
   /** Set by the core: resolves a [[title]] in a fact to a record (links.ts). */
   resolveLink?: (title: string) => string | null;
@@ -61,6 +62,10 @@ export class FactRepo {
       this.changes.record('facts', id, 'insert', 1);
       this.indexFact(id, text, f.subjectId ?? null);
     });
+    if (f.subjectId && this.events) {
+      const actor = f.source === 'talk' || f.source === 'dump' ? 'assistant' : f.source === 'automation' ? 'automation' : f.source === 'notification' ? 'system' : 'user';
+      this.events.add({ entityId: f.subjectId, kind: 'fact', title: 'Fact', body: text, actor, occurredAt: f.statedAt ?? now, meta: { factId: id } });
+    }
     bus.emit('data.changed', { table: 'facts', id });
     return this.get(id)!;
   }

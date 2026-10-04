@@ -57,14 +57,14 @@ describe('search covers what hangs on a record', () => {
     const o = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), registry: reg, modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [{ id: 'thing', module: 'm', label: 'Thing', labelPlural: 'Things', icon: 'box', schema: z.object({}), fields: [] }] }] });
     const e = o.records.create({ object: 'thing', title: 'Balcony', data: {} });
     const ids = (q: string) => o.records.search.search(q).map((h) => h.id);
-    const c = o.comments.add(e.id, 'the plumber fixed the leak');
+    const c = o.facts.add({ text: 'the plumber fixed the leak', subjectId: e.id, source: 'user' });
     o.tags.apply(e.id, 'renovation');
     o.attachments.add({ entityId: e.id, name: 'quote-marble.pdf', uri: 'file://x', mime: 'application/pdf', size: 1, kind: 'file' });
-    expect(ids('plumber')).toEqual([e.id]);
+    expect(ids('plumber')).toContain(e.id); // the fact is a hit of its own too
     expect(ids('renovation')).toEqual([e.id]);
     expect(ids('marble')).toEqual([e.id]);
-    o.comments.remove(c.id);
-    expect(ids('plumber')).toEqual([]);
+    o.facts.forget(c.id);
+    expect(ids('plumber')).not.toContain(e.id);
     expect(o.settings.get('search.indexV2', false)).toBe(true);
     o.db.close();
   });

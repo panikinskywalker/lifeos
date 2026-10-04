@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from '../db/adapter';
 import type { Registry } from './registry';
 import type { RecordRepo } from '../repo/recordRepo';
-import type { AttachmentRepo, CommentRepo, CustomFieldRepo, ModuleRepo, LinkRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from '../repo/sideRepos';
+import type { AttachmentRepo, CustomFieldRepo, ModuleRepo, LinkRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from '../repo/sideRepos';
 import type { AutomationEngine } from '../automation/engine';
 import type { CycleRepo } from '../cycles/cycleRepo';
 import type { GroupRepo } from '../repo/groupRepo';
@@ -28,7 +28,6 @@ export interface LifeOSContext {
   facts: FactRepo;
   dumps: DumpRepo;
   questions: QuestionRepo;
-  comments: CommentRepo;
   reminders: ReminderRepo;
   customFields: CustomFieldRepo;
   views: ViewRepo;

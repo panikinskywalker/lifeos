@@ -23,9 +23,9 @@ export class SearchIndex {
     const body = [
       def.searchText?.(e.data as never) ?? '',
       ...def.fields.filter((f) => ['text', 'longtext', 'select'].includes(f.type)).map((f) => String((e.data as Record<string, unknown>)[f.key] ?? '')),
-      // What's hung on the record: notes (comments), tags, attachment names.
+      // What's hung on the record: facts about it, tags, attachment names.
       ...this.db.all<{ t: string }>(
-        `SELECT body AS t FROM comments WHERE record_id=? AND deleted_at IS NULL
+        `SELECT text AS t FROM facts WHERE subject_id=? AND active=1 AND deleted_at IS NULL
          UNION ALL SELECT tg.name FROM record_tags et JOIN tags tg ON tg.id = et.tag_id WHERE et.record_id=?
          UNION ALL SELECT name FROM attachments WHERE record_id=? AND deleted_at IS NULL`,
         [e.id, e.id, e.id],

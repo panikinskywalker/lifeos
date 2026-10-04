@@ -117,7 +117,7 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
           <DumpsCard entity={entity} />
           <RemindersCard entity={entity} tint={tint} />
           <AttachmentsCard entity={entity} />
-          <NotesCard entity={entity} />
+          <FactsCard entity={entity} />
           <TimelineCard entity={entity} tint={tint} />
           <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>
             Created {os.format.dateTime(entity.createdAt)} · updated {os.format.dateTime(entity.updatedAt)}
@@ -270,19 +270,15 @@ function BacklinksCard({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const router = useRouter();
   const notes = useLive((o) => backlinks(o, entity.id), [entity.id]);
-  const facts = useLive((o) => o.facts.list({ subjectId: entity.id, limit: 20 }), [entity.id]);
-  if (!notes.length && !facts.length) return null;
+  if (!notes.length) return null;
   return (
-    <Section title="Mentioned in" meta={String(notes.length + facts.length)} action={facts.length ? 'Memory' : undefined} onAction={facts.length ? () => router.push({ pathname: '/memory', params: { q: entity.title } }) : undefined}>
+    <Section title="Mentioned in" meta={String(notes.length)}>
       <RowList>
         {notes.map((n) => {
           const d = os.registry.objects.get(n.object);
           const body = String((n.data as Record<string, unknown>).body ?? n.subtitle ?? '').replace(/\[\[|\]\]/g, '');
           return <RowItem key={n.id} icon={d?.icon ?? 'file'} tint={tintForModule(d?.module)} title={n.title} subtitle={body.slice(0, 90) || d?.label} onPress={() => router.push(`/entity/${n.object}/${n.id}`)} />;
         })}
-        {facts.map((f) => (
-          <RowItem key={f.id} icon="sparkle" tint="memory" title={f.text} subtitle="Remembered" onPress={() => router.push({ pathname: '/memory', params: { q: entity.title } })} />
-        ))}
       </RowList>
     </Section>
   );
@@ -591,34 +587,35 @@ function CoverSheet({ visible, onClose, entity, hasCover }: { visible: boolean; 
   );
 }
 
-function NotesCard({ entity }: { entity: ObjectRecord }) {
+function FactsCard({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const t = useTheme();
-  const comments = useLive((o) => o.comments.forEntity(entity.id), [entity.id]);
+  const facts = useLive((o) => o.facts.list({ subjectId: entity.id, limit: 50 }), [entity.id]);
   const [text, setText] = useState('');
   const send = () => {
     if (!text.trim()) return;
-    os.comments.add(entity.id, text.trim());
+    os.facts.add({ text: text.trim(), subjectId: entity.id, source: 'user' });
     setText('');
   };
+  const who = (s: string) => (s === 'user' ? 'You' : s === 'talk' || s === 'dump' ? 'Agent' : s === 'automation' ? 'Automation' : s === 'notification' ? 'A message' : s === 'correction' ? 'A correction' : 'A note');
   return (
-    <Card icon="book" tint="memory" title="Notes" meta={comments.length ? `${comments.length}` : undefined}>
+    <Card icon="sparkle" tint="memory" title="Facts" meta={facts.length ? `${facts.length}` : undefined}>
       <View style={{ gap: 12 }}>
-        {comments.map((c) => (
-          <Pressable key={c.id} accessibilityHint="Long-press to delete" onLongPress={() => os.comments.remove(c.id)} style={{ gap: 2 }}>
+        {facts.map((f) => (
+          <Pressable key={f.id} accessibilityHint="Long-press to forget" onLongPress={() => os.facts.forget(f.id)} style={{ gap: 2 }}>
             <Text variant="body" selectable style={{ lineHeight: 21 }}>
-              {c.body}
+              {f.text.replace(/\[\[|\]\]/g, '')}
             </Text>
             <Text variant="caption" color="tertiary">
-              {c.author === 'user' ? 'You' : c.author === 'assistant' ? 'Agent' : 'Automation'} · {os.format.dateTime(c.createdAt)}
+              {who(f.source)} · {os.format.dateTime(f.statedAt)}
             </Text>
           </Pressable>
         ))}
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
           <View style={{ flex: 1 }}>
-            <TextField value={text} onChange={setText} placeholder="Add a note…" multiline compact />
+            <TextField value={text} onChange={setText} placeholder="Add a fact about this…" multiline compact />
           </View>
-          <IconButton icon="arrow-up" accessibilityLabel="Add note" filled={text.trim() ? t.c.accent.mustard : true} color={text.trim() ? t.c.accent.mustardInk : t.c.fg.tertiary} disabled={!text.trim()} onPress={send} size={44} style={{ marginBottom: 4 }} />
+          <IconButton icon="arrow-up" accessibilityLabel="Add fact" filled={text.trim() ? t.c.accent.mustard : true} color={text.trim() ? t.c.accent.mustardInk : t.c.fg.tertiary} disabled={!text.trim()} onPress={send} />
         </View>
       </View>
     </Card>

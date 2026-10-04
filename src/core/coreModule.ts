@@ -80,11 +80,11 @@ const actions: ActionDef[] = [
     },
   },
   {
-    id: 'core.addComment', module: 'core', label: 'Add comment', configFields: [{ key: 'body', label: 'Comment (supports {{title}} templates)', type: 'longtext', required: true }],
+    id: 'core.addComment', module: 'core', label: 'Add a fact', configFields: [{ key: 'body', label: 'Fact (supports {{title}} templates)', type: 'longtext', required: true }],
     run: async (cfg, ctx, os) => {
       const id = ctx.entity?.id ?? (ctx.vars.entityId as string | undefined);
       if (!id) return 'no entity';
-      os.comments.add(id, String(cfg.body), 'automation');
+      os.facts.add({ text: String(cfg.body), subjectId: id, source: 'automation' });
     },
   },
   {
@@ -216,12 +216,12 @@ const aiTools: AiToolDef[] = [
   },
   {
     name: 'get_entity',
-    description: 'Fetch one record by id including tags, relations, recent timeline, comments and reminders.',
+    description: 'Fetch one record by id including tags, links, recent timeline, facts about it and reminders.',
     input: z.object({ id: z.string() }),
     run: async (input, os) => {
       const e = os.records.get((input as { id: string }).id);
       if (!e) return { error: 'not found' };
-      return { ...slim(e, os), timeline: os.records.timeline.forEntity(e.id, 15).map((t) => ({ at: new Date(t.occurredAt).toISOString(), kind: t.kind, title: t.title, body: t.body })), comments: os.comments.forEntity(e.id).map((c) => ({ at: new Date(c.createdAt).toISOString(), author: c.author, body: c.body })), reminders: os.reminders.forEntity(e.id).map((r) => ({ id: r.id, title: r.title, nextAt: r.nextAt ? new Date(r.nextAt).toISOString() : null, done: !!r.doneAt })) };
+      return { ...slim(e, os), timeline: os.records.timeline.forEntity(e.id, 15).map((t) => ({ at: new Date(t.occurredAt).toISOString(), kind: t.kind, title: t.title, body: t.body })), facts: os.facts.list({ subjectId: e.id, limit: 30 }).map((f) => ({ at: new Date(f.statedAt).toISOString(), source: f.source, text: f.text })), reminders: os.reminders.forEntity(e.id).map((r) => ({ id: r.id, title: r.title, nextAt: r.nextAt ? new Date(r.nextAt).toISOString() : null, done: !!r.doneAt })) };
     },
   },
   {
@@ -291,11 +291,11 @@ const aiTools: AiToolDef[] = [
   },
   {
     name: 'add_comment',
-    description: 'Add a note/comment to a record\'s timeline.',
+    description: 'Add a fact about a record (one line, shown on its page).',
     input: z.object({ id: z.string(), body: z.string() }),
     run: async (input, os) => {
       const i = input as { id: string; body: string };
-      return os.comments.add(i.id, i.body, 'assistant');
+      return os.facts.add({ text: i.body, subjectId: i.id, source: 'talk' });
     },
   },
   {

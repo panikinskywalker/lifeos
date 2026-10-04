@@ -4,7 +4,7 @@ import { registry as defaultRegistry, Registry } from './registry/registry';
 import type { LifeOSContext } from './registry/context';
 import type { BoardManifest, ModuleManifest } from './registry/types';
 import { RecordRepo } from './repo/recordRepo';
-import { AttachmentRepo, CommentRepo, CustomFieldRepo, ModuleRepo, LinkRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from './repo/sideRepos';
+import { AttachmentRepo, CustomFieldRepo, ModuleRepo, LinkRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from './repo/sideRepos';
 import { ChangeLog } from './sync/changeLog';
 import { CycleRepo } from './cycles/cycleRepo';
 import { GroupRepo } from './repo/groupRepo';
@@ -63,10 +63,9 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     cycles: new CycleRepo(db, timeline, changes),
     groups: new GroupRepo(db, changes),
     aliases: new AliasRepo(db, changes),
-    facts: new FactRepo(db, changes),
+    facts: new FactRepo(db, changes, timeline),
     dumps: new DumpRepo(db, changes),
     questions: new QuestionRepo(db),
-    comments: new CommentRepo(db, timeline, changes),
     reminders: new ReminderRepo(db, timeline, changes),
     customFields: new CustomFieldRepo(db),
     views: new ViewRepo(db),
@@ -79,13 +78,14 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     notify: opts.notify ?? (async () => null),
     cancelNotification: opts.cancelNotification ?? (async () => {}),
   };
-  // Notes, tags and attachment names are part of a record's search text: reindex it when they change.
+  // Facts about a record, its tags and attachment names are part of its search text: reindex it when they change.
   const reindex = (entityId: string | null | undefined) => {
     const e = entityId ? entities.get(entityId) : undefined;
     const def = e ? registry.objects.get(e.object) : undefined;
     if (e && def) entities.search.index(e, def);
   };
-  const ownerOf = (table: 'comments' | 'attachments', id: string) => db.get<{ record_id: string }>(`SELECT record_id FROM ${table} WHERE id=?`, [id])?.record_id;
+  const ownerOf = (table: 'attachments', id: string) => db.get<{ record_id: string }>(`SELECT record_id FROM ${table} WHERE id=?`, [id])?.record_id;
+  const subjectOf = (factId: string) => db.get<{ subject_id: string | null }>(`SELECT subject_id FROM facts WHERE id=?`, [factId])?.subject_id;
   const wrap = <T extends object, K extends keyof T>(repo: T, name: K, entityOf: (args: never[], result: unknown) => string | null | undefined, before = false) => {
     const fn = (repo[name] as unknown as (...a: never[]) => unknown).bind(repo);
     (repo as Record<K, unknown>)[name] = (...args: never[]) => {
@@ -95,8 +95,8 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
       return result;
     };
   };
-  wrap(ctx.comments, 'add', (a) => a[0] as string);
-  wrap(ctx.comments, 'remove', (a) => ownerOf('comments', a[0] as string), true);
+  wrap(ctx.facts, 'add', (_a, r) => (r as { subjectId?: string | null }).subjectId);
+  wrap(ctx.facts, 'forget', (a) => subjectOf(a[0] as string), true);
   wrap(ctx.tags, 'apply', (a) => a[0] as string);
   wrap(ctx.tags, 'remove', (a) => a[0] as string);
   wrap(ctx.tags, 'set', (a) => a[0] as string);

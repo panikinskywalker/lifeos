@@ -689,4 +689,40 @@ export const migrations: Migration[] = [
       `UPDATE changes SET tbl = 'links' WHERE tbl = 'relations'`,
     ],
   },
+  {
+    version: 12,
+    name: 'comments-are-facts',
+    // docs/MODEL.md §1: a note typed on a record is a Fact about it. Facts gain
+    // the source 'automation' (a CHECK cannot be widened in place, so the table
+    // is rebuilt as in v7), every comment becomes a fact with the record as its
+    // subject, and the comments table goes.
+    up: [
+      `CREATE TABLE facts_v12 (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        subject_id TEXT,
+        subject_key TEXT,
+        source TEXT NOT NULL CHECK (source IN ('talk', 'notification', 'note', 'correction', 'user', 'dump', 'automation')),
+        source_ref TEXT,
+        stated_at INTEGER NOT NULL,
+        confidence REAL NOT NULL DEFAULT 1,
+        active INTEGER NOT NULL DEFAULT 1,
+        superseded_by TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `INSERT INTO facts_v12 SELECT id, text, subject_id, subject_key, source, source_ref, stated_at, confidence, active, superseded_by, created_at, updated_at, deleted_at, version FROM facts`,
+      `INSERT INTO facts_v12(id, text, subject_id, source, stated_at, created_at, updated_at, deleted_at)
+         SELECT id, body, record_id, CASE author WHEN 'assistant' THEN 'talk' WHEN 'automation' THEN 'automation' ELSE 'user' END, created_at, created_at, updated_at, deleted_at FROM comments`,
+      `DROP TABLE facts`,
+      `ALTER TABLE facts_v12 RENAME TO facts`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_subject ON facts(subject_id, active)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_key ON facts(subject_key, active)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_recent ON facts(active, stated_at DESC)`,
+      `DROP TABLE comments`,
+      `UPDATE changes SET tbl = 'facts' WHERE tbl = 'comments'`,
+    ],
+  },
 ];

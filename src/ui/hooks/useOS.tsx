@@ -14,7 +14,7 @@ export function useOS(): LifeOSContext {
   return os;
 }
 
-const DATA_EVENTS: EventName[] = ['entity.created', 'entity.updated', 'entity.deleted', 'entity.restored', 'entity.status', 'relation.added', 'relation.removed', 'comment.added', 'attachment.added', 'reminder.created', 'reminder.completed', 'tag.applied', 'schedule.tick', 'module.installed', 'data.changed'];
+const DATA_EVENTS: EventName[] = ['entity.created', 'entity.updated', 'entity.deleted', 'entity.restored', 'entity.status', 'relation.added', 'relation.removed', 'attachment.added', 'reminder.created', 'reminder.completed', 'tag.applied', 'schedule.tick', 'module.installed', 'data.changed'];
 
 /**
  * Global data version — bumps on any mutation. Screens re-read at most every

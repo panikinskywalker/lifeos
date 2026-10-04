@@ -1,5 +1,5 @@
 import type { DatabaseAdapter, Row } from '../db/adapter';
-import type {Attachment, Comment, CustomFieldDef, EntityRef, Link, Reminder, SavedViewDef, Tag, ViewDefinition} from '../domain/types';
+import type {Attachment, CustomFieldDef, EntityRef, Link, Reminder, SavedViewDef, Tag, ViewDefinition} from '../domain/types';
 import { newId } from '../domain/ids';
 import { bus, type Actor } from '../events/bus';
 import { safeJson } from './recordRepo';
@@ -181,29 +181,6 @@ function toAttachment(r: Row): Attachment {
 /* ------------------------------------------------------------------ */
 /* Comments                                                            */
 /* ------------------------------------------------------------------ */
-
-export class CommentRepo {
-  constructor(private db: DatabaseAdapter, private timeline: EventRepo, private changes: ChangeLog) {}
-  add(entityId: string, body: string, author: Comment['author'] = 'user'): Comment {
-    const now = Date.now();
-    const id = newId(now);
-    this.db.run(`INSERT INTO comments(id,record_id,body,author,created_at,updated_at) VALUES (?,?,?,?,?,?)`, [id, entityId, body, author, now, now]);
-    this.changes.record('comments', id, 'insert', 1);
-    this.timeline.add({ entityId, kind: 'comment', title: 'Comment', body, actor: author, occurredAt: now, meta: { commentId: id } });
-    const c: Comment = { id, entityId, body, author, createdAt: now, updatedAt: now };
-    bus.emit('comment.added', { comment: c, actor: author });
-    return c;
-  }
-  forEntity(entityId: string): Comment[] {
-    return this.db.all<Row>(`SELECT * FROM comments WHERE record_id=? AND deleted_at IS NULL ORDER BY created_at ASC`, [entityId]).map((r) => ({
-      id: r.id as string, entityId: r.record_id as string, body: r.body as string, author: r.author as Comment['author'], createdAt: r.created_at as number, updatedAt: r.updated_at as number,
-    }));
-  }
-  remove(id: string) {
-    this.db.run(`UPDATE comments SET deleted_at=? WHERE id=?`, [Date.now(), id]);
-    bus.emit('data.changed', { table: 'comments', id: id });
-  }
-}
 
 /* ------------------------------------------------------------------ */
 /* Reminders                                                           */

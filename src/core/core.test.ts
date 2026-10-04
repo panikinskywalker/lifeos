@@ -162,8 +162,8 @@ describe('live-query events', () => {
     };
     os.tags.apply(e.id, 'snack');
     emits('tag removed', () => os.tags.set(e.id, []));
-    const c = os.comments.add(e.id, 'ok');
-    emits('comment removed', () => os.comments.remove(c.id));
+    const c = os.facts.add({ text: 'ok', subjectId: e.id, source: 'user' });
+    emits('fact forgotten', () => os.facts.forget(c.id));
     const a = os.attachments.add({ entityId: e.id, name: 'r.jpg', mime: 'image/jpeg', size: 1, uri: 'file://r.jpg', kind: 'receipt' });
     emits('attachment removed', () => os.attachments.remove(a.id));
     const r = os.reminders.create({ entityId: e.id, title: 'x', dueAt: Date.now() + 1000 });
@@ -180,7 +180,7 @@ describe('live-query events', () => {
   });
 });
 
-describe('relations, tags, comments, attachments', () => {
+describe('links, tags, facts, attachments', () => {
   it('links bidirectionally and filters by relatedTo', () => {
     const trip = os.records.create({ object: 'trip', data: { destination: 'Tokyo' } });
     const t1 = os.records.create({ object: 'txn', data: { amount: 5000, date: '2026-12-20', merchant: 'JR Pass' } });
@@ -203,12 +203,12 @@ describe('relations, tags, comments, attachments', () => {
     expect(os.tags.forEntity(t.id).map((x) => x.name)).toEqual(['home']);
   });
 
-  it('comments and attachments land on the timeline', () => {
+  it('facts and attachments land on the timeline', () => {
     const t = os.records.create({ object: 'txn', data: { amount: 1, date: '2026-01-01' } });
-    os.comments.add(t.id, 'Reimbursed by office');
+    os.facts.add({ text: 'Reimbursed by office', subjectId: t.id, source: 'user' });
     os.attachments.add({ entityId: t.id, name: 'receipt.jpg', uri: 'file:///x', kind: 'receipt' });
     const kinds = os.records.timeline.forEntity(t.id).map((e) => e.kind);
-    expect(kinds).toEqual(expect.arrayContaining(['comment', 'attachment', 'created']));
+    expect(kinds).toEqual(expect.arrayContaining(['fact', 'attachment', 'created']));
   });
 
   it('a record has at most one cover photo; replacing keeps the old one recoverable', () => {
@@ -253,7 +253,7 @@ describe('automation', () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(os.tags.forEntity(small.id)).toHaveLength(0);
     expect(os.tags.forEntity(big.id).map((t) => t.name)).toEqual(['big']);
-    expect(os.comments.forEntity(big.id)[0].body).toBe('Flight was 5000');
+    expect(os.facts.list({ subjectId: big.id })[0]!.text).toBe('Flight was 5000');
     const runs = os.automation.rules.runs();
     expect(runs.map((r) => r.status).sort()).toEqual(['ok', 'skipped']);
   });

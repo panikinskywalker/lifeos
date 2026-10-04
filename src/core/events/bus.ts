@@ -1,4 +1,4 @@
-import type { ObjectRecord, Link, Reminder, Comment, Attachment } from '../domain/types';
+import type { ObjectRecord, Link, Reminder, Attachment } from '../domain/types';
 
 /**
  * Typed in-process event bus. Every mutation in the repo layer emits here;
@@ -13,7 +13,6 @@ export type CoreEvents = {
   'entity.status': { entity: ObjectRecord; from: string | null; to: string | null; actor: Actor };
   'relation.added': { relation: Link; actor: Actor };
   'relation.removed': { relation: Link; actor: Actor };
-  'comment.added': { comment: Comment; actor: Actor };
   'attachment.added': { attachment: Attachment; actor: Actor };
   'reminder.created': { reminder: Reminder; actor: Actor };
   'reminder.due': { reminder: Reminder };

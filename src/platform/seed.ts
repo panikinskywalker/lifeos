@@ -110,7 +110,7 @@ export function seedDemoData(os: LifeOSContext) {
     os.tags.apply(japan.id, 'travel');
     os.tags.apply(lifeos.id, 'side-project');
     os.tags.apply(goal.id, 'money');
-    os.comments.add(japan.id, 'Priya prefers late Dec so we catch New Year in Kyoto.');
+    os.facts.add({ text: 'Priya prefers late Dec so we catch New Year in Kyoto.', subjectId: japan.id, source: 'user' });
     os.reminders.create({ entityId: dad.id, title: 'Call Dad', dueAt: Date.now() + 3 * 86400000, rrule: 'FREQ=WEEKLY;INTERVAL=1' });
     os.reminders.create({ entityId: car.id, title: 'Renew car insurance', dueAt: Date.now() + 5 * 86400000 });
     os.reminders.create({ title: 'Review budgets', dueAt: Date.now() + 86400000, rrule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1' });

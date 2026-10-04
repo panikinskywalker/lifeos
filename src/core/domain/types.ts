@@ -243,15 +243,6 @@ export interface Tag {
   createdAt: number;
 }
 
-export interface Comment {
-  id: string;
-  entityId: string;
-  body: string;
-  author: 'user' | 'assistant' | 'automation';
-  createdAt: number;
-  updatedAt: number;
-}
-
 export interface CustomFieldDef {
   id: string;
   entityType: string;
