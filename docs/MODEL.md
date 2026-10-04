@@ -110,6 +110,13 @@ breakdown in data), filed by Usage access.
 | **Trip** | Travel with dates, people and spend | destination → Place, dates, companions, budget, currency | dumps, mail, calendar |
 | **Habit** | Something you do on a rhythm, chores included | cadence (daily / weekdays / N per week / every N weeks / weekday), kind (habit / chore), minutes; check-ins are Events; streaks where cadence is daily-ish | dumps, you |
 
+### Design follows the same tiers (added 5 Oct)
+Design is assembled the way the code is: the **Field type kit** (each type in a
+row, on the record page, as a form input, as a tile), then the **six generic
+screens** drawn once, then the **boards**. The brief for Claude Design is
+`docs/design/MODEL-BRIEF.md` (Light first; Abyss, `docs/design/ABYSS-BRIEF.md`,
+is a theme on the same parts). Each module milestone includes its board's design.
+
 ### Field types — proposed 4 Oct
 
 A closed list. Every Field on every Object has one of these types, and each
