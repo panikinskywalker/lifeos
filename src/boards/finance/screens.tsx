@@ -8,8 +8,11 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Card, Chip, IconButton, Row, Screen, SectionHeader, Stat, Text, Button } from '@ui/components/primitives';
 import { Bars, ProgressBar, StackedBar } from '@ui/components/charts';
 import { EntityRow } from '@ui/components/EntityRow';
-import { accountBalance, budgetStatus, dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange } from './lib';
-import { categoryOf, FINANCE_COLOR, type AccountData, type BudgetData } from './types';
+import { accountBalance, budgetStatus, dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange } from '@modules/finance/lib';
+import { categoryOf, type AccountData, type BudgetData } from '@modules/finance/types';
+import { palette } from '@ui/theme/tokens';
+
+const FINANCE_COLOR = palette.green;
 
 /** Finance module home — the "Summary" page for money. */
 export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string, string> }) {
@@ -65,12 +68,12 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
             <SectionHeader title="By category" icon="chart.pie" color={FINANCE_COLOR} />
             <Card padded={false}>
               <View style={{ padding: 16, paddingBottom: 8 }}>
-                <StackedBar parts={data.byCat.map((c) => ({ value: c.total, color: categoryOf(c.category).color ?? FINANCE_COLOR }))} />
+                <StackedBar parts={data.byCat.map((c) => ({ value: c.total, color: t.paletteColor(categoryOf(c.category).color) ?? FINANCE_COLOR }))} />
               </View>
               {data.byCat.map((c, i) => {
                 const cat = categoryOf(c.category);
                 return (
-                  <Row key={c.category} title={cat.label} subtitle={`${c.count} transaction${c.count === 1 ? '' : 's'}`} icon={cat.icon} iconColor={cat.color} value={ctx.format.currency(c.total)} last={i === data.byCat.length - 1} onPress={() => router.push({ pathname: '/spend', params: { category: c.category, period: offset === 0 ? 'month' : 'last_month' } } as never)} />
+                  <Row key={c.category} title={cat.label} subtitle={`${c.count} transaction${c.count === 1 ? '' : 's'}`} icon={cat.icon} iconColor={t.paletteColor(cat.color)} value={ctx.format.currency(c.total)} last={i === data.byCat.length - 1} onPress={() => router.push({ pathname: '/spend', params: { category: c.category, period: offset === 0 ? 'month' : 'last_month' } } as never)} />
                 );
               })}
             </Card>
@@ -107,7 +110,7 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
                       {s.remaining >= 0 ? `${ctx.format.currency(s.remaining)} left` : `${ctx.format.currency(-s.remaining)} over`}
                     </Text>
                   </View>
-                  <ProgressBar progress={s.progress} color={categoryOf(b.data.category).color ?? FINANCE_COLOR} />
+                  <ProgressBar progress={s.progress} color={t.paletteColor(categoryOf(b.data.category).color) ?? FINANCE_COLOR} />
                 </View>
               ))}
             </Card>
@@ -174,7 +177,7 @@ export function BudgetSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeO
     <View style={{ gap: 16 }}>
       <Card style={{ gap: 8 }}>
         <Stat value={ctx.format.currency(s.spent)} unit={`of ${ctx.format.currency(s.limit)}`} label={`Spent this ${b.data.period.replace('ly', '')}`} color={s.remaining < 0 ? t.colors.danger : undefined} />
-        <ProgressBar progress={s.progress} color={categoryOf(b.data.category).color ?? FINANCE_COLOR} height={12} />
+        <ProgressBar progress={s.progress} color={t.paletteColor(categoryOf(b.data.category).color) ?? FINANCE_COLOR} height={12} />
         <Text variant="footnote" color="secondary">
           {s.remaining >= 0 ? `${ctx.format.currency(s.remaining)} remaining` : `${ctx.format.currency(-s.remaining)} over budget`}
         </Text>

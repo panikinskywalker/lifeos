@@ -8,7 +8,7 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Card, Chip, EmptyState, Field, FilterChip, NumberField, RowItem, RowList, Section, Segmented, Sheet, Text, useToast } from '@ui/kit';
 import { EntityPicker } from '@ui/components/fields';
-import { applySplit, balanceWith, balances, clearSplit, settleUp, splitAmounts, undoSettle, type DebtData, type Party, type SplitMethod, type SplitRecord } from './split';
+import { applySplit, balanceWith, balances, clearSplit, settleUp, splitAmounts, undoSettle, type DebtData, type Party, type SplitMethod, type SplitRecord } from '@modules/finance/split';
 
 const METHODS: Array<{ value: SplitMethod; label: string }> = [
   { value: 'equal', label: 'Equally' },

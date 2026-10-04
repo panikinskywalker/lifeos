@@ -72,7 +72,7 @@ export default function TimeScreen() {
               <Stat value={money(s.spend.total)} caption="spent" size="count" />
               {s.spend.income ? <Stat value={money(s.spend.income)} caption="came in" size="count" tone="ok" /> : null}
             </View>
-            {cats.length ? <StackedBar parts={cats.map((c) => ({ label: categoryOf(c.category).label, value: c.total, color: categoryOf(c.category).color ?? t.c.fg.tertiary, display: money(c.total) }))} /> : null}
+            {cats.length ? <StackedBar parts={cats.map((c) => ({ label: categoryOf(c.category).label, value: c.total, color: t.paletteColor(categoryOf(c.category).color) ?? t.c.fg.tertiary, display: money(c.total) }))} /> : null}
             {span === 'day' && txs.length ? (
               <RowList>
                 {txs.map((e) => (

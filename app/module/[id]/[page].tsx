@@ -8,7 +8,8 @@ export default function ModuleScreenRoute() {
   // The segment is [page], not [screen]: expo-router reserves `screen` for nested navigation, which made it undefined.
   const { id, page, ...params } = useLocalSearchParams<{ id: string; page: string }>();
   const m = os.registry.modules.get(id ?? '');
-  const s = m?.screens?.find((x) => x.key === page);
+  const board = os.registry.boardFor(id ?? '');
+  const s = board?.screens?.find((x) => x.key === page);
   if (!m || !s) return <EmptyState icon="cube" title="Screen not found" />;
   const C = s.component;
   return <C ctx={os} params={params as Record<string, string>} />;

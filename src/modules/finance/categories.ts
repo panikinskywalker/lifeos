@@ -1,7 +1,6 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { FieldDef, FieldOption } from '@core/domain/types';
 import { bus } from '@core/events/bus';
-import { palette } from '@ui/theme/tokens';
 import { CATEGORIES } from './types';
 
 /**
@@ -20,7 +19,7 @@ export interface CustomCategory {
 const KEY = 'finance.customCategories';
 const BUILTIN = CATEGORIES.slice();
 /** Colours offered for a new category, in turn. */
-export const CATEGORY_COLORS = [palette.orange, palette.blue, palette.pink, palette.purple, palette.teal, palette.red, palette.yellow, palette.indigo, palette.green, palette.brown];
+export const CATEGORY_COLORS = ['orange', 'blue', 'pink', 'purple', 'teal', 'red', 'yellow', 'indigo', 'green', 'brown'];
 /** Icons offered for a category. */
 export const CATEGORY_ICONS = ['tag', 'heart', 'gift', 'cart', 'bag', 'car', 'plane', 'food', 'film', 'book', 'activity', 'leaf', 'shirt', 'cash', 'briefcase', 'home', 'phone', 'drop', 'flame', 'cake'];
 
@@ -71,7 +70,7 @@ export function addCategory(os: LifeOSContext, c: { label: string; color?: strin
   const label = c.label.trim().replace(/\s+/g, ' ');
   if (!label) return null;
   const same = CATEGORIES.find((x) => x.label.toLowerCase() === label.toLowerCase());
-  if (same) return { value: same.value, label: same.label, color: same.color ?? palette.gray, icon: same.icon };
+  if (same) return { value: same.value, label: same.label, color: same.color ?? 'gray', icon: same.icon };
   const list = customCategories(os);
   let value = `c_${slug(label) || 'category'}`;
   for (let i = 2; CATEGORIES.some((x) => x.value === value); i++) value = `c_${slug(label)}_${i}`;

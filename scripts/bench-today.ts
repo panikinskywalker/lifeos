@@ -19,7 +19,7 @@ import { eventType, goalType, projectType, taskType } from '../src/modules/proje
 import { tripType } from '../src/modules/travel/types';
 import { deliveryType } from '../src/modules/deliveries/types';
 import { habitLogType, habitType } from '../src/modules/habits/types';
-import { financeOverview } from '../src/modules/finance/overview';
+import { financeOverview } from '../src/boards/finance/overview';
 import { peopleOverview } from '../src/boards/crm/overview';
 import { projectsOverview } from '../src/boards/projects/overview';
 import { habitsOverview } from '../src/boards/habits/overview';

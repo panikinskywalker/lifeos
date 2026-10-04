@@ -1,25 +1,20 @@
-import type { ComponentType } from 'react';
+import type { ComponentType } from 'react'; // type-only: core has no runtime dependency on React (deps.test allows `import type`)
 import type { ZodTypeAny } from 'zod';
 import type { Entity, EntityTypeDef, WidgetSize } from '../domain/types';
 import type { CoreEvents, EventName } from '../events/bus';
 import type { LifeOSContext } from './context';
 
 /* ------------------------------------------------------------------ */
-/* Plugin API — the ONLY contract between core and a module.           */
-/* A module is a plain object; nothing in core imports a module.       */
+/* Plugin API — the ONLY contract between core and a module / board.   */
+/* Manifests are plain objects; nothing in core imports a module or a  */
+/* board. See docs/PLUGINS.md.                                         */
 /* ------------------------------------------------------------------ */
+
 
 export interface TileProps {
   size: WidgetSize;
   config: Record<string, unknown>;
   ctx: LifeOSContext;
-}
-
-export interface ModuleScreen {
-  /** Route segment under /module/<moduleId>/<key>; "index" is the module home. */
-  key: string;
-  title: string;
-  component: ComponentType<{ ctx: LifeOSContext; params: Record<string, string> }>;
 }
 
 export interface QuickAction {
@@ -148,16 +143,14 @@ export interface BoardManifest {
   /** Companion boards: the module's Overview (Browse › module, Today's area card). */
   overview?: OverviewFn;
   overrides?: ObjectOverride[];
-  /** @deprecated R0: moves to the companion board. */
   quickActions?: QuickAction[];
   buttons?: ManualRun[];
 }
 
 /* ------------------------------------------------------------------ */
-/* Modules — one domain of data each. Objects, filing, sources, AI     */
-/* tools, triggers, actions. Nothing visual (that is the board's).     */
-/* The visual fields below are @deprecated and move to the companion   */
-/* board in R0 stage B.                                                 */
+/* Modules — one domain of data each: Objects, filing, sources, AI     */
+/* tools, triggers, actions. Nothing visual — that is the companion    */
+/* board's (docs/MODEL.md §3).                                          */
 /* ------------------------------------------------------------------ */
 
 export interface ModuleManifest {
@@ -171,19 +164,11 @@ export interface ModuleManifest {
   /** Module ids that must be installed first. */
   dependencies?: string[];
   entityTypes?: EntityTypeDef<any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-  /** @deprecated R0: moves to the companion board. */
-  screens?: ModuleScreen[];
-  /** @deprecated R0: moves to the companion board. */
-  quickActions?: QuickAction[];
   triggers?: TriggerDef[];
   actions?: ActionDef[];
   aiTools?: AiToolDef[];
-  /** @deprecated R0: moves to the companion board. */
-  detailSections?: EntityDetailSection[];
   /** Runs once when installed: seed default views/dashboards/rules. */
   onInstall?: (os: LifeOSContext) => void | Promise<void>;
-  /** @deprecated R0: moves to the companion board. */
-  overview?: OverviewFn;
   /** Runs every app start after install. */
   onStart?: (os: LifeOSContext) => void | Promise<void>;
 }

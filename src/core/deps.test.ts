@@ -56,12 +56,13 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|(?:^|\n)\s*import\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
+const IMPORT_RE = /(?:^|\n)\s*((?:import|export)\s[^'"]*?)from\s*['"]([^'"]+)['"]|(?:^|\n)\s*import\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
 
-function imports(file: string): string[] {
+/** Each import's target and whether it is type-only (`import type …`, erased at build time: no runtime coupling). */
+function imports(file: string): Array<{ spec: string; typeOnly: boolean }> {
   const src = readFileSync(file, 'utf8');
-  const out: string[] = [];
-  for (const m of src.matchAll(IMPORT_RE)) out.push((m[1] ?? m[2] ?? m[3])!);
+  const out: Array<{ spec: string; typeOnly: boolean }> = [];
+  for (const m of src.matchAll(IMPORT_RE)) out.push({ spec: (m[2] ?? m[3] ?? m[4])!, typeOnly: /^(?:import|export)\s+type\b/.test((m[1] ?? '').trim()) });
   return out;
 }
 
@@ -78,16 +79,8 @@ function resolveTarget(fromFile: string, spec: string): string | null {
   return null; // a package
 }
 
-/** Violations that exist today (R0 stage A). Shrinks to empty by the end of R0. */
-const ALLOWED = new Set<string>([
-  // core → react: ComponentType on the deprecated widget / screen fields; gone with stage B
-  'core/registry/types.ts',
-  // modules → ui: colours and screens still inside modules until stage B moves them to boards
-  ...[
-    'finance/categories.ts', 'finance/types.ts', 'finance/reportsScreen.tsx', 'finance/screens.tsx', 'finance/subscriptionHero.tsx', 'finance/splitScreens.tsx',
-    'automation/index.tsx',
-  ].map((f) => `modules/${f}`),
-]);
+/** Known violations. Empty since R0 stage B; adding a line needs a reason in the commit message. */
+const ALLOWED = new Set<string>([]);
 
 describe('the one-way rule', () => {
   const files = walk(ROOT).filter((f) => !/\.test\.tsx?$/.test(f));
@@ -100,11 +93,11 @@ describe('the one-way rule', () => {
     if (rel === 'modules/index.ts' || rel === 'boards/index.ts') continue;
     const tier = tierOf(rel);
     const mod = moduleOf(rel);
-    for (const spec of imports(file)) {
+    for (const { spec, typeOnly } of imports(file)) {
       const target = resolveTarget(file, spec);
       if (!target) {
         const banned = FORBIDDEN_PACKAGES[tier];
-        if (banned && banned.test(spec)) {
+        if (banned && !typeOnly && banned.test(spec)) {
           if (ALLOWED.has(rel)) stillAllowed.add(rel);
           else violations.push(`${rel} imports package "${spec}" (${tier} must not)`);
         }

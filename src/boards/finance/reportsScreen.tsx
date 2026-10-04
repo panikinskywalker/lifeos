@@ -6,9 +6,9 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Card, Chip, ColumnChart, EmptyState, IconButton, LineChart, ProgressBar, RowItem, RowList, Screen, Section, Segmented, StackedBar, StatTile, Text } from '@ui/kit';
-import { categoryOf } from './types';
-import { monthReport, netWorthSeries, subscriptionRunRate } from './reports';
-import { netWorth } from './lib';
+import { categoryOf } from '@modules/finance/types';
+import { monthReport, netWorthSeries, subscriptionRunRate } from '@modules/finance/reports';
+import { netWorth } from '@modules/finance/lib';
 
 type Tab = 'month' | 'subs' | 'worth';
 

@@ -9,7 +9,6 @@ import { documentsModule } from './documents';
 import { knowledgeModule } from './knowledge';
 import { habitsModule } from './habits';
 import { inventoryModule } from './inventory';
-import { automationModule } from './automation';
 import { placesModule } from './places';
 import { deliveriesModule } from './deliveries';
 
@@ -29,7 +28,6 @@ export const installedModules: ModuleManifest[] = [
   knowledgeModule,
   habitsModule,
   inventoryModule,
-  automationModule,
   placesModule,
   deliveriesModule,
 ];

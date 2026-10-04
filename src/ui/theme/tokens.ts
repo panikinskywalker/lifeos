@@ -355,6 +355,8 @@ export const darkColors = legacyColors(darkTokens, darkPalette);
 
 export interface Theme {
   dark: boolean;
+  /** A module's colour name ("pink", see PaletteKey in core) → this theme's hex; a hex passes through. */
+  paletteColor: (c: string | undefined | null) => string | undefined;
   /** DESIGN.md colour tokens. */
   c: Colors;
   tints: Record<TintKey, Tint>;
@@ -366,9 +368,17 @@ export interface Theme {
   colors: ThemeColors;
 }
 
+/** Resolve a colour name from core (PaletteKey) to a hex for the given scheme; hex and unknown strings pass through. */
+export function paletteColor(c: string | undefined | null, dark = false): string | undefined {
+  if (!c) return undefined;
+  const p = (dark ? darkPalette : palette) as Record<string, string>;
+  return p[c] ?? c;
+}
+
 export function makeTheme(dark: boolean): Theme {
   return {
     dark,
+    paletteColor: (c) => paletteColor(c, dark),
     c: dark ? darkTokens : lightTokens,
     tints: dark ? darkTints : lightTints,
     type,

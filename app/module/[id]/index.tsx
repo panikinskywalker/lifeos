@@ -13,6 +13,8 @@ export default function ModuleRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const counts = useLive((o) => o.entities.countsByType(), []);
   const m = os.registry.modules.get(id ?? "");
+  const board = os.registry.boardFor(id ?? "");
+  const screens = board?.screens ?? [];
   const overview = useLive(
     (o) => o.registry.overviewFor(id ?? "")?.(o) ?? null,
     [id],
@@ -30,7 +32,7 @@ export default function ModuleRoute() {
   if (m.id === "health") return <HealthHome />;
   const tint = tintForModule(m.id);
   const types = os.registry.typesForModule(m.id).filter((x) => !x.hidden);
-  const hasHome = m.screens?.some((s) => s.key === "index");
+  const hasHome = screens.some((s) => s.key === "index");
   const total = types.reduce((n, ty) => n + (counts[ty.type] ?? 0), 0);
   return (
     <Screen
@@ -52,7 +54,7 @@ export default function ModuleRoute() {
               onPress={() => router.push(`/module/${m.id}/index`)}
             />
           ) : null}
-          {(m.screens ?? [])
+          {screens
             .filter((sc) => sc.key !== "index")
             .map((sc) => (
               <RowItem
@@ -70,24 +72,6 @@ export default function ModuleRoute() {
                 }
               />
             ))}
-          {m.id === "automation" ? (
-            <>
-              <RowItem
-                icon="bolt"
-                tint={tint}
-                title="Rules"
-                subtitle="Triggers, conditions, actions"
-                onPress={() => router.push("/automation")}
-              />
-              <RowItem
-                icon="bell"
-                tint={tint}
-                title="Reminders"
-                subtitle="Everything scheduled"
-                onPress={() => router.push("/reminders")}
-              />
-            </>
-          ) : null}
           {types.map((ty) => (
             <RowItem
               key={ty.type}

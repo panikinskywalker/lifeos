@@ -7,8 +7,8 @@ import { logDone, undoLoggedDone } from '@core/cycles/upkeep';
 import { useLive } from '@ui/hooks';
 import { AttentionCard, QuickActions, RowList, Section, StatTrio, useToast } from '@ui/kit';
 import { EntityRow } from '@ui/components/EntityRow';
-import type { SubscriptionData } from './types';
-import { perMonth } from './reports';
+import type { SubscriptionData } from '@modules/finance/types';
+import { perMonth } from '@modules/finance/reports';
 
 /**
  * Subscription (Stitch "Record · Subscription"): per month / next bill /

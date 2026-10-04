@@ -55,14 +55,14 @@ export default function SpendScreen() {
             </Text>
             <Stat value={os.format.currency(r.total)} size="hero" />
             <DeltaChip change={r.change} better={kind === 'spending' ? 'down' : kind === 'income' ? 'up' : 'none'} vs={`vs the period before${r.prevTotal != null ? ` (${os.format.currency(r.prevTotal)})` : ''}`} />
-            {r.byCategory.length > 1 ? <StackedBar parts={r.byCategory.slice(0, 6).map((c) => ({ label: categoryOf(c.category).label, value: c.total, color: categoryOf(c.category).color ?? t.c.chart[0], display: `${Math.round(c.share * 100)}%` }))} legend={false} /> : null}
+            {r.byCategory.length > 1 ? <StackedBar parts={r.byCategory.slice(0, 6).map((c) => ({ label: categoryOf(c.category).label, value: c.total, color: t.paletteColor(categoryOf(c.category).color) ?? t.c.chart[0], display: `${Math.round(c.share * 100)}%` }))} legend={false} /> : null}
             <View style={{ gap: 2 }}>
               {r.byCategory.map((c) => {
                 const on = cats.includes(c.category);
                 const cat = categoryOf(c.category);
                 return (
                   <Pressable key={c.category} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => toggle(cats, setCats, c.category)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 12, backgroundColor: on ? t.c.bg.tileRaised : 'transparent' }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: cat.color ?? t.c.fg.tertiary }} />
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: t.paletteColor(cat.color) ?? t.c.fg.tertiary }} />
                     <Text variant="label" style={{ flex: 1 }}>{cat.label}</Text>
                     <Text variant="caption" color="secondary">{Math.round(c.share * 100)}% · {c.count}</Text>
                     <Text variant="label" style={{ fontVariant: ['tabular-nums'], minWidth: 84, textAlign: 'right' }}>{os.format.currency(c.total)}</Text>

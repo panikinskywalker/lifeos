@@ -50,7 +50,7 @@ export function OverviewBlocks({ blocks, tint }: { blocks: OverviewBlock[]; tint
             const palette = t.c.chart;
             return (
               <Section key={i} title={b.title}>
-                <StackedBar parts={b.parts.map((p, k) => ({ label: p.label, value: p.value, color: p.color ?? palette[k % palette.length]!, display: formatValue(p.value, b.format, os.format.currency) }))} />
+                <StackedBar parts={b.parts.map((p, k) => ({ label: p.label, value: p.value, color: t.paletteColor(p.color) ?? palette[k % palette.length]!, display: formatValue(p.value, b.format, os.format.currency) }))} />
               </Section>
             );
           }

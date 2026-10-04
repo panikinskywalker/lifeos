@@ -1,12 +1,7 @@
 import type { ModuleManifest } from '@core/registry/types';
 import { accountType, budgetType, subscriptionType, transactionType, FINANCE_COLOR, CATEGORIES, debtType } from './types';
 import { applyCategories, trackCategoryField } from './categories';
-import { financeOverview } from './overview';
-import { AccountSection, BudgetSection, FinanceHome } from './screens';
 import { postDueSubscriptions } from './lib';
-import { GroupBalanceSection, PersonBalanceSection, SplitSection } from './splitScreens';
-import { ReportsScreen } from './reportsScreen';
-import { SubscriptionHero } from './subscriptionHero';
 import { financeAiTools } from './aiTools';
 
 export const financeModule: ModuleManifest = {
@@ -17,20 +12,6 @@ export const financeModule: ModuleManifest = {
   icon: 'banknote',
   color: FINANCE_COLOR,
   entityTypes: [accountType, transactionType, budgetType, subscriptionType, debtType],
-  screens: [{ key: 'index', title: 'Finance', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }],
-  quickActions: [
-    { id: 'finance.addTransaction', label: 'Transaction', icon: 'arrow.up.arrow.down', route: '/entity/transaction/new', global: true },
-    { id: 'finance.addAccount', label: 'Account', icon: 'creditcard', route: '/entity/account/new' },
-    { id: 'finance.addSubscription', label: 'Subscription', icon: 'repeat', route: '/entity/subscription/new' },
-  ],
-  detailSections: [
-    { entityType: 'account', key: 'finance.account', title: 'Balance', component: AccountSection, order: 10 },
-    { entityType: 'budget', key: 'finance.budget', title: 'Progress', component: BudgetSection, order: 10 },
-    { entityType: 'subscription', key: 'finance.subscription', title: 'Billing', component: SubscriptionHero, order: 10, placement: 'top' },
-    { entityType: 'transaction', key: 'finance.split', title: 'Split', component: SplitSection, order: 20 },
-    { entityType: 'person', key: 'finance.balance', title: 'Money', component: PersonBalanceSection, order: 20 },
-    { entityType: 'group', key: 'finance.group', title: 'Balances', component: GroupBalanceSection, order: 10 },
-  ],
   triggers: [
     {
       id: 'finance.transaction.created', module: 'finance', label: 'Transaction added', event: 'entity.created',
@@ -60,7 +41,6 @@ export const financeModule: ModuleManifest = {
     },
   ],
   aiTools: financeAiTools,
-  overview: financeOverview,
   onStart: async (os) => {
     // Your own categories join the built-in list in every category picker.
     for (const def of [transactionType, budgetType, subscriptionType]) trackCategoryField(def.fields.find((f) => f.key === 'category'));

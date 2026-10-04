@@ -16,7 +16,7 @@ import { groupType, personType } from './crm/types';
 import { eventType, goalType, projectType, taskType } from './projects/types';
 import { tripType } from './travel/types';
 import { deliveryType } from './deliveries/types';
-import { financeOverview } from './finance/overview';
+import { financeOverview } from '@boards/finance/overview';
 import { peopleOverview } from '@boards/crm/overview';
 import { projectsOverview } from '@boards/projects/overview';
 import { travelOverview } from '@boards/travel/overview';

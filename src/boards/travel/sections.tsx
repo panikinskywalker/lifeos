@@ -8,7 +8,7 @@ import { ProgressBar, StackedBar } from '@ui/components/charts';
 import { EntityRow } from '@ui/components/EntityRow';
 import { categoryOf } from '@modules/finance/types';
 import { type TripData } from '@modules/travel';
-import { palette } from '@ui/theme/tokens';
+import { palette, paletteColor } from '@ui/theme/tokens';
 
 const TRAVEL_COLOR = palette.cyan;
 
@@ -48,7 +48,7 @@ export function TripSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSC
           ) : null}
         </View>
         {trip.data.budget ? <ProgressBar progress={spent / trip.data.budget} color={TRAVEL_COLOR} /> : null}
-        {data.byCat.length ? <StackedBar parts={data.byCat.map((c) => ({ value: c.values['sum_data.amount'], color: categoryOf(c.key ?? 'other').color ?? TRAVEL_COLOR }))} height={8} /> : null}
+        {data.byCat.length ? <StackedBar parts={data.byCat.map((c) => ({ value: c.values['sum_data.amount'], color: paletteColor(categoryOf(c.key ?? 'other').color) ?? TRAVEL_COLOR }))} height={8} /> : null}
         {days && spent && until != null && until <= 0 ? (
           <Text variant="caption" color="secondary">
             {ctx.format.currency(spent / days)} per day
@@ -66,7 +66,7 @@ export function TripSection({ entity, ctx }: { entity: Entity<any>; ctx: LifeOSC
           <SectionHeader title="Bookings & documents" icon="doc" color={TRAVEL_COLOR} />
           <Card padded={false}>
             {data.docs.map((r, i) => (
-              <Row key={r.relation.id} title={r.other.title} subtitle={ctx.registry.entityTypes.get(r.other.type)?.label} icon={ctx.registry.entityTypes.get(r.other.type)?.icon} iconColor={ctx.registry.colorFor(r.other.type)} last={i === data.docs.length - 1} onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)} />
+              <Row key={r.relation.id} title={r.other.title} subtitle={ctx.registry.entityTypes.get(r.other.type)?.label} icon={ctx.registry.entityTypes.get(r.other.type)?.icon} iconColor={paletteColor(ctx.registry.colorFor(r.other.type))} last={i === data.docs.length - 1} onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)} />
             ))}
           </Card>
         </View>

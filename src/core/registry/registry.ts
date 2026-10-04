@@ -25,17 +25,6 @@ export class Registry {
     for (const t of m.triggers ?? []) this.triggers.set(t.id, { ...t, module: m.id });
     for (const a of m.actions ?? []) this.actions.set(a.id, { ...a, module: m.id });
     for (const t of m.aiTools ?? []) this.aiTools.set(t.name, t);
-    for (const q of m.quickActions ?? []) {
-      const i = this.quickActions.findIndex((x) => x.id === q.id);
-      if (i >= 0) this.quickActions[i] = q;
-      else this.quickActions.push(q);
-    }
-    for (const s of m.detailSections ?? []) {
-      const i = this.detailSections.findIndex((x) => x.key === s.key && x.entityType === s.entityType);
-      if (i >= 0) this.detailSections[i] = s;
-      else this.detailSections.push(s);
-    }
-    this.detailSections.sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
   }
 
   /** Boards register after modules; their tiles, overrides and quick actions join the same lookups. */
@@ -59,10 +48,16 @@ export class Registry {
     this.detailSections.sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
   }
 
-  /** The overview for a module: its companion board's override, else the module's own (deprecated) one. */
+  /** The module's Overview, from its companion board. */
   overviewFor(moduleId: string) {
     for (const b of this.boards.values()) if (b.module === moduleId && b.overview) return b.overview;
-    return this.modules.get(moduleId)?.overview;
+    return undefined;
+  }
+
+  /** The companion board of a module, if it has one. */
+  boardFor(moduleId: string) {
+    for (const b of this.boards.values()) if (b.module === moduleId) return b;
+    return undefined;
   }
 
   type(type: string): EntityTypeDef {

@@ -2,9 +2,9 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { Entity } from '@core/domain/types';
 import { isoOf, lastMonths, DAY_MS, type ModuleOverview, type OverviewBlock } from '@core/dashboard/overview';
 import { daily } from '@core/dashboard/metrics';
-import { budgetStatus, dailySpend, netWorth, spendInRange } from './lib';
-import { monthReport, monthlySubscriptionCost } from './reports';
-import { categoryOf, type BudgetData } from './types';
+import { budgetStatus, dailySpend, netWorth, spendInRange } from '@modules/finance/lib';
+import { monthReport, monthlySubscriptionCost } from '@modules/finance/reports';
+import { categoryOf, type BudgetData } from '@modules/finance/types';
 
 /** Money at a glance: this month vs usual, where it went, budgets, the last six months, the biggest spends. */
 export function financeOverview(os: LifeOSContext, now = Date.now(), opts: { cardOnly?: boolean } = {}): ModuleOverview {

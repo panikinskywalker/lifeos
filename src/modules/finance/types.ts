@@ -1,29 +1,28 @@
 import { z } from 'zod';
 import type { EntityTypeDef, FieldOption } from '@core/domain/types';
-import { palette } from '@ui/theme/tokens';
 import { dateField, nextAnnual, periodFromRRule } from '@core/cycles/schedule';
 
-export const FINANCE_COLOR = palette.green;
+export const FINANCE_COLOR = 'green';
 
 export const CATEGORIES: Array<FieldOption & { icon: string }> = [
-  { value: 'food', label: 'Food & Drink', color: palette.orange, icon: 'fork.knife' },
-  { value: 'groceries', label: 'Groceries', color: palette.green, icon: 'cart' },
-  { value: 'transport', label: 'Transport', color: palette.blue, icon: 'bus' },
-  { value: 'housing', label: 'Housing & Rent', color: palette.brown, icon: 'house' },
-  { value: 'utilities', label: 'Utilities', color: palette.teal, icon: 'bolt' },
-  { value: 'shopping', label: 'Shopping', color: palette.pink, icon: 'bag' },
-  { value: 'entertainment', label: 'Entertainment', color: palette.purple, icon: 'film' },
-  { value: 'health', label: 'Health', color: palette.red, icon: 'heart' },
-  { value: 'travel', label: 'Travel', color: palette.cyan, icon: 'airplane' },
-  { value: 'education', label: 'Education', color: palette.indigo, icon: 'graduationcap' },
-  { value: 'subscriptions', label: 'Subscriptions', color: palette.mint, icon: 'repeat' },
-  { value: 'gifts', label: 'Gifts', color: palette.yellow, icon: 'gift' },
-  { value: 'investment', label: 'Investment', color: palette.green, icon: 'chart.line' },
-  { value: 'salary', label: 'Salary', color: palette.green, icon: 'banknote' },
-  { value: 'freelance', label: 'Freelance', color: palette.teal, icon: 'briefcase' },
-  { value: 'fees', label: 'Fees & Charges', color: palette.gray, icon: 'building.columns' },
-  { value: 'transfer', label: 'Transfer', color: palette.gray, icon: 'arrow.left.arrow.right' },
-  { value: 'other', label: 'Other', color: palette.gray, icon: 'ellipsis' },
+  { value: 'food', label: 'Food & Drink', color: 'orange', icon: 'fork.knife' },
+  { value: 'groceries', label: 'Groceries', color: 'green', icon: 'cart' },
+  { value: 'transport', label: 'Transport', color: 'blue', icon: 'bus' },
+  { value: 'housing', label: 'Housing & Rent', color: 'brown', icon: 'house' },
+  { value: 'utilities', label: 'Utilities', color: 'teal', icon: 'bolt' },
+  { value: 'shopping', label: 'Shopping', color: 'pink', icon: 'bag' },
+  { value: 'entertainment', label: 'Entertainment', color: 'purple', icon: 'film' },
+  { value: 'health', label: 'Health', color: 'red', icon: 'heart' },
+  { value: 'travel', label: 'Travel', color: 'cyan', icon: 'airplane' },
+  { value: 'education', label: 'Education', color: 'indigo', icon: 'graduationcap' },
+  { value: 'subscriptions', label: 'Subscriptions', color: 'mint', icon: 'repeat' },
+  { value: 'gifts', label: 'Gifts', color: 'yellow', icon: 'gift' },
+  { value: 'investment', label: 'Investment', color: 'green', icon: 'chart.line' },
+  { value: 'salary', label: 'Salary', color: 'green', icon: 'banknote' },
+  { value: 'freelance', label: 'Freelance', color: 'teal', icon: 'briefcase' },
+  { value: 'fees', label: 'Fees & Charges', color: 'gray', icon: 'building.columns' },
+  { value: 'transfer', label: 'Transfer', color: 'gray', icon: 'arrow.left.arrow.right' },
+  { value: 'other', label: 'Other', color: 'gray', icon: 'ellipsis' },
 ];
 export const categoryOf = (v: string | undefined) => CATEGORIES.find((c) => c.value === v) ?? CATEGORIES[CATEGORIES.length - 1];
 
@@ -131,7 +130,7 @@ export const transactionType: EntityTypeDef<TransactionData> = {
   ],
   indexed: ['category', 'kind', 'accountId', 'date'],
   occurredAtField: 'date',
-  statuses: [{ value: 'cleared', label: 'Cleared' }, { value: 'pending', label: 'Pending' }, { value: 'reimbursable', label: 'Reimbursable', color: palette.orange }, { value: 'reimbursed', label: 'Reimbursed' }],
+  statuses: [{ value: 'cleared', label: 'Cleared' }, { value: 'pending', label: 'Pending' }, { value: 'reimbursable', label: 'Reimbursable', color: 'orange' }, { value: 'reimbursed', label: 'Reimbursed' }],
   computeTitle: (d) => d.merchant?.trim() || categoryOf(d.category).label,
   computeSubtitle: (d) => (d.merchant ? categoryOf(d.category).label : undefined),
   searchText: (d) => [d.note, d.category, d.kind].filter(Boolean).join(' '),
@@ -216,7 +215,7 @@ export const subscriptionType: EntityTypeDef<SubscriptionData> = {
     currencyField,
   ],
   occurredAtField: 'nextBillingAt',
-  statuses: [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused' }, { value: 'cancelled', label: 'Cancelled', color: palette.gray }],
+  statuses: [{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused' }, { value: 'cancelled', label: 'Cancelled', color: 'gray' }],
   computeTitle: (d) => d.name,
   cycleFields: { 'subscription.renewal': { nextDueAt: 'nextBillingAt' } },
   cycleActiveStatuses: ['active'],
@@ -259,5 +258,5 @@ export const debtType: EntityTypeDef<{ personId: string; direction: 'they_owe' |
   occurredAtField: 'date',
   computeTitle: (d) => d.reason || (d.kind === 'payment' ? 'Payment' : 'Debt'),
   computeSubtitle: (d, { formatCurrency }) => `${d.direction === 'they_owe' ? 'Owes you' : 'You owe'} ${formatCurrency(d.amount, d.currency)}`,
-  statuses: [{ value: 'open', label: 'Open' }, { value: 'settled', label: 'Settled', color: palette.gray }],
+  statuses: [{ value: 'open', label: 'Open' }, { value: 'settled', label: 'Settled', color: 'gray' }],
 };

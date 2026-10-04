@@ -27,6 +27,7 @@ export default function CategoriesScreen() {
   const amounts = [...new Set(amountText.split(/[,/\s]+/).map((x) => Number(x.replace(/[₹rs.]+$/i, '').replace(/^(?:₹|rs\.?)/i, ''))).filter((n) => Number.isFinite(n) && n > 0))];
   const [category, setCategory] = useState('food');
   const [showBuiltin, setShowBuiltin] = useState(false);
+  const t = useTheme();
   const mine = useLive((o) => customCategories(o), []);
   const groups = useLive((o) => (o.registry.entityTypes.has('group') ? o.entities.query('group', {}, { limit: 200 }) : []), []);
   const [mode, setMode] = useState<'exact' | 'range'>('exact');
@@ -87,7 +88,7 @@ export default function CategoriesScreen() {
           {mine.length ? (
             <RowList>
               {mine.map((c) => (
-                <RowItem key={c.value} icon={c.icon} title={c.label} subtitle="Tap to rename, recolour or delete" trailing={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.color }} />} onPress={() => setEditing(c)} />
+                <RowItem key={c.value} icon={c.icon} title={c.label} subtitle="Tap to rename, recolour or delete" trailing={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: t.paletteColor(c.color) }} />} onPress={() => setEditing(c)} />
               ))}
             </RowList>
           ) : (
@@ -226,13 +227,13 @@ function CategorySheet({ editing, nextColor, onClose, onSave, onDelete }: { edit
         <Text variant="label" color="secondary">Colour</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {CATEGORY_COLORS.map((c) => (
-            <Pressable key={c} accessibilityRole="button" accessibilityLabel={`Colour ${c}`} accessibilityState={{ selected: color === c }} onPress={() => setColor(c)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c, borderWidth: color === c ? 3 : 0, borderColor: t.c.fg.primary }} />
+            <Pressable key={c} accessibilityRole="button" accessibilityLabel={`Colour ${c}`} accessibilityState={{ selected: color === c }} onPress={() => setColor(c)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: t.paletteColor(c), borderWidth: color === c ? 3 : 0, borderColor: t.c.fg.primary }} />
           ))}
         </View>
         <Text variant="label" color="secondary">Icon</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {CATEGORY_ICONS.map((i) => (
-            <Pressable key={i} accessibilityRole="button" accessibilityLabel={`Icon ${i}`} accessibilityState={{ selected: icon === i }} onPress={() => setIcon(i)} style={{ width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: icon === i ? color : t.c.bg.tile }}>
+            <Pressable key={i} accessibilityRole="button" accessibilityLabel={`Icon ${i}`} accessibilityState={{ selected: icon === i }} onPress={() => setIcon(i)} style={{ width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: icon === i ? t.paletteColor(color) : t.c.bg.tile }}>
               <Icon name={i} size={20} color={icon === i ? '#fff' : t.c.fg.secondary} />
             </Pressable>
           ))}
