@@ -25,7 +25,7 @@ const testModule: ModuleManifest = {
       icon: 'x',
       schema: z.object({ amount: z.number(), category: z.string().default('other'), merchant: z.string().optional(), date: z.string() }),
       fields: [
-        { key: 'amount', label: 'Amount', type: 'currency' },
+        { key: 'amount', label: 'Amount', type: 'money' },
         { key: 'category', label: 'Category', type: 'select', options: [{ value: 'food', label: 'Food' }, { value: 'travel', label: 'Travel' }] },
         { key: 'merchant', label: 'Merchant', type: 'text' },
         { key: 'date', label: 'Date', type: 'date' },

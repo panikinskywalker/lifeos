@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
-import type { FieldDef, FieldOption } from '@core/domain/types';
+import type { Field, FieldOption } from '@core/domain/types';
 import { bus } from '@core/events/bus';
 import { CATEGORIES } from './types';
 
@@ -27,7 +27,7 @@ export const CATEGORY_ICONS = ['tag', 'heart', 'gift', 'cart', 'bag', 'car', 'pl
 const pickers: Array<{ options: FieldOption[]; keep: (v: string) => boolean }> = [];
 
 /** Register a select field whose options are the category list (done once per field at start). */
-export function trackCategoryField(field: FieldDef | undefined) {
+export function trackCategoryField(field: Field | undefined) {
   if (!field?.options || pickers.some((p) => p.options === field.options)) return;
   const present = new Set(field.options.map((o) => o.value));
   const excluded = new Set(BUILTIN.map((c) => c.value).filter((v) => !present.has(v)));

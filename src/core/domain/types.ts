@@ -38,37 +38,13 @@ export interface EntityRef {
 /* Field definitions — drive forms, filters, AI tools, custom fields   */
 /* ------------------------------------------------------------------ */
 
-/** @deprecated R0 stage E replaces 'currency' → 'money', 'relation' → 'link', removes 'json'; see fields.ts. */
-export type FieldType = FieldTypeNew | 'currency' | 'relation' | 'json';
+export type FieldType = FieldTypeNew;
 
 export type FieldOption = FieldOptionNew;
 export type { Field };
 
-export interface FieldDef {
-  key: string;
-  label: string;
-  type: FieldType;
-  required?: boolean;
-  /** For select/multiselect. */
-  options?: FieldOption[];
-  /** For select: the picker offers "Add “…”" and this makes the new option (e.g. a new spending category). */
-  onCreateOption?: (label: string) => FieldOption | null;
-  /** For relation: which entity type(s) may be linked; `relationKind` names the edge. */
-  relationTo?: string | string[];
-  relationKind?: string;
-  /** Show in list rows / cards. */
-  summary?: boolean;
-  /** Extra hint for the AI assistant and forms. */
-  description?: string;
-  placeholder?: string;
-  /** Default value when creating. */
-  defaultValue?: unknown;
-  /** Group fields into sections in forms. */
-  section?: string;
-}
-
 /* ------------------------------------------------------------------ */
-/* ObjectRecord type definition — registered once, used everywhere           */
+/* Object definition — registered once, used everywhere                 */
 /* ------------------------------------------------------------------ */
 
 /** An Object: the definition of a storage unit — name, Fields, cycles. */
@@ -83,7 +59,7 @@ export interface ObjectDef<TData = Record<string, unknown>> {
   color?: string;
   /** Runtime validation for `data`. */
   schema: ZodTypeAny;
-  fields: FieldDef[];
+  fields: Field[];
   /** Fields whose `data.<key>` get an expression index. */
   indexed?: string[];
   /** Statuses this type supports (drives kanban/board views and filters). */

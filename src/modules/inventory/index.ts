@@ -11,7 +11,7 @@ export const itemType: ObjectDef<ItemData> = {
   schema: z.object({ quantity: z.coerce.number().default(1), unit: z.string().optional(), location: z.string().optional(), minQuantity: z.coerce.number().optional(), expiresOn: z.string().optional(), category: z.string().optional(), notes: z.string().optional() }),
   cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'item.expiry', name: 'Use or replace', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: 7 }] : []),
   fields: [
-    { key: 'quantity', label: 'Quantity', type: 'number', required: true, defaultValue: 1, summary: true },
+    { key: 'quantity', label: 'Quantity', type: 'number', required: true, default: 1, summary: true },
     { key: 'unit', label: 'Unit', type: 'text', placeholder: 'pcs, kg, L' },
     { key: 'location', label: 'Location', type: 'text', summary: true, placeholder: 'Kitchen, Garage, Storage box 3' },
     { key: 'category', label: 'Category', type: 'select', options: [{ value: 'pantry', label: 'Pantry' }, { value: 'household', label: 'Household' }, { value: 'medicine', label: 'Medicine' }, { value: 'tools', label: 'Tools' }, { value: 'clothing', label: 'Clothing' }, { value: 'other', label: 'Other' }] },

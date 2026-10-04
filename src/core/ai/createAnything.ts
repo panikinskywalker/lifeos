@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { LifeOSContext } from '../registry/context';
 import type { AiToolDef } from '../registry/types';
-import type { ObjectDef, FieldDef } from '../domain/types';
+import type { ObjectDef, Field } from '../domain/types';
 import { withExtras, type ReplyCard } from './cards';
 import { clearMatch, resolveCandidates } from './lifeTools';
 import { parseAmount } from './parser';
@@ -57,11 +57,11 @@ function dayMonth(s: string, from: Date): string | undefined {
 
 const empty = (v: unknown) => v === undefined || v === null || v === '';
 
-export function coerce(f: FieldDef, v: unknown): unknown {
+export function coerce(f: Field, v: unknown): unknown {
   if (empty(v)) return v;
   switch (f.type) {
     case 'number':
-    case 'currency':
+    case 'money':
       return typeof v === 'number' ? v : typeof v === 'string' ? (parseAmount(v) ?? (Number.isFinite(Number(v)) ? Number(v) : v)) : v;
     case 'date':
       return parseDateish(v) ?? v;
@@ -84,8 +84,8 @@ export function fillDefaults(def: ObjectDef, data: Record<string, unknown>, titl
   for (const f of def.fields) {
     out[f.key] = coerce(f, out[f.key]);
     if (!empty(out[f.key])) continue;
-    if (f.defaultValue !== undefined) {
-      out[f.key] = typeof f.defaultValue === 'function' ? (f.defaultValue as () => unknown)() : f.defaultValue;
+    if (f.default !== undefined) {
+      out[f.key] = typeof f.default === 'function' ? (f.default as () => unknown)() : f.default;
       continue;
     }
     if (!f.required) continue;

@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { ObjectRecord, ObjectDef, FieldDef } from '@core/domain/types';
+import type { ObjectRecord, ObjectDef, Field } from '@core/domain/types';
 import { ZodError } from 'zod';
 import { useTheme } from '../theme/ThemeProvider';
-import { Button, Field, FilterChip, Screen, Section, Text, TextField } from '../kit';
+import { Button, FormField, FilterChip, Screen, Section, Text, TextField } from '../kit';
 import { FieldInput, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 
@@ -25,7 +25,7 @@ export function FormScreen({ type, id, initial, onSaved, linkTo }: { type: strin
   const [status, setStatus] = useState<string | null>(existing?.status ?? def.statuses?.[0]?.value ?? null);
   const [data, setData] = useState<Record<string, unknown>>(() => {
     const base: Record<string, unknown> = {};
-    for (const f of def.fields) if (f.defaultValue !== undefined) base[f.key] = typeof f.defaultValue === 'function' ? (f.defaultValue as () => unknown)() : f.defaultValue;
+    for (const f of def.fields) if (f.default !== undefined) base[f.key] = typeof f.default === 'function' ? (f.default as () => unknown)() : f.default;
     return { ...base, ...(existing?.data ?? {}), ...(initial ?? {}) };
   });
   const [tags, setTags] = useState<string[]>(existingTags);
@@ -34,8 +34,8 @@ export function FormScreen({ type, id, initial, onSaved, linkTo }: { type: strin
 
   const hasTitleField = !def.computeTitle;
   const sections = useMemo(() => {
-    const all: FieldDef[] = [...def.fields, ...customFields.map((c) => ({ key: `custom_${c.key}`, label: c.label, type: c.fieldType, options: c.options.options, section: 'Custom fields' }))];
-    const map = new Map<string, FieldDef[]>();
+    const all: Field[] = [...def.fields, ...customFields.map((c) => ({ key: `custom_${c.key}`, label: c.label, type: c.fieldType, options: c.options.options, section: 'Custom fields' }))];
+    const map = new Map<string, Field[]>();
     for (const f of all) {
       const s = f.section ?? '';
       if (!map.has(s)) map.set(s, []);
@@ -76,13 +76,13 @@ export function FormScreen({ type, id, initial, onSaved, linkTo }: { type: strin
     <Screen title={id ? `Edit ${def.label.toLowerCase()}` : `New ${def.label.toLowerCase()}`} subtitle={id ? existing?.title : os.registry.modules.get(def.module)?.description ?? os.registry.modules.get(def.module)?.name} onBack={close}>
       {hasTitleField ? <TextField label="Name" required value={title} onChange={setTitle} placeholder={`${def.label} name`} autoFocus={!id} error={errors.title} /> : null}
       {def.statuses?.length ? (
-        <Field label="Status">
+        <FormField label="Status">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {def.statuses.map((s) => (
               <FilterChip key={s.value} label={s.label} selected={status === s.value} onPress={() => setStatus(s.value)} />
             ))}
           </View>
-        </Field>
+        </FormField>
       ) : null}
       {sections.map(([section, fields], si) =>
         section ? (

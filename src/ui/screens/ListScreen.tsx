@@ -23,7 +23,7 @@ export function ListScreen({ type, title, initialView, embedded, linkTo }: { typ
   const insets = useSafeAreaInsets();
   const def = os.registry.object(type);
   const tint = tintForModule(def.module);
-  const currencyKey = def.fields.find((f) => f.type === 'currency')?.key;
+  const currencyKey = def.fields.find((f) => f.type === 'money')?.key;
   const views = useLive((o) => o.views.forType(type), [type]);
   const [activeViewId, setActiveViewId] = useState<string | null>(() => views.find((v) => v.isDefault)?.id ?? null);
   const [override, setOverride] = useState<ViewDefinition | null>(initialView ?? null);
@@ -230,7 +230,7 @@ export function groupEntities(entities: ObjectRecord[], groupBy: string | undefi
     const v = e.data[key];
     if (v == null || v === '') return 'None';
     if (f?.type === 'select') return f.options?.find((o) => o.value === v)?.label ?? String(v);
-    if (f?.type === 'relation') return os.records.ref(String(v))?.title ?? 'None';
+    if (f?.type === 'link') return os.records.ref(String(v))?.title ?? 'None';
     return String(v);
   };
   for (const e of entities) {
@@ -238,7 +238,7 @@ export function groupEntities(entities: ObjectRecord[], groupBy: string | undefi
     if (!map.has(l)) map.set(l, []);
     map.get(l)!.push(e);
   }
-  const currencyKey = entities[0] ? os.registry.object(entities[0].object).fields.find((f) => f.type === 'currency')?.key : undefined;
+  const currencyKey = entities[0] ? os.registry.object(entities[0].object).fields.find((f) => f.type === 'money')?.key : undefined;
   const sum = (items: ObjectRecord[], kind: string) => items.reduce((n, e) => n + (e.data.kind === kind ? Number(e.data[currencyKey!] ?? 0) : 0), 0);
   return [...map.entries()].map(([label, items]) => ({
     key: label,

@@ -11,7 +11,7 @@ export { Sheet } from './Sheet';
 export { ToastProvider, useToast, UNDO_MS, type ToastOptions } from './Toast';
 export { EmptyState } from './EmptyState';
 export { Segmented } from './Segmented';
-export { Field, TextField, NumberField, MoneyField, DateField, SelectField, RelationField, TagsField, SwitchField, Toggle, Stepper, DayChips, PickerSheet, type Option, type PickerItem } from './fields';
+export { FormField, TextField, NumberField, MoneyField, DateField, SelectField, RelationField, TagsField, SwitchField, Toggle, Stepper, DayChips, PickerSheet, type Option, type PickerItem } from './fields';
 export { RecordHeader, type HeaderStat } from './RecordHeader';
 export { Section, ListGroup, Card } from './SectionCard';
 export { Icon, icons, type IconName } from '../icons';

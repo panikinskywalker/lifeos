@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import type { FieldDef, FieldOption } from '@core/domain/types';
+import type { Field, FieldOption } from '@core/domain/types';
 import { tintForModule } from '../theme/moduleTint';
-import { Chip, DateField as KitDateField, Field, FilterChip, MoneyField, NumberField, PickerSheet, RelationField as KitRelationField, SelectField as KitSelectField, SwitchField, TagsField, TextField } from '../kit';
+import { Chip, DateField as KitDateField, FormField, FilterChip, MoneyField, NumberField, PickerSheet, RelationField as KitRelationField, SelectField as KitSelectField, SwitchField, TagsField, TextField } from '../kit';
 import { useLive, useOS, useSettings } from '../hooks';
 
 /*
- * FieldDef-driven inputs: every entity form is built from these, and each
+ * Field-driven inputs: every entity form is built from these, and each
  * one is a kit field underneath, so forms follow docs/DESIGN.md.
  */
 
 export interface FieldInputProps {
-  field: FieldDef;
+  field: Field;
   value: unknown;
   onChange: (v: unknown) => void;
   error?: string;
@@ -26,7 +26,7 @@ export function FieldInput(props: FieldInputProps) {
   switch (field.type) {
     case 'number':
       return <NumberField {...common} value={value as number | undefined} onChange={onChange} autoFocus={autoFocus} placeholder={field.placeholder} />;
-    case 'currency':
+    case 'money':
       return <CurrencyField {...props} />;
     case 'boolean':
       return <SwitchField label={field.label} value={!!value} onChange={onChange} />;
@@ -37,10 +37,14 @@ export function FieldInput(props: FieldInputProps) {
       return <KitSelectField {...common} options={toOptions(field.options)} value={value == null ? undefined : String(value)} onChange={onChange} onCreate={field.onCreateOption ? (label) => field.onCreateOption!(label)?.value ?? null : undefined} />;
     case 'multiselect':
       return <MultiSelectField {...props} />;
-    case 'relation':
+    case 'link':
       return <RelationField {...props} />;
+    case 'duration':
+    case 'meter':
+      return <NumberField {...common} value={value as number | undefined} onChange={onChange} placeholder={field.placeholder ?? (field.type === 'duration' ? 'minutes' : field.unit)} autoFocus={autoFocus} />;
+    case 'contact':
+      return <TextField {...common} value={value == null ? '' : String(value)} onChange={onChange} placeholder={field.placeholder} autoFocus={autoFocus} keyboardType={field.contactKind === 'phone' ? 'phone-pad' : field.contactKind === 'email' ? 'email-address' : field.contactKind === 'url' ? 'url' : 'default'} />;
     case 'longtext':
-    case 'json':
       return <TextField {...common} multiline value={value == null ? '' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)} onChange={onChange} placeholder={field.placeholder} autoFocus={autoFocus} />;
     default:
       return <TextField {...common} value={value == null ? '' : String(value)} onChange={onChange} placeholder={field.placeholder} autoFocus={autoFocus} />;
@@ -75,13 +79,13 @@ function MultiSelectField({ field, value, onChange, error }: FieldInputProps) {
   const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
   if (options.length <= 8) {
     return (
-      <Field label={field.label} required={field.required} error={error}>
+      <FormField label={field.label} required={field.required} error={error}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {options.map((o) => (
             <FilterChip key={o.value} label={o.label} selected={selected.includes(o.value)} onPress={() => toggle(o.value)} />
           ))}
         </View>
-      </Field>
+      </FormField>
     );
   }
   return (
@@ -94,12 +98,12 @@ function MultiSelectField({ field, value, onChange, error }: FieldInputProps) {
 
 /** Pick one or many records of the allowed type(s). */
 export function RelationField({ field, value, onChange, error }: FieldInputProps) {
-  const multi = Array.isArray(value) || Array.isArray(field.defaultValue);
+  const multi = Array.isArray(value) || Array.isArray(field.default);
   const ids: string[] = Array.isArray(value) ? (value as string[]) : value ? [String(value)] : [];
   const refs = useLive((o) => o.records.getMany(ids), [ids.join(',')]);
   const os = useOS();
   const [open, setOpen] = useState(false);
-  const types = Array.isArray(field.relationTo) ? field.relationTo : field.relationTo ? [field.relationTo] : [];
+  const types = Array.isArray(field.linkTo) ? field.linkTo : field.linkTo ? [field.linkTo] : [];
   const placeholder = `Choose ${types.map((x) => os.registry.objects.get(x)?.label.toLowerCase() ?? x).join(' / ') || 'record'}`;
   return (
     <>

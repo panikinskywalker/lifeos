@@ -7,7 +7,7 @@ import { dateField, describeCycle, type CycleKind, type CycleUnit } from '@core/
 import { logDone, undoLoggedDone, type UpkeepItem } from '@core/cycles/upkeep';
 import { useLive, useOS } from '../hooks';
 import { useTheme } from '../theme/ThemeProvider';
-import { ActionSheet, Button, Chip, DateField, EmptyState, Field, FilterChip, MoneyField, NumberField, ProgressBar, RowItem, RowList, Section, Segmented, Sheet, SwitchField, Text, TextField, useToast } from '../kit';
+import { ActionSheet, Button, Chip, DateField, EmptyState, FormField, FilterChip, MoneyField, NumberField, ProgressBar, RowItem, RowList, Section, Segmented, Sheet, SwitchField, Text, TextField, useToast } from '../kit';
 
 /** "4 d late", "Today", "in 3 d", "800 km left", "Snoozed". */
 export function dueLabel(i: UpkeepItem): string {
@@ -122,12 +122,12 @@ export function CycleSheet({ entity, cycle, visible, onClose }: { entity: Object
   return (
     <Sheet visible={visible} onClose={onClose} title={cycle ? 'Edit cycle' : 'New cycle'} footer={<Button title={cycle ? 'Save' : 'Add cycle'} icon="check" block disabled={!valid} onPress={save} />}>
       <TextField label="What recurs" value={name} onChange={setName} placeholder="Service, wash, renew, call…" />
-      <Field label="Repeats">
+      <FormField label="Repeats">
         <Segmented value={kind} onChange={setKind} options={kinds} />
-      </Field>
+      </FormField>
       {kind === 'fixed' ? <SwitchField label="Repeats on a schedule" hint="Off for a one-off date, like a passport expiry" value={repeats} onChange={setRepeats} /> : null}
       {periodic ? (
-        <Field label="Every">
+        <FormField label="Every">
           <View style={{ gap: 10 }}>
             <NumberField value={everyN} onChange={(v) => setEveryN(Math.max(1, Math.round(v ?? 1)))} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -136,7 +136,7 @@ export function CycleSheet({ entity, cycle, visible, onClose }: { entity: Object
               ))}
             </View>
           </View>
-        </Field>
+        </FormField>
       ) : null}
       {usesMeter ? <NumberField label="Every (km)" unit="km" value={meterEvery} onChange={setMeterEvery} placeholder="10000" /> : null}
       {usesTime ? <DateField label={kind === 'fixed' && !repeats ? 'Date' : 'Next due'} value={due} onChange={setDue} hint={kind === 'interval' ? 'Leave empty to count from the next time it’s done' : undefined} /> : null}

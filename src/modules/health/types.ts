@@ -13,7 +13,7 @@ export const workoutType: ObjectDef<WorkoutData> = {
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [{ value: 'run', label: 'Run' }, { value: 'walk', label: 'Walk' }, { value: 'cycle', label: 'Cycling' }, { value: 'strength', label: 'Strength' }, { value: 'yoga', label: 'Yoga' }, { value: 'swim', label: 'Swim' }, { value: 'sport', label: 'Sport' }, { value: 'other', label: 'Other' }] },
     { key: 'durationMin', label: 'Duration (min)', type: 'number', required: true, summary: true },
-    { key: 'date', label: 'Date', type: 'date', required: true, defaultValue: () => iso(new Date()) },
+    { key: 'date', label: 'Date', type: 'date', required: true, default: () => iso(new Date()) },
     { key: 'distanceKm', label: 'Distance (km)', type: 'number', section: 'Details' },
     { key: 'calories', label: 'Calories', type: 'number', section: 'Details' },
     { key: 'intensity', label: 'Intensity', type: 'select', section: 'Details', options: [{ value: 'easy', label: 'Easy' }, { value: 'moderate', label: 'Moderate' }, { value: 'hard', label: 'Hard' }] },
@@ -34,7 +34,7 @@ export const measurementType: ObjectDef<MeasurementData> = {
     { key: 'metric', label: 'Metric', type: 'select', required: true, summary: true, options: [{ value: 'weight', label: 'Weight' }, { value: 'sleep', label: 'Sleep (hours)' }, { value: 'steps', label: 'Steps' }, { value: 'resting_hr', label: 'Resting heart rate' }, { value: 'heart_rate', label: 'Heart rate (avg)' }, { value: 'water', label: 'Water (L)' }, { value: 'mood', label: 'Mood (1-5)' }, { value: 'other', label: 'Other' }] },
     { key: 'value', label: 'Value', type: 'number', required: true },
     { key: 'unit', label: 'Unit', type: 'text' },
-    { key: 'date', label: 'Date', type: 'date', required: true, defaultValue: () => iso(new Date()) },
+    { key: 'date', label: 'Date', type: 'date', required: true, default: () => iso(new Date()) },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   indexed: ['metric', 'date'], occurredAtField: 'date',

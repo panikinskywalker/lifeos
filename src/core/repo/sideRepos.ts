@@ -1,3 +1,4 @@
+import { LEGACY_FIELD_TYPE } from '../domain/fields';
 import type { DatabaseAdapter, Row } from '../db/adapter';
 import type {Attachment, CustomFieldDef, EntityRef, Link, Reminder, SavedViewDef, Tag, ViewDefinition} from '../domain/types';
 import { newId } from '../domain/ids';
@@ -265,7 +266,7 @@ export class CustomFieldRepo {
   constructor(private db: DatabaseAdapter) {}
   forType(entityType: string): CustomFieldDef[] {
     return this.db.all<Row>(`SELECT * FROM custom_field_defs WHERE object=? AND deleted_at IS NULL ORDER BY sort_order, created_at`, [entityType]).map((r) => ({
-      id: r.id as string, entityType: r.object as string, key: r.key as string, label: r.label as string, fieldType: r.field_type as CustomFieldDef['fieldType'], options: safeJson(r.options as string) as CustomFieldDef['options'], sortOrder: r.sort_order as number,
+      id: r.id as string, entityType: r.object as string, key: r.key as string, label: r.label as string, fieldType: (LEGACY_FIELD_TYPE[r.field_type as string] ?? (r.field_type as CustomFieldDef['fieldType'])) as CustomFieldDef['fieldType'], options: safeJson(r.options as string) as CustomFieldDef['options'], sortOrder: r.sort_order as number,
     }));
   }
   add(def: Omit<CustomFieldDef, 'id' | 'sortOrder'> & { sortOrder?: number }): CustomFieldDef {

@@ -19,7 +19,7 @@ export default function NewEntityRoute() {
     if (v == null || v === '') continue;
     const f = def.fields.find((x) => x.key === k);
     if (!f) continue;
-    initial[k] = f.type === 'number' || f.type === 'currency' ? Number(v) : f.type === 'boolean' ? v === 'true' : f.type === 'relation' && Array.isArray(f.defaultValue) ? [v] : v;
+    initial[k] = f.type === 'number' || f.type === 'money' ? Number(v) : f.type === 'boolean' ? v === 'true' : f.type === 'link' && Array.isArray(f.default) ? [v] : v;
   }
   return <FormScreen type={type} initial={initial} linkTo={linkId && linkKind ? { id: linkId, kind: linkKind } : undefined} />;
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { FilterClause, FieldDef } from '@core/domain/types';
+import type { FilterClause, Field } from '@core/domain/types';
 import type { RuleAction, RuleTrigger } from '@core/automation/engine';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -28,7 +28,7 @@ export function RuleEditor({ id }: { id?: string }) {
   const actionDefs = [...os.registry.actions.values()];
   const trigDef = os.registry.triggers.get(trigger.id);
   const entityTypeOptions = [...os.registry.objects.values()].filter((x) => !x.hidden).map((x) => ({ value: x.id, label: x.label }));
-  const withTypeOptions = (f: FieldDef): FieldDef => (f.key === 'entityType' ? { ...f, options: entityTypeOptions } : f);
+  const withTypeOptions = (f: Field): Field => (f.key === 'entityType' ? { ...f, options: entityTypeOptions } : f);
 
   const save = () => {
     if (!name.trim() || !actions.length) return;
@@ -88,7 +88,7 @@ export function RuleEditor({ id }: { id?: string }) {
           <Text variant="footnote" color="secondary">Add action</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {actionDefs.map((ad) => (
-              <Chip key={ad.id} label={ad.label} color={accent} onPress={() => setActions([...actions, { id: ad.id, config: Object.fromEntries((ad.configFields ?? []).filter((f) => f.defaultValue !== undefined).map((f) => [f.key, f.defaultValue])) }])} />
+              <Chip key={ad.id} label={ad.label} color={accent} onPress={() => setActions([...actions, { id: ad.id, config: Object.fromEntries((ad.configFields ?? []).filter((f) => f.default !== undefined).map((f) => [f.key, f.default])) }])} />
             ))}
           </View>
           <Text variant="caption" color="tertiary">Text fields support templates like {'{{title}}'} and {'{{data.amount}}'}.</Text>

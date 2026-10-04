@@ -108,13 +108,13 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   // relations table so the graph and the JSON stay consistent.
   entities.syncRelations = (entity, def, actor) => {
     for (const f of def.fields) {
-      if (f.type !== 'relation' || !f.relationKind) continue;
+      if (f.type !== 'link' || !f.linkWord) continue;
       const raw = (entity.data as Record<string, unknown>)[f.key];
       const want = new Set((Array.isArray(raw) ? raw : raw ? [raw] : []).map(String).filter(Boolean));
       // Only links the field made: a payment's payer (linked from the SMS, with what it called them) isn't the field's to remove.
-      const have = new Set(ctx.links.forEntity(entity.id, f.relationKind).filter((r) => r.direction === 'out' && !('as' in r.relation.meta)).map((r) => r.other.id));
-      for (const id of want) if (!have.has(id)) ctx.links.link(entity.id, id, f.relationKind, {}, actor);
-      for (const id of have) if (!want.has(id)) ctx.links.unlink(entity.id, id, f.relationKind, actor);
+      const have = new Set(ctx.links.forEntity(entity.id, f.linkWord).filter((r) => r.direction === 'out' && !('as' in r.relation.meta)).map((r) => r.other.id));
+      for (const id of want) if (!have.has(id)) ctx.links.link(entity.id, id, f.linkWord, {}, actor);
+      for (const id of have) if (!want.has(id)) ctx.links.unlink(entity.id, id, f.linkWord, actor);
     }
   };
   ctx.automation = new AutomationEngine(ctx, registry);

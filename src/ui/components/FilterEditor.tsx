@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import type { ObjectDef, FieldDef, FilterClause, FilterGroup, FilterOp, ViewDefinition } from '@core/domain/types';
+import type { ObjectDef, Field, FilterClause, FilterGroup, FilterOp, ViewDefinition } from '@core/domain/types';
 import { useTheme } from '../theme/ThemeProvider';
 import { Button, ChipRow, FilterChip, IconButton, Text } from '../kit';
 import { FieldInput } from './fields';
@@ -19,16 +19,16 @@ const OPS_FOR: Record<string, Array<{ op: FilterOp; label: string }>> = {
   boolean: [{ op: 'eq', label: 'is' }],
   relation: [{ op: 'eq', label: 'is' }, { op: 'isNull', label: 'is empty' }, { op: 'notNull', label: 'is set' }],
 };
-function opsFor(f: FieldDef) {
-  const k = f.type === 'currency' ? 'number' : f.type === 'datetime' ? 'date' : f.type === 'longtext' ? 'text' : f.type === 'multiselect' ? 'select' : f.type;
+function opsFor(f: Field) {
+  const k = f.type === 'money' ? 'number' : f.type === 'datetime' ? 'date' : f.type === 'longtext' ? 'text' : f.type === 'multiselect' ? 'select' : f.type;
   return OPS_FOR[k] ?? OPS_FOR.text;
 }
 
-export function filterableFields(def: ObjectDef): FieldDef[] {
-  const envelope: FieldDef[] = [{ key: 'title', label: 'Title', type: 'text' }];
+export function filterableFields(def: ObjectDef): Field[] {
+  const envelope: Field[] = [{ key: 'title', label: 'Title', type: 'text' }];
   if (def.statuses?.length) envelope.push({ key: 'status', label: 'Status', type: 'select', options: def.statuses });
   envelope.push({ key: 'starred', label: 'Starred', type: 'boolean' }, { key: 'createdAt', label: 'Created', type: 'datetime' }, { key: 'tag', label: 'Tag', type: 'text' });
-  return [...envelope, ...def.fields.filter((f) => f.type !== 'json').map((f) => ({ ...f, key: `data.${f.key}` }))];
+  return [...envelope, ...def.fields.map((f) => ({ ...f, key: `data.${f.key}` }))];
 }
 
 export function FilterEditor({ type, value, onChange }: { type: string; value: ViewDefinition; onChange: (v: ViewDefinition) => void; accent?: string }) {
@@ -40,7 +40,7 @@ export function FilterEditor({ type, value, onChange }: { type: string; value: V
   const [adding, setAdding] = useState(false);
   const setClauses = (cs: FilterClause[]) => onChange({ ...value, filter: cs.length ? { and: cs } : undefined });
   const sortFields = fields.filter((f) => f.key !== 'tag' && f.type !== 'boolean');
-  const groupFields: Array<{ key: string; label: string }> = [{ key: '', label: 'None' }, ...(def.statuses?.length ? [{ key: 'status', label: 'Status' }] : []), { key: 'month', label: 'Month' }, { key: 'day', label: 'Day' }, ...def.fields.filter((f) => f.type === 'select' || f.type === 'relation').map((f) => ({ key: `data.${f.key}`, label: f.label }))];
+  const groupFields: Array<{ key: string; label: string }> = [{ key: '', label: 'None' }, ...(def.statuses?.length ? [{ key: 'status', label: 'Status' }] : []), { key: 'month', label: 'Month' }, { key: 'day', label: 'Day' }, ...def.fields.filter((f) => f.type === 'select' || f.type === 'link').map((f) => ({ key: `data.${f.key}`, label: f.label }))];
   const tags = useLive((o) => o.tags.counts(), []);
   const card = { backgroundColor: t.c.bg.tile, borderRadius: t.radius.card, padding: 12, gap: 10 };
 
@@ -144,7 +144,7 @@ export function FilterEditor({ type, value, onChange }: { type: string; value: V
   );
 }
 
-function normalise(f: FieldDef, v: unknown): unknown {
+function normalise(f: Field, v: unknown): unknown {
   if (f.type === 'date' && typeof v === 'string') return v;
   if (f.type === 'datetime' && typeof v === 'number') return v;
   return v;

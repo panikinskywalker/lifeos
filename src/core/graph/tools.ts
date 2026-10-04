@@ -1,6 +1,6 @@
 import { categoryFor } from '../ingest/ingest';
 import { z } from 'zod';
-import type { ObjectDef, FieldDef } from '../domain/types';
+import type { ObjectDef, Field } from '../domain/types';
 import type { LifeOSContext } from '../registry/context';
 import type { AiToolDef } from '../registry/types';
 import { coerce, parseDateish } from '../ai/createAnything';
@@ -142,13 +142,13 @@ function pickType(os: LifeOSContext, type: string | undefined, name: string): st
 function baseData(def: ObjectDef, title: string): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const f of def.fields) {
-    if (f.defaultValue !== undefined) out[f.key] = typeof f.defaultValue === 'function' ? (f.defaultValue as () => unknown)() : f.defaultValue;
+    if (f.default !== undefined) out[f.key] = typeof f.default === 'function' ? (f.default as () => unknown)() : f.default;
     else if (f.required) {
       if (f.type === 'text' || f.type === 'longtext') out[f.key] = title;
       else if (f.type === 'date') out[f.key] = parseDateish('today');
       else if (f.type === 'datetime') out[f.key] = Date.now();
       else if (f.type === 'select' && f.options?.length) out[f.key] = (f.options.find((o) => o.value === 'other') ?? f.options[0]!).value;
-      else if (f.type === 'number' || f.type === 'currency') out[f.key] = 0;
+      else if (f.type === 'number' || f.type === 'money') out[f.key] = 0;
     }
   }
   return out;
@@ -173,7 +173,7 @@ const KEY_SYNONYMS: Record<string, string[]> = {
   endDate: ['end', 'ends', 'until', 'till'],
 };
 
-function fieldFor(def: ObjectDef, key: string): FieldDef | undefined {
+function fieldFor(def: ObjectDef, key: string): Field | undefined {
   const k = norm(key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' '));
   return (
     def.fields.find((f) => norm(f.key.replace(/([a-z])([A-Z])/g, '$1 $2')) === k || norm(f.label) === k) ??
@@ -196,7 +196,7 @@ export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, at
   for (const [k, raw] of Object.entries(attributes)) {
     if (raw == null || raw === '') continue;
     const f = fieldFor(def, k);
-    if (!f || f.type === 'relation' || f.type === 'longtext') {
+    if (!f || f.type === 'link' || f.type === 'longtext') {
       notes.push([k, shown(raw)]);
       continue;
     }

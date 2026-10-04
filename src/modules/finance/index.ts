@@ -27,11 +27,11 @@ export const financeModule: ModuleManifest = {
     {
       id: 'finance.createTransaction', module: 'finance', label: 'Create transaction',
       configFields: [
-        { key: 'amount', label: 'Amount', type: 'currency', required: true },
-        { key: 'kind', label: 'Kind', type: 'select', defaultValue: 'expense', options: [{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }] },
+        { key: 'amount', label: 'Amount', type: 'money', required: true },
+        { key: 'kind', label: 'Kind', type: 'select', default: 'expense', options: [{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }] },
         { key: 'category', label: 'Category', type: 'select', options: CATEGORIES.map(({ value, label }) => ({ value, label })) },
         { key: 'merchant', label: 'Merchant', type: 'text' },
-        { key: 'accountId', label: 'Account', type: 'relation', relationTo: 'account' },
+        { key: 'accountId', label: 'Account', type: 'link', linkTo: 'account' },
       ],
       run: async (cfg, ctx, os) => {
         const tx = os.records.create({ object: 'transaction', data: { amount: Number(cfg.amount), kind: (cfg.kind as string) || 'expense', category: (cfg.category as string) || 'other', merchant: cfg.merchant ? String(cfg.merchant) : undefined, accountId: cfg.accountId ? String(cfg.accountId) : undefined, date: new Date().toISOString().slice(0, 10) } }, 'automation');

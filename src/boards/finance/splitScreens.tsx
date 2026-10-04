@@ -6,7 +6,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, Card, Chip, EmptyState, Field, FilterChip, NumberField, RowItem, RowList, Section, Segmented, Sheet, Text, useToast } from '@ui/kit';
+import { Button, Card, Chip, EmptyState, FormField, FilterChip, NumberField, RowItem, RowList, Section, Segmented, Sheet, Text, useToast } from '@ui/kit';
 import { EntityPicker } from '@ui/components/fields';
 import { applySplit, balanceWith, balances, clearSplit, settleUp, splitAmounts, undoSettle, type DebtData, type Party, type SplitMethod, type SplitRecord } from '@modules/finance/split';
 
@@ -107,32 +107,32 @@ function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () =>
   return (
     <Sheet visible={visible} onClose={onClose} title={`Split ${os.format.currency(total)}`} footer={<Button title="Save split" icon="check" block disabled={!!preview.error || people.length === 0} onPress={save} />}>
       {groups.length ? (
-        <Field label="Group">
+        <FormField label="Group">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {groups.map((g) => (
               <FilterChip key={g.id} label={g.title} icon="people" selected={groupId === g.id} onPress={() => pickGroup(g.id)} />
             ))}
           </View>
-        </Field>
+        </FormField>
       ) : null}
-      <Field label="With">
+      <FormField label="With">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {people.map((p) => (
             <Chip key={p} label={nameOf(os, p)} icon="x" onPress={() => setPeople(people.filter((x) => x !== p))} />
           ))}
           <Chip label="Add person" icon="plus" tone="accent" onPress={() => setPicking(true)} />
         </View>
-      </Field>
-      <Field label="Paid by">
+      </FormField>
+      <FormField label="Paid by">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {parties.map((p) => (
             <FilterChip key={p} label={nameOf(os, p)} selected={payer === p} onPress={() => setPayer(p)} />
           ))}
         </View>
-      </Field>
-      <Field label="Divide">
+      </FormField>
+      <FormField label="Divide">
         <Segmented value={method} onChange={setMethod} options={METHODS} />
-      </Field>
+      </FormField>
       <RowList>
         {parties.map((p) => {
           const share = preview.shares.find((s) => s.party === p)?.amount;

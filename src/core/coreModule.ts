@@ -91,9 +91,9 @@ const actions: ActionDef[] = [
     id: 'core.createReminder', module: 'core', label: 'Create reminder',
     configFields: [
       { key: 'title', label: 'Title', type: 'text', required: true },
-      { key: 'inDays', label: 'Due in (days from now)', type: 'number', defaultValue: 1 },
+      { key: 'inDays', label: 'Due in (days from now)', type: 'number', default: 1 },
       { key: 'atField', label: 'Or relative to a date field', type: 'text', placeholder: 'expiresOn', description: 'data.<field> on the triggering record' },
-      { key: 'offsetDays', label: 'Days before that date', type: 'number', defaultValue: 0 },
+      { key: 'offsetDays', label: 'Days before that date', type: 'number', default: 0 },
       { key: 'rrule', label: 'Repeat (RRULE)', type: 'text', placeholder: 'FREQ=WEEKLY;INTERVAL=1' },
     ],
     run: async (cfg, ctx, os) => {
@@ -121,7 +121,7 @@ const actions: ActionDef[] = [
     configFields: [
       { key: 'entityType', label: 'Type', type: 'text', required: true },
       { key: 'title', label: 'Title', type: 'text' },
-      { key: 'data', label: 'Fields (JSON, supports templates)', type: 'json' },
+      { key: 'data', label: 'Fields (JSON, supports templates)', type: 'longtext' },
       { key: 'linkKind', label: 'Link to triggering record as', type: 'text', placeholder: 'related' },
     ],
     run: async (cfg, ctx, os) => {
@@ -182,7 +182,7 @@ const aiTools: AiToolDef[] = [
       const { module } = input as { module?: string };
       return [...os.registry.objects.values()]
         .filter((t) => !module || t.module === module)
-        .map((t) => ({ type: t.id, module: t.module, label: t.label, fields: t.fields.map((f) => ({ key: f.key, type: f.type, label: f.label, options: f.options?.map((o) => o.value), relationTo: f.relationTo, relationKind: f.relationKind })), statuses: t.statuses?.map((s) => s.value), relations: t.links, count: os.records.count(t.id) }));
+        .map((t) => ({ type: t.id, module: t.module, label: t.label, fields: t.fields.map((f) => ({ key: f.key, type: f.type, label: f.label, options: f.options?.map((o) => o.value), linkTo: f.linkTo, linkWord: f.linkWord })), statuses: t.statuses?.map((s) => s.value), relations: t.links, count: os.records.count(t.id) }));
     },
   },
   {

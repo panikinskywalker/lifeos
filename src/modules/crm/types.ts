@@ -63,7 +63,7 @@ export const groupType: ObjectDef<{ name: string; kind?: string; memberIds: stri
   fields: [
     { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Flat 4B, Goa trip, Family' },
     { key: 'kind', label: 'Kind', type: 'select', summary: true, options: [{ value: 'home', label: 'Home' }, { value: 'trip', label: 'Trip' }, { value: 'friends', label: 'Friends' }, { value: 'family', label: 'Family' }, { value: 'work', label: 'Work' }] },
-    { key: 'memberIds', label: 'Members', type: 'relation', relationTo: 'person', relationKind: 'member', defaultValue: [] },
+    { key: 'memberIds', label: 'Members', type: 'link', linkTo: 'person', linkWord: 'member', default: [] },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   computeTitle: (d) => d.name,

@@ -6,13 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import type { ObjectRecord, FieldDef } from '@core/domain/types';
+import type { ObjectRecord, Field } from '@core/domain/types';
+import { fieldType } from '@core/domain/fields';
 import { describeRRule } from '@core/automation/recurrence';
 import type { LifeOSContext } from '@core/registry/context';
 import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
 import type { TintKey } from '../theme/tokens';
-import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, Field, FilterChip, Icon, IconButton, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
+import { ActionSheet, Button, Card, Chip, DateField, DetailRow, EmptyState, FormField, FilterChip, Icon, IconButton, RecordHeader, RowItem, RowList, Section, Sheet, Text, TextField, Timeline, useToast, type HeaderStat } from '../kit';
 import { EntityPicker, TagChips, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
@@ -178,9 +179,9 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
 }
 
 /** Display text for a field value, plus a target when it points at another record. */
-function renderValue(os: LifeOSContext, entity: ObjectRecord, f: FieldDef, v: unknown): { text: string; target?: ObjectRecord } {
+function renderValue(os: LifeOSContext, entity: ObjectRecord, f: Field, v: unknown): { text: string; target?: ObjectRecord } {
   switch (f.type) {
-    case 'currency':
+    case 'money':
       return { text: os.format.currency(Number(v), (entity.data.currency as string) || undefined) };
     case 'number':
       // Years read as 2022, not 2,022.
@@ -195,32 +196,31 @@ function renderValue(os: LifeOSContext, entity: ObjectRecord, f: FieldDef, v: un
       return { text: f.options?.find((x) => x.value === v)?.label ?? String(v) };
     case 'multiselect':
       return { text: (v as string[]).map((x) => f.options?.find((o) => o.value === x)?.label ?? x).join(', ') };
-    case 'relation': {
+    case 'link': {
       const refs = os.records.getMany(Array.isArray(v) ? (v as string[]) : [String(v)]);
       return { text: refs.map((r) => r.title).join(', ') || '—', target: refs.length === 1 ? refs[0] : undefined };
     }
-    case 'json':
-      return { text: typeof v === 'string' ? v : JSON.stringify(v) };
     default:
-      return { text: String(v) };
+      // duration, contact, file, location, meter, text: the Field type registry formats it.
+      return { text: fieldType(f.type).format(v, f, os.format) };
   }
 }
 
 const hasValue = (v: unknown) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0);
 
 /** Up to three header stats: money first, then summary fields, then the record's date. */
-function headerStats(os: LifeOSContext, entity: ObjectRecord, fields: FieldDef[]): HeaderStat[] {
-  const picked = [...fields.filter((f) => f.type === 'currency'), ...fields.filter((f) => f.summary && f.type !== 'currency' && f.type !== 'longtext' && f.type !== 'relation')].filter((f) => hasValue(entity.data[f.key]));
+function headerStats(os: LifeOSContext, entity: ObjectRecord, fields: Field[]): HeaderStat[] {
+  const picked = [...fields.filter((f) => f.type === 'money'), ...fields.filter((f) => f.summary && f.type !== 'money' && f.type !== 'longtext' && f.type !== 'link')].filter((f) => hasValue(entity.data[f.key]));
   const stats = picked.slice(0, 3).map((f) => ({ label: f.label.toLowerCase(), value: renderValue(os, entity, f, entity.data[f.key]).text }));
   if (stats.length < 3 && entity.occurredAt) stats.push({ label: 'date', value: os.format.date(entity.occurredAt, 'medium') });
   return stats.filter((s) => s.value.length <= 16);
 }
 
-function DetailsCard({ entity, fields }: { entity: ObjectRecord; fields: FieldDef[] }) {
+function DetailsCard({ entity, fields }: { entity: ObjectRecord; fields: Field[] }) {
   const os = useOS();
   const router = useRouter();
   const custom = useLive((o) => o.customFields.forType(entity.object), [entity.object]);
-  const all: FieldDef[] = [...fields, ...custom.map((c) => ({ key: `custom_${c.key}`, label: c.label, type: c.fieldType, options: c.options.options }))];
+  const all: Field[] = [...fields, ...custom.map((c) => ({ key: `custom_${c.key}`, label: c.label, type: c.fieldType, options: c.options.options }))];
   const rows = all.filter((f) => hasValue(entity.data[f.key]));
   if (!rows.length) return null;
   return (
@@ -401,13 +401,13 @@ function LinkSheet({ visible, onClose, entity }: { visible: boolean; onClose: ()
   return (
     <>
       <Sheet visible={visible && !picking} onClose={onClose} title="Link to…" footer={<Button title="Choose record" icon="search" block onPress={() => setPicking(true)} />}>
-        <Field label="Link as">
+        <FormField label="Link as">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {kinds.map((k) => (
               <FilterChip key={k} label={kindLabel(k)} selected={kind === k} onPress={() => setKind(k)} />
             ))}
           </View>
-        </Field>
+        </FormField>
         <TextField label="Or a custom kind" value={kinds.includes(kind) ? '' : kind} onChange={(v) => setKind(v || 'related')} placeholder="e.g. vendor, gift for" />
       </Sheet>
       <EntityPicker
@@ -484,13 +484,13 @@ function ReminderSheet({ visible, onClose, entity }: { visible: boolean; onClose
     <Sheet visible={visible} onClose={onClose} title="Remind me" footer={<Button title="Save reminder" block disabled={!title || !due} onPress={save} />}>
       <TextField label="What" value={title} onChange={setTitle} />
       <DateField label="When" withTime value={due} onChange={(v) => setDue(typeof v === 'number' ? v : v ? new Date(v).getTime() : undefined)} />
-      <Field label="Repeat">
+      <FormField label="Repeat">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {REPEATS.map(([v, l]) => (
             <FilterChip key={l} label={l} selected={rrule === v} onPress={() => setRrule(v)} />
           ))}
         </View>
-      </Field>
+      </FormField>
     </Sheet>
   );
 }

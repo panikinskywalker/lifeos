@@ -14,11 +14,11 @@ import { Text } from './Text';
 
 /*
  * Presentational form fields: value in, onChange out, no knowledge of
- * entity types. FieldDef-driven forms compose these.
+ * entity types. Field-driven forms compose these.
  */
 
 /** Label · control · hint or error. */
-export function Field({ label, required, hint, error, children }: { label?: string; required?: boolean; hint?: string; error?: string; children: React.ReactNode }) {
+export function FormField({ label, required, hint, error, children }: { label?: string; required?: boolean; hint?: string; error?: string; children: React.ReactNode }) {
   const t = useTheme();
   return (
     <View style={{ gap: 8 }}>
@@ -65,7 +65,7 @@ export function TextField({ label, required, hint, error, value, onChange, multi
   const t = useTheme();
   const [focused, setFocused] = useState(false);
   return (
-    <Field label={label} required={required} hint={hint} error={error}>
+    <FormField label={label} required={required} hint={hint} error={error}>
       <View style={[useInputBox(focused, error), multiline && { alignItems: compact ? 'center' : 'flex-start', paddingVertical: compact ? 14 : 12 }]}>
         {leading ? <Icon name={leading} size={18} color={t.c.fg.secondary} /> : null}
         <TextInput
@@ -88,7 +88,7 @@ export function TextField({ label, required, hint, error, value, onChange, multi
           style={[t.type.body as TextStyle, { flex: 1, color: t.c.fg.primary, paddingVertical: multiline ? 0 : 12, minHeight: multiline ? (compact ? 22 : 96) : undefined, maxHeight: compact ? 140 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]}
         />
       </View>
-    </Field>
+    </FormField>
   );
 }
 
@@ -102,7 +102,7 @@ export function NumberField({ label, required, hint, error, value, onChange, uni
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
   return (
-    <Field label={label} required={required} hint={hint} error={error}>
+    <FormField label={label} required={required} hint={hint} error={error}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={[box, { flex: 1 }]}>
           <TextInput
@@ -128,7 +128,7 @@ export function NumberField({ label, required, hint, error, value, onChange, uni
           </Text>
         ) : null}
       </View>
-    </Field>
+    </FormField>
   );
 }
 
@@ -141,7 +141,7 @@ function PressField({ label, required, hint, error, icon, text, placeholder, onP
   const t = useTheme();
   const box = useInputBox(false, error);
   return (
-    <Field label={label} required={required} hint={hint} error={error}>
+    <FormField label={label} required={required} hint={hint} error={error}>
       <View style={[box, { paddingHorizontal: 0, gap: 0 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={label ? `${label}: ${text || placeholder}` : text || placeholder} onPress={onPress} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch', paddingLeft: 14 }}>
           {icon ? <Icon name={icon} size={18} color={t.c.fg.secondary} /> : null}
@@ -156,7 +156,7 @@ function PressField({ label, required, hint, error, icon, text, placeholder, onP
           </Pressable>
         ) : null}
       </View>
-    </Field>
+    </FormField>
   );
 }
 
@@ -220,13 +220,13 @@ export function SelectField({ label, required, hint, error, options, value, onCh
   const [open, setOpen] = useState(false);
   if (options.length <= 6 && !onCreate) {
     return (
-      <Field label={label} required={required} hint={hint} error={error}>
+      <FormField label={label} required={required} hint={hint} error={error}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {options.map((o) => (
             <FilterChip key={o.value} label={o.label} icon={o.icon} selected={value === o.value} onPress={() => onChange(value === o.value ? undefined : o.value)} />
           ))}
         </View>
-      </Field>
+      </FormField>
     );
   }
   return (
@@ -320,7 +320,7 @@ export function PickerSheet({ visible, onClose, title, items, selected = [], onS
 export function RelationField({ label, required, hint, error, value, onOpen, onRemove, placeholder = 'Choose' }: { label?: string; required?: boolean; hint?: string; error?: string; value: Array<{ id: string; title: string }>; onOpen: () => void; onRemove: (id: string) => void; placeholder?: string }) {
   const t = useTheme();
   return (
-    <Field label={label} required={required} hint={hint} error={error}>
+    <FormField label={label} required={required} hint={hint} error={error}>
       <View style={[useInputBox(false, error), { flexWrap: 'wrap', paddingVertical: 10, paddingRight: 6 }]}>
         <Icon name="link" size={18} color={t.c.fg.secondary} />
         {value.map((v) => (
@@ -335,7 +335,7 @@ export function RelationField({ label, required, hint, error, value, onOpen, onR
           <Icon name="plus" size={18} color={t.c.fg.secondary} style={{ marginRight: 8 }} />
         </Pressable>
       </View>
-    </Field>
+    </FormField>
   );
 }
 
@@ -349,7 +349,7 @@ export function TagsField({ label, value, onChange, suggestions = [] }: { label?
   };
   const pool = suggestions.filter((s) => !value.includes(s) && (!text || s.toLowerCase().includes(text.toLowerCase()))).slice(0, 8);
   return (
-    <Field label={label}>
+    <FormField label={label}>
       {value.length ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {value.map((tag) => (
@@ -365,7 +365,7 @@ export function TagsField({ label, value, onChange, suggestions = [] }: { label?
           ))}
         </View>
       ) : null}
-    </Field>
+    </FormField>
   );
 }
 
@@ -394,7 +394,7 @@ export function Stepper({ label, value, onChange, min = 1, max = 999, step = 1, 
     </Pressable>
   );
   return (
-    <Field label={label}>
+    <FormField label={label}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 6, borderRadius: t.radius.input, backgroundColor: fill }}>
           <Surface kind="tile">
@@ -411,7 +411,7 @@ export function Stepper({ label, value, onChange, min = 1, max = 999, step = 1, 
           </Text>
         ) : null}
       </View>
-    </Field>
+    </FormField>
   );
 }
 
@@ -422,7 +422,7 @@ export function DayChips({ label, value, onChange }: { label?: string; value: nu
   const t = useTheme();
   const fill = useControlFill();
   return (
-    <Field label={label}>
+    <FormField label={label}>
       <View style={{ flexDirection: 'row', gap: 6 }}>
         {DAYS.map((d, i) => {
           const sel = value === i;
@@ -435,7 +435,7 @@ export function DayChips({ label, value, onChange }: { label?: string; value: nu
           );
         })}
       </View>
-    </Field>
+    </FormField>
   );
 }
 

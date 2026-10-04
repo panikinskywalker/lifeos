@@ -17,7 +17,7 @@ export function RecordRow({ entity, onPress, showType, value, subtitle, swipe = 
   const toast = useToast();
   const def = os.registry.objects.get(entity.object);
   const tint = tintForModule(def?.module);
-  const currencyField = def?.fields.find((f) => f.type === 'currency');
+  const currencyField = def?.fields.find((f) => f.type === 'money');
   const amount = currencyField ? (entity.data[currencyField.key] as number | undefined) : undefined;
   // Canvas: a list row shows the record's category as a small tag in its module tint.
   const tagField = def?.fields.find((f) => f.type === 'select' && f.summary && entity.data[f.key] != null && entity.data[f.key] !== '');
@@ -34,7 +34,7 @@ export function RecordRow({ entity, onPress, showType, value, subtitle, swipe = 
             if (v == null || v === '') return null;
             if (f.type === 'select') return f.options?.find((o) => o.value === v)?.label ?? String(v);
             if (f.type === 'date') return os.format.date(String(v), 'short');
-            if (f.type === 'relation') return os.records.ref(String(v))?.title ?? null;
+            if (f.type === 'link') return os.records.ref(String(v))?.title ?? null;
             return String(v);
           })
           .filter(Boolean)
