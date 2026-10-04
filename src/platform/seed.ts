@@ -1,3 +1,4 @@
+import { setCategoryTarget } from '@modules/finance/categories';
 import type { LifeOSContext } from '@core/registry/context';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -68,9 +69,9 @@ export function seedDemoData(os: LifeOSContext) {
     }
     os.records.create({ object: 'transaction', data: { amount: 50000, kind: 'transfer', category: 'transfer', merchant: 'Card payment', date: daysAgo(6), accountId: hdfc.id, toAccountId: card.id } });
 
-    os.records.create({ object: 'budget', data: { category: 'food', amount: 8000, period: 'monthly' } });
-    os.records.create({ object: 'budget', data: { category: 'shopping', amount: 10000, period: 'monthly' } });
-    os.records.create({ object: 'budget', data: { category: 'transport', amount: 4000, period: 'monthly' } });
+    setCategoryTarget(os, 'food', 8000);
+    setCategoryTarget(os, 'shopping', 10000);
+    setCategoryTarget(os, 'transport', 4000);
 
     os.records.create({ object: 'subscription', data: { name: 'Netflix', amount: 649, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: daysAhead(26), category: 'subscriptions', accountId: card.id }, status: 'active' });
     os.records.create({ object: 'subscription', data: { name: 'iCloud 200GB', amount: 219, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: daysAhead(3), category: 'subscriptions', accountId: card.id }, status: 'active' });

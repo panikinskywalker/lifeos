@@ -1,7 +1,8 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { nextOccurrence } from '@core/automation/recurrence';
-import type { AccountData, BudgetData, SubscriptionData, TransactionData } from './types';
+import type { AccountData, InvestmentData, SubscriptionData, TransactionData } from './types';
+import { categoryTargets } from './categories';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -14,7 +15,7 @@ export function monthRange(offset = 0, now: number | Date = Date.now()): { start
   return { start: iso(start), end: iso(end), label: start.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) };
 }
 
-export function periodRange(period: BudgetData['period'], at: number | Date = Date.now()): { start: string; end: string } {
+export function periodRange(period: 'monthly' | 'weekly' | 'yearly', at: number | Date = Date.now()): { start: string; end: string } {
   const now = new Date(at);
   if (period === 'weekly') {
     const s = new Date(now);
@@ -33,10 +34,12 @@ export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountD
   const exp = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
   const out = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'transfer' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
   const inn = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.toAccountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'transfer' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
-  return (account.data.openingBalance ?? 0) + inc - exp - out + inn;
+  // A buy or SIP leaves the account it was paid from (R1: kind 'investment'); the money shows up again as the holding's value.
+  const inv = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'investment' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
+  return (account.data.openingBalance ?? 0) + inc - exp - out + inn - inv;
 }
 
-export function netWorth(os: LifeOSContext): { total: number; assets: number; liabilities: number; accounts: Array<{ account: ObjectRecord<AccountData>; balance: number }> } {
+export function netWorth(os: LifeOSContext): { total: number; assets: number; liabilities: number; investments: number; accounts: Array<{ account: ObjectRecord<AccountData>; balance: number }>; holdings: Array<{ investment: ObjectRecord<InvestmentData>; value: number }> } {
   const accounts = os.records.query<AccountData>('account');
   const rows = accounts.map((a) => ({ account: a, balance: accountBalance(os, a) }));
   let assets = 0;
@@ -46,7 +49,12 @@ export function netWorth(os: LifeOSContext): { total: number; assets: number; li
     if (r.balance >= 0) assets += r.balance;
     else liabilities += -r.balance;
   }
-  return { total: assets - liabilities, assets, liabilities, accounts: rows };
+  // R1: holdings count at their latest known value (else what was put in).
+  const holdings = os.registry.objects.has('investment')
+    ? os.records.query<InvestmentData>('investment', { filter: { and: [{ field: 'status', op: 'neq', value: 'sold' }] } }).map((i) => ({ investment: i, value: i.data.currentValue ?? i.data.invested ?? 0 }))
+    : [];
+  const investments = holdings.reduce((n, h) => n + h.value, 0);
+  return { total: assets + investments - liabilities, assets, liabilities, investments, accounts: rows, holdings };
 }
 
 export function spendInRange(os: LifeOSContext, start: string, end: string, category?: string): number {
@@ -77,10 +85,17 @@ export function dailySpend(os: LifeOSContext, start: string, end: string): Array
   return out;
 }
 
-export function budgetStatus(os: LifeOSContext, budget: ObjectRecord<BudgetData>, now: number | Date = Date.now()) {
-  const { start, end } = periodRange(budget.data.period, now);
-  const spent = spendInRange(os, start, end, budget.data.category);
-  return { spent, limit: budget.data.amount, progress: budget.data.amount ? spent / budget.data.amount : 0, remaining: budget.data.amount - spent };
+/** This month's spend in a category against its target (R1: targets live on categories, see categories.ts). */
+export function targetStatus(os: LifeOSContext, category: string, now: number | Date = Date.now()) {
+  const limit = categoryTargets(os)[category] ?? 0;
+  const { start, end } = monthRange(0, now);
+  const spent = spendInRange(os, start, end, category);
+  return { category, spent, limit, progress: limit ? spent / limit : 0, remaining: limit - spent };
+}
+
+/** Every category with a target, this month. */
+export function targetStatuses(os: LifeOSContext, now: number | Date = Date.now()) {
+  return Object.keys(categoryTargets(os)).map((c) => targetStatus(os, c, now));
 }
 
 /**
@@ -115,3 +130,24 @@ export function postDueSubscriptions(os: LifeOSContext, today = iso(new Date()))
   return n;
 }
 
+/**
+ * R1: an account's institution is an Organisation (kind 'bank'). Accounts made
+ * before that carry the bank as free text; fold each into a record and link
+ * it, once. Returns how many accounts were linked.
+ */
+export function foldInstitutions(os: LifeOSContext): number {
+  if (!os.registry.objects.has('org')) return 0;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  let n = 0;
+  for (const a of os.records.query<AccountData>('account', {}, { limit: 500 })) {
+    const name = a.data.institution?.trim();
+    if (!name || a.data.institutionId) continue;
+    const orgs = os.records.query<{ kind: string }>('org', {}, { limit: 2000 });
+    const hit = orgs.find((o) => norm(o.title) === norm(name)) ?? orgs.find((o) => norm(o.title).startsWith(norm(name)) || norm(name).startsWith(norm(o.title)));
+    const org = hit ?? os.records.create({ object: 'org', title: name, data: { kind: 'bank' } }, 'system');
+    if (hit && hit.data.kind !== 'bank' && hit.data.kind === 'other') os.records.update(hit.id, { data: { kind: 'bank' } }, 'system');
+    os.records.update<AccountData>(a.id, { data: { institutionId: org.id } as Partial<AccountData> }, 'system');
+    n++;
+  }
+  return n;
+}

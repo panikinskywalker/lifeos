@@ -3,7 +3,7 @@ import { Alert, Platform, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BUILTIN_CATEGORIES, categoryRules, rangeRule, ruleAmounts, ruleCategory, ruleText, setCategoryRules } from '@core/filing/messages';
 import { CATEGORIES } from '@modules/finance/types';
-import { CATEGORY_COLORS, CATEGORY_ICONS, addCategory, customCategories, deleteCategory, updateCategory, type CustomCategory } from '@modules/finance/categories';
+import { CATEGORY_COLORS, CATEGORY_ICONS, addCategory, categoryTargets, customCategories, deleteCategory, setCategoryTarget, updateCategory, type CustomCategory } from '@modules/finance/categories';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, ChipRow, FilterChip, Icon, IconButton, NumberField, RowItem, Segmented, SwitchField, RowList, Screen, Section, Sheet, Text, TextField, useToast } from '@ui/kit';
@@ -29,6 +29,8 @@ export default function CategoriesScreen() {
   const [showBuiltin, setShowBuiltin] = useState(false);
   const t = useTheme();
   const mine = useLive((o) => customCategories(o), []);
+  const targets = useLive((o) => categoryTargets(o), []);
+  const [targetFor, setTargetFor] = useState<string | null>(null);
   const groups = useLive((o) => (o.registry.objects.has('group') ? o.records.query('group', {}, { limit: 200 }) : []), []);
   const [mode, setMode] = useState<'exact' | 'range'>('exact');
   const [min, setMin] = useState<number | undefined>(undefined);
@@ -92,9 +94,24 @@ export default function CategoriesScreen() {
               ))}
             </RowList>
           ) : (
-            <Text variant="caption" color="secondary">Add your own — Pets, Gym, Kids… They show up wherever you pick a category, in budgets, charts and rules. You can also add one straight from a transaction’s category picker.</Text>
+            <Text variant="caption" color="secondary">Add your own — Pets, Gym, Kids… They show up wherever you pick a category, in targets, charts and rules. You can also add one straight from a transaction’s category picker.</Text>
           )}
           <Button title="New category" icon="plus" size="sm" variant="secondary" onPress={() => setEditing('new')} />
+        </Section>
+        <Section title="Monthly targets" meta={Object.keys(targets).length ? String(Object.keys(targets).length) : undefined}>
+          <Text variant="caption" color="secondary">A monthly amount per category. Spend and the Money overview show how you are pacing against it. Leave blank for none.</Text>
+          <RowList>
+            {CATEGORIES.filter((c) => !['salary', 'freelance', 'transfer', 'investment'].includes(c.value)).map((c) => (
+              <RowItem
+                key={c.value}
+                icon={c.icon}
+                title={c.label}
+                subtitle={targets[c.value] ? `${os.format.currency(targets[c.value]!)} a month` : 'No target'}
+                onPress={() => setTargetFor(c.value)}
+                chevron
+              />
+            ))}
+          </RowList>
         </Section>
         <Section title="Add a rule">
           <View style={{ gap: 10 }}>
@@ -176,6 +193,16 @@ export default function CategoriesScreen() {
           )}
         </Section>
       </View>
+      <TargetSheet
+        key={targetFor ?? 'none'}
+        category={targetFor}
+        current={targetFor ? targets[targetFor] : undefined}
+        onClose={() => setTargetFor(null)}
+        onSave={(m) => {
+          if (targetFor) setCategoryTarget(os, targetFor, m);
+          setTargetFor(null);
+        }}
+      />
       <CategorySheet
         editing={editing}
         nextColor={CATEGORY_COLORS[mine.length % CATEGORY_COLORS.length]!}
@@ -205,6 +232,22 @@ export default function CategoriesScreen() {
 }
 
 /** New or edit: a name, a colour, an icon. */
+function TargetSheet({ category, current, onClose, onSave }: { category: string | null; current: number | undefined; onClose: () => void; onSave: (monthly: number | null) => void }) {
+  const [amount, setAmount] = useState<number | undefined>(current);
+  const cat = CATEGORIES.find((c) => c.value === category);
+  return (
+    <Sheet visible={!!category} onClose={onClose} title={cat ? `${cat.label} target` : 'Target'}>
+      <View style={{ gap: 14 }}>
+        <NumberField label="Per month ₹" value={amount} onChange={setAmount} placeholder="8000" autoFocus />
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Button title="Save" icon="check" onPress={() => onSave(amount && amount > 0 ? amount : null)} />
+          {current ? <Button title="Remove" variant="secondary" icon="trash" onPress={() => onSave(null)} /> : null}
+        </View>
+      </View>
+    </Sheet>
+  );
+}
+
 function CategorySheet({ editing, nextColor, onClose, onSave, onDelete }: { editing: CustomCategory | 'new' | null; nextColor: string; onClose: () => void; onSave: (c: { label: string; color: string; icon: string }) => void; onDelete: (c: CustomCategory) => void }) {
   const t = useTheme();
   const existing = editing && editing !== 'new' ? editing : null;

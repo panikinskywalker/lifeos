@@ -13,7 +13,7 @@ import { doneToday, myDay, progress } from '../src/core/dashboard/day';
 import { upkeep } from '../src/core/cycles/upkeep';
 import { onThisDay } from '../src/core/almanac/almanac';
 import { measurementType, workoutType } from '../src/modules/health/types';
-import { accountType, budgetType, subscriptionType, transactionType } from '../src/modules/finance/types';
+import { accountType, subscriptionType, transactionType } from '../src/modules/finance/types';
 import { groupType, personType } from '../src/modules/crm/types';
 import { eventType, goalType, projectType, taskType } from '../src/modules/projects/types';
 import { tripType } from '../src/modules/travel/types';
@@ -32,7 +32,7 @@ const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 async function main() {
   const os = await createLifeOS({
     db: createBetterSqliteAdapter(':memory:'),
-    modules: [{ id: 'all', name: 'all', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, budgetType, subscriptionType, transactionType, personType, groupType, eventType, taskType, projectType, goalType, tripType, deliveryType, habitType, habitLogType] }],
+    modules: [{ id: 'all', name: 'all', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, subscriptionType, transactionType, personType, groupType, eventType, taskType, projectType, goalType, tripType, deliveryType, habitType, habitLogType] }],
     registry: new Registry(),
   });
   const now = Date.now();

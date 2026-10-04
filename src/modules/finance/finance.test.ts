@@ -5,10 +5,12 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ModuleManifest } from '@core/registry/types';
 import { bus } from '@core/events/bus';
-import { accountType, subscriptionType, transactionType } from './types';
-import { postDueSubscriptions } from './lib';
+import { accountType, investmentType, subscriptionType, transactionType } from './types';
+import { foldInstitutions, postDueSubscriptions, targetStatus } from './lib';
+import { categoryTargets, foldBudgetsIntoTargets, setCategoryTarget } from './categories';
+import { orgType } from '../places/types';
 
-const mod: ModuleManifest = { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType] };
+const mod: ModuleManifest = { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, investmentType, orgType] };
 let os: LifeOSContext;
 beforeEach(async () => {
   bus.clear();
@@ -76,5 +78,46 @@ describe('reports', () => {
     expect(m.byCategory.map((c) => [c.category, c.share])).toEqual([['food', 0.75], ['transport', 0.25]]);
     expect(m.daily).toHaveLength(30);
     expect(netWorthSeries(os, 3, now).map((p) => p.total)).toEqual([10000, 58000, 104000]);
+  });
+});
+
+describe('R1 finance Objects', () => {
+  it('a monthly target lives on the category; spend paces against it', () => {
+    setCategoryTarget(os, 'food', 1000);
+    os.records.create({ object: 'transaction', data: { amount: 400, kind: 'expense', category: 'food', date: '2026-10-02' } });
+    os.records.create({ object: 'transaction', data: { amount: 900, kind: 'expense', category: 'food', date: '2026-10-03' } });
+    expect(targetStatus(os, 'food', Date.parse('2026-10-04T12:00:00'))).toMatchObject({ limit: 1000, spent: 1300, progress: 1.3, remaining: -300 });
+    setCategoryTarget(os, 'food', null);
+    expect(categoryTargets(os)).toEqual({});
+  });
+
+  it('old Budget rows fold into targets once and leave the records table', () => {
+    const now = Date.now();
+    os.db.run(`INSERT INTO records(id, object, title, data, created_at, updated_at, version) VALUES ('b1', 'budget', 'Food', '{"category":"food","amount":8000,"period":"monthly"}', ?, ?, 1)`, [now, now]);
+    os.db.run(`INSERT INTO records(id, object, title, data, created_at, updated_at, version) VALUES ('b2', 'budget', 'Transport', '{"category":"transport","amount":1200,"period":"yearly"}', ?, ?, 1)`, [now, now]);
+    expect(foldBudgetsIntoTargets(os)).toBe(2);
+    expect(categoryTargets(os)).toEqual({ food: 8000, transport: 100 });
+    expect(os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records WHERE object='budget' AND deleted_at IS NULL`)?.n).toBe(0);
+    expect(foldBudgetsIntoTargets(os)).toBe(0); // once
+  });
+
+  it('an account\'s bank becomes an Organisation it links to', () => {
+    const a = os.records.create({ object: 'account', data: { kind: 'bank', openingBalance: 0, institution: 'HDFC Bank' } });
+    expect(foldInstitutions(os)).toBe(1);
+    const linked = os.records.get<{ institutionId?: string }>(a.id)!.data.institutionId!;
+    const org = os.records.get<{ kind: string }>(linked)!;
+    expect(org.title).toBe('HDFC Bank');
+    expect(org.data.kind).toBe('bank');
+    expect(os.links.forEntity(a.id).map((l) => l.relation.kind)).toContain('institution');
+    expect(foldInstitutions(os)).toBe(0);
+  });
+
+  it('an investment carries its SIP and maturity cycles; a buy is an investment transaction out of spend', () => {
+    const inv = os.records.create({ object: 'investment', title: 'Parag Parikh Flexi Cap', data: { instrument: 'mutual_fund', invested: 50000, sip: 5000, sipDay: 5, maturesOn: '2027-03-31' }, status: 'active' });
+    const cycles = os.cycles.forEntity(inv.id).map((c) => c.template).sort();
+    expect(cycles).toEqual(['investment.maturity', 'investment.sip']);
+    const tx = os.records.create({ object: 'transaction', data: { amount: 5000, kind: 'investment', category: 'investment', date: '2026-10-05', investmentId: inv.id } });
+    expect(os.links.forEntity(inv.id).some((l) => l.other.id === tx.id)).toBe(true);
+    expect(os.records.query('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }] } })).toHaveLength(0);
   });
 });

@@ -5,15 +5,15 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { setCategoryRules } from '@core/filing/messages';
-import { budgetType, CATEGORIES, categoryOf, transactionType } from './types';
+import { CATEGORIES, categoryOf, subscriptionType, transactionType } from './types';
 import { addCategory, applyCategories, customCategories, deleteCategory, trackCategoryField, updateCategory } from './categories';
 
 let os: LifeOSContext;
-const pick = (def: typeof transactionType | typeof budgetType) => def.fields.find((f) => f.key === 'category')!;
+const pick = (def: typeof transactionType | typeof subscriptionType) => def.fields.find((f) => f.key === 'category')!;
 beforeEach(async () => {
   bus.clear();
-  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [transactionType, budgetType] }], registry: new Registry() });
-  for (const d of [transactionType, budgetType]) trackCategoryField(pick(d));
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [{ id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [transactionType, subscriptionType] }], registry: new Registry() });
+  for (const d of [transactionType, subscriptionType]) trackCategoryField(pick(d));
   applyCategories(os);
 });
 afterEach(() => {
@@ -23,13 +23,12 @@ afterEach(() => {
 });
 
 describe('your own categories', () => {
-  it('a new category joins the list and every category picker (budgets keep leaving out income kinds)', () => {
+  it('a new category joins the list and every category picker', () => {
     const pets = addCategory(os, { label: 'pets' })!;
     expect(pets).toMatchObject({ value: 'c_pets', label: 'Pets', icon: 'tag' });
     expect(categoryOf('c_pets').label).toBe('Pets');
     expect(pick(transactionType).options!.some((o) => o.value === 'c_pets')).toBe(true);
-    expect(pick(budgetType).options!.some((o) => o.value === 'c_pets')).toBe(true);
-    expect(pick(budgetType).options!.some((o) => o.value === 'salary')).toBe(false);
+    expect(pick(subscriptionType).options!.some((o) => o.value === 'c_pets')).toBe(true);
     // Before Fees / Transfer / Other, so it sits with the spending ones.
     expect(CATEGORIES.findIndex((c) => c.value === 'c_pets')).toBeLessThan(CATEGORIES.findIndex((c) => c.value === 'fees'));
     // Same name again (any case) is the same category; a built-in name is the built-in.

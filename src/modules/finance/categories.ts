@@ -86,11 +86,62 @@ export function updateCategory(os: LifeOSContext, value: string, patch: Partial<
   );
 }
 
-/** Remove a category; its transactions, budgets and subscriptions move to Other, keyword rules to it are dropped. Returns how many records moved. */
+/* ------------------------------------------------------------------ */
+/* Targets (R1: Budget folded into Category). A monthly amount per      */
+/* category; Spend and the Money overview show pace against it.         */
+/* ------------------------------------------------------------------ */
+
+const TARGETS_KEY = 'finance.categoryTargets';
+
+/** Monthly target per category, in the default currency. */
+export function categoryTargets(os: LifeOSContext): Record<string, number> {
+  const raw = os.settings.get<Record<string, number>>(TARGETS_KEY, {}) ?? {};
+  return Object.fromEntries(Object.entries(raw).filter(([, v]) => typeof v === 'number' && v > 0));
+}
+
+/** Set (or clear with null) the monthly target of a category. */
+export function setCategoryTarget(os: LifeOSContext, category: string, monthly: number | null) {
+  const next = { ...categoryTargets(os) };
+  if (monthly && monthly > 0) next[category] = monthly;
+  else delete next[category];
+  os.settings.set(TARGETS_KEY, next);
+  bus.emit('data.changed', { table: 'settings', id: TARGETS_KEY });
+}
+
+/**
+ * One-time fold of the old Budget records into category targets (migration v14
+ * drops the Object; the rows are read here raw and soft-deleted). Weekly ×52/12,
+ * yearly ÷12.
+ */
+export function foldBudgetsIntoTargets(os: LifeOSContext): number {
+  if (os.settings.get<boolean>('finance.budgetsFolded', false)) return 0;
+  const rows = os.db.all<{ id: string; data: string }>(`SELECT id, data FROM records WHERE object='budget' AND deleted_at IS NULL`);
+  const next = { ...categoryTargets(os) };
+  for (const r of rows) {
+    try {
+      const d = JSON.parse(r.data) as { category?: string; amount?: number; period?: string };
+      if (!d.category || !d.amount) continue;
+      const monthly = d.period === 'weekly' ? (d.amount * 52) / 12 : d.period === 'yearly' ? d.amount / 12 : d.amount;
+      next[d.category] = Math.round(monthly);
+    } catch {
+      /* unreadable row: skip */
+    }
+  }
+  os.db.transaction(() => {
+    os.settings.set(TARGETS_KEY, next);
+    if (rows.length) os.db.run(`UPDATE records SET deleted_at=?, updated_at=? WHERE object='budget' AND deleted_at IS NULL`, [Date.now(), Date.now()]);
+    os.settings.set('finance.budgetsFolded', true);
+  });
+  if (rows.length) bus.emit('data.changed', { table: 'settings', id: TARGETS_KEY });
+  return rows.length;
+}
+
+/** Remove a category; its transactions and subscriptions move to Other, its target and keyword rules are dropped. Returns how many records moved. */
 export function deleteCategory(os: LifeOSContext, value: string): number {
   let moved = 0;
+  setCategoryTarget(os, value, null);
   os.db.transaction(() => {
-    for (const type of ['transaction', 'budget', 'subscription']) {
+    for (const type of ['transaction', 'subscription']) {
       if (!os.registry.objects.has(type)) continue;
       for (const e of os.records.query<{ category?: string }>(type, { filter: { and: [{ field: 'data.category', op: 'eq', value }] } }, { limit: 100000 })) {
         os.records.update(e.id, { data: { category: 'other' } }, 'user');

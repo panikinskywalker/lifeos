@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import type { AiToolDef } from '@core/registry/types';
 import { withExtras } from '@core/ai/cards';
-import { budgetStatus, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange } from './lib';
+import { targetStatuses, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange } from './lib';
 import { monthlySubscriptionCost } from './reports';
-import type { BudgetData } from './types';
 import { applySplit, balanceWith, balances, clearSplit, settleUp, undoSettle } from './split';
 
 /** Finance tools for the agent (no React Native — unit-tested). */
@@ -76,7 +75,7 @@ export const financeAiTools: AiToolDef[] = [
           spent: spendInRange(os, m.start, m.end),
           income: incomeInRange(os, m.start, m.end),
           byCategory: spendByCategory(os, m.start, m.end),
-          budgets: os.records.query<BudgetData>('budget').map((b) => ({ id: b.id, category: b.data.category, period: b.data.period, ...budgetStatus(os, b) })),
+          targets: targetStatuses(os).map((s) => ({ category: s.category, monthly: s.limit, spent: s.spent, remaining: s.remaining, progress: s.progress })),
           monthlySubscriptions: monthlySubscriptionCost(os),
         };
       },

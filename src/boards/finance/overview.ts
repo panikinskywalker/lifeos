@@ -2,9 +2,9 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { isoOf, lastMonths, DAY_MS, type ModuleOverview, type OverviewBlock } from '@core/dashboard/overview';
 import { daily } from '@core/dashboard/metrics';
-import { budgetStatus, dailySpend, netWorth, spendInRange } from '@modules/finance/lib';
+import { targetStatuses, dailySpend, netWorth, spendInRange } from '@modules/finance/lib';
 import { monthReport, monthlySubscriptionCost } from '@modules/finance/reports';
-import { categoryOf, type BudgetData } from '@modules/finance/types';
+import { categoryOf } from '@modules/finance/types';
 
 /** Money at a glance: this month vs usual, where it went, budgets, the last six months, the biggest spends. */
 export function financeOverview(os: LifeOSContext, now = Date.now(), opts: { cardOnly?: boolean } = {}): ModuleOverview {
@@ -43,18 +43,13 @@ export function financeOverview(os: LifeOSContext, now = Date.now(), opts: { car
   ];
   if (r.byCategory.length) blocks.push({ kind: 'breakdown', title: 'Where it went this month', parts: r.byCategory.slice(0, 8).map((c) => ({ label: categoryOf(c.category).label, value: c.total, color: categoryOf(c.category).color })), format: 'money' });
   if (byMonth.some((x) => x > 0)) blocks.push({ kind: 'bars', title: 'Spend by month', labels: months.map((m) => m.label), values: byMonth, format: 'money' });
-  if (os.registry.objects.has('budget')) {
-    const budgets = os.records.query<BudgetData>('budget', {}, { limit: 50 });
-    if (budgets.length)
-      blocks.push({
-        kind: 'progress',
-        title: 'Budgets',
-        items: budgets.map((b: ObjectRecord<BudgetData>) => {
-          const s = budgetStatus(os, b, now);
-          return { label: categoryOf(b.data.category).label, ratio: s.progress, sub: `${money(s.spent)} of ${money(s.limit)}`, entityId: b.id, type: 'budget', over: s.progress > 1 };
-        }),
-      });
-  }
+  const targets = targetStatuses(os, now);
+  if (targets.length)
+    blocks.push({
+      kind: 'progress',
+      title: 'Targets',
+      items: targets.map((s) => ({ label: categoryOf(s.category).label, ratio: s.progress, sub: `${money(s.spent)} of ${money(s.limit)}`, over: s.progress > 1 })),
+    });
   const big = os.records.query<{ amount: number; merchant?: string; category?: string; date: string }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: r.month.start }] }, sort: [{ field: 'data.amount', dir: 'desc' }] }, { limit: 5 });
   if (big.length) blocks.push({ kind: 'list', title: 'Biggest this month', items: big.map((t) => ({ title: t.title, sub: `${categoryOf(t.data.category).label} · ${t.data.date.slice(8)}/${t.data.date.slice(5, 7)}`, value: money(t.data.amount), entityId: t.id, type: 'transaction' })), more: { label: 'All transactions', type: 'transaction' } });
   return {

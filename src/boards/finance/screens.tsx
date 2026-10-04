@@ -8,8 +8,8 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Card, Chip, IconButton, Row, Screen, SectionHeader, Stat, Text, Button } from '@ui/components/primitives';
 import { Bars, ProgressBar, StackedBar } from '@ui/components/charts';
 import { RecordRow } from '@ui/components/RecordRow';
-import { accountBalance, budgetStatus, dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange } from '@modules/finance/lib';
-import { categoryOf, type AccountData, type BudgetData } from '@modules/finance/types';
+import { accountBalance, targetStatuses, dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange } from '@modules/finance/lib';
+import { categoryOf, type AccountData } from '@modules/finance/types';
 import { palette } from '@ui/theme/tokens';
 
 const FINANCE_COLOR = palette.green;
@@ -27,7 +27,7 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
       byCat: spendByCategory(os, m.start, m.end),
       days: dailySpend(os, m.start, m.end),
       nw: netWorth(os),
-      budgets: os.records.query<BudgetData>('budget').map((b) => ({ b, s: budgetStatus(os, b) })),
+      targets: targetStatuses(os),
       recent: os.records.query('transaction', { sort: [{ field: 'data.date', dir: 'desc' }, { field: 'createdAt', dir: 'desc' }] }, { limit: 8 }),
       count: os.records.count('transaction'),
     }),
@@ -40,7 +40,6 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
           <Chip label="Spend" icon="chart.pie" color={FINANCE_COLOR} onPress={() => router.push('/spend' as never)} />
           <Chip label="Transactions" icon="arrow.up.arrow.down" color={FINANCE_COLOR} onPress={() => router.push('/entity/transaction')} />
           <Chip label="Accounts" icon="creditcard" color={FINANCE_COLOR} onPress={() => router.push('/entity/account')} />
-          <Chip label="Budgets" icon="chart.pie" color={FINANCE_COLOR} onPress={() => router.push('/entity/budget')} />
           <Chip label="Subscriptions" icon="repeat" color={FINANCE_COLOR} onPress={() => router.push('/entity/subscription')} />
         </ScrollView>
 
@@ -98,19 +97,19 @@ export function FinanceHome({ ctx }: { ctx: LifeOSContext; params: Record<string
           </Card>
         </View>
 
-        {data.budgets.length ? (
+        {data.targets.length ? (
           <View>
-            <SectionHeader title="Budgets" icon="chart.pie" color={FINANCE_COLOR} action="All" onAction={() => router.push('/entity/budget')} />
+            <SectionHeader title="Targets" icon="chart.pie" color={FINANCE_COLOR} action="Edit" onAction={() => router.push('/settings/categories' as never)} />
             <Card style={{ gap: 10 }}>
-              {data.budgets.map(({ b, s }) => (
-                <View key={b.id} style={{ gap: 4 }}>
+              {data.targets.map((s) => (
+                <View key={s.category} style={{ gap: 4 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text variant="subhead">{b.title}</Text>
+                    <Text variant="subhead">{categoryOf(s.category).label}</Text>
                     <Text variant="subhead" color={s.remaining < 0 ? t.colors.danger : 'secondary'}>
                       {s.remaining >= 0 ? `${ctx.format.currency(s.remaining)} left` : `${ctx.format.currency(-s.remaining)} over`}
                     </Text>
                   </View>
-                  <ProgressBar progress={s.progress} color={t.paletteColor(categoryOf(b.data.category).color) ?? FINANCE_COLOR} />
+                  <ProgressBar progress={s.progress} color={t.paletteColor(categoryOf(s.category).color) ?? FINANCE_COLOR} />
                 </View>
               ))}
             </Card>
@@ -167,26 +166,4 @@ export function AccountSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx
   );
 }
 
-export function BudgetSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
-  const t = useTheme();
-  const router = useRouter();
-  const b = entity as ObjectRecord<BudgetData>;
-  const s = useLive((os) => budgetStatus(os, b), [entity.id, entity.version]);
-  const txns = useLive((os) => os.records.query('transaction', { filter: { and: [{ field: 'data.category', op: 'eq', value: b.data.category }, { field: 'data.kind', op: 'eq', value: 'expense' }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 8 }), [entity.id]);
-  return (
-    <View style={{ gap: 16 }}>
-      <Card style={{ gap: 8 }}>
-        <Stat value={ctx.format.currency(s.spent)} unit={`of ${ctx.format.currency(s.limit)}`} label={`Spent this ${b.data.period.replace('ly', '')}`} color={s.remaining < 0 ? t.colors.danger : undefined} />
-        <ProgressBar progress={s.progress} color={t.paletteColor(categoryOf(b.data.category).color) ?? FINANCE_COLOR} height={12} />
-        <Text variant="footnote" color="secondary">
-          {s.remaining >= 0 ? `${ctx.format.currency(s.remaining)} remaining` : `${ctx.format.currency(-s.remaining)} over budget`}
-        </Text>
-      </Card>
-      <View>
-        <SectionHeader title="Recent in category" icon="list.bullet" color={FINANCE_COLOR} action="All" onAction={() => router.push({ pathname: '/entity/[type]', params: { type: 'transaction', category: b.data.category } })} />
-        <Card padded={false}>{txns.map((e, i) => <RecordRow key={e.id} entity={e} last={i === txns.length - 1} />)}</Card>
-      </View>
-    </View>
-  );
-}
 

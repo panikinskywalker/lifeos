@@ -1,6 +1,6 @@
 import type { BoardManifest } from '@core/registry/types';
 import { financeOverview } from './overview';
-import { AccountSection, BudgetSection, FinanceHome } from './screens';
+import { AccountSection, FinanceHome } from './screens';
 import { GroupBalanceSection, PersonBalanceSection, SplitSection } from './splitScreens';
 import { ReportsScreen } from './reportsScreen';
 import { SubscriptionHero } from './subscriptionHero';
@@ -22,7 +22,6 @@ export const financeBoard: BoardManifest = {
   ],
   overrides: [
     { object: 'account', record: [{ entityType: 'account', key: 'finance.account', title: 'Balance', component: AccountSection, order: 10 }] },
-    { object: 'budget', record: [{ entityType: 'budget', key: 'finance.budget', title: 'Progress', component: BudgetSection, order: 10 }] },
     { object: 'subscription', record: [{ entityType: 'subscription', key: 'finance.subscription', title: 'Billing', component: SubscriptionHero, order: 10, placement: 'top' }] },
     { object: 'transaction', record: [{ entityType: 'transaction', key: 'finance.split', title: 'Split', component: SplitSection, order: 20 }] },
     { object: 'person', record: [{ entityType: 'person', key: 'finance.balance', title: 'Money', component: PersonBalanceSection, order: 20 }] },

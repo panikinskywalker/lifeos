@@ -11,7 +11,8 @@ import { bus } from '@core/events/bus';
 import { doneToday, goals, myDay, progress, setGoal } from '@core/dashboard/day';
 import { saveHealthDays } from '@core/sources/deviceData';
 import { measurementType, workoutType } from './health/types';
-import { accountType, budgetType, subscriptionType, transactionType } from './finance/types';
+import { accountType, subscriptionType, transactionType } from './finance/types';
+import { setCategoryTarget } from './finance/categories';
 import { groupType, personType } from './crm/types';
 import { eventType, goalType, projectType, taskType } from './projects/types';
 import { tripType } from './travel/types';
@@ -34,7 +35,7 @@ beforeEach(async () => {
   bus.clear();
   os = await createLifeOS({
     db: createBetterSqliteAdapter(':memory:'),
-    modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, budgetType, subscriptionType, transactionType, personType, groupType, eventType, taskType, projectType, goalType, tripType, deliveryType] }],
+    modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, subscriptionType, transactionType, personType, groupType, eventType, taskType, projectType, goalType, tripType, deliveryType] }],
     registry: new Registry(),
   });
 });
@@ -92,7 +93,7 @@ describe('module overviews', () => {
     os.records.create({ object: 'transaction', data: { amount: 1200, kind: 'expense', category: 'food', date: day(-1) } });
     os.records.create({ object: 'transaction', data: { amount: 800, kind: 'expense', category: 'transport', date: day(-2) } });
     os.records.create({ object: 'transaction', data: { amount: 3000, kind: 'expense', category: 'food', date: '2026-08-10' } });
-    os.records.create({ object: 'budget', data: { category: 'food', amount: 1000, period: 'monthly' } });
+    setCategoryTarget(os, 'food', 1000);
     const f = financeOverview(os, NOW);
     expect(f.card!.headline).toBe('₹2,000');
     expect(f.blocks.find((b) => b.kind === 'breakdown')).toMatchObject({ parts: [{ label: 'Food & Drink', value: 1200 }, { label: 'Transport', value: 800 }] });

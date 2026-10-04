@@ -106,7 +106,7 @@ export function pickCycle(os: LifeOSContext, entityId: string, hint?: string): C
 }
 
 const at = (iso?: string) => (iso ? (dateField(iso) ?? new Date(iso).getTime()) : Date.now());
-const MONEY_TYPES = ['transaction', 'debt', 'account', 'budget', 'subscription'];
+const MONEY_TYPES = ['transaction', 'debt', 'account', 'investment', 'subscription'];
 
 export const lifeTools: AiToolDef[] = [
   {
