@@ -84,14 +84,14 @@ export class CycleRepo {
 
   /** Latest reading of a meter on a record (odometer by default). */
   latestMeter(entityId: string, meter = 'odometer'): number | null {
-    return this.db.get<{ value: number }>(`SELECT value FROM meter_readings WHERE entity_id=? AND meter=? AND deleted_at IS NULL ORDER BY read_at DESC, rowid DESC LIMIT 1`, [entityId, meter])?.value ?? null;
+    return this.db.get<{ value: number }>(`SELECT value FROM meter_readings WHERE record_id=? AND meter=? AND deleted_at IS NULL ORDER BY read_at DESC, rowid DESC LIMIT 1`, [entityId, meter])?.value ?? null;
   }
 
   /** Readings of a meter, newest first. */
   readings(entityId: string, meter = 'odometer', limit = 50): MeterReading[] {
     return this.db
-      .all<Row>(`SELECT * FROM meter_readings WHERE entity_id=? AND meter=? AND deleted_at IS NULL ORDER BY read_at DESC, rowid DESC LIMIT ?`, [entityId, meter, limit])
-      .map((r) => ({ id: r.id as string, entityId: r.entity_id as string, meter: r.meter as string, value: r.value as number, unit: (r.unit as string | null) ?? null, readAt: r.read_at as number, source: r.source as string, note: (r.note as string | null) ?? null }));
+      .all<Row>(`SELECT * FROM meter_readings WHERE record_id=? AND meter=? AND deleted_at IS NULL ORDER BY read_at DESC, rowid DESC LIMIT ?`, [entityId, meter, limit])
+      .map((r) => ({ id: r.id as string, entityId: r.record_id as string, meter: r.meter as string, value: r.value as number, unit: (r.unit as string | null) ?? null, readAt: r.read_at as number, source: r.source as string, note: (r.note as string | null) ?? null }));
   }
 
   /**
@@ -104,7 +104,7 @@ export class CycleRepo {
     const now = Date.now();
     const id = newId(now);
     this.db.transaction(() => {
-      this.db.run(`INSERT INTO meter_readings(id,entity_id,meter,value,unit,read_at,source,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`, [id, entityId, meter, value, opts.unit ?? null, at, actor, opts.note ?? null, now, now]);
+      this.db.run(`INSERT INTO meter_readings(id,record_id,meter,value,unit,read_at,source,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`, [id, entityId, meter, value, opts.unit ?? null, at, actor, opts.note ?? null, now, now]);
       this.changes.record('meter_readings', id, 'insert', 1);
       this.timeline.add({ entityId, kind: 'meter.reading', title: `${opts.label ?? 'Odometer'} ${value.toLocaleString('en-IN')}${opts.unit ? ` ${opts.unit}` : ''}`, body: opts.note ?? null, actor, occurredAt: at, meta: { readingId: id, meter, value } });
     });
@@ -118,10 +118,10 @@ export class CycleRepo {
     this.db.transaction(() => {
       this.db.run(`UPDATE meter_readings SET deleted_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
       this.changes.record('meter_readings', id, 'delete', 1);
-      this.db.run(`DELETE FROM timeline_events WHERE kind='meter.reading' AND json_extract(meta,'$.readingId')=?`, [id]);
+      this.db.run(`DELETE FROM events WHERE kind='meter.reading' AND json_extract(meta,'$.readingId')=?`, [id]);
     });
-    const r = this.db.get<{ entity_id: string; meter: string }>(`SELECT entity_id, meter FROM meter_readings WHERE id=?`, [id]);
-    if (r) this.onReading?.(r.entity_id, r.meter, 'user');
+    const r = this.db.get<{ record_id: string; meter: string }>(`SELECT record_id, meter FROM meter_readings WHERE id=?`, [id]);
+    if (r) this.onReading?.(r.record_id, r.meter, 'user');
     bus.emit('data.changed', { table: 'meter_readings', id });
   }
 
@@ -147,7 +147,7 @@ export class CycleRepo {
       if (m != null) c.nextDueMeter = m + c.meterEvery;
     }
     this.db.run(
-      `INSERT INTO cycles(id,entity_id,${COLS.map(([, col]) => col).join(',')},created_at,updated_at) VALUES (?,?,${COLS.map(() => '?').join(',')},?,?)`,
+      `INSERT INTO cycles(id,record_id,${COLS.map(([, col]) => col).join(',')},created_at,updated_at) VALUES (?,?,${COLS.map(() => '?').join(',')},?,?)`,
       [id, c.entityId, ...COLS.map(([k]) => toDb(c[k])), now, now],
     );
     this.changes.record('cycles', id, 'insert', 1);
@@ -162,7 +162,7 @@ export class CycleRepo {
    */
   applyTemplates(entity: ObjectRecord, def: ObjectDef | undefined, actor: Actor = 'system'): Cycle[] {
     if (!def?.cycleTemplates) return [];
-    const seen = new Set(this.db.all<{ template: string }>(`SELECT template FROM cycles WHERE entity_id=? AND template IS NOT NULL`, [entity.id]).map((r) => r.template));
+    const seen = new Set(this.db.all<{ template: string }>(`SELECT template FROM cycles WHERE record_id=? AND template IS NOT NULL`, [entity.id]).map((r) => r.template));
     const made: Cycle[] = [];
     for (const seed of def.cycleTemplates(entity.data as never)) {
       if (seen.has(seed.template)) continue;
@@ -184,7 +184,7 @@ export class CycleRepo {
       const c = live.get(seed.template);
       if (!c) {
         // A field that seeds a cycle was just filled (a birthday, a warranty date): add that cycle, once.
-        const ever = this.db.get(`SELECT 1 AS x FROM cycles WHERE entity_id=? AND template=?`, [entity.id, seed.template]);
+        const ever = this.db.get(`SELECT 1 AS x FROM cycles WHERE record_id=? AND template=?`, [entity.id, seed.template]);
         if (!before.has(seed.template) && !ever) {
           this.create({ ...seed, entityId: entity.id }, 'system');
           bus.emit('data.changed', { table: 'cycles', id: entity.id });
@@ -213,13 +213,13 @@ export class CycleRepo {
   }
 
   forEntity(entityId: string): Cycle[] {
-    return this.db.all<Row>(`SELECT * FROM cycles WHERE entity_id=? AND deleted_at IS NULL ORDER BY sort_order, created_at`, [entityId]).map(toCycle);
+    return this.db.all<Row>(`SELECT * FROM cycles WHERE record_id=? AND deleted_at IS NULL ORDER BY sort_order, created_at`, [entityId]).map(toCycle);
   }
 
   /** Every enabled cycle on a live record, soonest first (undated last). */
   all(): Cycle[] {
     return this.db
-      .all<Row>(`SELECT c.* FROM cycles c JOIN entities e ON e.id=c.entity_id WHERE c.deleted_at IS NULL AND c.enabled=1 AND e.deleted_at IS NULL AND e.archived=0 ORDER BY c.next_due_at IS NULL, c.next_due_at`)
+      .all<Row>(`SELECT c.* FROM cycles c JOIN records e ON e.id=c.record_id WHERE c.deleted_at IS NULL AND c.enabled=1 AND e.deleted_at IS NULL AND e.archived=0 ORDER BY c.next_due_at IS NULL, c.next_due_at`)
       .map(toCycle);
   }
 
@@ -263,7 +263,7 @@ export class CycleRepo {
 
   /** Undo a markDone: restore the cycle as it was and drop the event. */
   undoDone(eventId: string): void {
-    const ev = this.db.get<Row>(`SELECT * FROM timeline_events WHERE id=? AND kind='cycle.done'`, [eventId]);
+    const ev = this.db.get<Row>(`SELECT * FROM events WHERE id=? AND kind='cycle.done'`, [eventId]);
     if (!ev) return;
     const meta = safeJson(ev.meta as string) as { cycleId: string; prev?: Partial<Cycle>; readingId?: string | null };
     const c = this.get(meta.cycleId);
@@ -309,7 +309,7 @@ export class CycleRepo {
   }
 
   stats(id: string): CycleStats {
-    const rows = this.db.all<Row>(`SELECT * FROM timeline_events WHERE kind='cycle.done' AND json_extract(meta,'$.cycleId')=? ORDER BY occurred_at DESC`, [id]);
+    const rows = this.db.all<Row>(`SELECT * FROM events WHERE kind='cycle.done' AND json_extract(meta,'$.cycleId')=? ORDER BY occurred_at DESC`, [id]);
     const history = rows.map((r) => {
       const m = safeJson(r.meta as string);
       return { eventId: r.id as string, at: r.occurred_at as number, meter: (m.meter as number | null) ?? null, cost: (m.cost as number | null) ?? null, note: (r.body as string | null) ?? null, late: m.late === true };
@@ -327,7 +327,7 @@ export class CycleRepo {
   private addReading(entityId: string, meter: string, value: number, at: number, actor: Actor): string {
     const now = Date.now();
     const id = newId(now);
-    this.db.run(`INSERT INTO meter_readings(id,entity_id,meter,value,read_at,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, [id, entityId, meter, value, at, actor, now, now]);
+    this.db.run(`INSERT INTO meter_readings(id,record_id,meter,value,read_at,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, [id, entityId, meter, value, at, actor, now, now]);
     return id;
   }
 
@@ -351,7 +351,7 @@ function toDb(v: unknown): SqlParam {
 function toCycle(r: Row): Cycle {
   const n = (k: string) => (r[k] as number | null) ?? null;
   return {
-    id: r.id as string, entityId: r.entity_id as string, name: r.name as string, kind: r.kind as CycleKind,
+    id: r.id as string, entityId: r.record_id as string, name: r.name as string, kind: r.kind as CycleKind,
     everyN: n('every_n'), everyUnit: (r.every_unit as CycleUnit | null) ?? null, meter: (r.meter as string | null) ?? null, meterEvery: n('meter_every'),
     lastDoneAt: n('last_done_at'), lastMeter: n('last_meter'), nextDueAt: n('next_due_at'), nextDueMeter: n('next_due_meter'), leadDays: (r.lead_days as number) ?? 0,
     costEstimate: n('cost_estimate'), currency: (r.currency as string | null) ?? null, notes: (r.notes as string | null) ?? null,

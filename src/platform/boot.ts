@@ -104,12 +104,12 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   // TEMP diagnostics (counts only, no content): what's in the database on this phone.
   try {
     const q = <T extends Record<string, unknown>>(sql: string) => os.db.all<T>(sql);
-    console.log('[diag] records', JSON.stringify(q<{ type: string; n: number }>(`SELECT type, COUNT(*) AS n FROM entities WHERE deleted_at IS NULL GROUP BY type`)));
+    console.log('[diag] records', JSON.stringify(q<{ type: string; n: number }>(`SELECT object, COUNT(*) AS n FROM records WHERE deleted_at IS NULL GROUP BY object`)));
     console.log('[diag] messages', JSON.stringify(q<{ source: string; status: string; n: number }>(`SELECT source, status, COUNT(*) AS n FROM ingest_queue GROUP BY source, status`)));
     console.log('[diag] sources', JSON.stringify(q<{ id: string; enabled: number; last_sync: number | null; total: number; error: string | null }>(`SELECT id, enabled, last_sync, total, error FROM source_state`)));
     console.log('[diag] set aside, why', JSON.stringify(q<{ source: string; reason: string | null; n: number }>(`SELECT source, error AS reason, COUNT(*) AS n FROM ingest_queue WHERE status='dismissed' GROUP BY source, reason ORDER BY n DESC`)));
     console.log('[diag] untrusted senders (bank-style headers only)', JSON.stringify(q<{ address: string; bank: string | null; count: number }>(`SELECT address, bank, count FROM sms_senders WHERE trusted=0 AND address GLOB '*[A-Z]-*' ORDER BY count DESC LIMIT 25`)));
-    console.log('[diag] payments by month', JSON.stringify(q<{ m: string; n: number }>(`SELECT substr(json_extract(data,'$.date'),1,7) AS m, COUNT(*) AS n FROM entities WHERE type='transaction' AND deleted_at IS NULL GROUP BY m ORDER BY m`)));
+    console.log('[diag] payments by month', JSON.stringify(q<{ m: string; n: number }>(`SELECT substr(json_extract(data,'$.date'),1,7) AS m, COUNT(*) AS n FROM records WHERE object='transaction' AND deleted_at IS NULL GROUP BY m ORDER BY m`)));
     console.log('[diag] dumps', JSON.stringify(q<{ status: string; n: number }>(`SELECT status, COUNT(*) AS n FROM dumps GROUP BY status`)));
     console.log('[diag] usage days', JSON.stringify(q<{ n: number; last: string | null }>(`SELECT COUNT(*) AS n, MAX(day) AS last FROM usage_daily`)));
     console.log('[diag] migrations', JSON.stringify(q<{ v: number }>(`SELECT MAX(version) AS v FROM _migrations`)));

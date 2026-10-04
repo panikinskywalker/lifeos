@@ -54,8 +54,8 @@ export function daily(os: LifeOSContext, id: MetricId, from: string, to: string)
   else if (id === 'spend') {
     if (!os.registry.objects.has('transaction')) return out;
     const rows = os.db.all<{ day: string; total: number }>(
-      `SELECT json_extract(data,'$.date') AS day, SUM(json_extract(data,'$.amount')) AS total FROM entities
-       WHERE type='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')='expense' AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY day`,
+      `SELECT json_extract(data,'$.date') AS day, SUM(json_extract(data,'$.amount')) AS total FROM records
+       WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')='expense' AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY day`,
       [from, to],
     );
     for (const r of rows) out.set(r.day, r.total);

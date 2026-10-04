@@ -42,7 +42,7 @@ export function myDay(os: LifeOSContext, now = Date.now(), u: Upkeep = upkeep(os
   const has = (t: string) => os.registry.objects.has(t);
   const out: DayItem[] = [];
   if (has('event')) {
-    for (const r of os.db.all<Row>(`SELECT id FROM entities WHERE type='event' AND deleted_at IS NULL AND ((occurred_at BETWEEN ? AND ?) OR (occurred_at < ? AND COALESCE(json_extract(data,'$.endAt'),0) >= ?)) ORDER BY occurred_at LIMIT 50`, [a, b, a, a])) {
+    for (const r of os.db.all<Row>(`SELECT id FROM records WHERE object='event' AND deleted_at IS NULL AND ((occurred_at BETWEEN ? AND ?) OR (occurred_at < ? AND COALESCE(json_extract(data,'$.endAt'),0) >= ?)) ORDER BY occurred_at LIMIT 50`, [a, b, a, a])) {
       const e = os.records.get<{ startAt: number; endAt?: number; allDay?: boolean; location?: string; kind?: string }>(r.id as string);
       if (!e) continue;
       const allDay = !!e.data.allDay || e.data.startAt < a;
@@ -103,9 +103,9 @@ export function doneToday(os: LifeOSContext, now = Date.now()): DoneToday {
   const today = isoDay(now);
   const has = (t: string) => os.registry.objects.has(t);
   const money = has('transaction')
-    ? os.db.all<{ kind: string; total: number; n: number }>(`SELECT json_extract(data,'$.kind') AS kind, SUM(json_extract(data,'$.amount')) AS total, COUNT(*) AS n FROM entities WHERE type='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date')=? GROUP BY kind`, [today])
+    ? os.db.all<{ kind: string; total: number; n: number }>(`SELECT json_extract(data,'$.kind') AS kind, SUM(json_extract(data,'$.amount')) AS total, COUNT(*) AS n FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date')=? GROUP BY kind`, [today])
     : [];
-  const w = has('workout') ? os.db.get<{ n: number; m: number | null }>(`SELECT COUNT(*) AS n, SUM(json_extract(data,'$.durationMin')) AS m FROM entities WHERE type='workout' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [today]) : null;
+  const w = has('workout') ? os.db.get<{ n: number; m: number | null }>(`SELECT COUNT(*) AS n, SUM(json_extract(data,'$.durationMin')) AS m FROM records WHERE object='workout' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [today]) : null;
   const count = (sql: string, p: unknown[]) => os.db.get<{ n: number }>(sql, p as never[])?.n ?? 0;
   return {
     spent: money.find((m) => m.kind === 'expense')?.total ?? 0,
@@ -114,11 +114,11 @@ export function doneToday(os: LifeOSContext, now = Date.now()): DoneToday {
     steps: has('measurement') ? (daily(os, 'steps', today, today).get(today) ?? null) : null,
     workouts: w?.n ?? 0,
     workoutMin: w?.m ?? 0,
-    habitsDone: has('habit_log') ? count(`SELECT COUNT(DISTINCT json_extract(data,'$.habitId')) AS n FROM entities WHERE type='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [today]) : 0,
-    tasksDone: has('task') ? count(`SELECT COUNT(*) AS n FROM entities WHERE type='task' AND deleted_at IS NULL AND status='done' AND json_extract(data,'$.completedAt') >= ?`, [a]) : 0,
-    upkeepDone: count(`SELECT COUNT(*) AS n FROM timeline_events WHERE kind='cycle.done' AND occurred_at >= ?`, [a]),
+    habitsDone: has('habit_log') ? count(`SELECT COUNT(DISTINCT json_extract(data,'$.habitId')) AS n FROM records WHERE object='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [today]) : 0,
+    tasksDone: has('task') ? count(`SELECT COUNT(*) AS n FROM records WHERE object='task' AND deleted_at IS NULL AND status='done' AND json_extract(data,'$.completedAt') >= ?`, [a]) : 0,
+    upkeepDone: count(`SELECT COUNT(*) AS n FROM events WHERE kind='cycle.done' AND occurred_at >= ?`, [a]),
     dumps: count(`SELECT COUNT(*) AS n FROM dumps WHERE created_at >= ?`, [a]),
-    added: count(`SELECT COUNT(*) AS n FROM entities WHERE deleted_at IS NULL AND created_at >= ? AND type NOT IN ('transaction','measurement','habit_log')`, [a]),
+    added: count(`SELECT COUNT(*) AS n FROM records WHERE deleted_at IS NULL AND created_at >= ? AND object NOT IN ('transaction','measurement','habit_log')`, [a]),
   };
 }
 
@@ -228,9 +228,9 @@ export function progress(os: LifeOSContext, now = Date.now()): Progress[] {
     const dow = new Date(now).getDay();
     const due = active.filter((h) => h.data.frequency !== 'weekdays' || (dow > 0 && dow < 6)).filter((h) => h.data.frequency !== 'weekly');
     if (due.length) {
-      const done = new Set(os.db.all<{ h: string }>(`SELECT DISTINCT json_extract(data,'$.habitId') AS h FROM entities WHERE type='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [today]).map((r) => r.h));
+      const done = new Set(os.db.all<{ h: string }>(`SELECT DISTINCT json_extract(data,'$.habitId') AS h FROM records WHERE object='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [today]).map((r) => r.h));
       const n = due.filter((h) => done.has(h.id)).length;
-      const perDay = Array.from({ length: 7 }, (_, i) => os.db.get<{ n: number }>(`SELECT COUNT(DISTINCT json_extract(data,'$.habitId')) AS n FROM entities WHERE type='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [isoDay(now - (6 - i) * DAY)])?.n ?? 0);
+      const perDay = Array.from({ length: 7 }, (_, i) => os.db.get<{ n: number }>(`SELECT COUNT(DISTINCT json_extract(data,'$.habitId')) AS n FROM records WHERE object='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [isoDay(now - (6 - i) * DAY)])?.n ?? 0);
       out.push({ id: 'habits', label: 'Habits', value: n, target: due.length, ratio: n / due.length, better: 'up', week: perDay, unit: '', goalSource: undefined });
     }
   }
@@ -239,12 +239,12 @@ export function progress(os: LifeOSContext, now = Date.now()): Progress[] {
     const d = new Date(now);
     const monday = startOf(now) - ((d.getDay() + 6) % 7) * DAY;
     const sunday = isoDay(monday + 6 * DAY);
-    const done = os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM entities WHERE type='task' AND deleted_at IS NULL AND status='done' AND json_extract(data,'$.completedAt') >= ?`, [monday])?.n ?? 0;
-    const open = os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM entities WHERE type='task' AND deleted_at IS NULL AND COALESCE(status,'todo')<>'done' AND json_extract(data,'$.dueDate') <= ?`, [sunday])?.n ?? 0;
+    const done = os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records WHERE object='task' AND deleted_at IS NULL AND status='done' AND json_extract(data,'$.completedAt') >= ?`, [monday])?.n ?? 0;
+    const open = os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records WHERE object='task' AND deleted_at IS NULL AND COALESCE(status,'todo')<>'done' AND json_extract(data,'$.dueDate') <= ?`, [sunday])?.n ?? 0;
     if (done + open) {
       const perDay = Array.from({ length: 7 }, (_, i) => {
         const s = startOf(now) - (6 - i) * DAY;
-        return os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM entities WHERE type='task' AND deleted_at IS NULL AND status='done' AND json_extract(data,'$.completedAt') BETWEEN ? AND ?`, [s, s + DAY - 1])?.n ?? 0;
+        return os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records WHERE object='task' AND deleted_at IS NULL AND status='done' AND json_extract(data,'$.completedAt') BETWEEN ? AND ?`, [s, s + DAY - 1])?.n ?? 0;
       });
       out.push({ id: 'tasks', label: 'Tasks this week', value: done, target: done + open, ratio: done / (done + open), better: 'up', week: perDay, unit: '' });
     }

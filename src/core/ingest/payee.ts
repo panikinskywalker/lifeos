@@ -116,7 +116,7 @@ export function linkMissingPayees(os: LifeOSContext): number {
     if (!t.data.merchant || t.data.category === 'investment' || t.data.kind === 'transfer') continue;
     if (os.links.forEntity(t.id).some((r) => r.relation.kind === 'payee' || r.relation.kind === 'person')) continue;
     // The message it came from knows the UPI ID, which finds the right person for sure.
-    const parsed = os.db.get<{ parsed: string | null }>(`SELECT parsed FROM ingest_queue WHERE entity_id=? AND parsed IS NOT NULL LIMIT 1`, [t.id])?.parsed;
+    const parsed = os.db.get<{ parsed: string | null }>(`SELECT parsed FROM ingest_queue WHERE record_id=? AND parsed IS NOT NULL LIMIT 1`, [t.id])?.parsed;
     const vpa = parsed ? ((JSON.parse(parsed) as { txn?: { vpa?: string | null } }).txn?.vpa ?? null) : null;
     const m = payeeFor(os, t.data.merchant, vpa);
     if (!m) continue;

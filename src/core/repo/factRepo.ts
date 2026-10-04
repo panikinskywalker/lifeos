@@ -37,7 +37,7 @@ const toFact = (r: Row): Fact => ({
 /**
  * The second brain: one-line things said in passing ("Dad hates surprises",
  * "the landlord is Suresh, rent due on the 5th"). Each fact is indexed in
- * entities_fts (type 'fact') so search and the agent's retrieval find it next
+ * records_fts (type 'fact') so search and the agent's retrieval find it next
  * to records. Newer facts can supersede older ones; forgetting is soft.
  */
 export class FactRepo {
@@ -93,10 +93,10 @@ export class FactRepo {
   search(q: string, limit = 10): Fact[] {
     const term = q.trim();
     if (!term) return [];
-    const fts = /fts5/i.test(this.db.get<{ sql: string }>(`SELECT sql FROM sqlite_master WHERE name='entities_fts'`)?.sql ?? '');
+    const fts = /fts5/i.test(this.db.get<{ sql: string }>(`SELECT sql FROM sqlite_master WHERE name='records_fts'`)?.sql ?? '');
     const ids = fts
-      ? this.db.all<{ id: string }>(`SELECT id FROM entities_fts WHERE entities_fts MATCH ? AND type='fact' ORDER BY rank LIMIT ?`, [term.split(/\s+/).map((t) => `"${t.replace(/"/g, '""')}"*`).join(' OR '), limit * 2]).map((r) => r.id)
-      : this.db.all<{ id: string }>(`SELECT id FROM entities_fts WHERE type='fact' AND (${term.split(/\s+/).map(() => 'body LIKE ? COLLATE NOCASE').join(' OR ')}) LIMIT ?`, [...term.split(/\s+/).map((t) => `%${t}%`), limit * 2]).map((r) => r.id);
+      ? this.db.all<{ id: string }>(`SELECT id FROM records_fts WHERE records_fts MATCH ? AND object='fact' ORDER BY rank LIMIT ?`, [term.split(/\s+/).map((t) => `"${t.replace(/"/g, '""')}"*`).join(' OR '), limit * 2]).map((r) => r.id)
+      : this.db.all<{ id: string }>(`SELECT id FROM records_fts WHERE object='fact' AND (${term.split(/\s+/).map(() => 'body LIKE ? COLLATE NOCASE').join(' OR ')}) LIMIT ?`, [...term.split(/\s+/).map((t) => `%${t}%`), limit * 2]).map((r) => r.id);
     return ids.map((id) => this.get(id)).filter((f): f is Fact => !!f && f.active).slice(0, limit);
   }
 
@@ -106,7 +106,7 @@ export class FactRepo {
     const next = this.add({ text, subjectId: extra.subjectId ?? old?.subjectId ?? null, subjectKey: old?.subjectKey ?? null, source: extra.source, sourceRef: extra.sourceRef });
     this.db.run(`UPDATE facts SET active=0, superseded_by=?, updated_at=?, version=version+1 WHERE id=?`, [next.id, Date.now(), oldId]);
     this.changes.record('facts', oldId, 'update', 1);
-    this.db.run(`DELETE FROM entities_fts WHERE id=?`, [oldId]);
+    this.db.run(`DELETE FROM records_fts WHERE id=?`, [oldId]);
     bus.emit('data.changed', { table: 'facts', id: oldId });
     return next;
   }
@@ -115,7 +115,7 @@ export class FactRepo {
   forget(id: string): void {
     this.db.run(`UPDATE facts SET deleted_at=?, active=0, version=version+1 WHERE id=?`, [Date.now(), id]);
     this.changes.record('facts', id, 'delete', 1);
-    this.db.run(`DELETE FROM entities_fts WHERE id=?`, [id]);
+    this.db.run(`DELETE FROM records_fts WHERE id=?`, [id]);
     bus.emit('data.changed', { table: 'facts', id });
   }
 
@@ -134,8 +134,8 @@ export class FactRepo {
   }
 
   private indexFact(id: string, text: string, subjectId: string | null) {
-    const subject = subjectId ? (this.db.get<{ title: string }>(`SELECT title FROM entities WHERE id=?`, [subjectId])?.title ?? '') : '';
-    this.db.run(`DELETE FROM entities_fts WHERE id=?`, [id]);
-    this.db.run(`INSERT INTO entities_fts(id,type,title,subtitle,body) VALUES (?,?,?,?,?)`, [id, 'fact', text.slice(0, 120), subject, `${text} ${subject}`]);
+    const subject = subjectId ? (this.db.get<{ title: string }>(`SELECT title FROM records WHERE id=?`, [subjectId])?.title ?? '') : '';
+    this.db.run(`DELETE FROM records_fts WHERE id=?`, [id]);
+    this.db.run(`INSERT INTO records_fts(id,object,title,subtitle,body) VALUES (?,?,?,?,?)`, [id, 'fact', text.slice(0, 120), subject, `${text} ${subject}`]);
   }
 }

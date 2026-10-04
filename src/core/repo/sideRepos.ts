@@ -17,16 +17,16 @@ export class LinkRepo {
 
   link(fromId: string, toId: string, kind: string, meta: Record<string, unknown> = {}, actor: Actor = 'user', prov: Provenance = {}): Link {
     const now = Date.now();
-    const existing = this.db.get<Row>(`SELECT * FROM relations WHERE from_id=? AND to_id=? AND kind=?`, [fromId, toId, kind]);
+    const existing = this.db.get<Row>(`SELECT * FROM links WHERE from_id=? AND to_id=? AND kind=?`, [fromId, toId, kind]);
     if (existing && !existing.deleted_at) return toRelation(existing);
     const id = existing ? (existing.id as string) : newId(now);
     this.db.transaction(() => {
       const p = [prov.source ?? (actor === 'assistant' ? 'assistant' : 'manual'), prov.sourceId ?? null, prov.confidence ?? 1, prov.validFrom ?? null, prov.validTo ?? null];
-      if (existing) this.db.run(`UPDATE relations SET deleted_at=NULL, meta=?, source=?, source_id=?, confidence=?, valid_from=?, valid_to=?, version=version+1 WHERE id=?`, [JSON.stringify(meta), ...p, id]);
-      else this.db.run(`INSERT INTO relations(id,from_id,to_id,kind,meta,created_at,source,source_id,confidence,valid_from,valid_to) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, [id, fromId, toId, kind, JSON.stringify(meta), now, ...p]);
-      this.changes.record('relations', id, existing ? 'update' : 'insert', 1);
-      const to = this.db.get<{ title: string }>(`SELECT title FROM entities WHERE id=?`, [toId]);
-      const from = this.db.get<{ title: string }>(`SELECT title FROM entities WHERE id=?`, [fromId]);
+      if (existing) this.db.run(`UPDATE links SET deleted_at=NULL, meta=?, source=?, source_id=?, confidence=?, valid_from=?, valid_to=?, version=version+1 WHERE id=?`, [JSON.stringify(meta), ...p, id]);
+      else this.db.run(`INSERT INTO links(id,from_id,to_id,kind,meta,created_at,source,source_id,confidence,valid_from,valid_to) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, [id, fromId, toId, kind, JSON.stringify(meta), now, ...p]);
+      this.changes.record('links', id, existing ? 'update' : 'insert', 1);
+      const to = this.db.get<{ title: string }>(`SELECT title FROM records WHERE id=?`, [toId]);
+      const from = this.db.get<{ title: string }>(`SELECT title FROM records WHERE id=?`, [fromId]);
       this.timeline.add({ entityId: fromId, kind: 'relation', title: `Linked to ${to?.title ?? 'record'}`, actor, occurredAt: now, meta: { kind, toId } });
       this.timeline.add({ entityId: toId, kind: 'relation', title: `Linked from ${from?.title ?? 'record'}`, actor, occurredAt: now, meta: { kind, fromId } });
     });
@@ -36,10 +36,10 @@ export class LinkRepo {
   }
 
   unlink(fromId: string, toId: string, kind?: string, actor: Actor = 'user') {
-    const rows = this.db.all<Row>(`SELECT * FROM relations WHERE deleted_at IS NULL AND ((from_id=? AND to_id=?) OR (from_id=? AND to_id=?))${kind ? ' AND kind=?' : ''}`, kind ? [fromId, toId, toId, fromId, kind] : [fromId, toId, toId, fromId]);
+    const rows = this.db.all<Row>(`SELECT * FROM links WHERE deleted_at IS NULL AND ((from_id=? AND to_id=?) OR (from_id=? AND to_id=?))${kind ? ' AND kind=?' : ''}`, kind ? [fromId, toId, toId, fromId, kind] : [fromId, toId, toId, fromId]);
     for (const r of rows) {
-      this.db.run(`UPDATE relations SET deleted_at=?, version=version+1 WHERE id=?`, [Date.now(), r.id as string]);
-      this.changes.record('relations', r.id as string, 'delete', 1);
+      this.db.run(`UPDATE links SET deleted_at=?, version=version+1 WHERE id=?`, [Date.now(), r.id as string]);
+      this.changes.record('links', r.id as string, 'delete', 1);
       bus.emit('relation.removed', { relation: toRelation(r), actor });
     }
   }
@@ -47,8 +47,8 @@ export class LinkRepo {
   /** Everything linked to an entity in either direction, with the other side's ref. */
   forEntity(id: string, kind?: string): Array<{ relation: Link; other: EntityRef; direction: 'out' | 'in' }> {
     const rows = this.db.all<Row>(
-      `SELECT r.*, e.id AS o_id, e.type AS o_type, e.title AS o_title, CASE WHEN r.from_id=? THEN 'out' ELSE 'in' END AS direction
-       FROM relations r JOIN entities e ON e.id = CASE WHEN r.from_id=? THEN r.to_id ELSE r.from_id END
+      `SELECT r.*, e.id AS o_id, e.object AS o_type, e.title AS o_title, CASE WHEN r.from_id=? THEN 'out' ELSE 'in' END AS direction
+       FROM links r JOIN records e ON e.id = CASE WHEN r.from_id=? THEN r.to_id ELSE r.from_id END
        WHERE r.deleted_at IS NULL AND e.deleted_at IS NULL AND (r.from_id=? OR r.to_id=?)${kind ? ' AND r.kind=?' : ''}
        ORDER BY r.created_at DESC`,
       kind ? [id, id, id, id, kind] : [id, id, id, id],
@@ -58,30 +58,30 @@ export class LinkRepo {
 
   /** Ids of entities linked from `id` with a given kind (e.g. transaction → account). */
   get(id: string): Link | null {
-    const r = this.db.get<Row>(`SELECT * FROM relations WHERE id=?`, [id]);
+    const r = this.db.get<Row>(`SELECT * FROM links WHERE id=?`, [id]);
     return r ? toRelation(r) : null;
   }
 
   /** A guessed link you confirmed (or corrected). */
   setConfidence(id: string, confidence: number) {
-    this.db.run(`UPDATE relations SET confidence=?, version=version+1 WHERE id=?`, [confidence, id]);
-    this.changes.record('relations', id, 'update', 1);
+    this.db.run(`UPDATE links SET confidence=?, version=version+1 WHERE id=?`, [confidence, id]);
+    this.changes.record('links', id, 'update', 1);
   }
 
   /** Remove one edge by id (cancelling an agent's link). */
   remove(id: string, actor: Actor = 'user') {
-    const r = this.db.get<Row>(`SELECT * FROM relations WHERE id=? AND deleted_at IS NULL`, [id]);
+    const r = this.db.get<Row>(`SELECT * FROM links WHERE id=? AND deleted_at IS NULL`, [id]);
     if (!r) return;
-    this.db.run(`UPDATE relations SET deleted_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
-    this.changes.record('relations', id, 'delete', 1);
+    this.db.run(`UPDATE links SET deleted_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
+    this.changes.record('links', id, 'delete', 1);
     bus.emit('relation.removed', { relation: toRelation(r), actor });
   }
 
   targets(id: string, kind: string): string[] {
-    return this.db.all<{ to_id: string }>(`SELECT to_id FROM relations WHERE from_id=? AND kind=? AND deleted_at IS NULL`, [id, kind]).map((r) => r.to_id);
+    return this.db.all<{ to_id: string }>(`SELECT to_id FROM links WHERE from_id=? AND kind=? AND deleted_at IS NULL`, [id, kind]).map((r) => r.to_id);
   }
   sources(id: string, kind: string): string[] {
-    return this.db.all<{ from_id: string }>(`SELECT from_id FROM relations WHERE to_id=? AND kind=? AND deleted_at IS NULL`, [id, kind]).map((r) => r.from_id);
+    return this.db.all<{ from_id: string }>(`SELECT from_id FROM links WHERE to_id=? AND kind=? AND deleted_at IS NULL`, [id, kind]).map((r) => r.from_id);
   }
 }
 
@@ -109,11 +109,11 @@ export class TagRepo {
     return { id, name: n, color: color ?? null, createdAt: now };
   }
   forEntity(entityId: string): Tag[] {
-    return this.db.all<Row>(`SELECT t.* FROM tags t JOIN entity_tags et ON et.tag_id=t.id WHERE et.entity_id=? ORDER BY t.name`, [entityId]).map(toTag);
+    return this.db.all<Row>(`SELECT t.* FROM tags t JOIN record_tags et ON et.tag_id=t.id WHERE et.record_id=? ORDER BY t.name`, [entityId]).map(toTag);
   }
   apply(entityId: string, name: string, actor: Actor = 'user'): Tag {
     const tag = this.ensure(name);
-    const r = this.db.run(`INSERT OR IGNORE INTO entity_tags(entity_id,tag_id,created_at) VALUES (?,?,?)`, [entityId, tag.id, Date.now()]);
+    const r = this.db.run(`INSERT OR IGNORE INTO record_tags(record_id,tag_id,created_at) VALUES (?,?,?)`, [entityId, tag.id, Date.now()]);
     if (r.changes) {
       this.timeline.add({ entityId, kind: 'tag', title: `Tagged #${tag.name}`, actor, occurredAt: Date.now() });
       bus.emit('tag.applied', { entityId, tag: tag.name, actor });
@@ -121,8 +121,8 @@ export class TagRepo {
     return tag;
   }
   remove(entityId: string, tagId: string) {
-    this.db.run(`DELETE FROM entity_tags WHERE entity_id=? AND tag_id=?`, [entityId, tagId]);
-    bus.emit('data.changed', { table: 'entity_tags', id: entityId });
+    this.db.run(`DELETE FROM record_tags WHERE record_id=? AND tag_id=?`, [entityId, tagId]);
+    bus.emit('data.changed', { table: 'record_tags', id: entityId });
   }
   set(entityId: string, names: string[], actor: Actor = 'user') {
     const current = this.forEntity(entityId);
@@ -131,7 +131,7 @@ export class TagRepo {
     for (const n of want) if (!current.some((t) => t.name.toLowerCase() === n)) this.apply(entityId, n, actor);
   }
   counts(): Array<Tag & { count: number }> {
-    return this.db.all<Row>(`SELECT t.*, COUNT(et.entity_id) AS count FROM tags t LEFT JOIN entity_tags et ON et.tag_id=t.id GROUP BY t.id ORDER BY count DESC, t.name`).map((r) => ({ ...toTag(r), count: Number(r.count) }));
+    return this.db.all<Row>(`SELECT t.*, COUNT(et.record_id) AS count FROM tags t LEFT JOIN record_tags et ON et.tag_id=t.id GROUP BY t.id ORDER BY count DESC, t.name`).map((r) => ({ ...toTag(r), count: Number(r.count) }));
   }
 }
 function toTag(r: Row): Tag {
@@ -147,7 +147,7 @@ export class AttachmentRepo {
   add(a: Omit<Attachment, 'id' | 'createdAt'>, actor: Actor = 'user'): Attachment {
     const now = Date.now();
     const id = newId(now);
-    this.db.run(`INSERT INTO attachments(id,entity_id,name,mime,size,uri,kind,created_at) VALUES (?,?,?,?,?,?,?,?)`, [id, a.entityId, a.name, a.mime ?? null, a.size ?? null, a.uri, a.kind, now]);
+    this.db.run(`INSERT INTO attachments(id,record_id,name,mime,size,uri,kind,created_at) VALUES (?,?,?,?,?,?,?,?)`, [id, a.entityId, a.name, a.mime ?? null, a.size ?? null, a.uri, a.kind, now]);
     this.changes.record('attachments', id, 'insert', 1);
     this.timeline.add({ entityId: a.entityId, kind: 'attachment', title: `Attached ${a.name}`, actor, occurredAt: now, meta: { attachmentId: id } });
     const att = { ...a, id, createdAt: now };
@@ -155,11 +155,11 @@ export class AttachmentRepo {
     return att;
   }
   forEntity(entityId: string): Attachment[] {
-    return this.db.all<Row>(`SELECT * FROM attachments WHERE entity_id=? AND deleted_at IS NULL ORDER BY created_at DESC`, [entityId]).map(toAttachment);
+    return this.db.all<Row>(`SELECT * FROM attachments WHERE record_id=? AND deleted_at IS NULL ORDER BY created_at DESC`, [entityId]).map(toAttachment);
   }
   /** The record's cover photo (photo header), if any. */
   cover(entityId: string): Attachment | null {
-    const r = this.db.get<Row>(`SELECT * FROM attachments WHERE entity_id=? AND kind='cover' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`, [entityId]);
+    const r = this.db.get<Row>(`SELECT * FROM attachments WHERE record_id=? AND kind='cover' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`, [entityId]);
     return r ? toAttachment(r) : null;
   }
   /** Replace the cover photo; the previous one is soft-deleted. */
@@ -175,7 +175,7 @@ export class AttachmentRepo {
   }
 }
 function toAttachment(r: Row): Attachment {
-  return { id: r.id as string, entityId: r.entity_id as string, name: r.name as string, mime: (r.mime as string | null) ?? null, size: (r.size as number | null) ?? null, uri: r.uri as string, kind: r.kind as Attachment['kind'], createdAt: r.created_at as number };
+  return { id: r.id as string, entityId: r.record_id as string, name: r.name as string, mime: (r.mime as string | null) ?? null, size: (r.size as number | null) ?? null, uri: r.uri as string, kind: r.kind as Attachment['kind'], createdAt: r.created_at as number };
 }
 
 /* ------------------------------------------------------------------ */
@@ -187,7 +187,7 @@ export class CommentRepo {
   add(entityId: string, body: string, author: Comment['author'] = 'user'): Comment {
     const now = Date.now();
     const id = newId(now);
-    this.db.run(`INSERT INTO comments(id,entity_id,body,author,created_at,updated_at) VALUES (?,?,?,?,?,?)`, [id, entityId, body, author, now, now]);
+    this.db.run(`INSERT INTO comments(id,record_id,body,author,created_at,updated_at) VALUES (?,?,?,?,?,?)`, [id, entityId, body, author, now, now]);
     this.changes.record('comments', id, 'insert', 1);
     this.timeline.add({ entityId, kind: 'comment', title: 'Comment', body, actor: author, occurredAt: now, meta: { commentId: id } });
     const c: Comment = { id, entityId, body, author, createdAt: now, updatedAt: now };
@@ -195,8 +195,8 @@ export class CommentRepo {
     return c;
   }
   forEntity(entityId: string): Comment[] {
-    return this.db.all<Row>(`SELECT * FROM comments WHERE entity_id=? AND deleted_at IS NULL ORDER BY created_at ASC`, [entityId]).map((r) => ({
-      id: r.id as string, entityId: r.entity_id as string, body: r.body as string, author: r.author as Comment['author'], createdAt: r.created_at as number, updatedAt: r.updated_at as number,
+    return this.db.all<Row>(`SELECT * FROM comments WHERE record_id=? AND deleted_at IS NULL ORDER BY created_at ASC`, [entityId]).map((r) => ({
+      id: r.id as string, entityId: r.record_id as string, body: r.body as string, author: r.author as Comment['author'], createdAt: r.created_at as number, updatedAt: r.updated_at as number,
     }));
   }
   remove(id: string) {
@@ -216,7 +216,7 @@ export class ReminderRepo {
     const now = Date.now();
     const id = newId(now);
     const nextAt = r.dueAt;
-    this.db.run(`INSERT INTO reminders(id,entity_id,title,body,due_at,rrule,next_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`, [id, r.entityId ?? null, r.title, r.body ?? null, r.dueAt, r.rrule ?? null, nextAt, now, now]);
+    this.db.run(`INSERT INTO reminders(id,record_id,title,body,due_at,rrule,next_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`, [id, r.entityId ?? null, r.title, r.body ?? null, r.dueAt, r.rrule ?? null, nextAt, now, now]);
     this.changes.record('reminders', id, 'insert', 1);
     if (r.entityId) this.timeline.add({ entityId: r.entityId, kind: 'reminder', title: `Reminder set: ${r.title}`, actor, occurredAt: now, meta: { reminderId: id, dueAt: r.dueAt } });
     const rem: Reminder = { id, entityId: r.entityId ?? null, title: r.title, body: r.body ?? null, dueAt: r.dueAt, rrule: r.rrule ?? null, nextAt, doneAt: null, snoozedUntil: null, notificationId: null, createdAt: now, updatedAt: now };
@@ -229,7 +229,7 @@ export class ReminderRepo {
     return r ? toReminder(r) : undefined;
   }
   forEntity(entityId: string): Reminder[] {
-    return this.db.all<Row>(`SELECT * FROM reminders WHERE entity_id=? AND deleted_at IS NULL ORDER BY next_at ASC`, [entityId]).map(toReminder);
+    return this.db.all<Row>(`SELECT * FROM reminders WHERE record_id=? AND deleted_at IS NULL ORDER BY next_at ASC`, [entityId]).map(toReminder);
   }
   upcoming(limit = 50, before?: number): Reminder[] {
     const params: (number | string)[] = [];
@@ -274,7 +274,7 @@ export class ReminderRepo {
 }
 function toReminder(r: Row): Reminder {
   return {
-    id: r.id as string, entityId: (r.entity_id as string | null) ?? null, title: r.title as string, body: (r.body as string | null) ?? null, dueAt: r.due_at as number, rrule: (r.rrule as string | null) ?? null,
+    id: r.id as string, entityId: (r.record_id as string | null) ?? null, title: r.title as string, body: (r.body as string | null) ?? null, dueAt: r.due_at as number, rrule: (r.rrule as string | null) ?? null,
     nextAt: (r.next_at as number | null) ?? null, doneAt: (r.done_at as number | null) ?? null, snoozedUntil: (r.snoozed_until as number | null) ?? null, notificationId: (r.notification_id as string | null) ?? null,
     createdAt: r.created_at as number, updatedAt: r.updated_at as number,
   };
@@ -287,15 +287,15 @@ function toReminder(r: Row): Reminder {
 export class CustomFieldRepo {
   constructor(private db: DatabaseAdapter) {}
   forType(entityType: string): CustomFieldDef[] {
-    return this.db.all<Row>(`SELECT * FROM custom_field_defs WHERE entity_type=? AND deleted_at IS NULL ORDER BY sort_order, created_at`, [entityType]).map((r) => ({
-      id: r.id as string, entityType: r.entity_type as string, key: r.key as string, label: r.label as string, fieldType: r.field_type as CustomFieldDef['fieldType'], options: safeJson(r.options as string) as CustomFieldDef['options'], sortOrder: r.sort_order as number,
+    return this.db.all<Row>(`SELECT * FROM custom_field_defs WHERE object=? AND deleted_at IS NULL ORDER BY sort_order, created_at`, [entityType]).map((r) => ({
+      id: r.id as string, entityType: r.object as string, key: r.key as string, label: r.label as string, fieldType: r.field_type as CustomFieldDef['fieldType'], options: safeJson(r.options as string) as CustomFieldDef['options'], sortOrder: r.sort_order as number,
     }));
   }
   add(def: Omit<CustomFieldDef, 'id' | 'sortOrder'> & { sortOrder?: number }): CustomFieldDef {
     const now = Date.now();
     const id = newId(now);
     const key = def.key.replace(/[^a-zA-Z0-9_]/g, '_');
-    this.db.run(`INSERT INTO custom_field_defs(id,entity_type,key,label,field_type,options,sort_order,created_at) VALUES (?,?,?,?,?,?,?,?)`, [id, def.entityType, key, def.label, def.fieldType, JSON.stringify(def.options ?? {}), def.sortOrder ?? 0, now]);
+    this.db.run(`INSERT INTO custom_field_defs(id,object,key,label,field_type,options,sort_order,created_at) VALUES (?,?,?,?,?,?,?,?)`, [id, def.entityType, key, def.label, def.fieldType, JSON.stringify(def.options ?? {}), def.sortOrder ?? 0, now]);
     bus.emit('data.changed', { table: 'custom_field_defs', id: id });
     return { ...def, key, id, sortOrder: def.sortOrder ?? 0 };
   }
@@ -318,7 +318,7 @@ export interface SavedView extends SavedViewDef {
 export class ViewRepo {
   constructor(private db: DatabaseAdapter) {}
   forType(entityType: string): SavedView[] {
-    return this.db.all<Row>(`SELECT * FROM saved_views WHERE entity_type=? AND deleted_at IS NULL ORDER BY sort_order, created_at`, [entityType]).map(toView);
+    return this.db.all<Row>(`SELECT * FROM saved_views WHERE object=? AND deleted_at IS NULL ORDER BY sort_order, created_at`, [entityType]).map(toView);
   }
   get(id: string): SavedView | undefined {
     const r = this.db.get<Row>(`SELECT * FROM saved_views WHERE id=? AND deleted_at IS NULL`, [id]);
@@ -332,7 +332,7 @@ export class ViewRepo {
       return this.get(v.id)!;
     }
     const id = v.id ?? newId(now);
-    this.db.run(`INSERT INTO saved_views(id,entity_type,name,icon,definition,is_default,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`, [id, entityType, v.name, v.icon ?? null, JSON.stringify(v.definition), v.isDefault ? 1 : 0, v.sortOrder ?? 0, now, now]);
+    this.db.run(`INSERT INTO saved_views(id,object,name,icon,definition,is_default,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`, [id, entityType, v.name, v.icon ?? null, JSON.stringify(v.definition), v.isDefault ? 1 : 0, v.sortOrder ?? 0, now, now]);
     bus.emit('data.changed', { table: 'saved_views', id: id });
     return this.get(id)!;
   }
@@ -342,7 +342,7 @@ export class ViewRepo {
   }
 }
 function toView(r: Row): SavedView {
-  return { id: r.id as string, entityType: r.entity_type as string, name: r.name as string, icon: (r.icon as string | null) ?? undefined, definition: safeJson(r.definition as string) as ViewDefinition, isDefault: !!r.is_default, sortOrder: r.sort_order as number };
+  return { id: r.id as string, entityType: r.object as string, name: r.name as string, icon: (r.icon as string | null) ?? undefined, definition: safeJson(r.definition as string) as ViewDefinition, isDefault: !!r.is_default, sortOrder: r.sort_order as number };
 }
 
 /* ------------------------------------------------------------------ */

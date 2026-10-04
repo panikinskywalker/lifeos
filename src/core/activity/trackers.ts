@@ -91,7 +91,7 @@ function ruleDays(os: LifeOSContext, r: TrackerRule, from: string, to: string): 
       const dir = r.direction ?? 'spent';
       for (const t of os.db.all<{ day: string; merchant: string | null; note: string | null; category: string | null; kind: string }>(
         `SELECT json_extract(data,'$.date') AS day, json_extract(data,'$.merchant') AS merchant, json_extract(data,'$.note') AS note, json_extract(data,'$.category') AS category, json_extract(data,'$.kind') AS kind
-         FROM entities WHERE type='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date') BETWEEN ? AND ?`,
+         FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date') BETWEEN ? AND ?`,
         [from, to],
       )) {
         if (dir !== 'any' && t.kind !== (dir === 'received' ? 'income' : 'expense')) continue;
@@ -105,7 +105,7 @@ function ruleDays(os: LifeOSContext, r: TrackerRule, from: string, to: string): 
     case 'record': {
       if (!has(r.type)) return out;
       // The day it happened when the record has one, else the day it was added.
-      for (const e of os.db.all<{ at: number }>(`SELECT COALESCE(occurred_at, created_at) AS at FROM entities WHERE type=? AND deleted_at IS NULL AND COALESCE(occurred_at, created_at) BETWEEN ? AND ?`, [r.type, startMs(from), endMs(to)])) out.add(isoDay(e.at));
+      for (const e of os.db.all<{ at: number }>(`SELECT COALESCE(occurred_at, created_at) AS at FROM records WHERE object=? AND deleted_at IS NULL AND COALESCE(occurred_at, created_at) BETWEEN ? AND ?`, [r.type, startMs(from), endMs(to)])) out.add(isoDay(e.at));
       return out;
     }
     case 'metric': {
@@ -131,7 +131,7 @@ function ruleDays(os: LifeOSContext, r: TrackerRule, from: string, to: string): 
       const re = r.words?.length ? wordRe(r.words) : null;
       const cals = new Set((r.calendars ?? []).map((c) => c.toLowerCase()));
       if (!re && !cals.size) return out;
-      for (const e of os.db.all<Row>(`SELECT title, occurred_at, data FROM entities WHERE type='event' AND deleted_at IS NULL AND occurred_at BETWEEN ? AND ?`, [startMs(from), endMs(to)])) {
+      for (const e of os.db.all<Row>(`SELECT title, occurred_at, data FROM records WHERE object='event' AND deleted_at IS NULL AND occurred_at BETWEEN ? AND ?`, [startMs(from), endMs(to)])) {
         const d = JSON.parse(e.data as string) as { calendars?: string[] };
         const onCal = cals.size > 0 && (d.calendars ?? []).some((c) => cals.has(c.toLowerCase()));
         const said = re?.test(String(e.title)) ?? false;
@@ -141,7 +141,7 @@ function ruleDays(os: LifeOSContext, r: TrackerRule, from: string, to: string): 
     }
     case 'habit': {
       if (!has('habit_log')) return out;
-      for (const l of os.db.all<{ day: string }>(`SELECT json_extract(data,'$.date') AS day FROM entities WHERE type='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.habitId')=? AND json_extract(data,'$.date') BETWEEN ? AND ?`, [r.habitId, from, to])) out.add(l.day);
+      for (const l of os.db.all<{ day: string }>(`SELECT json_extract(data,'$.date') AS day FROM records WHERE object='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.habitId')=? AND json_extract(data,'$.date') BETWEEN ? AND ?`, [r.habitId, from, to])) out.add(l.day);
       return out;
     }
   }
@@ -194,7 +194,7 @@ export function trackerSummary(os: LifeOSContext, t: Tracker, now = Date.now(), 
 /** Calendars seen on synced events (for the "work calendar" picker). */
 export function knownCalendars(os: LifeOSContext): string[] {
   if (!os.registry.objects.has('event')) return [];
-  return os.db.all<{ c: string }>(`SELECT DISTINCT j.value AS c FROM entities e, json_each(json_extract(e.data,'$.calendars')) j WHERE e.type='event' AND e.deleted_at IS NULL ORDER BY c`).map((r) => r.c);
+  return os.db.all<{ c: string }>(`SELECT DISTINCT j.value AS c FROM records e, json_each(json_extract(e.data,'$.calendars')) j WHERE e.object='event' AND e.deleted_at IS NULL ORDER BY c`).map((r) => r.c);
 }
 
 /** Apps with screen time in the last 30 days, most used first (for the "work apps" picker). */

@@ -77,7 +77,7 @@ const toExtraction = (r: Row): Extraction => ({
   sourceRef: (r.source_ref as string | null) ?? null,
   kind: r.kind as string,
   action: r.action as Extraction['action'],
-  entityId: (r.entity_id as string | null) ?? null,
+  entityId: (r.record_id as string | null) ?? null,
   factId: (r.fact_id as string | null) ?? null,
   label: r.label as string,
   undone: r.undone === 1,
@@ -171,7 +171,7 @@ export class DumpRepo {
 
   addExtraction(x: { dumpId?: string | null; source?: string; sourceRef?: string | null; kind: string; action?: Extraction['action']; entityId?: string | null; factId?: string | null; relationId?: string | null; label: string; before?: Record<string, unknown> | null; confidence?: number; flag?: string | null }): Extraction {
     const id = newId();
-    this.db.run(`INSERT INTO dump_extractions(id,dump_id,source,source_ref,kind,action,entity_id,fact_id,relation_id,label,before,confidence,flag,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    this.db.run(`INSERT INTO dump_extractions(id,dump_id,source,source_ref,kind,action,record_id,fact_id,relation_id,label,before,confidence,flag,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
       id,
       x.dumpId ?? null,
       x.source ?? 'dump',
@@ -232,7 +232,7 @@ export class DumpRepo {
   /** Dumps that produced or touched a record (for "Dumps that mention it" on its page). */
   forEntity(entityId: string): Dump[] {
     return this.db
-      .all<Row>(`SELECT d.* FROM dumps d WHERE d.id IN (SELECT dump_id FROM dump_extractions WHERE entity_id=? AND undone=0) ORDER BY d.created_at DESC`, [entityId])
+      .all<Row>(`SELECT d.* FROM dumps d WHERE d.id IN (SELECT dump_id FROM dump_extractions WHERE record_id=? AND undone=0) ORDER BY d.created_at DESC`, [entityId])
       .map(toDump);
   }
 
@@ -249,7 +249,7 @@ export class DumpRepo {
 
   private index(id: string, body: string) {
     const firstLine = body.trim().split('\n')[0]!.slice(0, 120);
-    this.db.run(`DELETE FROM entities_fts WHERE id=?`, [id]);
-    this.db.run(`INSERT INTO entities_fts(id,type,title,subtitle,body) VALUES (?,?,?,?,?)`, [id, 'dump', firstLine, 'Dump', body]);
+    this.db.run(`DELETE FROM records_fts WHERE id=?`, [id]);
+    this.db.run(`INSERT INTO records_fts(id,object,title,subtitle,body) VALUES (?,?,?,?,?)`, [id, 'dump', firstLine, 'Dump', body]);
   }
 }

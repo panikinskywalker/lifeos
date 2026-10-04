@@ -139,7 +139,7 @@ describe('entity store', () => {
     expect(seen).toEqual([t.id]);
     expect(os.links.forEntity(t.id).map((r) => r.other.id)).toEqual([trip.id]);
     expect(os.records.search.search('houseboat').map((h) => h.id)).toEqual([t.id]);
-    const last = os.db.get<{ op: string; row_id: string }>(`SELECT op, row_id FROM changes WHERE tbl = 'entities' ORDER BY seq DESC LIMIT 1`);
+    const last = os.db.get<{ op: string; row_id: string }>(`SELECT op, row_id FROM changes WHERE tbl = 'records' ORDER BY seq DESC LIMIT 1`);
     expect(last).toEqual({ op: 'update', row_id: t.id });
     os.records.restore(t.id); // restoring a live record is a no-op
     expect(seen).toEqual([t.id]);

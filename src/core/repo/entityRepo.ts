@@ -47,7 +47,7 @@ export interface AggregateSpec {
 function rowToEntity(r: Row): ObjectRecord {
   return {
     id: r.id as string,
-    object: r.type as string,
+    object: r.object as string,
     title: (r.title as string) ?? '',
     subtitle: (r.subtitle as string | null) ?? null,
     data: safeJson(r.data as string),
@@ -133,11 +133,11 @@ export class RecordRepo {
     };
     this.db.transaction(() => {
       this.db.run(
-        `INSERT INTO entities(id,type,title,subtitle,data,status,starred,archived,occurred_at,created_at,updated_at,deleted_at,version)
+        `INSERT INTO records(id,object,title,subtitle,data,status,starred,archived,occurred_at,created_at,updated_at,deleted_at,version)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [id, entity.object, entity.title, entity.subtitle ?? null, JSON.stringify(data), entity.status ?? null, entity.starred ? 1 : 0, 0, entity.occurredAt ?? null, now, now, null, 1],
       );
-      this.changes.record('entities', id, 'insert', 1);
+      this.changes.record('records', id, 'insert', 1);
       this.timeline.add({ entityId: id, kind: 'created', title: `${def.label} created`, actor, occurredAt: now });
       this.search.index(entity as ObjectRecord, def);
       this.syncRelations?.(entity as ObjectRecord, def, actor);
@@ -147,20 +147,20 @@ export class RecordRepo {
   }
 
   get<T = Record<string, unknown>>(id: string): ObjectRecord<T> | undefined {
-    const r = this.db.get(`SELECT * FROM entities WHERE id = ? AND deleted_at IS NULL`, [id]);
+    const r = this.db.get(`SELECT * FROM records WHERE id = ? AND deleted_at IS NULL`, [id]);
     return r ? (rowToEntity(r) as ObjectRecord<T>) : undefined;
   }
 
   getMany(ids: string[]): ObjectRecord[] {
     if (!ids.length) return [];
-    const rows = this.db.all(`SELECT * FROM entities WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`, ids);
+    const rows = this.db.all(`SELECT * FROM records WHERE deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`, ids);
     const map = new Map(rows.map((r) => [r.id as string, rowToEntity(r)]));
     return ids.map((i) => map.get(i)).filter((x): x is ObjectRecord => !!x);
   }
 
   ref(id: string): EntityRef | undefined {
-    const r = this.db.get<{ id: string; type: string; title: string }>(`SELECT id,type,title FROM entities WHERE id = ? AND deleted_at IS NULL`, [id]);
-    return r ? { id: r.id, object: r.type, title: r.title } : undefined;
+    const r = this.db.get<{ id: string; object: string; title: string }>(`SELECT id,object,title FROM records WHERE id = ? AND deleted_at IS NULL`, [id]);
+    return r ?? undefined;
   }
 
   update<T extends object>(id: string, patch: UpdateInput<T>, actor: Actor = 'user'): ObjectRecord<T> {
@@ -191,10 +191,10 @@ export class RecordRepo {
     if (!changed.length) return previous;
     this.db.transaction(() => {
       this.db.run(
-        `UPDATE entities SET title=?, subtitle=?, data=?, status=?, starred=?, archived=?, occurred_at=?, updated_at=?, version=? WHERE id=?`,
+        `UPDATE records SET title=?, subtitle=?, data=?, status=?, starred=?, archived=?, occurred_at=?, updated_at=?, version=? WHERE id=?`,
         [next.title, next.subtitle ?? null, JSON.stringify(next.data), next.status ?? null, next.starred ? 1 : 0, next.archived ? 1 : 0, next.occurredAt ?? null, now, next.version, id],
       );
-      this.changes.record('entities', id, 'update', next.version);
+      this.changes.record('records', id, 'update', next.version);
       if (previous.status !== next.status) {
         this.timeline.add({ entityId: id, kind: 'status', title: `Status → ${labelFor(def, next.status)}`, actor, occurredAt: now, meta: { from: previous.status, to: next.status } });
       } else {
@@ -218,9 +218,9 @@ export class RecordRepo {
     if (!e) return;
     const now = Date.now();
     this.db.transaction(() => {
-      this.db.run(`UPDATE entities SET deleted_at=?, updated_at=?, version=version+1 WHERE id=?`, [now, now, id]);
-      this.db.run(`UPDATE relations SET deleted_at=? WHERE deleted_at IS NULL AND (from_id=? OR to_id=?)`, [now, id, id]);
-      this.changes.record('entities', id, 'delete', e.version + 1);
+      this.db.run(`UPDATE records SET deleted_at=?, updated_at=?, version=version+1 WHERE id=?`, [now, now, id]);
+      this.db.run(`UPDATE links SET deleted_at=? WHERE deleted_at IS NULL AND (from_id=? OR to_id=?)`, [now, id, id]);
+      this.changes.record('records', id, 'delete', e.version + 1);
       this.search.remove(id);
     });
     bus.emit('entity.deleted', { entity: e, actor });
@@ -228,13 +228,13 @@ export class RecordRepo {
 
   /** Undo a soft delete, including the relations that delete() removed with it. */
   restore(id: string, actor: Actor = 'user'): void {
-    const row = this.db.get<{ deleted_at: number | null; version: number }>(`SELECT deleted_at, version FROM entities WHERE id=?`, [id]);
+    const row = this.db.get<{ deleted_at: number | null; version: number }>(`SELECT deleted_at, version FROM records WHERE id=?`, [id]);
     if (!row?.deleted_at) return;
     this.db.transaction(() => {
-      this.db.run(`UPDATE entities SET deleted_at=NULL, updated_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
+      this.db.run(`UPDATE records SET deleted_at=NULL, updated_at=?, version=version+1 WHERE id=?`, [Date.now(), id]);
       // delete() tombstones the record and its relations with one timestamp; links removed earlier keep theirs.
-      this.db.run(`UPDATE relations SET deleted_at=NULL, version=version+1 WHERE deleted_at=? AND (from_id=? OR to_id=?)`, [row.deleted_at, id, id]);
-      this.changes.record('entities', id, 'update', row.version + 1);
+      this.db.run(`UPDATE links SET deleted_at=NULL, version=version+1 WHERE deleted_at=? AND (from_id=? OR to_id=?)`, [row.deleted_at, id, id]);
+      this.changes.record('records', id, 'update', row.version + 1);
     });
     const e = this.get(id);
     if (!e) return;
@@ -248,13 +248,13 @@ export class RecordRepo {
     const sort = compileSort(view.sort);
     const limit = opts.limit ?? 200;
     const offset = opts.offset ?? 0;
-    const rows = this.db.all(`SELECT e.* FROM entities e WHERE ${where} ORDER BY ${sort} LIMIT ? OFFSET ?`, [...params, limit, offset]);
+    const rows = this.db.all(`SELECT e.* FROM records e WHERE ${where} ORDER BY ${sort} LIMIT ? OFFSET ?`, [...params, limit, offset]);
     return rows.map(rowToEntity) as ObjectRecord<T>[];
   }
 
   count(type: string | string[] | null, view: ViewDefinition = {}): number {
     const { where, params } = this.buildWhere(type, view);
-    return (this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM entities e WHERE ${where}`, params)?.n as number) ?? 0;
+    return (this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records e WHERE ${where}`, params)?.n as number) ?? 0;
   }
 
   aggregate(type: string | string[] | null, view: ViewDefinition, spec: AggregateSpec): Record<string, number> {
@@ -265,7 +265,7 @@ export class RecordRepo {
     for (const f of spec.min ?? []) cols.push(`MIN(${fieldExpr(f)}) AS "min_${f}"`);
     for (const f of spec.max ?? []) cols.push(`MAX(${fieldExpr(f)}) AS "max_${f}"`);
     if (spec.count || !cols.length) cols.push(`COUNT(*) AS count`);
-    const r = this.db.get(`SELECT ${cols.join(', ')} FROM entities e WHERE ${where}`, params) ?? {};
+    const r = this.db.get(`SELECT ${cols.join(', ')} FROM records e WHERE ${where}`, params) ?? {};
     const out: Record<string, number> = {};
     for (const [k, v] of Object.entries(r)) out[k] = Number(v ?? 0);
     return out;
@@ -279,7 +279,7 @@ export class RecordRepo {
     for (const f of spec.sum ?? []) cols.push(`COALESCE(SUM(${fieldExpr(f)}),0) AS "sum_${f}"`);
     for (const f of spec.avg ?? []) cols.push(`COALESCE(AVG(${fieldExpr(f)}),0) AS "avg_${f}"`);
     cols.push(`COUNT(*) AS count`);
-    const rows = this.db.all(`SELECT ${cols.join(', ')} FROM entities e WHERE ${where} GROUP BY grp ORDER BY 2 DESC`, params);
+    const rows = this.db.all(`SELECT ${cols.join(', ')} FROM records e WHERE ${where} GROUP BY grp ORDER BY 2 DESC`, params);
     return rows.map((r) => {
       const { grp, ...rest } = r;
       const values: Record<string, number> = {};
@@ -295,7 +295,7 @@ export class RecordRepo {
     const fmt = bucket === 'day' ? '%Y-%m-%d' : bucket === 'week' ? '%Y-W%W' : '%Y-%m';
     const sum = sumField ? `COALESCE(SUM(${fieldExpr(sumField)}),0)` : `0`;
     const rows = this.db.all<{ b: string; s: number; c: number }>(
-      `SELECT strftime('${fmt}', ${t}/1000, 'unixepoch', 'localtime') AS b, ${sum} AS s, COUNT(*) AS c FROM entities e WHERE ${where} AND ${t} IS NOT NULL GROUP BY b ORDER BY b ASC`,
+      `SELECT strftime('${fmt}', ${t}/1000, 'unixepoch', 'localtime') AS b, ${sum} AS s, COUNT(*) AS c FROM records e WHERE ${where} AND ${t} IS NOT NULL GROUP BY b ORDER BY b ASC`,
       params,
     );
     return rows.map((r) => ({ bucket: r.b, sum: Number(r.s), count: Number(r.c) }));
@@ -306,7 +306,7 @@ export class RecordRepo {
     const parts: string[] = ['e.deleted_at IS NULL'];
     if (type) {
       const types = Array.isArray(type) ? type : [type];
-      parts.push(`e.type IN (${types.map(() => '?').join(',')})`);
+      parts.push(`e.object IN (${types.map(() => '?').join(',')})`);
       params.push(...types);
     }
     if (!view.includeArchived) parts.push('e.archived = 0');
@@ -323,23 +323,23 @@ export class RecordRepo {
     const params: SqlParam[] = [];
     let where = 'deleted_at IS NULL AND archived = 0';
     if (types?.length) {
-      where += ` AND type IN (${types.map(() => '?').join(',')})`;
+      where += ` AND object IN (${types.map(() => '?').join(',')})`;
       params.push(...types);
     }
     params.push(limit);
-    return this.db.all(`SELECT * FROM entities WHERE ${where} ORDER BY updated_at DESC LIMIT ?`, params).map(rowToEntity);
+    return this.db.all(`SELECT * FROM records WHERE ${where} ORDER BY updated_at DESC LIMIT ?`, params).map(rowToEntity);
   }
 
   countsByType(): Record<string, number> {
-    const rows = this.db.all<{ type: string; n: number }>(`SELECT type, COUNT(*) AS n FROM entities WHERE deleted_at IS NULL AND archived = 0 GROUP BY type`);
-    return Object.fromEntries(rows.map((r) => [r.type, Number(r.n)]));
+    const rows = this.db.all<{ object: string; n: number }>(`SELECT object, COUNT(*) AS n FROM records WHERE deleted_at IS NULL AND archived = 0 GROUP BY object`);
+    return Object.fromEntries(rows.map((r) => [r.object, Number(r.n)]));
   }
 
   /** Create expression indexes declared by a type (idempotent, safe on every start). */
   ensureIndexes(def: ObjectDef) {
     for (const key of def.indexed ?? []) {
       if (!/^[a-zA-Z0-9_]+$/.test(key)) continue;
-      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_data_${def.id}_${key} ON entities(type, json_extract(data,'$.${key}')) WHERE type='${def.id}'`);
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_data_${def.id}_${key} ON records(object, json_extract(data,'$.${key}')) WHERE object='${def.id}'`);
     }
   }
 }

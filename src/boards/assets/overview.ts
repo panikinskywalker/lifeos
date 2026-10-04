@@ -16,7 +16,7 @@ export function assetsOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
   const worth = assets.reduce((n, a) => n + (a.data.currentValue ?? a.data.purchasePrice ?? 0), 0);
   // Upkeep spend per month: costs logged when a job was done.
   const months = lastMonths(6, now);
-  const costs = months.map((m) => os.db.get<{ t: number | null }>(`SELECT SUM(json_extract(meta,'$.cost')) AS t FROM timeline_events WHERE kind='cycle.done' AND occurred_at BETWEEN ? AND ?`, [new Date(`${m.start}T00:00:00`).getTime(), new Date(`${m.end}T23:59:59`).getTime()])?.t ?? 0);
+  const costs = months.map((m) => os.db.get<{ t: number | null }>(`SELECT SUM(json_extract(meta,'$.cost')) AS t FROM events WHERE kind='cycle.done' AND occurred_at BETWEEN ? AND ?`, [new Date(`${m.start}T00:00:00`).getTime(), new Date(`${m.end}T23:59:59`).getTime()])?.t ?? 0);
   const expiring = [
     ...assets.filter((a) => a.data.warrantyUntil).map((a) => ({ title: a.title, what: 'Warranty', until: a.data.warrantyUntil!, id: a.id, type: 'asset' })),
     ...vehicles.flatMap((v) => [v.data.insuranceUntil ? { title: v.title, what: 'Insurance', until: v.data.insuranceUntil, id: v.id, type: 'vehicle' } : null, v.data.pucUntil ? { title: v.title, what: 'PUC', until: v.data.pucUntil, id: v.id, type: 'vehicle' } : null].filter((x): x is NonNullable<typeof x> => !!x)),

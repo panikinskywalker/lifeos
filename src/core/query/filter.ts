@@ -9,9 +9,9 @@ import type { SqlParam } from '../db/adapter';
 
 const ENVELOPE_COLUMNS: Record<string, string> = {
   id: 'e.id',
-  object: 'e.type',
+  object: 'e.object',
   /** @deprecated saved views written before R0 may still say 'type'. */
-  type: 'e.type',
+  type: 'e.object',
   title: 'e.title',
   subtitle: 'e.subtitle',
   status: 'e.status',
@@ -139,14 +139,14 @@ export function compileClause(c: FilterClause, params: SqlParam[]): string {
       return `(${f} IS NOT NULL AND ${f} != '')`;
     case 'hasTag':
       params.push(String(c.value));
-      return `EXISTS (SELECT 1 FROM entity_tags et JOIN tags t ON t.id = et.tag_id WHERE et.entity_id = e.id AND t.name = ? COLLATE NOCASE)`;
+      return `EXISTS (SELECT 1 FROM record_tags et JOIN tags t ON t.id = et.tag_id WHERE et.record_id = e.id AND t.name = ? COLLATE NOCASE)`;
     case 'relatedTo': {
       // value: entity id, optional kind via field "relation.<kind>"
       const kind = c.field.startsWith('relation.') ? c.field.slice(9) : null;
       params.push(String(c.value), String(c.value));
       const kindSql = kind ? ` AND r.kind = ?` : '';
       if (kind) params.push(kind);
-      return `EXISTS (SELECT 1 FROM relations r WHERE r.deleted_at IS NULL AND ((r.from_id = e.id AND r.to_id = ?) OR (r.to_id = e.id AND r.from_id = ?))${kindSql})`;
+      return `EXISTS (SELECT 1 FROM links r WHERE r.deleted_at IS NULL AND ((r.from_id = e.id AND r.to_id = ?) OR (r.to_id = e.id AND r.from_id = ?))${kindSql})`;
     }
     default:
       throw new Error(`Unsupported op ${(c as FilterClause).op}`);

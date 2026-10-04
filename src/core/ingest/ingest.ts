@@ -51,7 +51,7 @@ const toItem = (r: Row): IngestItem => ({
   text: r.raw_text as string,
   parsed: r.parsed ? (JSON.parse(r.parsed as string) as SmsKind) : null,
   status: r.status as IngestItem['status'],
-  entityId: (r.entity_id as string | null) ?? null,
+  entityId: (r.record_id as string | null) ?? null,
   note: (r.error as string | null) ?? null,
   account: (r.raw_extra ? ((JSON.parse(r.raw_extra as string) as { account?: string }).account ?? null) : null),
 });
@@ -303,7 +303,7 @@ export function learnCategory(os: LifeOSContext, merchant: string | null | undef
   const ids = payee
     ? os.links.forEntity(payee.id).filter((r) => r.direction === 'in' && r.other.object === 'transaction').map((r) => r.other.id)
     : merchant
-      ? os.db.all<{ id: string }>(`SELECT id FROM entities WHERE type='transaction' AND deleted_at IS NULL AND lower(json_extract(data,'$.merchant'))=? LIMIT 500`, [merchant.toLowerCase()]).map((r) => r.id)
+      ? os.db.all<{ id: string }>(`SELECT id FROM records WHERE object='transaction' AND deleted_at IS NULL AND lower(json_extract(data,'$.merchant'))=? LIMIT 500`, [merchant.toLowerCase()]).map((r) => r.id)
       : [];
   return ids.filter((id) => id !== txId && (os.records.get<{ category?: string; kind?: string }>(id)?.data.category ?? category) !== category && os.records.get<{ kind?: string }>(id)?.data.kind !== 'transfer');
 }
@@ -366,11 +366,11 @@ function fundAccount(os: LifeOSContext, fund: string | null, created: string[]):
 
 /** What the app did with one message: filed, set aside (and why), or never seen; and the record it made. */
 export function ingestOutcome(os: LifeOSContext, m: RawMessage): { status: string; note: string | null; record: Record<string, unknown> | null } | null {
-  const r = os.db.get<{ status: string; error: string | null; entity_id: string | null }>(`SELECT status, error, entity_id FROM ingest_queue WHERE id=?`, [messageId(m)]);
+  const r = os.db.get<{ status: string; error: string | null; record_id: string | null }>(`SELECT status, error, record_id FROM ingest_queue WHERE id=?`, [messageId(m)]);
   if (!r) return null;
-  const e = r.entity_id ? os.records.get(r.entity_id) : null;
+  const e = r.record_id ? os.records.get(r.record_id) : null;
   const d = (e?.data ?? {}) as Record<string, unknown>;
-  const record = e ? { type: e.object, title: e.title, ...Object.fromEntries(['amount', 'kind', 'category', 'merchant', 'date', 'status', 'shop', 'carrier'].filter((k) => d[k] !== undefined).map((k) => [k, d[k]])) } : r.entity_id ? { deleted: true } : null;
+  const record = e ? { type: e.object, title: e.title, ...Object.fromEntries(['amount', 'kind', 'category', 'merchant', 'date', 'status', 'shop', 'carrier'].filter((k) => d[k] !== undefined).map((k) => [k, d[k]])) } : r.record_id ? { deleted: true } : null;
   return { status: r.status, note: r.error, record };
 }
 
@@ -391,7 +391,7 @@ function setItem(os: LifeOSContext, id: string, patch: { status?: IngestItem['st
   const sets: string[] = ['updated_at=?'];
   const p: unknown[] = [Date.now()];
   if (patch.status) (sets.push('status=?'), p.push(patch.status));
-  if (patch.entityId !== undefined) (sets.push('entity_id=?'), p.push(patch.entityId));
+  if (patch.entityId !== undefined) (sets.push('record_id=?'), p.push(patch.entityId));
   if (patch.note !== undefined) (sets.push('error=?'), p.push(patch.note));
   if (patch.parsed !== undefined) (sets.push('parsed=?'), p.push(patch.parsed ? JSON.stringify(patch.parsed) : null));
   os.db.run(`UPDATE ingest_queue SET ${sets.join(', ')} WHERE id=?`, [...(p as never[]), id]);
@@ -400,11 +400,11 @@ function setItem(os: LifeOSContext, id: string, patch: { status?: IngestItem['st
 /** The same money already seen: another message within 10 minutes, or a transaction you already filed that day. */
 function findDuplicate(os: LifeOSContext, itemId: string, t: ParsedTxn, at: number): { ingestId?: string; entityId?: string } | null {
   const key = `${t.direction}:${t.amount.toFixed(2)}`;
-  const twin = os.db.get<{ id: string; entity_id: string | null }>(
-    `SELECT id, entity_id FROM ingest_queue WHERE dedupe_key=? AND id<>? AND received_at BETWEEN ? AND ? AND status IN ('confirmed','proposed','duplicate') ORDER BY received_at LIMIT 1`,
+  const twin = os.db.get<{ id: string; record_id: string | null }>(
+    `SELECT id, record_id FROM ingest_queue WHERE dedupe_key=? AND id<>? AND received_at BETWEEN ? AND ? AND status IN ('confirmed','proposed','duplicate') ORDER BY received_at LIMIT 1`,
     [key, itemId, at - WINDOW, at + WINDOW],
   );
-  if (twin) return { ingestId: twin.id, entityId: twin.entity_id ?? undefined };
+  if (twin) return { ingestId: twin.id, entityId: twin.record_id ?? undefined };
   if (!os.registry.objects.has('transaction')) return null;
   // Said it before the SMS came ("spent 450 on lunch"): same amount, same kind, same or previous day, not from a message.
   const day = iso(at);
@@ -412,9 +412,9 @@ function findDuplicate(os: LifeOSContext, itemId: string, t: ParsedTxn, at: numb
   const kind = t.direction === 'credit' ? 'income' : 'expense';
   // Straight to the few candidates (date and kind are indexed), not a scan of recent transactions.
   const tx = os.db.get<{ id: string }>(
-    `SELECT e.id FROM entities e WHERE e.type='transaction' AND e.deleted_at IS NULL
+    `SELECT e.id FROM records e WHERE e.object='transaction' AND e.deleted_at IS NULL
        AND json_extract(e.data,'$.date') IN (?, ?) AND json_extract(e.data,'$.kind')=? AND json_extract(e.data,'$.amount')=?
-       AND NOT EXISTS (SELECT 1 FROM ingest_queue q WHERE q.entity_id = e.id AND q.source <> 'email') LIMIT 1`,
+       AND NOT EXISTS (SELECT 1 FROM ingest_queue q WHERE q.record_id = e.id AND q.source <> 'email') LIMIT 1`,
     [day, prev, kind, t.amount],
   );
   return tx ? { entityId: tx.id } : null;
@@ -802,7 +802,7 @@ function sameMoney(os: LifeOSContext, amount: number, kind: string, day: string)
   const d = new Date(`${day}T12:00:00`).getTime();
   return (
     os.db.get<{ id: string }>(
-      `SELECT id FROM entities WHERE type='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')=? AND ABS(json_extract(data,'$.amount') - ?) < 0.5
+      `SELECT id FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')=? AND ABS(json_extract(data,'$.amount') - ?) < 0.5
          AND json_extract(data,'$.date') BETWEEN ? AND ? ORDER BY ABS(julianday(json_extract(data,'$.date')) - julianday(?)) LIMIT 1`,
       [kind, amount, iso(d - DAY), iso(d + DAY), day],
     )?.id ?? null

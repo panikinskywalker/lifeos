@@ -9,8 +9,8 @@ export function placesOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
   const places = os.registry.objects.has('place') ? os.records.query('place', {}, { limit: 5000 }) : [];
   // Top payees this month: payments linked to each.
   const rows = os.db.all<{ id: string; total: number; n: number }>(
-    `SELECT r.to_id AS id, SUM(json_extract(e.data,'$.amount')) AS total, COUNT(*) AS n FROM relations r JOIN entities e ON e.id = r.from_id
-     WHERE r.kind='payee' AND r.deleted_at IS NULL AND e.deleted_at IS NULL AND e.type='transaction' AND json_extract(e.data,'$.kind')='expense' AND json_extract(e.data,'$.date') BETWEEN ? AND ?
+    `SELECT r.to_id AS id, SUM(json_extract(e.data,'$.amount')) AS total, COUNT(*) AS n FROM links r JOIN records e ON e.id = r.from_id
+     WHERE r.kind='payee' AND r.deleted_at IS NULL AND e.deleted_at IS NULL AND e.object='transaction' AND json_extract(e.data,'$.kind')='expense' AND json_extract(e.data,'$.date') BETWEEN ? AND ?
      GROUP BY r.to_id ORDER BY total DESC LIMIT 8`,
     [month!.start, month!.end],
   );

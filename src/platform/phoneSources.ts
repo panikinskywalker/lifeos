@@ -88,7 +88,7 @@ async function syncCallLog(os: LifeOSContext) {
 
 async function syncContacts(os: LifeOSContext) {
   if (!(await contactsGranted())) return;
-  const linked = os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM entities WHERE type='person' AND deleted_at IS NULL AND json_extract(data,'$.contactId') IS NOT NULL`)?.n ?? 0;
+  const linked = os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records WHERE object='person' AND deleted_at IS NULL AND json_extract(data,'$.contactId') IS NOT NULL`)?.n ?? 0;
   if (!linked) return;
   const n = resyncContacts(os, await loadDeviceContacts());
   setSourceState(os, 'contacts', { enabled: true, lastSync: Date.now(), addTotal: n, error: null });

@@ -123,7 +123,7 @@ describe('CycleRepo', () => {
 
   it('meter-only cycles start from the latest reading', () => {
     const car = os.records.create({ object: 'car', data: { name: 'City' } });
-    os.db.run(`INSERT INTO meter_readings(id,entity_id,meter,value,read_at,created_at,updated_at) VALUES ('r1',?,'odometer',12000,1,1,1)`, [car.id]);
+    os.db.run(`INSERT INTO meter_readings(id,record_id,meter,value,read_at,created_at,updated_at) VALUES ('r1',?,'odometer',12000,1,1,1)`, [car.id]);
     const c = os.cycles.create({ entityId: car.id, name: 'Tyre rotation', kind: 'meter', meterEvery: 8000 });
     expect(c.nextDueMeter).toBe(20000);
     expect(os.cycles.status(c).meterLeft).toBe(8000);

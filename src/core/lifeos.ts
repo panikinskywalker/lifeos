@@ -85,7 +85,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     const def = e ? registry.objects.get(e.object) : undefined;
     if (e && def) entities.search.index(e, def);
   };
-  const ownerOf = (table: 'comments' | 'attachments', id: string) => db.get<{ entity_id: string }>(`SELECT entity_id FROM ${table} WHERE id=?`, [id])?.entity_id;
+  const ownerOf = (table: 'comments' | 'attachments', id: string) => db.get<{ record_id: string }>(`SELECT record_id FROM ${table} WHERE id=?`, [id])?.record_id;
   const wrap = <T extends object, K extends keyof T>(repo: T, name: K, entityOf: (args: never[], result: unknown) => string | null | undefined, before = false) => {
     const fn = (repo[name] as unknown as (...a: never[]) => unknown).bind(repo);
     (repo as Record<K, unknown>)[name] = (...args: never[]) => {

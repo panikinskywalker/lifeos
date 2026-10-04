@@ -187,7 +187,7 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
   if (has('transaction')) {
     const rows = os.db.all<{ kind: string; category: string | null; total: number; n: number }>(
       `SELECT json_extract(data,'$.kind') AS kind, json_extract(data,'$.category') AS category, SUM(json_extract(data,'$.amount')) AS total, COUNT(*) AS n
-       FROM entities WHERE type='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY kind, category`,
+       FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY kind, category`,
       [from, to],
     );
     for (const r of rows) {
@@ -212,7 +212,7 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
   const workouts = { count: 0, minutes: 0 };
   if (has('workout')) {
     const w = os.db.get<{ n: number; m: number | null }>(
-      `SELECT COUNT(*) AS n, SUM(json_extract(data,'$.durationMin')) AS m FROM entities WHERE type='workout' AND deleted_at IS NULL AND json_extract(data,'$.date') BETWEEN ? AND ?`,
+      `SELECT COUNT(*) AS n, SUM(json_extract(data,'$.durationMin')) AS m FROM records WHERE object='workout' AND deleted_at IS NULL AND json_extract(data,'$.date') BETWEEN ? AND ?`,
       [from, to],
     );
     workouts.count = w?.n ?? 0;
@@ -222,9 +222,9 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
   // What happened: events in the period, trips overlapping it.
   const happenedIds = os.db
     .all<{ id: string }>(
-      `SELECT id FROM entities WHERE deleted_at IS NULL AND (
-         (type='event' AND occurred_at BETWEEN ? AND ?)
-         OR (type='trip' AND json_extract(data,'$.startDate') <= ? AND COALESCE(json_extract(data,'$.endDate'), json_extract(data,'$.startDate')) >= ?)
+      `SELECT id FROM records WHERE deleted_at IS NULL AND (
+         (object='event' AND occurred_at BETWEEN ? AND ?)
+         OR (object='trip' AND json_extract(data,'$.startDate') <= ? AND COALESCE(json_extract(data,'$.endDate'), json_extract(data,'$.startDate')) >= ?)
        ) ORDER BY occurred_at LIMIT 500`,
       [a, b, to, from],
     )
@@ -234,20 +234,20 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
   const dumps = os.dumps.list({ from: a, to: b, limit: 500 });
 
   const done = os.db
-    .all<Row>(`SELECT id, entity_id, title, occurred_at, meta FROM timeline_events WHERE kind='cycle.done' AND occurred_at BETWEEN ? AND ? ORDER BY occurred_at`, [a, b])
+    .all<Row>(`SELECT id, record_id, title, occurred_at, meta FROM events WHERE kind='cycle.done' AND occurred_at BETWEEN ? AND ? ORDER BY occurred_at`, [a, b])
     .map((r) => {
       const meta = r.meta ? (JSON.parse(r.meta as string) as { cost?: number | null }) : {};
-      return { id: r.id as string, entityId: r.entity_id as string, title: r.title as string, at: r.occurred_at as number, cost: meta.cost ?? null };
+      return { id: r.id as string, entityId: r.record_id as string, title: r.title as string, at: r.occurred_at as number, cost: meta.cost ?? null };
     });
 
   // Records made (not the automatic ones: measurements and transactions show as numbers above).
   const created = os.db
-    .all<{ type: string; n: number }>(`SELECT type, COUNT(*) AS n FROM entities WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ? AND type NOT IN ('measurement','transaction','habit_log') GROUP BY type ORDER BY n DESC`, [a, b])
+    .all<{ type: string; n: number }>(`SELECT object, COUNT(*) AS n FROM records WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ? AND object NOT IN ('measurement','transaction','habit_log') GROUP BY object ORDER BY n DESC`, [a, b])
     .filter((r) => os.registry.objects.has(r.type))
     .map((r) => ({ type: r.type, count: r.n }));
   const newPeople = has('person')
     ? os.db
-        .all<{ id: string }>(`SELECT id FROM entities WHERE type='person' AND deleted_at IS NULL AND created_at BETWEEN ? AND ? ORDER BY created_at LIMIT 50`, [a, b])
+        .all<{ id: string }>(`SELECT id FROM records WHERE object='person' AND deleted_at IS NULL AND created_at BETWEEN ? AND ? ORDER BY created_at LIMIT 50`, [a, b])
         .map((r) => os.records.get(r.id))
         .filter((e): e is ObjectRecord => !!e)
     : [];
@@ -308,14 +308,14 @@ export function onThisDay(os: LifeOSContext, today = isoDay(Date.now()), maxYear
     const items: OnThisDayItem[] = [];
     for (const x of os.dumps.list({ from: a, to: b, limit: 5 })) items.push({ kind: 'dump', id: x.id, title: firstLine(x.body) });
     for (const r of os.db.all<{ id: string; type: string; title: string }>(
-      `SELECT id, type, title FROM entities WHERE deleted_at IS NULL AND ((type='event' AND occurred_at BETWEEN ? AND ?) OR (type='trip' AND json_extract(data,'$.startDate') = ?)) LIMIT 5`,
+      `SELECT id, object, title FROM records WHERE deleted_at IS NULL AND ((object='event' AND occurred_at BETWEEN ? AND ?) OR (object='trip' AND json_extract(data,'$.startDate') = ?)) LIMIT 5`,
       [a, b, day],
     ))
       items.push({ kind: r.type === 'trip' ? 'trip' : 'event', id: r.id, type: r.type, title: r.title });
-    for (const r of os.db.all<{ id: string; title: string }>(`SELECT id, title FROM entities WHERE type='person' AND deleted_at IS NULL AND created_at BETWEEN ? AND ? LIMIT 5`, [a, b]))
+    for (const r of os.db.all<{ id: string; title: string }>(`SELECT id, title FROM records WHERE object='person' AND deleted_at IS NULL AND created_at BETWEEN ? AND ? LIMIT 5`, [a, b]))
       items.push({ kind: 'person', id: r.id, type: 'person', title: `Met ${r.title}` });
-    for (const r of os.db.all<{ id: string; entity_id: string; title: string }>(`SELECT id, entity_id, title FROM timeline_events WHERE kind='cycle.done' AND occurred_at BETWEEN ? AND ? LIMIT 5`, [a, b])) {
-      const e = os.records.get(r.entity_id);
+    for (const r of os.db.all<{ id: string; record_id: string; title: string }>(`SELECT id, record_id, title FROM events WHERE kind='cycle.done' AND occurred_at BETWEEN ? AND ? LIMIT 5`, [a, b])) {
+      const e = os.records.get(r.record_id);
       if (e) items.push({ kind: 'done', id: e.id, type: e.object, title: `${r.title} · ${e.title}` });
     }
     if (items.length) out.push({ ago, day, items });

@@ -625,4 +625,68 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_timeline_kind_time ON timeline_events(kind, occurred_at)`,
     ],
   },
+  {
+    version: 11,
+    name: 'vocabulary',
+    // docs/MODEL.md §1: the tables say what the app says. entities → records
+    // (column type → object), relations → links, timeline_events → events,
+    // entity_tags → record_tags, every entity_id → record_id, every
+    // entity_type → object. The search index is rebuilt as records_fts with an
+    // `object` column (FTS5 cannot rename a column). The old widget dashboards
+    // table goes. Indexes keep their names; SQLite rewrites them on rename.
+    up: [
+      `ALTER TABLE entities RENAME TO records`,
+      `ALTER TABLE records RENAME COLUMN type TO object`,
+      `ALTER TABLE relations RENAME TO links`,
+      `ALTER TABLE timeline_events RENAME TO events`,
+      `ALTER TABLE events RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE entity_tags RENAME TO record_tags`,
+      `ALTER TABLE record_tags RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE attachments RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE reminders RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE comments RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE cycles RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE meter_readings RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE ingest_queue RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE aliases RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE dump_extractions RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE custom_field_defs RENAME COLUMN entity_type TO object`,
+      `ALTER TABLE saved_views RENAME COLUMN entity_type TO object`,
+      `CREATE VIRTUAL TABLE IF NOT EXISTS records_fts USING fts5(
+        id UNINDEXED, object UNINDEXED, title, subtitle, body, tokenize='unicode61 remove_diacritics 2'
+      )`,
+      `INSERT INTO records_fts(id, object, title, subtitle, body) SELECT id, type, title, subtitle, body FROM entities_fts`,
+      `DROP TABLE entities_fts`,
+      `DROP TABLE IF EXISTS dashboards`,
+      `UPDATE changes SET tbl = 'records' WHERE tbl = 'entities'`,
+      `UPDATE changes SET tbl = 'links' WHERE tbl = 'relations'`,
+    ],
+    // Web (wa-sqlite, no FTS5): the same renames with a plain search table.
+    fallback: [
+      `ALTER TABLE entities RENAME TO records`,
+      `ALTER TABLE records RENAME COLUMN type TO object`,
+      `ALTER TABLE relations RENAME TO links`,
+      `ALTER TABLE timeline_events RENAME TO events`,
+      `ALTER TABLE events RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE entity_tags RENAME TO record_tags`,
+      `ALTER TABLE record_tags RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE attachments RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE reminders RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE comments RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE cycles RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE meter_readings RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE ingest_queue RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE aliases RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE dump_extractions RENAME COLUMN entity_id TO record_id`,
+      `ALTER TABLE custom_field_defs RENAME COLUMN entity_type TO object`,
+      `ALTER TABLE saved_views RENAME COLUMN entity_type TO object`,
+      `CREATE TABLE IF NOT EXISTS records_fts (id TEXT PRIMARY KEY, object TEXT, title TEXT, subtitle TEXT, body TEXT)`,
+      `CREATE INDEX IF NOT EXISTS idx_records_fts_title ON records_fts(title)`,
+      `INSERT INTO records_fts(id, object, title, subtitle, body) SELECT id, type, title, subtitle, body FROM entities_fts`,
+      `DROP TABLE entities_fts`,
+      `DROP TABLE IF EXISTS dashboards`,
+      `UPDATE changes SET tbl = 'records' WHERE tbl = 'entities'`,
+      `UPDATE changes SET tbl = 'links' WHERE tbl = 'relations'`,
+    ],
+  },
 ];
