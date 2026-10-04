@@ -9,6 +9,8 @@ import type { SqlParam } from '../db/adapter';
 
 const ENVELOPE_COLUMNS: Record<string, string> = {
   id: 'e.id',
+  object: 'e.type',
+  /** @deprecated saved views written before R0 may still say 'type'. */
   type: 'e.type',
   title: 'e.title',
   subtitle: 'e.subtitle',

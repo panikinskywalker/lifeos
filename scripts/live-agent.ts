@@ -56,7 +56,7 @@ const ASK = ['when did I last see Kendal?', 'where does Karan work', 'who was on
 
 async function main() {
   const os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules, registry: new Registry() });
-  os.records.create({ type: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
+  os.records.create({ object: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
   let fellBack = '';
   const built = buildAgentProviders({ chain, events: { onFallback: (a, b, e) => (fellBack += ` [${a}→${b}: ${e.message.slice(0, 120)}]`) } });
   // LIVE_DEBUG=1 prints every tool call the model makes and what came back.
@@ -92,7 +92,7 @@ async function main() {
     const links = os.links.forEntity(e.id).map((l) => `${edgeLabel(l.relation.kind, l.direction).toLowerCase()} ${l.other.title}`);
     const d = e.data as Record<string, unknown>;
     const facts = ['birthday', 'company', 'relationship', 'notes', 'purchasePrice', 'warrantyUntil', 'amount', 'kind', 'dueDate'].filter((k) => d[k] != null && d[k] !== '').map((k) => `${k}=${String(d[k]).replace(/\n/g, ' / ')}`);
-    console.log(`${e.type.padEnd(11)} ${e.title}${facts.length ? `  {${facts.join(', ')}}` : ''}${links.length ? `\n              ↳ ${links.join(' · ')}` : ''}`);
+    console.log(`${e.object.padEnd(11)} ${e.title}${facts.length ? `  {${facts.join(', ')}}` : ''}${links.length ? `\n              ↳ ${links.join(' · ')}` : ''}`);
   }
 
   console.log('\n— Questions —');

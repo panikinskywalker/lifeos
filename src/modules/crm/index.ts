@@ -19,7 +19,7 @@ export const crmModule: ModuleManifest = {
   onStart: (os) => {
     // A group's member field is mirrored into group_members (default shares for splits, "groups Priya is in").
     const sync = (e: ObjectRecord) => {
-      if (e.type === 'group') os.groups.setMembers(e.id, ((e.data as { memberIds?: string[] }).memberIds ?? []).filter(Boolean));
+      if (e.object === 'group') os.groups.setMembers(e.id, ((e.data as { memberIds?: string[] }).memberIds ?? []).filter(Boolean));
     };
     bus.on('entity.created', ({ entity }) => sync(entity));
     bus.on('entity.updated', ({ entity }) => sync(entity));

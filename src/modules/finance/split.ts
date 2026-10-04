@@ -108,11 +108,11 @@ export function applySplit(os: LifeOSContext, transactionId: string, input: Spli
     if (input.payer === 'me') {
       for (const s of shares) {
         if (s.party === 'me' || s.amount <= 0) continue;
-        made.push(os.records.create<DebtData>({ type: 'debt', status: 'open', data: { ...base, personId: s.party, direction: 'they_owe', amount: s.amount } }).id);
+        made.push(os.records.create<DebtData>({ object: 'debt', status: 'open', data: { ...base, personId: s.party, direction: 'they_owe', amount: s.amount } }).id);
       }
     } else {
       const mine = shares.find((s) => s.party === 'me');
-      if (mine && mine.amount > 0) made.push(os.records.create<DebtData>({ type: 'debt', status: 'open', data: { ...base, personId: input.payer, direction: 'i_owe', amount: mine.amount } }).id);
+      if (mine && mine.amount > 0) made.push(os.records.create<DebtData>({ object: 'debt', status: 'open', data: { ...base, personId: input.payer, direction: 'i_owe', amount: mine.amount } }).id);
     }
   });
   return made;
@@ -155,7 +155,7 @@ export function settleUp(os: LifeOSContext, personId: string, opts: { groupId?: 
   const settled: string[] = [];
   os.db.transaction(() => {
     if (bal !== 0) {
-      paymentId = os.records.create<DebtData>({ type: 'debt', status: 'settled', data: { personId, direction: bal > 0 ? 'i_owe' : 'they_owe', amount: Math.abs(bal), reason: 'Settled up', date: opts.date ?? today(), kind: 'payment', groupId: opts.groupId } }).id;
+      paymentId = os.records.create<DebtData>({ object: 'debt', status: 'settled', data: { personId, direction: bal > 0 ? 'i_owe' : 'they_owe', amount: Math.abs(bal), reason: 'Settled up', date: opts.date ?? today(), kind: 'payment', groupId: opts.groupId } }).id;
     }
     for (const d of open) {
       os.records.setStatus(d.id, 'settled');

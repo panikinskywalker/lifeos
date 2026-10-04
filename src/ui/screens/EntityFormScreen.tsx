@@ -52,7 +52,7 @@ export function EntityFormScreen({ type, id, initial, onSaved, linkTo }: { type:
     try {
       const clean: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(data)) if (v !== undefined && v !== '') clean[k] = v;
-      const saved = id ? os.records.update(id, { title: hasTitleField ? title : undefined, data: clean, status }) : os.records.create({ type, title: hasTitleField ? title : undefined, data: clean, status });
+      const saved = id ? os.records.update(id, { title: hasTitleField ? title : undefined, data: clean, status }) : os.records.create({ object: type, title: hasTitleField ? title : undefined, data: clean, status });
       os.tags.set(saved.id, tags);
       if (linkTo && !id) os.links.link(saved.id, linkTo.id, linkTo.kind);
       if (onSaved) onSaved(saved);

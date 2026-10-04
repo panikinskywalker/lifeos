@@ -24,11 +24,11 @@ beforeEach(async () => {
 afterEach(() => os.db.close());
 
 const at = (d: string, h = 12) => new Date(`${d}T${String(h).padStart(2, '0')}:00:00`).getTime();
-const spend = (date: string, amount: number, category: string, kind = 'expense') => os.records.create({ type: 'transaction', data: { amount, kind, category, date } });
+const spend = (date: string, amount: number, category: string, kind = 'expense') => os.records.create({ object: 'transaction', data: { amount, kind, category, date } });
 
 describe('Almanac', () => {
   it('sections list the installed types with counts; Mind counts dumps and facts', () => {
-    os.records.create({ type: 'person', data: { name: 'Kendal' } });
+    os.records.create({ object: 'person', data: { name: 'Kendal' } });
     spend('2026-09-02', 100, 'food');
     os.dumps.add({ body: 'met Kendal' });
     os.facts.add({ text: 'Kendal likes pink', source: 'dump' });
@@ -55,9 +55,9 @@ describe('Almanac', () => {
     spend('2026-04-01', 999, 'food'); // next month
     saveHealthDays(os, [{ day: '2026-03-01', steps: 8000, sleepMin: 420 }, { day: '2026-03-02', steps: 6000, sleepMin: 360, weightKg: 71.2 }, { day: '2026-03-20', weightKg: 70.4 }]);
     saveUsageDays(os, [{ day: '2026-03-05', totalMs: 3 * 3_600_000, apps: [] }]);
-    os.records.create({ type: 'workout', data: { kind: 'run', durationMin: 30, date: '2026-03-04' } });
-    os.records.create({ type: 'event', title: 'Dinner with Kendal', data: { startAt: at('2026-03-09', 20) } });
-    os.records.create({ type: 'trip', data: { destination: 'Goa', startDate: '2026-02-27', endDate: '2026-03-02' } });
+    os.records.create({ object: 'workout', data: { kind: 'run', durationMin: 30, date: '2026-03-04' } });
+    os.records.create({ object: 'event', title: 'Dinner with Kendal', data: { startAt: at('2026-03-09', 20) } });
+    os.records.create({ object: 'trip', data: { destination: 'Goa', startDate: '2026-02-27', endDate: '2026-03-02' } });
     os.dumps.add({ body: 'great week', createdAt: at('2026-03-09') });
     os.dumps.add({ body: 'april thing', createdAt: at('2026-04-02') });
     const s = periodSummary(os, periodOf('month', '2026-03-15', '2026-09-26'));
@@ -74,7 +74,7 @@ describe('Almanac', () => {
 
   it('On this day: a year ago and a month ago, only dates with something', () => {
     os.dumps.add({ body: 'first day at the new job\nlong story', createdAt: at('2025-09-26') });
-    os.records.create({ type: 'event', title: 'Concert', data: { startAt: at('2026-08-26', 21) } });
+    os.records.create({ object: 'event', title: 'Concert', data: { startAt: at('2026-08-26', 21) } });
     os.dumps.add({ body: 'unrelated', createdAt: at('2026-08-25') });
     const r = onThisDay(os, '2026-09-26');
     expect(r.map((x) => [x.ago, x.day])).toEqual([['1 month ago', '2026-08-26'], ['1 year ago', '2025-09-26']]);

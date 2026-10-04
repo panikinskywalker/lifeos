@@ -114,7 +114,7 @@ export async function extractDump(os: LifeOSContext, dumpId: string, provider?: 
     return { status: 'pending', via: parsedItems ? 'parser' : 'none', items: parsedItems };
   }
   const subject = dump.subjectId ? os.records.get(dump.subjectId) : undefined;
-  const system = filingPrompt(os, subject ? { type: os.registry.objects.get(subject.type)?.label.toLowerCase() ?? subject.type, title: subject.title } : null);
+  const system = filingPrompt(os, subject ? { type: os.registry.objects.get(subject.object)?.label.toLowerCase() ?? subject.object, title: subject.title } : null);
   const tools = graphTools(session);
   const byName = new Map(tools.map((t) => [t.name, t]));
   const specs = tools.map(toolSpec);
@@ -225,7 +225,7 @@ async function runLogged(os: LifeOSContext, dump: Dump, name: string, input: Rec
   if (name === 'split_transaction' || name === 'settle_debt') return out; // the money itself was logged by create_entity
   const created = name.startsWith('create_');
   const entityId = ((created ? out.id : (input.entityId ?? (input.cycleId ? os.cycles.get(String(input.cycleId))?.entityId : undefined))) as string | undefined) ?? null;
-  const type = entityId ? os.records.get(entityId)?.type : undefined;
+  const type = entityId ? os.records.get(entityId)?.object : undefined;
   const label = String(out.logged ?? out.done ?? out.remembered ?? (out.title ? `${os.registry.objects.get(String(input.type ?? type))?.label ?? 'Record'}: ${out.title}` : null) ?? input.title ?? name.replace(/_/g, ' '));
   const row = os.dumps.addExtraction({ dumpId: dump.id, kind: name === 'remember_fact' ? 'fact' : (type ?? name.replace(/^create_/, '')), action: created ? 'created' : 'logged', entityId, factId: (out.factId as string) ?? null, label });
   const undo = extrasOf(out).undo;

@@ -53,7 +53,7 @@ describe('graph tools', () => {
   });
 
   it('on her page: "her favourite colour is pink" → a tidy Notes line, updated in place later', async () => {
-    const k = os.records.create({ type: 'person', title: 'Kendal', data: { notes: 'Met at Priya’s party' } });
+    const k = os.records.create({ object: 'person', title: 'Kendal', data: { notes: 'Met at Priya’s party' } });
     const s = session('her fav colour is pink and she loves sushi', k.id);
     await call(s, 'set_attributes', { node: 'her', attributes: { 'favourite colour': 'pink', loves: 'sushi' } });
     expect((os.records.get(k.id)!.data as { notes: string }).notes).toBe('Met at Priya’s party\n• Favourite colour: pink\n• Loves: sushi');
@@ -66,7 +66,7 @@ describe('graph tools', () => {
   });
 
   it('a flight with Kendal → event in a trip, Kendal on both, places created', async () => {
-    const kendal = os.records.create({ type: 'person', title: 'Kendal', data: {} });
+    const kendal = os.records.create({ object: 'person', title: 'Kendal', data: {} });
     const s = session('took a flight from US to CAN with Kendal on 8th sept');
     await call(s, 'record_event', { kind: 'flight', when: '8 Sept', roles: [{ role: 'from', node: { name: 'USA', type: 'place' } }, { role: 'to', node: { name: 'Canada', type: 'place' } }, { role: 'with', node: 'Kendal' }], details: { airline: 'Air Canada' } });
     const [flight] = os.records.query('event');
@@ -96,7 +96,7 @@ describe('graph tools', () => {
   });
 
   it('names: exact reuse, near-match is a flagged guess, "new" with an existing name flags a possible duplicate, "I" is skipped', async () => {
-    os.records.create({ type: 'person', title: 'Kendal Rao', data: {} });
+    os.records.create({ object: 'person', title: 'Kendal Rao', data: {} });
     const s = session('x');
     expect(resolveNode(os, s, { name: 'Kendal Rao', type: 'person' })).toMatchObject({ confidence: 0.95 });
     expect(resolveNode(os, s, { name: 'Kendal Rao', type: 'person' }).flag).toBeUndefined();

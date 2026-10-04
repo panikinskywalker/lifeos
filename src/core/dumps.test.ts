@@ -39,7 +39,7 @@ describe('dumps (PRODUCT v4 §1.3)', () => {
 
   it('is searchable next to records and survives an index rebuild', () => {
     const d = os.dumps.add({ body: 'the landlord said the plumber comes Tuesday' });
-    expect(os.records.search.search('plumber').map((h) => [h.id, h.type])).toEqual([[d.id, 'dump']]);
+    expect(os.records.search.search('plumber').map((h) => [h.id, h.object])).toEqual([[d.id, 'dump']]);
     os.records.search.rebuild([], () => undefined);
     expect(os.records.search.search('plumber')).toHaveLength(1);
   });
@@ -55,7 +55,7 @@ describe('search covers what hangs on a record', () => {
     const { z } = await import('zod');
     const reg = new Registry();
     const o = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), registry: reg, modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [{ type: 'thing', module: 'm', label: 'Thing', labelPlural: 'Things', icon: 'box', schema: z.object({}), fields: [] }] }] });
-    const e = o.records.create({ type: 'thing', title: 'Balcony', data: {} });
+    const e = o.records.create({ object: 'thing', title: 'Balcony', data: {} });
     const ids = (q: string) => o.records.search.search(q).map((h) => h.id);
     const c = o.comments.add(e.id, 'the plumber fixed the leak');
     o.tags.apply(e.id, 'renovation');

@@ -131,7 +131,7 @@ export class AutomationEngine {
   }
 
   private triggerConfigMatches(config: Record<string, unknown>, ctx: AutomationContext): boolean {
-    if (config.entityType && ctx.entity && ctx.entity.type !== config.entityType) return false;
+    if (config.entityType && ctx.entity && ctx.entity.object !== config.entityType) return false;
     if (config.toStatus && ctx.vars.to !== config.toStatus) return false;
     if (config.field && ctx.changed && !ctx.changed.includes(String(config.field)) && !ctx.changed.includes(`data.${config.field}`)) return false;
     return true;

@@ -54,7 +54,7 @@ function QuickAdd({ projectId, accent }: { projectId?: string; accent: string })
   const add = () => {
     const v = text.trim();
     if (!v) return;
-    os.records.create<TaskData>({ type: 'task', title: v, data: { priority: 'medium', projectId } });
+    os.records.create<TaskData>({ object: 'task', title: v, data: { priority: 'medium', projectId } });
     setText('');
   };
   return <Input value={text} onChangeText={setText} placeholder="Add a task…" onSubmitEditing={add} returnKeyType="done" blurOnSubmit={false} right={text ? <IconButton icon="plus.circle.fill" onPress={add} color={accent} /> : undefined} />;

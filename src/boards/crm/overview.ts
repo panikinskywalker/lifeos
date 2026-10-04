@@ -9,7 +9,7 @@ export function peopleOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
   const people = os.records.query<{ relationship?: string; lastContactAt?: string }>('person', {}, { limit: 5000 });
   const call = peopleToCall(os, 8, now, u);
   const birthdays = u.items
-    .filter((i) => i.entity.type === 'person' && i.cycle.template === 'person.birthday' && i.cycle.nextDueAt != null && i.cycle.nextDueAt - now <= 30 * DAY_MS)
+    .filter((i) => i.entity.object === 'person' && i.cycle.template === 'person.birthday' && i.cycle.nextDueAt != null && i.cycle.nextDueAt - now <= 30 * DAY_MS)
     .sort((a, b) => a.cycle.nextDueAt! - b.cycle.nextDueAt!);
   const touched30 = people.filter((p) => p.data.lastContactAt && now - Date.parse(p.data.lastContactAt) <= 30 * DAY_MS).length;
   // In touch per week (last 8 weeks): people whose last contact fell in it.

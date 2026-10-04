@@ -26,7 +26,7 @@ afterEach(() => os.db.close());
 
 describe('retrieval', () => {
   it('packs matching facts, the record in question (cycles, timeline, facts) and other hits', () => {
-    const car = os.records.create({ type: 'vehicle', data: { name: 'Creta', plate: 'KA 05 MZ 1234' } });
+    const car = os.records.create({ object: 'vehicle', data: { name: 'Creta', plate: 'KA 05 MZ 1234' } });
     os.cycles.create({ entityId: car.id, name: 'Service', kind: 'interval', everyN: 6, everyUnit: 'month', nextDueAt: Date.now() + 5 * 864e5 });
     os.facts.add({ text: 'The Creta is serviced at Hyundai Indiranagar', subjectId: car.id, source: 'talk' });
     os.facts.add({ text: 'Priya prefers window seats', source: 'talk' });

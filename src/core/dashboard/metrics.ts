@@ -202,7 +202,7 @@ export function upcoming(os: LifeOSContext, limit = 5, now = Date.now(), days = 
   for (const i of u.items) {
     const at = i.cycle.nextDueAt;
     if (at == null || at > now + days * DAY) continue;
-    out.push({ id: i.cycle.id, entityId: i.entity.id, type: i.entity.type, title: i.entity.title === i.cycle.name ? i.entity.title : `${i.entity.title} · ${i.cycle.name}`, at, kind: 'due', overdue: at < now - DAY / 2 });
+    out.push({ id: i.cycle.id, entityId: i.entity.id, type: i.entity.object, title: i.entity.title === i.cycle.name ? i.entity.title : `${i.entity.title} · ${i.cycle.name}`, at, kind: 'due', overdue: at < now - DAY / 2 });
   }
   if (os.registry.objects.has('event')) {
     for (const e of os.records.query<{ startAt: number }>('event', { filter: { and: [{ field: 'data.startAt', op: 'gte', value: now - DAY / 4 }, { field: 'data.startAt', op: 'lte', value: now + days * DAY }] }, sort: [{ field: 'data.startAt', dir: 'asc' }] }, { limit: 20 })) {
@@ -224,7 +224,7 @@ export function upcoming(os: LifeOSContext, limit = 5, now = Date.now(), days = 
 export function peopleToCall(os: LifeOSContext, limit = 4, now = Date.now(), u: Upkeep = upkeep(os)): Array<{ entityId: string; title: string; why: string; late: boolean }> {
   const out: Array<{ entityId: string; title: string; why: string; late: boolean; at: number }> = [];
   for (const i of u.items) {
-    if (i.entity.type !== 'person' || i.cycle.nextDueAt == null) continue;
+    if (i.entity.object !== 'person' || i.cycle.nextDueAt == null) continue;
     const days = Math.round((i.cycle.nextDueAt - now) / DAY);
     if (i.cycle.template === 'person.birthday' && days <= 14) out.push({ entityId: i.entity.id, title: i.entity.title, why: days <= 0 ? 'Birthday today' : `Birthday in ${days} d`, late: false, at: i.cycle.nextDueAt });
     else if (i.cycle.template === 'person.contact' && days <= 7) out.push({ entityId: i.entity.id, title: i.entity.title, why: days < 0 ? `${-days} d overdue` : days === 0 ? 'Today' : `In ${days} d`, late: days < 0, at: i.cycle.nextDueAt });

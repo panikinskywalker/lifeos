@@ -92,7 +92,7 @@ export function streakOf(h: Habit, done: Set<string>, now = Date.now()): { count
 export function checkIn(os: LifeOSContext, habitId: string, date: string): string | null {
   const existing = os.records.query('habit_log', { filter: { and: [{ field: 'data.habitId', op: 'eq', value: habitId }, { field: 'data.date', op: 'eq', value: date }] } }, { limit: 1 })[0];
   if (existing) return null;
-  return os.records.create({ type: 'habit_log', data: { habitId, date } }, 'user').id;
+  return os.records.create({ object: 'habit_log', data: { habitId, date } }, 'user').id;
 }
 
 /** Tap: done ↔ not done for a day. Returns whether it's done now. */
@@ -102,7 +102,7 @@ export function toggleCheckIn(os: LifeOSContext, habitId: string, date: string):
     os.records.delete(existing.id, 'user');
     return false;
   }
-  os.records.create({ type: 'habit_log', data: { habitId, date } }, 'user');
+  os.records.create({ object: 'habit_log', data: { habitId, date } }, 'user');
   return true;
 }
 

@@ -28,9 +28,9 @@ afterEach(() => os.db.close());
 describe('upkeep', () => {
   it('groups by bucket, filters by chip, totals this month', () => {
     const now = d('2026-09-10');
-    const jio = os.records.create({ type: 'subscription', data: { name: 'Jio' } });
-    const gym = os.records.create({ type: 'subscription', data: { name: 'Gym' } });
-    const laundry = os.records.create({ type: 'routine', data: { name: 'Laundry' } });
+    const jio = os.records.create({ object: 'subscription', data: { name: 'Jio' } });
+    const gym = os.records.create({ object: 'subscription', data: { name: 'Gym' } });
+    const laundry = os.records.create({ object: 'routine', data: { name: 'Laundry' } });
     os.cycles.create({ entityId: jio.id, name: 'Renewal', kind: 'fixed', everyN: 84, everyUnit: 'day', nextDueAt: d('2026-09-13'), costEstimate: 399 });
     os.cycles.create({ entityId: gym.id, name: 'Renewal', kind: 'fixed', everyN: 3, everyUnit: 'month', nextDueAt: d('2026-11-20'), costEstimate: 4500 });
     os.cycles.create({ entityId: laundry.id, name: 'Laundry', kind: 'interval', everyN: 4, everyUnit: 'day', nextDueAt: d('2026-09-08') });
@@ -46,7 +46,7 @@ describe('upkeep', () => {
   });
 
   it('done with cost files a linked expense; undo removes both', () => {
-    const jio = os.records.create({ type: 'subscription', data: { name: 'Jio' } });
+    const jio = os.records.create({ object: 'subscription', data: { name: 'Jio' } });
     const c = os.cycles.create({ entityId: jio.id, name: 'Renewal', kind: 'fixed', everyN: 84, everyUnit: 'day', nextDueAt: d('2026-09-13') });
     const done = logDone(os, c.id, { cost: 399, asExpense: true, at: d('2026-09-13') });
     const tx = os.records.get(done.transactionId!)!;
@@ -67,8 +67,8 @@ describe('week plan', () => {
     const now = d('2026-09-23'); // Wednesday
     const monday = weekStartOf(now);
     expect(new Date(monday).getDay()).toBe(1);
-    const laundry = os.records.create({ type: 'routine', data: { name: 'Laundry' } });
-    const jio = os.records.create({ type: 'subscription', data: { name: 'Jio' } });
+    const laundry = os.records.create({ object: 'routine', data: { name: 'Laundry' } });
+    const jio = os.records.create({ object: 'subscription', data: { name: 'Jio' } });
     os.cycles.create({ entityId: laundry.id, name: 'Laundry', kind: 'interval', everyN: 4, everyUnit: 'day', nextDueAt: d('2026-09-21') }); // 2 d late
     os.cycles.create({ entityId: jio.id, name: 'Renewal', kind: 'fixed', everyN: 84, everyUnit: 'day', nextDueAt: d('2026-09-26') });
     const days = weekPlan(os, monday, 'All', now);

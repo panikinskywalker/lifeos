@@ -46,7 +46,7 @@ describe('your own categories', () => {
     const gym = addCategory(os, { label: 'Gym' })!;
     updateCategory(os, gym.value, { label: 'Fitness', icon: 'activity' });
     expect(categoryOf('c_gym')).toMatchObject({ label: 'Fitness', icon: 'activity' });
-    const tx = os.records.create({ type: 'transaction', data: { amount: 1500, kind: 'expense', category: 'c_gym', date: '2026-09-26', merchant: 'Cult' } });
+    const tx = os.records.create({ object: 'transaction', data: { amount: 1500, kind: 'expense', category: 'c_gym', date: '2026-09-26', merchant: 'Cult' } });
     expect(tx.subtitle).toBe('Fitness');
     setCategoryRules(os, [{ keyword: 'CULT', category: 'c_gym' }, { keyword: 'ZOMATO', category: 'food' }]);
     expect(deleteCategory(os, 'c_gym')).toBe(1);

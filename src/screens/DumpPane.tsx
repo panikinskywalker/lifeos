@@ -62,7 +62,7 @@ export function DumpCard({ dump: d, os, onOpen, full }: { dump: Dump; os: LifeOS
     if (x.undone) return;
     if (x.factId && !x.entityId) return router.push('/memory');
     const e = x.entityId ? os.records.get(x.entityId) : undefined;
-    if (e) router.push(`/entity/${e.type}/${e.id}` as never);
+    if (e) router.push(`/entity/${e.object}/${e.id}` as never);
   };
   const busy = d.status === 'pending';
   return (

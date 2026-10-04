@@ -13,7 +13,7 @@ export default function TagRoute() {
   const tag = decodeURIComponent(name ?? '');
   const items = useLive((o) => o.records.query(null, { filter: { and: [{ field: 'tag', op: 'hasTag', value: tag }] }, sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 300 }), [tag]);
   const byType = new Map<string, ObjectRecord[]>();
-  for (const e of items) byType.set(e.type, [...(byType.get(e.type) ?? []), e]);
+  for (const e of items) byType.set(e.object, [...(byType.get(e.object) ?? []), e]);
   return (
     <Screen title={`#${tag}`} subtitle={`${items.length} ${items.length === 1 ? 'record' : 'records'}`} onBack={() => (router.canGoBack() ? router.back() : router.replace('/tag'))}>
       {items.length === 0 ? <EmptyState icon="tag" line="Nothing has this tag any more." /> : null}

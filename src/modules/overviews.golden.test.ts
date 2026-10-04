@@ -42,13 +42,13 @@ afterEach(() => os.db.close());
 
 describe('Today at a glance', () => {
   it('my day: all-day things first, then timed ones in order; overdue tasks flagged; deliveries with their OTP', () => {
-    os.records.create({ type: 'event', title: 'Standup', data: { startAt: Date.parse('2026-09-26T10:00:00') } });
-    os.records.create({ type: 'event', title: 'Dinner', data: { startAt: Date.parse('2026-09-26T20:00:00') } });
-    os.records.create({ type: 'event', title: 'Tomorrow thing', data: { startAt: Date.parse('2026-09-27T10:00:00') } });
-    os.records.create({ type: 'task', title: 'File taxes', data: { dueDate: day(-2) } });
-    os.records.create({ type: 'task', title: 'Call bank', data: { dueDate: day(0) } });
-    os.records.create({ type: 'task', title: 'Later', data: { dueDate: day(5) } });
-    os.records.create({ type: 'delivery', data: { item: 'Trimmer', status: 'out_for_delivery', otp: '4821' } });
+    os.records.create({ object: 'event', title: 'Standup', data: { startAt: Date.parse('2026-09-26T10:00:00') } });
+    os.records.create({ object: 'event', title: 'Dinner', data: { startAt: Date.parse('2026-09-26T20:00:00') } });
+    os.records.create({ object: 'event', title: 'Tomorrow thing', data: { startAt: Date.parse('2026-09-27T10:00:00') } });
+    os.records.create({ object: 'task', title: 'File taxes', data: { dueDate: day(-2) } });
+    os.records.create({ object: 'task', title: 'Call bank', data: { dueDate: day(0) } });
+    os.records.create({ object: 'task', title: 'Later', data: { dueDate: day(5) } });
+    os.records.create({ object: 'delivery', data: { item: 'Trimmer', status: 'out_for_delivery', otp: '4821' } });
     const d = myDay(os, NOW);
     expect(d.map((x) => x.title)).toEqual(['File taxes', 'Call bank', 'Trimmer', 'Standup', 'Dinner']);
     expect(d.find((x) => x.title === 'File taxes')!.late).toBe(true);
@@ -57,12 +57,12 @@ describe('Today at a glance', () => {
   });
 
   it('done today: spend, received, workouts, tasks done', () => {
-    os.records.create({ type: 'transaction', data: { amount: 450, kind: 'expense', category: 'food', date: day(0) } });
-    os.records.create({ type: 'transaction', data: { amount: 50, kind: 'expense', category: 'food', date: day(0) } });
-    os.records.create({ type: 'transaction', data: { amount: 900, kind: 'expense', category: 'food', date: day(-1) } });
-    os.records.create({ type: 'transaction', data: { amount: 147, kind: 'income', category: 'other', date: day(0) } });
-    os.records.create({ type: 'workout', data: { kind: 'run', durationMin: 30, date: day(0) } });
-    os.records.create({ type: 'task', title: 'Done thing', status: 'done', data: { completedAt: NOW - 3_600_000 } });
+    os.records.create({ object: 'transaction', data: { amount: 450, kind: 'expense', category: 'food', date: day(0) } });
+    os.records.create({ object: 'transaction', data: { amount: 50, kind: 'expense', category: 'food', date: day(0) } });
+    os.records.create({ object: 'transaction', data: { amount: 900, kind: 'expense', category: 'food', date: day(-1) } });
+    os.records.create({ object: 'transaction', data: { amount: 147, kind: 'income', category: 'other', date: day(0) } });
+    os.records.create({ object: 'workout', data: { kind: 'run', durationMin: 30, date: day(0) } });
+    os.records.create({ object: 'task', title: 'Done thing', status: 'done', data: { completedAt: NOW - 3_600_000 } });
     const d = doneToday(os, NOW);
     expect(d).toMatchObject({ payments: 2, workouts: 1, workoutMin: 30, tasksDone: 1 });
     expect([d.spent, d.received]).toEqual([500, 147]);
@@ -89,17 +89,17 @@ describe('module overviews', () => {
       const empty = f(os, NOW);
       expect(empty.card?.headline).toBeTruthy();
     }
-    os.records.create({ type: 'transaction', data: { amount: 1200, kind: 'expense', category: 'food', date: day(-1) } });
-    os.records.create({ type: 'transaction', data: { amount: 800, kind: 'expense', category: 'transport', date: day(-2) } });
-    os.records.create({ type: 'transaction', data: { amount: 3000, kind: 'expense', category: 'food', date: '2026-08-10' } });
-    os.records.create({ type: 'budget', data: { category: 'food', amount: 1000, period: 'monthly' } });
+    os.records.create({ object: 'transaction', data: { amount: 1200, kind: 'expense', category: 'food', date: day(-1) } });
+    os.records.create({ object: 'transaction', data: { amount: 800, kind: 'expense', category: 'transport', date: day(-2) } });
+    os.records.create({ object: 'transaction', data: { amount: 3000, kind: 'expense', category: 'food', date: '2026-08-10' } });
+    os.records.create({ object: 'budget', data: { category: 'food', amount: 1000, period: 'monthly' } });
     const f = financeOverview(os, NOW);
     expect(f.card!.headline).toBe('₹2,000');
     expect(f.blocks.find((b) => b.kind === 'breakdown')).toMatchObject({ parts: [{ label: 'Food & Drink', value: 1200 }, { label: 'Transport', value: 800 }] });
     expect(f.blocks.find((b) => b.kind === 'progress')).toMatchObject({ items: [{ ratio: 1.2, over: true }] });
-    os.records.create({ type: 'task', title: 'Late one', data: { dueDate: day(-3) } });
+    os.records.create({ object: 'task', title: 'Late one', data: { dueDate: day(-3) } });
     expect(projectsOverview(os, NOW).card).toMatchObject({ headline: '1 overdue', alert: true });
-    os.records.create({ type: 'trip', data: { destination: 'Goa', startDate: day(14) } });
+    os.records.create({ object: 'trip', data: { destination: 'Goa', startDate: day(14) } });
     expect(travelOverview(os, NOW).card!.headline).toBe('Goa in 14 d');
   });
 });

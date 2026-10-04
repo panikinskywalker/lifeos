@@ -8,7 +8,7 @@ const THINGS = new Set(['asset', 'vehicle', 'routine', 'item']);
 export function assetsOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
   const money = os.format.currency;
   const u = upkeep(os, 'All', now);
-  const mine = u.items.filter((i) => THINGS.has(i.entity.type));
+  const mine = u.items.filter((i) => THINGS.has(i.entity.object));
   const late = mine.filter((i) => (i.status.daysLeft ?? 1) < 0);
   const week = mine.filter((i) => (i.status.daysLeft ?? 99) >= 0 && (i.status.daysLeft ?? 99) <= 7);
   const assets = os.registry.objects.has('asset') ? os.records.query<{ purchasePrice?: number; currentValue?: number; warrantyUntil?: string }>('asset', { filter: { and: [{ field: 'status', op: 'neq', value: 'sold' }] } }, { limit: 1000 }) : [];
@@ -25,7 +25,7 @@ export function assetsOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
     .sort((a, b) => (a.until < b.until ? -1 : 1));
   const blocks: OverviewBlock[] = [
     { kind: 'stats', items: [{ label: 'Late', value: String(late.length), tone: late.length ? 'alert' : undefined }, { label: 'Due this week', value: String(week.length) }, { label: 'Due this month', value: money(u.monthCost), sub: 'estimated' }, ...(worth ? [{ label: 'Things worth', value: money(worth) }] : [])] },
-    { kind: 'list', title: 'Upkeep coming up', items: [...late, ...week].slice(0, 8).map((i) => ({ title: i.cycle.name.trim().toLowerCase() === i.entity.title.trim().toLowerCase() ? i.entity.title : `${i.cycle.name} · ${i.entity.title}`, sub: i.status.daysLeft != null ? inDays(i.status.daysLeft) : null, entityId: i.entity.id, type: i.entity.type, tone: (i.status.daysLeft ?? 0) < 0 ? 'alert' : undefined })), empty: 'Nothing due this week.' },
+    { kind: 'list', title: 'Upkeep coming up', items: [...late, ...week].slice(0, 8).map((i) => ({ title: i.cycle.name.trim().toLowerCase() === i.entity.title.trim().toLowerCase() ? i.entity.title : `${i.cycle.name} · ${i.entity.title}`, sub: i.status.daysLeft != null ? inDays(i.status.daysLeft) : null, entityId: i.entity.id, type: i.entity.object, tone: (i.status.daysLeft ?? 0) < 0 ? 'alert' : undefined })), empty: 'Nothing due this week.' },
   ];
   if (costs.some((c) => c > 0)) blocks.push({ kind: 'bars', title: 'Upkeep spend by month', labels: months.map((m) => m.label), values: costs, format: 'money' });
   if (expiring.length) blocks.push({ kind: 'list', title: 'Running out (90 d)', items: expiring.slice(0, 6).map((x) => ({ title: `${x.what} · ${x.title}`, sub: inDays(daysUntil(x.until, now)), entityId: x.id, type: x.type })) });

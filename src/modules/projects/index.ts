@@ -23,7 +23,7 @@ export const projectsModule: ModuleManifest = {
       id: 'projects.task.completed', module: 'projects', label: 'Task completed', event: 'entity.status',
       toContext: (p) => {
         const e = p as { entity: ObjectRecord; to: string | null };
-        if (e.entity.type !== 'task' || e.to !== 'done') return null;
+        if (e.entity.object !== 'task' || e.to !== 'done') return null;
         return { entity: e.entity, vars: { projectId: e.entity.data.projectId } };
       },
     },
@@ -34,8 +34,8 @@ export const projectsModule: ModuleManifest = {
       configFields: [{ key: 'title', label: 'Title', type: 'text', required: true }, { key: 'inDays', label: 'Due in (days)', type: 'number' }, { key: 'priority', label: 'Priority', type: 'select', options: PRIORITIES }],
       run: async (cfg, ctx, os) => {
         const due = cfg.inDays != null && cfg.inDays !== '' ? new Date(Date.now() + Number(cfg.inDays) * 86400000).toISOString().slice(0, 10) : undefined;
-        const task = os.records.create<TaskData>({ type: 'task', title: String(cfg.title), data: { priority: (cfg.priority as TaskData['priority']) || 'medium', dueDate: due, projectId: ctx.entity?.type === 'project' ? ctx.entity.id : undefined } }, 'automation');
-        if (ctx.entity && ctx.entity.type !== 'project') os.links.link(task.id, ctx.entity.id, 'related', {}, 'automation');
+        const task = os.records.create<TaskData>({ object: 'task', title: String(cfg.title), data: { priority: (cfg.priority as TaskData['priority']) || 'medium', dueDate: due, projectId: ctx.entity?.object === 'project' ? ctx.entity.id : undefined } }, 'automation');
+        if (ctx.entity && ctx.entity.object !== 'project') os.links.link(task.id, ctx.entity.id, 'related', {}, 'automation');
         return task.title;
       },
     },

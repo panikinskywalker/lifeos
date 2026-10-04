@@ -20,9 +20,9 @@ afterEach(() => os.db.close());
 
 describe('questions when no model is free', () => {
   it('the phone answers from the graph: the record, its latest dated connections, notes', () => {
-    const k = os.records.create({ type: 'person', title: 'Kendal', data: { notes: '• Favourite colour: pink' } });
-    const canoe = os.records.create({ type: 'place', title: 'Canoe', data: { kind: 'restaurant' } });
-    const dinner = os.records.create({ type: 'event', title: 'Dinner at Canoe', data: { kind: 'dinner', startAt: Date.parse('2026-09-08T12:00:00') } });
+    const k = os.records.create({ object: 'person', title: 'Kendal', data: { notes: '• Favourite colour: pink' } });
+    const canoe = os.records.create({ object: 'place', title: 'Canoe', data: { kind: 'restaurant' } });
+    const dinner = os.records.create({ object: 'event', title: 'Dinner at Canoe', data: { kind: 'dinner', startAt: Date.parse('2026-09-08T12:00:00') } });
     os.links.link(dinner.id, k.id, 'with');
     os.links.link(dinner.id, canoe.id, 'at');
     const a = localAnswer(os, 'when did I last see Kendal?');

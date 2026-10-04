@@ -98,7 +98,7 @@ afterEach(() => os.db.close());
 
 describe('CycleRepo', () => {
   it('markDone rolls the cycle, logs history, records the meter; undo restores', () => {
-    const car = os.records.create({ type: 'car', data: { name: 'Creta' } });
+    const car = os.records.create({ object: 'car', data: { name: 'Creta' } });
     const c = os.cycles.create({ entityId: car.id, name: 'Service', kind: 'either', everyN: 6, everyUnit: 'month', meterEvery: 10000, lastDoneAt: d('2026-01-15'), lastMeter: 29000 });
     expect(day(c.nextDueAt)).toBe('2026-07-15');
     expect(c.nextDueMeter).toBe(39000);
@@ -122,7 +122,7 @@ describe('CycleRepo', () => {
   });
 
   it('meter-only cycles start from the latest reading', () => {
-    const car = os.records.create({ type: 'car', data: { name: 'City' } });
+    const car = os.records.create({ object: 'car', data: { name: 'City' } });
     os.db.run(`INSERT INTO meter_readings(id,entity_id,meter,value,read_at,created_at,updated_at) VALUES ('r1',?,'odometer',12000,1,1,1)`, [car.id]);
     const c = os.cycles.create({ entityId: car.id, name: 'Tyre rotation', kind: 'meter', meterEvery: 8000 });
     expect(c.nextDueMeter).toBe(20000);
@@ -130,7 +130,7 @@ describe('CycleRepo', () => {
   });
 
   it('stats: average interval, late share; snooze, setNextDue, skip, remove', () => {
-    const car = os.records.create({ type: 'car', data: { name: 'Laundry' } });
+    const car = os.records.create({ object: 'car', data: { name: 'Laundry' } });
     const c = os.cycles.create({ entityId: car.id, name: 'Laundry', kind: 'interval', everyN: 4, everyUnit: 'day', nextDueAt: d('2026-03-04') });
     os.cycles.markDone(c.id, { at: d('2026-03-04') });
     os.cycles.markDone(c.id, { at: d('2026-03-10') }); // due 8th → late
@@ -154,7 +154,7 @@ describe('CycleRepo', () => {
   });
 
   it('cycles on deleted records drop out of Upkeep', () => {
-    const car = os.records.create({ type: 'car', data: { name: 'Old' } });
+    const car = os.records.create({ object: 'car', data: { name: 'Old' } });
     os.cycles.create({ entityId: car.id, name: 'Wash', kind: 'interval', everyN: 2, everyUnit: 'week' });
     expect(os.cycles.all()).toHaveLength(1);
     os.records.delete(car.id);
@@ -162,7 +162,7 @@ describe('CycleRepo', () => {
   });
 
   it('new records get their type\'s default cycles once; a deleted default is not re-added', () => {
-    const jio = os.records.create({ type: 'sub', data: { name: 'Jio', rrule: 'FREQ=DAILY;INTERVAL=84', next: '2026-10-01' } });
+    const jio = os.records.create({ object: 'sub', data: { name: 'Jio', rrule: 'FREQ=DAILY;INTERVAL=84', next: '2026-10-01' } });
     const [c] = os.cycles.forEntity(jio.id);
     expect(c).toMatchObject({ name: 'Renewal', kind: 'fixed', everyN: 84, everyUnit: 'day', template: 'sub.renewal' });
     expect(day(c!.nextDueAt)).toBe('2026-10-01');
@@ -190,7 +190,7 @@ describe('backfill', () => {
     bus.clear();
     const first = await createLifeOS({ db, modules: [plain], registry: new Registry() });
     first.settings.set('cycles.templatesBackfilled', false);
-    const s = first.records.create({ type: 'sub', data: { name: 'Netflix', rrule: 'FREQ=MONTHLY;INTERVAL=1', next: '2026-10-05' } });
+    const s = first.records.create({ object: 'sub', data: { name: 'Netflix', rrule: 'FREQ=MONTHLY;INTERVAL=1', next: '2026-10-05' } });
     expect(first.cycles.forEntity(s.id)).toHaveLength(0);
     bus.clear();
     const second = await createLifeOS({ db, modules: [things], registry: new Registry() });
@@ -207,7 +207,7 @@ describe('backfill', () => {
     bus.clear();
     const first = await createLifeOS({ db, modules: [plain], registry: new Registry() });
     first.settings.set('meters.backfilled', false);
-    const van = first.records.create({ type: 'van', data: { name: 'Creta', odometerKm: 28500 } });
+    const van = first.records.create({ object: 'van', data: { name: 'Creta', odometerKm: 28500 } });
     expect(first.cycles.latestMeter(van.id)).toBeNull();
     bus.clear();
     const second = await createLifeOS({ db, modules: [things], registry: new Registry() });
@@ -218,7 +218,7 @@ describe('backfill', () => {
 
 describe('meter readings', () => {
   it('the odometer field and readings stay in step; cycles use the latest; undo reverts', () => {
-    const van = os.records.create({ type: 'van', data: { name: 'Creta', odometerKm: 30000 } });
+    const van = os.records.create({ object: 'van', data: { name: 'Creta', odometerKm: 30000 } });
     expect(os.cycles.latestMeter(van.id)).toBe(30000);
     const svc = os.cycles.create({ entityId: van.id, name: 'Service', kind: 'either', everyN: 6, everyUnit: 'month', meterEvery: 10000, nextDueMeter: 34000 });
 
@@ -243,7 +243,7 @@ describe('meter readings', () => {
 
 describe('template sync', () => {
   it('edits follow into the cycle; a rolled due date survives unrelated edits', () => {
-    const sub = os.records.create({ type: 'sub', data: { name: 'Jio', rrule: 'FREQ=DAILY;INTERVAL=84', next: '2026-10-01' } });
+    const sub = os.records.create({ object: 'sub', data: { name: 'Jio', rrule: 'FREQ=DAILY;INTERVAL=84', next: '2026-10-01' } });
     const id = os.cycles.forEntity(sub.id)[0]!.id;
     os.records.update(sub.id, { data: { rrule: 'FREQ=DAILY;INTERVAL=28' } });
     expect(os.cycles.get(id)).toMatchObject({ everyN: 28, everyUnit: 'day' });
@@ -261,7 +261,7 @@ describe('template sync', () => {
 
 describe('last done on the record', () => {
   it('moving the record’s last-done date forward logs a done; done in Upkeep writes the date back', () => {
-    const c = os.records.create({ type: 'chore', data: { name: 'Laundry', last: '2026-09-01' } });
+    const c = os.records.create({ object: 'chore', data: { name: 'Laundry', last: '2026-09-01' } });
     const cyc = os.cycles.forEntity(c.id)[0]!;
     expect(day(cyc.nextDueAt)).toBe('2026-09-05');
     os.records.update(c.id, { data: { last: '2026-09-10' } });

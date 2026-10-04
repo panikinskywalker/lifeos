@@ -99,7 +99,7 @@ export function postDueSubscriptions(os: LifeOSContext, today = iso(new Date()))
     let next = s.data.nextBillingAt;
     let guard = 0;
     while (next <= today && guard++ < 24) {
-      const tx = os.records.create<TransactionData>({ type: 'transaction', data: { amount: s.data.amount, kind: 'expense', category: s.data.category || 'subscriptions', accountId: s.data.accountId, merchant: s.data.name, date: next, currency: s.data.currency, note: 'Auto-posted subscription' } }, 'automation');
+      const tx = os.records.create<TransactionData>({ object: 'transaction', data: { amount: s.data.amount, kind: 'expense', category: s.data.category || 'subscriptions', accountId: s.data.accountId, merchant: s.data.name, date: next, currency: s.data.currency, note: 'Auto-posted subscription' } }, 'automation');
       os.links.link(tx.id, s.id, 'subscription', {}, 'automation');
       n++;
       if (renewal) {

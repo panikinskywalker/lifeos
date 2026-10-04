@@ -18,7 +18,7 @@ afterEach(() => os.db.close());
 
 describe('subscriptions × cycles', () => {
   it('auto-post files the expense, logs the renewal as done and rolls both dates', () => {
-    const s = os.records.create({ type: 'subscription', data: { name: 'Jio', amount: 399, rrule: 'FREQ=DAILY;INTERVAL=28', nextBillingAt: '2026-09-01' }, status: 'active' });
+    const s = os.records.create({ object: 'subscription', data: { name: 'Jio', amount: 399, rrule: 'FREQ=DAILY;INTERVAL=28', nextBillingAt: '2026-09-01' }, status: 'active' });
     const renewal = os.cycles.forEntity(s.id)[0]!;
     expect(postDueSubscriptions(os, '2026-09-20')).toBe(1);
     expect(os.records.get<{ nextBillingAt: string }>(s.id)!.data.nextBillingAt).toBe('2026-09-29');
@@ -30,7 +30,7 @@ describe('subscriptions × cycles', () => {
   });
 
   it('paid by hand in Upkeep: the billing date moves, so auto-post does not charge twice', () => {
-    const s = os.records.create({ type: 'subscription', data: { name: 'Gym', amount: 1500, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-09-10' }, status: 'active' });
+    const s = os.records.create({ object: 'subscription', data: { name: 'Gym', amount: 1500, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-09-10' }, status: 'active' });
     const renewal = os.cycles.forEntity(s.id)[0]!;
     os.cycles.markDone(renewal.id, { at: new Date('2026-09-09T12:00:00').getTime() });
     expect(os.records.get<{ nextBillingAt: string }>(s.id)!.data.nextBillingAt).toBe('2026-10-10');
@@ -38,7 +38,7 @@ describe('subscriptions × cycles', () => {
   });
 
   it('auto-post off leaves it due; cancelling takes it out of Upkeep', () => {
-    const s = os.records.create({ type: 'subscription', data: { name: 'Netflix', amount: 649, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-09-05', autoPost: false }, status: 'active' });
+    const s = os.records.create({ object: 'subscription', data: { name: 'Netflix', amount: 649, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-09-05', autoPost: false }, status: 'active' });
     expect(postDueSubscriptions(os, '2026-09-20')).toBe(0);
     expect(os.cycles.all()).toHaveLength(1);
     os.records.setStatus(s.id, 'cancelled');
@@ -54,8 +54,8 @@ describe('reports', () => {
     expect(perMonth(1200, 'FREQ=YEARLY;INTERVAL=1')).toBe(100);
     expect(perMonth(300, 'FREQ=MONTHLY;INTERVAL=3')).toBe(100);
     expect(perMonth(399, 'FREQ=DAILY;INTERVAL=84')).toBeCloseTo(144.58, 1);
-    os.records.create({ type: 'subscription', data: { name: 'Netflix', amount: 649, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-10-01' }, status: 'active' });
-    os.records.create({ type: 'subscription', data: { name: 'Old gym', amount: 5000, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-10-01' }, status: 'cancelled' });
+    os.records.create({ object: 'subscription', data: { name: 'Netflix', amount: 649, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-10-01' }, status: 'active' });
+    os.records.create({ object: 'subscription', data: { name: 'Old gym', amount: 5000, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-10-01' }, status: 'cancelled' });
     const r = subscriptionRunRate(os);
     expect(r.rows.map((x) => x.sub.data.name)).toEqual(['Netflix']);
     expect(r).toMatchObject({ monthly: 649, yearly: 7788 });
@@ -64,8 +64,8 @@ describe('reports', () => {
   it('month report and net worth over time', async () => {
     const { monthReport, netWorthSeries } = await import('./reports');
     const now = new Date('2026-09-20T12:00:00');
-    const bank = os.records.create({ type: 'account', data: { name: 'HDFC', kind: 'bank', openingBalance: 10000 } });
-    const tx = (amount: number, kind: string, date: string, category = 'food') => os.records.create({ type: 'transaction', data: { amount, kind, category, date, accountId: bank.id } });
+    const bank = os.records.create({ object: 'account', data: { name: 'HDFC', kind: 'bank', openingBalance: 10000 } });
+    const tx = (amount: number, kind: string, date: string, category = 'food') => os.records.create({ object: 'transaction', data: { amount, kind, category, date, accountId: bank.id } });
     tx(50000, 'income', '2026-08-01', 'salary');
     tx(2000, 'expense', '2026-08-10');
     tx(50000, 'income', '2026-09-01', 'salary');

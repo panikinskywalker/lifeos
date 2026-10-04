@@ -36,8 +36,8 @@ export function upkeep(os: LifeOSContext, filter: UpkeepFilter = 'All', now = Da
   const items: UpkeepItem[] = [];
   for (const cycle of os.cycles.all()) {
     const entity = os.records.get(cycle.entityId);
-    if (!entity || (types && !types.includes(entity.type))) continue;
-    items.push({ cycle, entity, def: os.registry.objects.get(entity.type), status: os.cycles.status(cycle, now) });
+    if (!entity || (types && !types.includes(entity.object))) continue;
+    items.push({ cycle, entity, def: os.registry.objects.get(entity.object), status: os.cycles.status(cycle, now) });
   }
   const rank = (i: UpkeepItem) => (i.status.daysLeft ?? (i.status.meterLeft != null && i.cycle.meterEvery ? (i.status.meterLeft / i.cycle.meterEvery) * 180 : 9999));
   items.sort((a, b) => rank(a) - rank(b));
@@ -80,10 +80,10 @@ export function logDone(os: LifeOSContext, cycleId: string, input: { cost?: numb
     if (input.asExpense && input.cost && input.cost > 0 && os.registry.objects.has('transaction')) {
       const record = os.records.get(cycle.entityId);
       const tx = os.records.create({
-        type: 'transaction',
-        data: { amount: input.cost, kind: 'expense', category: COST_CATEGORY[record?.type ?? ''] ?? 'other', merchant: record ? `${record.title} · ${cycle.name}` : cycle.name, date: localDate(at), note: input.note ?? undefined, currency: cycle.currency ?? undefined },
+        object: 'transaction',
+        data: { amount: input.cost, kind: 'expense', category: COST_CATEGORY[record?.object ?? ''] ?? 'other', merchant: record ? `${record.title} · ${cycle.name}` : cycle.name, date: localDate(at), note: input.note ?? undefined, currency: cycle.currency ?? undefined },
       });
-      if (record) os.links.link(tx.id, record.id, record.type);
+      if (record) os.links.link(tx.id, record.id, record.object);
       transactionId = tx.id;
     }
   });

@@ -64,7 +64,7 @@ export function importContacts(os: LifeOSContext, picked: DeviceContact[]): { cr
     const data = Object.fromEntries(Object.entries(contactData(c)).filter(([, v]) => v != null && v !== ''));
     const id = personForContact(os, c);
     if (!id) {
-      const e = os.records.create({ type: 'person', title: c.name.trim(), data }, 'user');
+      const e = os.records.create({ object: 'person', title: c.name.trim(), data }, 'user');
       os.dumps.addExtraction({ source: 'contacts', sourceRef: c.id, kind: 'person', entityId: e.id, label: `Person: ${e.title} (from contacts)` });
       created++;
       continue;
@@ -177,7 +177,7 @@ export function saveCalendarEvents(os: LifeOSContext, events: CalendarEvent[]): 
           updated++;
         }
       } else {
-        id = os.records.create({ type: 'event', title: ev.title.trim(), data }, 'system').id;
+        id = os.records.create({ object: 'event', title: ev.title.trim(), data }, 'system').id;
         created++;
       }
       for (const a of ev.attendees ?? []) {

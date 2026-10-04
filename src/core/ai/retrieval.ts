@@ -15,7 +15,7 @@ const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 function describeRecord(os: LifeOSContext, id: string): string | null {
   const e = os.records.get(id);
   if (!e) return null;
-  const def = os.registry.objects.get(e.type);
+  const def = os.registry.objects.get(e.object);
   const data = Object.entries(e.data as Record<string, unknown>)
     .filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && !v.length) && typeof v !== 'object')
     .slice(0, 10)
@@ -29,7 +29,7 @@ function describeRecord(os: LifeOSContext, id: string): string | null {
   const rels = describeNeighbours(os, e.id, 10);
   const facts = os.facts.list({ subjectId: e.id, limit: 5 }).map((f) => f.text);
   return [
-    `• ${e.title} [${def?.label ?? e.type}, id ${e.id}${e.status ? `, ${e.status}` : ''}]${data ? ` — ${data}` : ''}`,
+    `• ${e.title} [${def?.label ?? e.object}, id ${e.id}${e.status ? `, ${e.status}` : ''}]${data ? ` — ${data}` : ''}`,
     cycles.length ? `  cycles: ${cycles.join(' | ')}` : '',
     timeline.length ? `  recent: ${timeline.join(' | ')}` : '',
     rels.length ? `  connections: ${rels.join(' | ')}` : '',
@@ -53,10 +53,10 @@ export function buildContext(os: LifeOSContext, userText: string, opts: Retrieva
   if (detailed.length) sections.push(['Records this message is probably about', detailed]);
   const shown = new Set(about.map((c) => c.id));
   const all = os.records.search.search(userText.split(/\s+/).filter((w) => w.length > 2).slice(0, 6).join(' '), { limit: 12 });
-  const dumps = all.filter((h) => h.type === 'dump').slice(0, 4).map((h) => os.dumps.get(h.id)).filter((d): d is NonNullable<typeof d> => !!d);
+  const dumps = all.filter((h) => h.object === 'dump').slice(0, 4).map((h) => os.dumps.get(h.id)).filter((d): d is NonNullable<typeof d> => !!d);
   if (dumps.length) sections.push(['From the user’s brain dumps (verbatim)', dumps.map((d) => `• ${iso(d.createdAt)}: “${d.body.replace(/\s+/g, ' ').slice(0, 400)}”`)]);
-  const hits = all.filter((h) => h.type !== 'fact' && h.type !== 'dump' && !shown.has(h.id)).slice(0, 8);
-  if (hits.length) sections.push(['Other matching records', hits.map((h) => `• ${h.title} [${os.registry.objects.get(h.type)?.label ?? h.type}, id ${h.id}]${h.subtitle ? ` — ${h.subtitle}` : ''}`)]);
+  const hits = all.filter((h) => h.object !== 'fact' && h.object !== 'dump' && !shown.has(h.id)).slice(0, 8);
+  if (hits.length) sections.push(['Other matching records', hits.map((h) => `• ${h.title} [${os.registry.objects.get(h.object)?.label ?? h.object}, id ${h.id}]${h.subtitle ? ` — ${h.subtitle}` : ''}`)]);
   let out = '';
   for (const [title, lines] of sections) {
     const head = `\n## ${title}\n`;

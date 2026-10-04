@@ -18,7 +18,7 @@ import { perMonth } from '@modules/finance/reports';
 export function SubscriptionHero({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
   const toast = useToast();
   const s = entity as ObjectRecord<SubscriptionData>;
-  const posted = useLive((os) => os.links.forEntity(entity.id, 'subscription').map((r) => os.records.get<{ date: string; amount: number }>(r.other.id)).filter((x): x is ObjectRecord<{ date: string; amount: number }> => !!x && x.type === 'transaction'), [entity.id]);
+  const posted = useLive((os) => os.links.forEntity(entity.id, 'subscription').map((r) => os.records.get<{ date: string; amount: number }>(r.other.id)).filter((x): x is ObjectRecord<{ date: string; amount: number }> => !!x && x.object === 'transaction'), [entity.id]);
   const renewal = useLive((os) => {
     const c = os.cycles.forEntity(entity.id).find((x) => x.template === 'subscription.renewal');
     return c ? { cycle: c, status: os.cycles.status(c) } : null;

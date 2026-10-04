@@ -28,9 +28,9 @@ describe('[[links]]', () => {
   });
 
   it('a note’s links become mentions that follow edits; the target shows backlinks', () => {
-    const priya = os.records.create({ type: 'person', data: { name: 'Priya Sharma' } });
-    const arjun = os.records.create({ type: 'person', data: { name: 'Arjun' } });
-    const n = os.records.create({ type: 'note', data: { title: 'Goa plan', body: 'Book with [[Priya Sharma]] and [[Arjun]]; ask [[Nobody]]' } });
+    const priya = os.records.create({ object: 'person', data: { name: 'Priya Sharma' } });
+    const arjun = os.records.create({ object: 'person', data: { name: 'Arjun' } });
+    const n = os.records.create({ object: 'note', data: { title: 'Goa plan', body: 'Book with [[Priya Sharma]] and [[Arjun]]; ask [[Nobody]]' } });
     expect(os.links.targets(n.id, 'mention').sort()).toEqual([priya.id, arjun.id].sort());
     expect(backlinks(os, priya.id).map((e) => e.title)).toEqual(['Goa plan']);
     os.records.update(n.id, { data: { body: 'Only [[Arjun]] now' } });
@@ -39,11 +39,11 @@ describe('[[links]]', () => {
   });
 
   it('ambiguous titles are not guessed; a fact’s [[link]] sets what it is about', () => {
-    os.records.create({ type: 'person', data: { name: 'Priya' } });
-    os.records.create({ type: 'person', data: { name: 'Priya' } });
-    const n = os.records.create({ type: 'note', data: { title: 'x', body: 'call [[Priya]]' } });
+    os.records.create({ object: 'person', data: { name: 'Priya' } });
+    os.records.create({ object: 'person', data: { name: 'Priya' } });
+    const n = os.records.create({ object: 'note', data: { title: 'x', body: 'call [[Priya]]' } });
     expect(os.links.targets(n.id, 'mention')).toEqual([]);
-    const dad = os.records.create({ type: 'person', data: { name: 'Dad' } });
+    const dad = os.records.create({ object: 'person', data: { name: 'Dad' } });
     expect(os.facts.add({ text: '[[Dad]] hates surprises', source: 'user' }).subjectId).toBe(dad.id);
   });
 });

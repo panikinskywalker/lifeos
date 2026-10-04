@@ -13,7 +13,7 @@ export function travelOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
   const spent = (id: string) =>
     os.links
       .forEntity(id, 'part_of')
-      .filter((r) => r.direction === 'in' && r.other.type === 'transaction')
+      .filter((r) => r.direction === 'in' && r.other.object === 'transaction')
       .reduce((n, r) => n + (os.records.get<{ amount?: number; kind?: string }>(r.other.id)?.data.amount ?? 0), 0);
   const blocks: OverviewBlock[] = [
     { kind: 'stats', items: [{ label: 'Next trip', value: upcoming[0] ? upcoming[0].data.destination : '—', sub: upcoming[0]?.data.startDate ? inDays(daysUntil(upcoming[0].data.startDate, now)) : null }, { label: `Trips in ${year}`, value: String(thisYear.length) }, { label: `Spent in ${year}`, value: money(thisYear.reduce((n, t) => n + spent(t.id), 0)) }] },

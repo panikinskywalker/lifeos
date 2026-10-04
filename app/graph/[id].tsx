@@ -18,7 +18,7 @@ export default function GraphScreen() {
   const e = os.records.get(centre);
   const open = (nid: string, type: string) => router.push(`/entity/${type}/${nid}` as never);
   return (
-    <Screen title={e?.title ?? 'Graph'} subtitle={g.nodes.length > 1 ? `${g.nodes.length - 1} linked · tap to walk, long-press to open` : undefined} onBack={() => router.back()} right={e ? <Button title="Open" size="sm" variant="secondary" icon="arrow-right" onPress={() => open(e.id, e.type)} /> : undefined}>
+    <Screen title={e?.title ?? 'Graph'} subtitle={g.nodes.length > 1 ? `${g.nodes.length - 1} linked · tap to walk, long-press to open` : undefined} onBack={() => router.back()} right={e ? <Button title="Open" size="sm" variant="secondary" icon="arrow-right" onPress={() => open(e.id, e.object)} /> : undefined}>
       <View style={{ gap: 12 }}>
         <Segmented<'1' | '2'> options={[{ value: '1', label: 'Direct links' }, { value: '2', label: 'Two steps out' }]} value={hops} onChange={setHops} />
         {g.nodes.length > 1 ? (

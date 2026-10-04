@@ -30,7 +30,7 @@ describe('facts', () => {
   });
 
   it('mining links subjects, skips duplicates, supersedes known facts, and is searchable', async () => {
-    const suresh = os.records.create({ type: 'person', data: { name: 'Suresh' } });
+    const suresh = os.records.create({ object: 'person', data: { name: 'Suresh' } });
     const got = await mineFacts(os, replying('{"facts":[{"text":"Suresh is the landlord; rent is due on the 5th","subject":"Suresh"}]}'), 'Remember the landlord is Suresh, rent on the 5th', 'c1');
     expect(got).toHaveLength(1);
     expect(got[0]).toMatchObject({ subjectId: suresh.id, source: 'talk', sourceRef: 'c1' });
@@ -39,12 +39,12 @@ describe('facts', () => {
     const next = await mineFacts(os, replying(`{"facts":[{"text":"Rent is due on the 7th now","subject":"Suresh","replaces":"${old.id}"}]}`), 'rent moved to the 7th', 'c2');
     expect(os.facts.get(old.id)!.active).toBe(false);
     expect(os.facts.search('rent').map((f) => f.text)).toEqual([next[0]!.text]);
-    expect(os.records.search.search('rent').some((h) => h.type === 'fact')).toBe(true);
+    expect(os.records.search.search('rent').some((h) => h.object === 'fact')).toBe(true);
     expect(await mineFacts(os, { id: 'boom', complete: async () => { throw new Error('offline'); } }, 'something long enough', 'c3')).toEqual([]);
   });
 
   it('remember / recall / forget tools with undo', async () => {
-    const dad = os.records.create({ type: 'person', data: { name: 'Dad' } });
+    const dad = os.records.create({ object: 'person', data: { name: 'Dad' } });
     const r = await tool('remember_fact').run({ text: 'Dad hates surprises', subjectId: dad.id }, os);
     expect(await tool('remember_fact').run({ text: 'dad hates surprises.', subjectId: dad.id }, os)).toMatchObject({ alreadyKnown: 'Dad hates surprises' });
     const rc = (await tool('recall').run({ subjectId: dad.id }, os)) as { facts: Array<{ id: string; text: string; about: string }> };

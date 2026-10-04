@@ -54,7 +54,7 @@ export function payeeFor(os: LifeOSContext, name: string | null | undefined, vpa
   // A name you confirmed before.
   for (const a of os.aliases.lookup(norm(said))) {
     const e = os.records.get(a.entityId);
-    if (e && (e.type === 'person' || e.type === 'org')) return { id: e.id, type: e.type, created: false, guess: null, confidence: 1 };
+    if (e && (e.object === 'person' || e.object === 'org')) return { id: e.id, type: e.object, created: false, guess: null, confidence: 1 };
   }
   const business = opts.business ?? BUSINESS.test(said);
   if (!business && people.length) {
@@ -73,7 +73,7 @@ export function payeeFor(os: LifeOSContext, name: string | null | undefined, vpa
     if (v && !(o2.data.upi ?? '').includes(v)) os.records.update(o2.id, { data: { upi: [o2.data.upi, v].filter(Boolean).join(', ') } }, 'system');
     return { id: o2.id, type: 'org', created: false, guess: null, confidence: 1 };
   }
-  const e = os.records.create({ type: 'org', title: titleCase(said), data: { kind: business ? 'shop' : 'payee', upi: v ?? undefined } }, 'assistant');
+  const e = os.records.create({ object: 'org', title: titleCase(said), data: { kind: business ? 'shop' : 'payee', upi: v ?? undefined } }, 'assistant');
   return { id: e.id, type: 'org', created: true, guess: null, confidence: 1 };
 }
 
@@ -104,7 +104,7 @@ export function rejectPayee(os: LifeOSContext, relationId: string) {
   if (!r) return;
   os.links.remove(relationId);
   const as = (r.meta.as as string | undefined) ?? 'Payee';
-  const e = os.records.create({ type: 'org', title: titleCase(as), data: { kind: 'payee', upi: (r.meta.vpa as string | undefined) ?? undefined } }, 'user');
+  const e = os.records.create({ object: 'org', title: titleCase(as), data: { kind: 'payee', upi: (r.meta.vpa as string | undefined) ?? undefined } }, 'user');
   os.links.link(r.fromId, e.id, 'payee', { as }, 'user', { source: 'manual', confidence: 1 });
 }
 

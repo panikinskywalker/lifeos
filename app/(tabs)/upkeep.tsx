@@ -132,7 +132,7 @@ export default function UpkeepTab() {
                 { label: 'Snooze a day', icon: 'clock' as const, onPress: () => snooze(active, 1) },
                 { label: 'Snooze 3 days', icon: 'clock' as const, onPress: () => snooze(active, 3) },
                 ...(active.cycle.everyN || active.cycle.meterEvery ? [{ label: 'Skip this one', icon: 'arrow-right' as const, onPress: () => { os.cycles.skip(active.cycle.id); toast.show({ message: 'Skipped', icon: 'arrow-right' }); } }] : []),
-                { label: `Open ${active.def?.label.toLowerCase() ?? 'record'}`, icon: 'chevron-right' as const, onPress: () => router.push(`/entity/${active.entity.type}/${active.entity.id}`) },
+                { label: `Open ${active.def?.label.toLowerCase() ?? 'record'}`, icon: 'chevron-right' as const, onPress: () => router.push(`/entity/${active.entity.object}/${active.entity.id}`) },
               ]
             : []
         }
@@ -177,7 +177,7 @@ function WeekView({ filter, onDone, onOpen }: { filter: UpkeepFilter; onDone: (i
         {entries.length ? (
           <RowList>
             {entries.map((e) => {
-              const chore = e.entity.type === 'routine';
+              const chore = e.entity.object === 'routine';
               const actionable = !e.projected && dayAt <= today + 7 * DAY;
               return (
                 <RowItem

@@ -17,8 +17,8 @@ export const financeModule: ModuleManifest = {
       id: 'finance.transaction.created', module: 'finance', label: 'Transaction added', event: 'entity.created',
       configFields: [{ key: 'kind', label: 'Kind', type: 'select', options: [{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }] }],
       toContext: (p) => {
-        const e = (p as { entity: { type: string; data: Record<string, unknown> } }).entity;
-        if (e.type !== 'transaction') return null;
+        const e = (p as { entity: { object: string; data: Record<string, unknown> } }).entity;
+        if (e.object !== 'transaction') return null;
         return { entity: e as never, vars: { amount: e.data.amount, category: e.data.category, kind: e.data.kind } };
       },
     },
@@ -34,7 +34,7 @@ export const financeModule: ModuleManifest = {
         { key: 'accountId', label: 'Account', type: 'relation', relationTo: 'account' },
       ],
       run: async (cfg, ctx, os) => {
-        const tx = os.records.create({ type: 'transaction', data: { amount: Number(cfg.amount), kind: (cfg.kind as string) || 'expense', category: (cfg.category as string) || 'other', merchant: cfg.merchant ? String(cfg.merchant) : undefined, accountId: cfg.accountId ? String(cfg.accountId) : undefined, date: new Date().toISOString().slice(0, 10) } }, 'automation');
+        const tx = os.records.create({ object: 'transaction', data: { amount: Number(cfg.amount), kind: (cfg.kind as string) || 'expense', category: (cfg.category as string) || 'other', merchant: cfg.merchant ? String(cfg.merchant) : undefined, accountId: cfg.accountId ? String(cfg.accountId) : undefined, date: new Date().toISOString().slice(0, 10) } }, 'automation');
         if (ctx.entity) os.links.link(tx.id, ctx.entity.id, 'related', {}, 'automation');
         return tx.title;
       },

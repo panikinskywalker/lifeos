@@ -9,7 +9,8 @@ import { TimelineRepo } from './timelineRepo';
 import { SearchIndex } from '../search/searchIndex';
 
 export interface CreateInput<T = Record<string, unknown>> {
-  type: string;
+  /** The Object to create a record of. */
+  object: string;
   title?: string;
   subtitle?: string | null;
   data: T;
@@ -46,7 +47,7 @@ export interface AggregateSpec {
 function rowToEntity(r: Row): ObjectRecord {
   return {
     id: r.id as string,
-    type: r.type as string,
+    object: r.type as string,
     title: (r.title as string) ?? '',
     subtitle: (r.subtitle as string | null) ?? null,
     data: safeJson(r.data as string),
@@ -110,14 +111,14 @@ export class RecordRepo {
   }
 
   create<T extends object>(input: CreateInput<T>, actor: Actor = 'user'): ObjectRecord<T> {
-    const def = this.def(input.type);
+    const def = this.def(input.object);
     const data = def.schema.parse(input.data) as T;
     const now = input.createdAt ?? Date.now();
     const id = input.id ?? newId(now);
     const d = this.derive(def, data as Record<string, unknown>, input.title, input.subtitle, input.occurredAt);
     const entity: ObjectRecord<T> = {
       id,
-      type: input.type,
+      object: input.object,
       title: d.title,
       subtitle: d.subtitle,
       data,
@@ -134,7 +135,7 @@ export class RecordRepo {
       this.db.run(
         `INSERT INTO entities(id,type,title,subtitle,data,status,starred,archived,occurred_at,created_at,updated_at,deleted_at,version)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [id, entity.type, entity.title, entity.subtitle ?? null, JSON.stringify(data), entity.status ?? null, entity.starred ? 1 : 0, 0, entity.occurredAt ?? null, now, now, null, 1],
+        [id, entity.object, entity.title, entity.subtitle ?? null, JSON.stringify(data), entity.status ?? null, entity.starred ? 1 : 0, 0, entity.occurredAt ?? null, now, now, null, 1],
       );
       this.changes.record('entities', id, 'insert', 1);
       this.timeline.add({ entityId: id, kind: 'created', title: `${def.label} created`, actor, occurredAt: now });
@@ -159,13 +160,13 @@ export class RecordRepo {
 
   ref(id: string): EntityRef | undefined {
     const r = this.db.get<{ id: string; type: string; title: string }>(`SELECT id,type,title FROM entities WHERE id = ? AND deleted_at IS NULL`, [id]);
-    return r ?? undefined;
+    return r ? { id: r.id, object: r.type, title: r.title } : undefined;
   }
 
   update<T extends object>(id: string, patch: UpdateInput<T>, actor: Actor = 'user'): ObjectRecord<T> {
     const previous = this.get<T>(id);
     if (!previous) throw new Error(`ObjectRecord ${id} not found`);
-    const def = this.def(previous.type);
+    const def = this.def(previous.object);
     const mergedData = patch.data ? def.schema.parse({ ...(previous.data as object), ...(patch.data as object) }) : previous.data;
     const now = Date.now();
     const d = this.derive(def, mergedData as Record<string, unknown>, patch.title ?? (patch.title === undefined && !previous.title ? undefined : previous.title), patch.subtitle, patch.occurredAt ?? previous.occurredAt);
@@ -237,7 +238,7 @@ export class RecordRepo {
     });
     const e = this.get(id);
     if (!e) return;
-    this.search.index(e, this.def(e.type));
+    this.search.index(e, this.def(e.object));
     bus.emit('entity.restored', { entity: e, actor });
   }
 

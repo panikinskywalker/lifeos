@@ -60,7 +60,7 @@ export function myDay(os: LifeOSContext, now = Date.now(), u: Upkeep = upkeep(os
   for (const i of [...u.sections.overdue, ...u.sections.week]) {
     const d = i.status.daysLeft;
     if (d == null || d > 0) continue;
-    out.push({ id: `cycle:${i.cycle.id}`, at: a, allDay: true, kind: 'due', title: i.cycle.name.trim().toLowerCase() === i.entity.title.trim().toLowerCase() ? i.entity.title : `${i.cycle.name} · ${i.entity.title}`, sub: d < 0 ? `${-d} d late` : 'due today', entityId: i.entity.id, type: i.entity.type, done: false, late: d < 0 });
+    out.push({ id: `cycle:${i.cycle.id}`, at: a, allDay: true, kind: 'due', title: i.cycle.name.trim().toLowerCase() === i.entity.title.trim().toLowerCase() ? i.entity.title : `${i.cycle.name} · ${i.entity.title}`, sub: d < 0 ? `${-d} d late` : 'due today', entityId: i.entity.id, type: i.entity.object, done: false, late: d < 0 });
   }
   if (has('delivery')) {
     for (const d of os.records.query<{ status: string; expectedDate?: string; otp?: string }>('delivery', { filter: { and: [{ field: 'data.status', op: 'in', value: ['shipped', 'out_for_delivery'] }] } }, { limit: 50 })) {
@@ -74,7 +74,7 @@ export function myDay(os: LifeOSContext, now = Date.now(), u: Upkeep = upkeep(os
   }
   for (const r of os.reminders.upcoming(50, b)) {
     if (r.dueAt < a) continue;
-    out.push({ id: `rem:${r.id}`, at: r.dueAt, allDay: false, kind: 'reminder', title: r.title, sub: null, entityId: r.entityId ?? null, type: r.entityId ? (os.records.get(r.entityId)?.type ?? null) : null, done: r.dueAt < now, late: false });
+    out.push({ id: `rem:${r.id}`, at: r.dueAt, allDay: false, kind: 'reminder', title: r.title, sub: null, entityId: r.entityId ?? null, type: r.entityId ? (os.records.get(r.entityId)?.object ?? null) : null, done: r.dueAt < now, late: false });
   }
   const rank = (x: DayItem) => (x.allDay ? 0 : 1);
   return out.sort((x, y) => rank(x) - rank(y) || x.at - y.at || Number(y.late) - Number(x.late));

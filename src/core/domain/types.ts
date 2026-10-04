@@ -12,7 +12,8 @@ import type { Field, FieldOption as FieldOptionNew, FieldType as FieldTypeNew, F
 /** One row of an Object: the shared envelope every record carries. */
 export interface ObjectRecord<TData = Record<string, unknown>> {
   id: string;
-  type: string;
+  /** The Object this record belongs to ('person', 'transaction'). */
+  object: string;
   title: string;
   subtitle?: string | null;
   data: TData;
@@ -29,7 +30,7 @@ export interface ObjectRecord<TData = Record<string, unknown>> {
 
 export interface EntityRef {
   id: string;
-  type: string;
+  object: string;
   title: string;
 }
 

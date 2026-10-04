@@ -140,8 +140,8 @@ export function EntityPicker({ visible, onClose, types, selected = [], onSelect,
     (o) => {
       if (!visible) return [];
       const tys = typeFilter ? [typeFilter] : allTypes;
-      if (q.trim()) return o.records.search.search(q, { types: tys, limit: 40 }).map((h) => ({ id: h.id, type: h.type, title: h.title, subtitle: h.subtitle }));
-      return o.records.query(tys, { sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 40 }).map((e) => ({ id: e.id, type: e.type, title: e.title, subtitle: e.subtitle }));
+      if (q.trim()) return o.records.search.search(q, { types: tys, limit: 40 }).map((h) => ({ id: h.id, type: h.object, title: h.title, subtitle: h.subtitle }));
+      return o.records.query(tys, { sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 40 }).map((e) => ({ id: e.id, type: e.object, title: e.title, subtitle: e.subtitle }));
     },
     [visible, q, typeFilter, allTypes.join(',')],
   ).filter((r) => !exclude?.includes(r.id));

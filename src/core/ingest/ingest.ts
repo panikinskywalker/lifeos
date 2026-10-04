@@ -277,7 +277,7 @@ export function categoryFor(os: LifeOSContext, merchant: string | null | undefin
 /** Who a transaction was paid to / by: its linked payee (a shop / payee record, or a person). */
 export function payeeOf(os: LifeOSContext, txId: string): { id: string; type: string; title: string } | null {
   const r = os.links.forEntity(txId).find((x) => x.direction === 'out' && (x.relation.kind === 'payee' || x.relation.kind === 'person'));
-  return r ? { id: r.other.id, type: r.other.type, title: r.other.title } : null;
+  return r ? { id: r.other.id, type: r.other.object, title: r.other.title } : null;
 }
 
 /**
@@ -301,7 +301,7 @@ export function learnCategory(os: LifeOSContext, merchant: string | null | undef
   if (!txId || payee?.type === 'person') return [];
   // The others: same payee record, else the same merchant name.
   const ids = payee
-    ? os.links.forEntity(payee.id).filter((r) => r.direction === 'in' && r.other.type === 'transaction').map((r) => r.other.id)
+    ? os.links.forEntity(payee.id).filter((r) => r.direction === 'in' && r.other.object === 'transaction').map((r) => r.other.id)
     : merchant
       ? os.db.all<{ id: string }>(`SELECT id FROM entities WHERE type='transaction' AND deleted_at IS NULL AND lower(json_extract(data,'$.merchant'))=? LIMIT 500`, [merchant.toLowerCase()]).map((r) => r.id)
       : [];
@@ -344,7 +344,7 @@ export function accountFor(os: LifeOSContext, t: ParsedTxn, from: string, create
   const title = `${bankName ?? 'Bank'}${t.isCard ? ' card' : ''}${t.last4 ? ` ••${t.last4}` : ''}`;
   const existing = accounts.find((a) => a.title === title);
   if (existing) return existing.id;
-  const a = os.records.create({ type: 'account', title, data: { kind, institution: bankName ?? undefined, last4: t.last4 ?? undefined, currency: 'INR', openingBalance: 0 } }, 'assistant');
+  const a = os.records.create({ object: 'account', title, data: { kind, institution: bankName ?? undefined, last4: t.last4 ?? undefined, currency: 'INR', openingBalance: 0 } }, 'assistant');
   created.push(a.id);
   return a.id;
 }
@@ -355,7 +355,7 @@ function fundAccount(os: LifeOSContext, fund: string | null, created: string[]):
   const title = fund ? fund.replace(/\s+(?:SIP|Direct|Growth|Plan)\b.*$/i, '').trim() : 'Mutual funds';
   const hit = os.records.query<{ kind?: string }>('account', {}, { limit: 500 }).find((a) => a.title.toLowerCase() === title.toLowerCase());
   if (hit) return hit.id;
-  const a = os.records.create({ type: 'account', title, data: { kind: 'investment', institution: 'Mutual fund', currency: 'INR', openingBalance: 0 } }, 'assistant');
+  const a = os.records.create({ object: 'account', title, data: { kind: 'investment', institution: 'Mutual fund', currency: 'INR', openingBalance: 0 } }, 'assistant');
   created.push(a.id);
   return a.id;
 }
@@ -370,7 +370,7 @@ export function ingestOutcome(os: LifeOSContext, m: RawMessage): { status: strin
   if (!r) return null;
   const e = r.entity_id ? os.records.get(r.entity_id) : null;
   const d = (e?.data ?? {}) as Record<string, unknown>;
-  const record = e ? { type: e.type, title: e.title, ...Object.fromEntries(['amount', 'kind', 'category', 'merchant', 'date', 'status', 'shop', 'carrier'].filter((k) => d[k] !== undefined).map((k) => [k, d[k]])) } : r.entity_id ? { deleted: true } : null;
+  const record = e ? { type: e.object, title: e.title, ...Object.fromEntries(['amount', 'kind', 'category', 'merchant', 'date', 'status', 'shop', 'carrier'].filter((k) => d[k] !== undefined).map((k) => [k, d[k]])) } : r.entity_id ? { deleted: true } : null;
   return { status: r.status, note: r.error, record };
 }
 
@@ -551,7 +551,7 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
     if (t.currency !== 'INR' && !fx.fxRate) flag = `No ${t.currency} rate yet — converted to rupees when the app is next online`;
     if (item.source === 'email') label += ` · from ${item.account ?? 'email'}`;
   }
-  const e = os.records.create({ type: 'transaction', data }, 'assistant');
+  const e = os.records.create({ object: 'transaction', data }, 'assistant');
   // Everyone you pay or get paid by is one record; this payment joins theirs.
   if (!t.investment && !t.transfer && t.channel !== 'atm' && (t.counterparty || t.vpa)) {
     const pm = payeeFor(os, t.counterparty, t.vpa, { business: data.category !== 'other' && data.category !== 'transfer' ? true : undefined });
@@ -587,7 +587,7 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
   setItem(os, id, { status: 'confirmed', entityId: e.id });
   for (const a of created) {
     const ce = os.records.get(a);
-    const kind = ce?.type === 'org' || ce?.type === 'subscription' ? ce.type : 'account';
+    const kind = ce?.object === 'org' || ce?.object === 'subscription' ? ce.object : 'account';
     const label = kind === 'org' ? `Payee: ${ce!.title}` : kind === 'subscription' ? `Subscription: ${ce!.title} (monthly — change if yearly)` : `Account: ${ce?.title ?? 'new account'}`;
     os.dumps.addExtraction({ source: item.source, sourceRef: id, kind, entityId: a, label });
   }
@@ -616,7 +616,7 @@ function linkSubscription(os: LifeOSContext, txId: string, name: string, amount:
   const subs = os.records.query<{ name: string; amount: number; nextBillingAt: string; rrule?: string; accountId?: string }>('subscription', {}, { limit: 500 });
   const sub = subs.find((s) => s.status !== 'cancelled' && (norm(s.data.name) === key || norm(s.data.name).startsWith(`${key} `) || key.startsWith(`${norm(s.data.name)} `)));
   if (!sub) {
-    const s = os.records.create({ type: 'subscription', data: { name, amount, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: addMonths(date), category: 'subscriptions', accountId, autoPost: false } }, 'assistant');
+    const s = os.records.create({ object: 'subscription', data: { name, amount, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: addMonths(date), category: 'subscriptions', accountId, autoPost: false } }, 'assistant');
     os.links.link(txId, s.id, 'subscription', {}, 'assistant', { source: via });
     created.push(s.id);
     return;
@@ -657,7 +657,7 @@ function fileDelivery(os: LifeOSContext, ingestId: string, d: ParsedDelivery, m:
   const day = iso(m.receivedAt);
   const via = m.source === 'email' ? ` · from ${m.account ?? 'email'}` : '';
   if (!hit) {
-    const e = os.records.create({ type: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, trackingUrl: d.link ?? undefined, otp: d.otp ?? undefined, otpAt: d.otp ? m.receivedAt : undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
+    const e = os.records.create({ object: 'delivery', data: { shop: d.shop ?? undefined, item: d.item ?? undefined, carrier: d.carrier ?? undefined, tracking: d.tracking ?? undefined, orderId: d.orderId ?? undefined, trackingUrl: d.link ?? undefined, otp: d.otp ?? undefined, otpAt: d.otp ? m.receivedAt : undefined, status: d.status, expectedDate: d.status === 'delivered' ? undefined : (d.expected ?? undefined), deliveredOn: d.status === 'delivered' ? day : undefined } }, 'assistant');
     os.records.timeline.add({ entityId: e.id, kind: m.source, title: `${STATUS_WORD[d.status]!}${via}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingestId } });
     os.dumps.addExtraction({ source: m.source, sourceRef: ingestId, kind: 'delivery', entityId: e.id, label: `Delivery: ${e.title} · ${STATUS_WORD[d.status]}${d.expected && d.status !== 'delivered' ? ` · by ${d.expected.slice(8)}/${d.expected.slice(5, 7)}` : ''}${via}` });
     return e.id;
@@ -822,7 +822,7 @@ function tripOn(os: LifeOSContext, day: string, destination: string | null, inge
     return hit.id;
   }
   if (!destination) return null;
-  const t = os.records.create({ type: 'trip', title: `Trip to ${destination}`, data: { destination, startDate: day, ...(end ? { endDate: end } : {}) } }, 'assistant');
+  const t = os.records.create({ object: 'trip', title: `Trip to ${destination}`, data: { destination, startDate: day, ...(end ? { endDate: end } : {}) } }, 'assistant');
   os.records.timeline.add({ entityId: t.id, kind: 'email', title: `From Email · ${account}`, body: null, actor: 'system', occurredAt: Date.now(), meta: { ingestId } });
   os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'trip', entityId: t.id, label: `Trip: Trip to ${destination} · from ${account}` });
   return t.id;
@@ -843,7 +843,7 @@ function fileFlight(os: LifeOSContext, ingestId: string, f: ParsedFlight, mail: 
     id = same.id;
     os.records.update(id, { data: { startAt, ...(f.time ? { allDay: false } : {}) } }, 'assistant');
   } else {
-    id = os.records.create({ type: 'event', title, data }, 'assistant').id;
+    id = os.records.create({ object: 'event', title, data }, 'assistant').id;
     os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Flight: ${route ?? f.flightNo} · ${f.date.slice(8)}/${f.date.slice(5, 7)}${f.flightNo ? ` · ${f.flightNo}` : ''} · from ${account}` });
   }
   os.records.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
@@ -861,7 +861,7 @@ function fileStay(os: LifeOSContext, ingestId: string, st: ParsedStay, mail: Mai
   let id: string;
   if (same) id = same.id;
   else {
-    id = os.records.create({ type: 'event', title: `Stay · ${st.name}`, data: { kind: 'stay', startAt, allDay: true, ...(st.checkOut ? { endAt: new Date(`${st.checkOut}T11:00:00`).getTime() } : {}), location: st.place ?? undefined, notes: `From ${account}: “${mail.subject}”` } }, 'assistant').id;
+    id = os.records.create({ object: 'event', title: `Stay · ${st.name}`, data: { kind: 'stay', startAt, allDay: true, ...(st.checkOut ? { endAt: new Date(`${st.checkOut}T11:00:00`).getTime() } : {}), location: st.place ?? undefined, notes: `From ${account}: “${mail.subject}”` } }, 'assistant').id;
     os.dumps.addExtraction({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Stay: ${st.name} · ${st.checkIn.slice(8)}/${st.checkIn.slice(5, 7)}${st.checkOut ? `–${st.checkOut.slice(8)}/${st.checkOut.slice(5, 7)}` : ''} · from ${account}` });
   }
   os.records.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });

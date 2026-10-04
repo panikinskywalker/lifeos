@@ -123,7 +123,7 @@ export default function TimeScreen() {
           <RowList>
             {s.done.slice(0, 20).map((d) => {
               const e = os.records.get(d.entityId);
-              return <RowItem key={d.id} icon="repeat" tint="upkeep" title={d.title} subtitle={`${e?.title ?? ''}${span === 'day' ? '' : ` · ${format(new Date(d.at), 'd MMM')}`}`} value={d.cost ? money(d.cost) : undefined} onPress={e ? () => router.push(`/entity/${e.type}/${e.id}` as never) : undefined} />;
+              return <RowItem key={d.id} icon="repeat" tint="upkeep" title={d.title} subtitle={`${e?.title ?? ''}${span === 'day' ? '' : ` · ${format(new Date(d.at), 'd MMM')}`}`} value={d.cost ? money(d.cost) : undefined} onPress={e ? () => router.push(`/entity/${e.object}/${e.id}` as never) : undefined} />;
             })}
           </RowList>
         </Section>

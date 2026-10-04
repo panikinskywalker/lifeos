@@ -184,7 +184,7 @@ function Board({ entities, statuses }: { entities: ObjectRecord[]; statuses: Non
                 key={e.id}
                 accessibilityRole="button"
                 accessibilityHint="Long-press to move to the next status"
-                onPress={() => router.push(`/entity/${e.type}/${e.id}`)}
+                onPress={() => router.push(`/entity/${e.object}/${e.id}`)}
                 onLongPress={() => {
                   const idx = statuses.findIndex((x) => x.value === e.status);
                   os.records.setStatus(e.id, statuses[(idx + 1) % statuses.length]!.value);
@@ -219,14 +219,14 @@ export function groupEntities(entities: ObjectRecord[], groupBy: string | undefi
   if (!groupBy) return [{ key: null, label: null, items: entities }];
   const map = new Map<string, ObjectRecord[]>();
   const labelFor = (e: ObjectRecord): string => {
-    if (groupBy === 'status') return os.registry.object(e.type).statuses?.find((s) => s.value === e.status)?.label ?? e.status ?? 'No status';
+    if (groupBy === 'status') return os.registry.object(e.object).statuses?.find((s) => s.value === e.status)?.label ?? e.status ?? 'No status';
     if (groupBy === 'occurredAt' || groupBy === 'createdAt' || groupBy === 'month') {
       const ts = groupBy === 'createdAt' ? e.createdAt : e.occurredAt ?? e.createdAt;
       return new Date(ts).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
     }
     if (groupBy === 'day') return dayLabel(e.occurredAt ?? e.createdAt);
     const key = groupBy.replace(/^data\./, '');
-    const f = os.registry.object(e.type).fields.find((x) => x.key === key);
+    const f = os.registry.object(e.object).fields.find((x) => x.key === key);
     const v = e.data[key];
     if (v == null || v === '') return 'None';
     if (f?.type === 'select') return f.options?.find((o) => o.value === v)?.label ?? String(v);
@@ -238,7 +238,7 @@ export function groupEntities(entities: ObjectRecord[], groupBy: string | undefi
     if (!map.has(l)) map.set(l, []);
     map.get(l)!.push(e);
   }
-  const currencyKey = entities[0] ? os.registry.object(entities[0].type).fields.find((f) => f.type === 'currency')?.key : undefined;
+  const currencyKey = entities[0] ? os.registry.object(entities[0].object).fields.find((f) => f.type === 'currency')?.key : undefined;
   const sum = (items: ObjectRecord[], kind: string) => items.reduce((n, e) => n + (e.data.kind === kind ? Number(e.data[currencyKey!] ?? 0) : 0), 0);
   return [...map.entries()].map(([label, items]) => ({
     key: label,

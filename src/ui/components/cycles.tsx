@@ -23,7 +23,7 @@ export function dueLabel(i: UpkeepItem): string {
   return meterLeft != null ? `${km(meterLeft)} left` : '';
 }
 
-const ownName = (i: UpkeepItem) => i.cycle.name === i.entity.title || i.entity.type === 'routine';
+const ownName = (i: UpkeepItem) => i.cycle.name === i.entity.title || i.entity.object === 'routine';
 
 /** "Keep in touch · every 14 days · last 22 days ago" — the record is the title, the cycle leads the subtitle. */
 export function subtitleFor(i: UpkeepItem): string {
@@ -77,7 +77,7 @@ const UNITS: CycleUnit[] = ['day', 'week', 'month', 'year'];
 export function CycleSheet({ entity, cycle, visible, onClose }: { entity: ObjectRecord; cycle?: Cycle | null; visible: boolean; onClose: () => void }) {
   const os = useOS();
   const toast = useToast();
-  const hasMeter = !!os.registry.objects.get(entity.type)?.meters?.length;
+  const hasMeter = !!os.registry.objects.get(entity.object)?.meters?.length;
   const [name, setName] = useState('');
   const [kind, setKind] = useState<CycleKind>('interval');
   const [everyN, setEveryN] = useState(1);
@@ -149,7 +149,7 @@ export function CycleSheet({ entity, cycle, visible, onClose }: { entity: Object
 export function CyclesSection({ entity }: { entity: ObjectRecord }) {
   const os = useOS();
   const toast = useToast();
-  const def = os.registry.objects.get(entity.type);
+  const def = os.registry.objects.get(entity.object);
   const items = useLive((o) => o.cycles.forEntity(entity.id).map((cycle) => ({ cycle, entity, def, status: o.cycles.status(cycle) })), [entity.id]);
   const [editing, setEditing] = useState<Cycle | null | 'new'>(null);
   const [active, setActive] = useState<UpkeepItem | null>(null);

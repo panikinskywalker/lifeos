@@ -15,7 +15,7 @@ export function EntityRow({ entity, onPress, showType, value, subtitle, swipe = 
   const os = useOS();
   const router = useRouter();
   const toast = useToast();
-  const def = os.registry.objects.get(entity.type);
+  const def = os.registry.objects.get(entity.object);
   const tint = tintForModule(def?.module);
   const currencyField = def?.fields.find((f) => f.type === 'currency');
   const amount = currencyField ? (entity.data[currencyField.key] as number | undefined) : undefined;
@@ -55,7 +55,7 @@ export function EntityRow({ entity, onPress, showType, value, subtitle, swipe = 
       strong={amount != null && value === undefined}
       valueTone={kind === 'income' ? 'ok' : 'default'}
       chevron={shownValue ? false : undefined}
-      onPress={onPress ?? (() => router.push(`/entity/${entity.type}/${entity.id}`))}
+      onPress={onPress ?? (() => router.push(`/entity/${entity.object}/${entity.id}`))}
     />
   );
   if (!swipe) return row;

@@ -85,23 +85,23 @@ export function resolveNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, op
   if (s.subjectId && (THIS.test(name) || norm(name) === norm(os.records.get(s.subjectId)?.title ?? '\0'))) return { id: s.subjectId, confidence: 1, name };
   const seen = s.seen.get(`${type ?? ''}:${norm(name)}`) ?? s.seen.get(norm(name));
   if (seen) return { id: seen, confidence: 1, name };
-  const cands = resolveCandidates(os, name, type && os.registry.objects.has(type) ? [type] : undefined).filter((c) => c.why !== `a ${c.type}`);
+  const cands = resolveCandidates(os, name, type && os.registry.objects.has(type) ? [type] : undefined).filter((c) => c.why !== `a ${c.object}`);
   const [a, b] = cands;
   if (opts.isNew) {
     // Models mark almost everything "new". An exact name already here is that record; only when the
     // user actually said "new" do we flag it, so two different Kendals can be split from To check.
-    if (a && a.score >= 0.95) return { id: a.id, confidence: 0.9, flag: s.saidNew ? `Used your existing ${a.title} — cancel if this is someone new` : undefined, type: a.type, name };
+    if (a && a.score >= 0.95) return { id: a.id, confidence: 0.9, flag: s.saidNew ? `Used your existing ${a.title} — cancel if this is someone new` : undefined, type: a.object, name };
     return { id: null, confidence: 1, type, name };
   }
-  if (a && a.score >= 0.95 && (!b || a.score - b.score >= 0.1)) return { id: a.id, confidence: a.score, type: a.type, name };
+  if (a && a.score >= 0.95 && (!b || a.score - b.score >= 0.1)) return { id: a.id, confidence: a.score, type: a.object, name };
   // The exact name as another kind of record ("HDFC card" is an account, not a person): use it.
   if (type && (!a || a.score < 0.8)) {
-    const any = resolveCandidates(os, name).find((c) => c.score >= 0.95 && c.why !== `a ${c.type}`);
-    if (any) return { id: any.id, confidence: 0.9, type: any.type, name };
+    const any = resolveCandidates(os, name).find((c) => c.score >= 0.95 && c.why !== `a ${c.object}`);
+    if (any) return { id: any.id, confidence: 0.9, type: any.object, name };
   }
   if (a && a.score >= 0.8) {
     const other = b && b.score >= 0.8 ? ` (also ${b.title})` : '';
-    return { id: a.id, confidence: a.score, flag: `Guessed “${name}” is ${a.title}${other}`, type: a.type, name };
+    return { id: a.id, confidence: a.score, flag: `Guessed “${name}” is ${a.title}${other}`, type: a.object, name };
   }
   return { id: null, confidence: 1, type, name };
 }
@@ -117,14 +117,14 @@ export function upsertNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, opt
     const def = os.registry.objects.get(type)!;
     const title = titleCase(r.name);
     const data = baseData(def, title);
-    const e = os.records.create({ type, title, data }, 'assistant');
+    const e = os.records.create({ object: type, title, data }, 'assistant');
     id = e.id;
     created = true;
     if (r.flag) s.flags.set(id, r.flag);
     log(os, s, { kind: type, action: 'created', entityId: id, label: `${def.label}: ${title}`, flag: r.flag });
   } else if (r.flag) s.flags.set(id, r.flag);
   const e = os.records.get(id)!;
-  s.seen.set(`${e.type}:${norm(r.name)}`, id);
+  s.seen.set(`${e.object}:${norm(r.name)}`, id);
   s.seen.set(norm(r.name), id);
   s.seen.set(norm(e.title), id);
   if (opts.attributes && Object.keys(opts.attributes).length) setAttributes(os, s, id, opts.attributes);
@@ -188,7 +188,7 @@ const shown = (v: unknown) => (v == null || v === '' ? '—' : Array.isArray(v) 
 export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, attributes: Record<string, unknown>): { fields: string[]; notes: string[] } {
   const e = os.records.get(id);
   if (!e) return { fields: [], notes: [] };
-  const def = os.registry.objects.get(e.type)!;
+  const def = os.registry.objects.get(e.object)!;
   const data = e.data as Record<string, unknown>;
   const patch: Record<string, unknown> = {};
   const before: Record<string, unknown> = {};
@@ -219,11 +219,11 @@ export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, at
   if (fields.length) {
     os.records.update(id, { data: patch }, 'assistant');
     const label = fields.map((k) => `${fieldFor(def, k)?.label ?? k} → ${shown(patch[k])}`).join(', ');
-    log(os, s, { kind: e.type, action: 'updated', entityId: id, label: `${e.title} · ${label}`, before });
+    log(os, s, { kind: e.object, action: 'updated', entityId: id, label: `${e.title} · ${label}`, before });
   }
   for (const [label, value] of notes) addNoteLine(os, s, id, label, value);
   // A person's company is also a link to the organisation.
-  if (e.type === 'person' && typeof patch.company === 'string' && os.registry.objects.has('org')) {
+  if (e.object === 'person' && typeof patch.company === 'string' && os.registry.objects.has('org')) {
     const org = upsertNode(os, s, { name: patch.company, type: 'org' });
     if (org) link(os, s, id, org.id, 'works_at');
   }
@@ -234,7 +234,7 @@ export function setAttributes(os: LifeOSContext, s: GraphSession, id: string, at
 export function addNoteLine(os: LifeOSContext, s: GraphSession, id: string, label: string, value: string): void {
   const e = os.records.get(id);
   if (!e) return;
-  const def = os.registry.objects.get(e.type)!;
+  const def = os.registry.objects.get(e.object)!;
   const key = def.fields.find((f) => f.key === 'notes' || f.key === 'body')?.key ?? def.fields.find((f) => f.type === 'longtext')?.key;
   const nice = titleCase(label.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()).replace(/^(\p{L})(.*)$/u, (_m, a: string, b: string) => a + b.toLowerCase());
   const line = `• ${nice}: ${value.trim()}`;
@@ -250,7 +250,7 @@ export function addNoteLine(os: LifeOSContext, s: GraphSession, id: string, labe
   if (at >= 0) lines[at] = line;
   else lines.push(line);
   os.records.update(id, { data: { [key]: lines.join('\n') } }, 'assistant');
-  log(os, s, { kind: e.type, action: 'updated', entityId: id, label: `${e.title} · ${nice}: ${value}`, before: { [key]: old || null } });
+  log(os, s, { kind: e.object, action: 'updated', entityId: id, label: `${e.title} · ${nice}: ${value}`, before: { [key]: old || null } });
 }
 
 /* ------------------------------------------------------------------ */
@@ -276,7 +276,7 @@ export function link(os: LifeOSContext, s: GraphSession, fromId: string, toId: s
 function nodeLabel(os: LifeOSContext, id: string): string {
   const e = os.records.get(id);
   if (!e) return 'record';
-  if (e.type === 'transaction') {
+  if (e.object === 'transaction') {
     const d = e.data as { amount?: number; merchant?: string };
     return `${d.amount ? os.format.currency(d.amount) : 'Expense'}${d.merchant ? ` · ${d.merchant}` : ''}`;
   }
@@ -309,7 +309,7 @@ function tripFor(os: LifeOSContext, s: GraphSession, day: string, destination?: 
   const hit = covers ?? named;
   if (hit) return hit.id;
   if (!destination) return null;
-  const t = os.records.create({ type: 'trip', title: `Trip to ${titleCase(destination)}`, data: { destination: titleCase(destination), startDate: day } }, 'assistant');
+  const t = os.records.create({ object: 'trip', title: `Trip to ${titleCase(destination)}`, data: { destination: titleCase(destination), startDate: day } }, 'assistant');
   log(os, s, { kind: 'trip', action: 'created', entityId: t.id, label: `Trip: Trip to ${titleCase(destination)}` });
   return t.id;
 }
@@ -344,7 +344,7 @@ export function recordEvent(os: LifeOSContext, s: GraphSession, i: EventInput): 
   const title = i.title?.trim() || (kind === 'flight' && to ? `Flight to ${titleCase(to)}` : `${titleCase(kind)}${at ? ` at ${titleCase(at)}` : to ? ` to ${titleCase(to)}` : people}`);
   const cost = typeof i.cost === 'string' ? (parseAmount(i.cost) ?? undefined) : i.cost;
   const details = Object.fromEntries(Object.entries(i.details ?? {}).filter(([k]) => ['airline', 'flightNo', 'location', 'notes'].includes(k)).map(([k, v]) => [k, String(v)]));
-  const ev = os.records.create({ type: 'event', title, data: { kind, startAt, allDay: !hasTime, ...(i.end ? { endAt: dayStart(parseDateish(i.end) ?? day) } : {}), ...(cost ? { cost } : {}), ...details } }, 'assistant');
+  const ev = os.records.create({ object: 'event', title, data: { kind, startAt, allDay: !hasTime, ...(i.end ? { endAt: dayStart(parseDateish(i.end) ?? day) } : {}), ...(cost ? { cost } : {}), ...details } }, 'assistant');
   log(os, s, { kind: 'event', action: 'created', entityId: ev.id, label: `${titleCase(kind)}: ${title} (${new Date(startAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})` });
   const withIds: string[] = [];
   for (const r of roles) {
@@ -409,7 +409,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         const n = upsertNode(os, s, { name: i.name, type: i.type }, { isNew: i.is_new, attributes: i.attributes });
         if (!n) return { skipped: 'that is the user' };
         const e = os.records.get(n.id)!;
-        return { id: n.id, name: e.title, type: e.type, created: n.created };
+        return { id: n.id, name: e.title, type: e.object, created: n.created };
       },
     },
     {
@@ -461,7 +461,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
       run: async (input, os) => {
         const i = input as { title: string; due?: string; about?: NodeRef };
         if (!os.registry.objects.has('task')) return { error: 'no task type installed' };
-        const t = os.records.create({ type: 'task', title: i.title.trim(), data: { dueDate: parseDateish(i.due), priority: 'medium' } }, 'assistant');
+        const t = os.records.create({ object: 'task', title: i.title.trim(), data: { dueDate: parseDateish(i.due), priority: 'medium' } }, 'assistant');
         log(os, s, { kind: 'task', action: 'created', entityId: t.id, label: `Task: ${t.title}${i.due ? ` (${parseDateish(i.due) ?? i.due})` : ''}` });
         if (i.about) {
           const n = upsertNode(os, s, i.about);
@@ -515,7 +515,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
         if (!amount) return { error: 'no amount' };
         const account = i.account ? resolveCandidates(os, i.account, ['account']).find((c) => c.score >= 0.8) : undefined;
         const data = { amount, kind: i.kind ?? 'expense', category: i.category ? categoryValue(os, i.category) : categoryFor(os, i.merchant ?? (i.for ? nameOf(i.for) : null), i.note ?? '', typeof amount === 'number' ? amount : null), merchant: i.merchant ?? (i.for ? nameOf(i.for) : undefined), date: parseDateish(i.date ?? 'today'), accountId: account?.id, note: i.note ?? (i.account && !account ? i.account : undefined) };
-        const tx = os.records.create({ type: 'transaction', data }, 'assistant');
+        const tx = os.records.create({ object: 'transaction', data }, 'assistant');
         log(os, s, { kind: 'transaction', action: 'created', entityId: tx.id, label: `${data.kind === 'income' ? 'Income' : 'Spent'}: ${os.format.currency(amount)}${data.merchant ? ` · ${data.merchant}` : ''}` });
         if (i.for) {
           const n = upsertNode(os, s, i.for);
@@ -525,7 +525,7 @@ export function graphTools(s: GraphSession): AiToolDef[] {
           const r = resolveNode(os, s, w, { type: 'person' });
           const hit = r.id ? os.records.get(r.id) : undefined;
           // "…on the HDFC card" said as "with": it's how it was paid, not who was there.
-          if (hit?.type === 'account') {
+          if (hit?.object === 'account') {
             if (!data.accountId) os.records.update(tx.id, { data: { accountId: hit.id } }, 'assistant');
             continue;
           }

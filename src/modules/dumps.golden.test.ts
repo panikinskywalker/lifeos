@@ -82,7 +82,7 @@ describe('saying things (Jarvis golden flows)', () => {
   });
 
   it('on Kendal’s page: "her fav colour is pink, she’s vegetarian, new number 98450 12345" → phone field + tidy notes', async () => {
-    const k = os.records.create({ type: 'person', title: 'Kendal', data: {} });
+    const k = os.records.create({ object: 'person', title: 'Kendal', data: {} });
     const m = model([{ name: 'set_attributes', input: { node: 'her', attributes: { 'favourite colour': 'pink', diet: 'vegetarian', phone: '98450 12345' } } }]);
     await say('her fav colour is pink, she’s vegetarian, new number 98450 12345', m, k.id);
     expect(os.records.get(k.id)!.data).toMatchObject({ phone: '98450 12345', notes: '• Favourite colour: pink\n• Diet: vegetarian' });
@@ -91,7 +91,7 @@ describe('saying things (Jarvis golden flows)', () => {
   });
 
   it('a day: flight US → Canada with Kendal on 8 Sept, dinner at Canoe with Kendal and her brother Mike, 180 for dinner → linked graph', async () => {
-    const kendal = os.records.create({ type: 'person', title: 'Kendal', data: {} });
+    const kendal = os.records.create({ object: 'person', title: 'Kendal', data: {} });
     const m = model(
       [
         { name: 'record_event', input: { kind: 'flight', when: '8 Sept', roles: [{ role: 'from', node: { name: 'USA', type: 'place' } }, { role: 'to', node: { name: 'Canada', type: 'place' } }, { role: 'with', node: 'Kendal' }] } },
@@ -119,7 +119,7 @@ describe('saying things (Jarvis golden flows)', () => {
   });
 
   it('"bought a Dyson for 32k on the HDFC card, warranty 2 years" → asset with a warranty cycle + the expense paid for it', async () => {
-    const hdfc = os.records.create({ type: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
+    const hdfc = os.records.create({ object: 'account', title: 'HDFC card', data: { kind: 'credit', currency: 'INR' } });
     const m = model([
       { name: 'upsert_node', input: { name: 'Dyson', type: 'asset', attributes: { category: 'appliance', purchasePrice: '32k', purchaseDate: 'today', warrantyUntil: '2 years' } } },
       { name: 'log_spend', input: { amount: '32k', merchant: 'Dyson', category: 'shopping', for: 'Dyson', account: 'HDFC card' } },
@@ -160,7 +160,7 @@ describe('saying things (Jarvis golden flows)', () => {
 
 describe('filing mechanics', () => {
   it('parser first: "did laundry" is filed offline with no model call, and lands in To check', async () => {
-    os.records.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
+    os.records.create({ object: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
     const m = model();
     const { r } = await say('did laundry', m);
     expect(r).toMatchObject({ status: 'done', via: 'parser', items: 1 });
@@ -223,7 +223,7 @@ describe('filing mechanics', () => {
   });
 
   it('the parser files the everyday sentences inside a longer dump now; the model gets only the rest', async () => {
-    os.records.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
+    os.records.create({ object: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', kind: 'chore' } });
     const { d, r } = await say('Did laundry. Spent 450 on lunch at Toit. Met Kendal there, she just moved to Pune.', null);
     // No key: the everyday sentences are filed anyway, the rest waits.
     expect(r).toMatchObject({ status: 'pending', via: 'parser', items: 2 });

@@ -21,11 +21,11 @@ export const travelModule: ModuleManifest = {
       input: z.object({ destination: z.string(), startDate: z.string().optional(), endDate: z.string().optional(), budget: z.number().optional(), personIds: z.array(z.string()).optional(), purpose: z.string().optional(), todos: z.array(z.string()).optional().describe('e.g. "Book flights", "Visa", "Hotel in Gion"') }),
       run: async (input, os) => {
         const i = input as { destination: string; startDate?: string; endDate?: string; budget?: number; personIds?: string[]; purpose?: string; todos?: string[] };
-        const trip = os.records.create({ type: 'trip', data: { destination: i.destination, startDate: i.startDate, endDate: i.endDate, budget: i.budget, personIds: i.personIds, purpose: i.purpose }, status: 'planning' }, 'assistant');
+        const trip = os.records.create({ object: 'trip', data: { destination: i.destination, startDate: i.startDate, endDate: i.endDate, budget: i.budget, personIds: i.personIds, purpose: i.purpose }, status: 'planning' }, 'assistant');
         const made: string[] = [];
         if (os.registry.objects.has('task')) {
           for (const t of i.todos ?? []) {
-            const task = os.records.create({ type: 'task', title: t, data: { priority: 'medium', dueDate: i.startDate }, status: 'todo' }, 'assistant');
+            const task = os.records.create({ object: 'task', title: t, data: { priority: 'medium', dueDate: i.startDate }, status: 'todo' }, 'assistant');
             os.links.link(task.id, trip.id, 'trip', {}, 'assistant');
             made.push(task.id);
           }

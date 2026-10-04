@@ -128,7 +128,7 @@ const actions: ActionDef[] = [
       let data: Record<string, unknown> = {};
       if (typeof cfg.data === 'string' && cfg.data.trim()) data = JSON.parse(cfg.data);
       else if (cfg.data && typeof cfg.data === 'object') data = cfg.data as Record<string, unknown>;
-      const e = os.records.create({ type: String(cfg.entityType), title: cfg.title ? String(cfg.title) : undefined, data }, 'automation');
+      const e = os.records.create({ object: String(cfg.entityType), title: cfg.title ? String(cfg.title) : undefined, data }, 'automation');
       if (ctx.entity && cfg.linkKind) os.links.link(e.id, ctx.entity.id, String(cfg.linkKind), {}, 'automation');
       return e.title;
     },
@@ -166,8 +166,8 @@ const sortSchema: z.ZodType<SortSpec> = z.object({ field: z.string(), dir: z.enu
 
 function slim(e: ObjectRecord, os: LifeOSContext) {
   const tags = os.tags.forEntity(e.id).map((t) => t.name);
-  const rels = os.links.forEntity(e.id).slice(0, 12).map((r) => ({ kind: r.relation.kind, direction: r.direction, id: r.other.id, type: r.other.type, title: r.other.title }));
-  return { id: e.id, type: e.type, title: e.title, subtitle: e.subtitle, status: e.status, starred: e.starred, occurredAt: e.occurredAt ? new Date(e.occurredAt).toISOString() : null, data: e.data, tags, relations: rels, updatedAt: new Date(e.updatedAt).toISOString() };
+  const rels = os.links.forEntity(e.id).slice(0, 12).map((r) => ({ kind: r.relation.kind, direction: r.direction, id: r.other.id, type: r.other.object, title: r.other.title }));
+  return { id: e.id, type: e.object, title: e.title, subtitle: e.subtitle, status: e.status, starred: e.starred, occurredAt: e.occurredAt ? new Date(e.occurredAt).toISOString() : null, data: e.data, tags, relations: rels, updatedAt: new Date(e.updatedAt).toISOString() };
 }
 
 const aiTools: AiToolDef[] = [
@@ -238,7 +238,7 @@ const aiTools: AiToolDef[] = [
       const i = input as { type: string; title?: string; data: Record<string, unknown>; status?: string; tags?: string[]; links?: Array<{ toId: string; kind: string }> };
       const def = os.registry.objects.get(i.type);
       if (!def) return { error: `unknown record type ${i.type}` };
-      const e = os.records.create({ type: i.type, title: i.title, data: fillDefaults(def, i.data ?? {}, i.title), status: i.status }, 'assistant');
+      const e = os.records.create({ object: i.type, title: i.title, data: fillDefaults(def, i.data ?? {}, i.title), status: i.status }, 'assistant');
       for (const t of i.tags ?? []) os.tags.apply(e.id, t, 'assistant');
       for (const l of i.links ?? []) os.links.link(e.id, l.toId, l.kind, {}, 'assistant');
       const saved = os.records.get(e.id)!;
@@ -249,7 +249,7 @@ const aiTools: AiToolDef[] = [
     name: 'update_entity',
     description: 'Update fields, title, status, star or archive on an existing record. Only send the fields that change.',
     input: z.object({ id: z.string(), title: z.string().optional(), data: z.record(z.string(), z.unknown()).optional(), status: z.string().nullable().optional(), starred: z.boolean().optional(), archived: z.boolean().optional(), addTags: z.array(z.string()).optional() }),
-    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.records.get(i.id)?.type),
+    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.records.get(i.id)?.object),
     describe: (i: { id: string; data?: Record<string, unknown> }, os) => `Change ${os.records.get(i.id)?.title ?? 'record'}${i.data ? `: ${Object.entries(i.data).map(([k, v]) => `${k} → ${String(v)}`).join(', ')}` : ''}`,
     run: async (input, os) => {
       const i = input as { id: string; title?: string; data?: Record<string, unknown>; status?: string | null; starred?: boolean; archived?: boolean; addTags?: string[] };
@@ -270,7 +270,7 @@ const aiTools: AiToolDef[] = [
     name: 'delete_entity',
     description: 'Soft-delete a record (recoverable).',
     input: z.object({ id: z.string() }),
-    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.records.get(i.id)?.type),
+    confirm: (i: { id: string }, os) => touchesMoneyOrPeople(os, os.records.get(i.id)?.object),
     describe: (i: { id: string }, os) => `Delete ${os.records.get(i.id)?.title ?? 'record'} (you can restore it)`,
     run: async (input, os) => {
       const id = (input as { id: string }).id;

@@ -84,7 +84,7 @@ export const assetsAiTools: AiToolDef[] = [
       input: z.object({ name: z.string(), everyN: z.number().int().positive(), everyUnit: z.enum(['day', 'week', 'month']), kind: z.enum(['chore', 'personal', 'home']).default('chore'), minutes: z.number().optional(), weekday: z.number().int().min(0).max(6).optional(), lastDoneOn: z.string().optional() }),
       run: async (input, os) => {
         const i = input as { name: string; everyN: number; everyUnit: 'day' | 'week' | 'month'; kind: string; minutes?: number; weekday?: number; lastDoneOn?: string };
-        const e = os.records.create({ type: 'routine', data: { ...i, weekday: i.weekday != null ? String(i.weekday) : undefined } }, 'assistant');
+        const e = os.records.create({ object: 'routine', data: { ...i, weekday: i.weekday != null ? String(i.weekday) : undefined } }, 'assistant');
         const c = os.cycles.forEntity(e.id)[0];
         return withExtras({ created: e.title, schedule: e.subtitle, cycleId: c?.id }, { undo: () => os.records.delete(e.id, 'user'), card: c ? { kind: 'cycle', entityId: e.id, cycleId: c.id, title: e.title, due: e.subtitle ?? '' } : { kind: 'record', entityId: e.id, type: 'routine', title: e.title, subtitle: e.subtitle } });
       },

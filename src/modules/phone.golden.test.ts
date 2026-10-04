@@ -25,7 +25,7 @@ describe('contacts you pick', () => {
     expect((k.data as { birthday: string }).birthday).toMatch(/-09-08$/);
     expect(os.cycles.forEntity(k.id).map((c) => c.name)).toContain('Birthday');
     // Already there (said in a dump): matched by name, gaps filled, your company kept.
-    const karan = os.records.create({ type: 'person', title: 'Karan', data: { company: 'Swiggy' } });
+    const karan = os.records.create({ object: 'person', title: 'Karan', data: { company: 'Swiggy' } });
     expect(importContacts(os, [{ id: 'c2', name: 'Karan', phones: ['09845000000'], emails: [], company: 'Zomato' }])).toEqual({ created: 0, updated: 1 });
     expect(os.records.get(karan.id)!.data).toMatchObject({ company: 'Swiggy', phone: '09845000000', contactId: 'c2' });
     expect(personForContact(os, { id: 'zz', name: 'Someone', phones: ['9845000000'], emails: [] })).toBe(karan.id);
@@ -34,7 +34,7 @@ describe('contacts you pick', () => {
 
   it('re-sync fills what an imported contact gained, and nothing for people you never imported', () => {
     importContacts(os, [{ id: 'c1', name: 'Kendal Rao', phones: [], emails: [] }]);
-    os.records.create({ type: 'person', title: 'Asha', data: {} });
+    os.records.create({ object: 'person', title: 'Asha', data: {} });
     expect(resyncContacts(os, [{ ...kendalContact }, { id: 'c9', name: 'Asha', phones: ['1'], emails: [] }])).toBe(1);
     expect(os.records.query('person').find((p) => p.title === 'Asha')!.data).toEqual({});
   });
@@ -60,7 +60,7 @@ describe('calendar and call log', () => {
     const [e] = os.records.query('event');
     expect(os.links.forEntity(e!.id).map((r) => r.other.title)).toEqual(['Kendal Rao']);
     // Duplicates from before this fix (one per calendar, old keys) are merged on the next sync.
-    for (const i of [1, 2, 3]) os.records.create({ type: 'event', title: 'Standup', data: { kind: 'event', startAt: start + 86_400_000, endAt: start + 86_400_000 + 900_000, source: 'calendar', sourceKey: `cal:old-${i}` } });
+    for (const i of [1, 2, 3]) os.records.create({ object: 'event', title: 'Standup', data: { kind: 'event', startAt: start + 86_400_000, endAt: start + 86_400_000 + 900_000, source: 'calendar', sourceKey: `cal:old-${i}` } });
     expect(saveCalendarEvents(os, [])).toMatchObject({ merged: 2 });
     expect(os.records.query('event').filter((x) => x.title === 'Standup')).toHaveLength(1);
   });

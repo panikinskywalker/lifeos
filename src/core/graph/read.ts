@@ -35,7 +35,7 @@ export function neighbours(os: LifeOSContext, id: string, opts: { kind?: string;
   const out: Neighbour[] = [];
   for (const r of os.links.forEntity(id, opts.kind)) {
     const o = r.other;
-    const dated = o.type === 'event' || o.type === 'trip' || o.type === 'transaction';
+    const dated = o.object === 'event' || o.object === 'trip' || o.object === 'transaction';
     let context: string | null = null;
     if (dated) {
       const around = os.links
@@ -45,7 +45,7 @@ export function neighbours(os: LifeOSContext, id: string, opts: { kind?: string;
         .map((x) => `${edgeLabel(x.relation.kind, x.direction).toLowerCase()} ${x.other.title}`);
       context = around.length ? around.join(' · ') : null;
     }
-    out.push({ id: o.id, type: o.type, title: o.title, label: edgeLabel(r.relation.kind, r.direction), kind: r.relation.kind, at: dated ? eventTime(os, o.id) : null, context });
+    out.push({ id: o.id, type: o.object, title: o.title, label: edgeLabel(r.relation.kind, r.direction), kind: r.relation.kind, at: dated ? eventTime(os, o.id) : null, context });
   }
   out.sort((a, b) => (b.at ?? -Infinity) - (a.at ?? -Infinity) || a.label.localeCompare(b.label));
   return out.slice(0, opts.limit ?? 40);
@@ -68,7 +68,7 @@ export const graphReadTools: AiToolDef[] = [
       const id = i.id ?? (i.name ? clearMatch(resolveCandidates(os, i.name))?.id : undefined);
       if (!id) return { error: i.name ? `no clear record called ${i.name}` : 'name or id required' };
       const e = os.records.get(id)!;
-      return { record: e.title, type: e.type, connections: neighbours(os, id, { kind: i.kind, limit: i.limit ?? 20 }).map((n) => ({ ...n, at: n.at ? day(n.at) : undefined })) };
+      return { record: e.title, type: e.object, connections: neighbours(os, id, { kind: i.kind, limit: i.limit ?? 20 }).map((n) => ({ ...n, at: n.at ? day(n.at) : undefined })) };
     },
   },
 ];
@@ -98,7 +98,7 @@ export function egoGraph(os: LifeOSContext, centreId: string, opts: { hops?: num
   if (!centre) return { nodes: [], edges: [] };
   const node = (id: string, hop: number): GraphNode | null => {
     const e = os.records.get(id);
-    return e ? { id: e.id, type: e.type, title: e.title, module: os.registry.objects.get(e.type)?.module ?? null, hop } : null;
+    return e ? { id: e.id, type: e.object, title: e.title, module: os.registry.objects.get(e.object)?.module ?? null, hop } : null;
   };
   const nodes = new Map<string, GraphNode>([[centre.id, node(centre.id, 0)!]]);
   const edges = new Map<string, GraphEdge>();

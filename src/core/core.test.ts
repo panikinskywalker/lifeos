@@ -68,7 +68,7 @@ afterEach(() => os.db.close());
 
 describe('entity store', () => {
   it('creates, derives title, indexes for search, writes timeline + change log', () => {
-    const t = os.records.create({ type: 'txn', data: { amount: 450, category: 'food', merchant: 'Blue Tokai', date: '2026-09-01' } });
+    const t = os.records.create({ object: 'txn', data: { amount: 450, category: 'food', merchant: 'Blue Tokai', date: '2026-09-01' } });
     expect(t.title).toBe('Blue Tokai');
     expect(t.status).toBe('pending');
     expect(t.occurredAt).toBe(new Date('2026-09-01').getTime());
@@ -78,11 +78,11 @@ describe('entity store', () => {
   });
 
   it('validates data against the schema', () => {
-    expect(() => os.records.create({ type: 'txn', data: { amount: 'lots', date: 'x' } })).toThrow();
+    expect(() => os.records.create({ object: 'txn', data: { amount: 'lots', date: 'x' } })).toThrow();
   });
 
   it('updates with diff, version bump and status timeline', () => {
-    const t = os.records.create({ type: 'txn', data: { amount: 10, date: '2026-09-01', merchant: 'A' } });
+    const t = os.records.create({ object: 'txn', data: { amount: 10, date: '2026-09-01', merchant: 'A' } });
     const u = os.records.update(t.id, { data: { amount: 20 }, status: 'cleared' });
     expect(u.version).toBe(2);
     expect(u.data.amount).toBe(20);
@@ -94,7 +94,7 @@ describe('entity store', () => {
 
   it('queries with the universal filter DSL, sorts and aggregates', () => {
     for (const [amt, cat, d] of [[100, 'food', '2026-09-01'], [200, 'food', '2026-09-02'], [900, 'travel', '2026-08-15']] as const) {
-      os.records.create({ type: 'txn', data: { amount: amt, category: cat, date: d } });
+      os.records.create({ object: 'txn', data: { amount: amt, category: cat, date: d } });
     }
     const food = os.records.query('txn', { filter: { and: [{ field: 'data.category', op: 'eq', value: 'food' }] }, sort: [{ field: 'data.amount', dir: 'desc' }] });
     expect(food.map((e) => e.data.amount)).toEqual([200, 100]);
@@ -109,7 +109,7 @@ describe('entity store', () => {
   });
 
   it('soft deletes and hides from queries and search', () => {
-    const t = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-01-01', merchant: 'Gone' } });
+    const t = os.records.create({ object: 'txn', data: { amount: 1, date: '2026-01-01', merchant: 'Gone' } });
     os.records.delete(t.id);
     expect(os.records.get(t.id)).toBeUndefined();
     expect(os.records.search.search('gone')).toHaveLength(0);
@@ -118,9 +118,9 @@ describe('entity store', () => {
   });
 
   it('restore undoes a delete: record, its links, search, change log and an event', () => {
-    const t = os.records.create({ type: 'txn', data: { amount: 900, date: '2026-09-01', merchant: 'Houseboat' } });
-    const trip = os.records.create({ type: 'trip', data: { destination: 'Alleppey' } });
-    const other = os.records.create({ type: 'trip', data: { destination: 'Goa' } });
+    const t = os.records.create({ object: 'txn', data: { amount: 900, date: '2026-09-01', merchant: 'Houseboat' } });
+    const trip = os.records.create({ object: 'trip', data: { destination: 'Alleppey' } });
+    const other = os.records.create({ object: 'trip', data: { destination: 'Goa' } });
     os.links.link(t.id, trip.id, 'trip');
     os.links.link(t.id, other.id, 'related');
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -152,7 +152,7 @@ describe('entity store', () => {
 
 describe('live-query events', () => {
   it('every stored change emits an event, so live screens refresh', () => {
-    const e = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-09-01', merchant: 'Chai' } });
+    const e = os.records.create({ object: 'txn', data: { amount: 1, date: '2026-09-01', merchant: 'Chai' } });
     const events: string[] = [];
     const off = bus.onAny((name) => void events.push(name));
     const emits = (label: string, fn: () => void) => {
@@ -182,9 +182,9 @@ describe('live-query events', () => {
 
 describe('relations, tags, comments, attachments', () => {
   it('links bidirectionally and filters by relatedTo', () => {
-    const trip = os.records.create({ type: 'trip', data: { destination: 'Tokyo' } });
-    const t1 = os.records.create({ type: 'txn', data: { amount: 5000, date: '2026-12-20', merchant: 'JR Pass' } });
-    os.records.create({ type: 'txn', data: { amount: 50, date: '2026-12-20', merchant: 'Chai' } });
+    const trip = os.records.create({ object: 'trip', data: { destination: 'Tokyo' } });
+    const t1 = os.records.create({ object: 'txn', data: { amount: 5000, date: '2026-12-20', merchant: 'JR Pass' } });
+    os.records.create({ object: 'txn', data: { amount: 50, date: '2026-12-20', merchant: 'Chai' } });
     os.links.link(t1.id, trip.id, 'trip');
     expect(os.links.forEntity(trip.id)[0].other.title).toBe('JR Pass');
     const inTrip = os.records.query('txn', { filter: { and: [{ field: 'relation.trip', op: 'relatedTo', value: trip.id }] } });
@@ -194,7 +194,7 @@ describe('relations, tags, comments, attachments', () => {
   });
 
   it('tags are case-insensitive and filterable', () => {
-    const t = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
+    const t = os.records.create({ object: 'txn', data: { amount: 1, date: '2026-01-01' } });
     os.tags.apply(t.id, 'Work');
     os.tags.apply(t.id, 'work');
     expect(os.tags.forEntity(t.id)).toHaveLength(1);
@@ -204,7 +204,7 @@ describe('relations, tags, comments, attachments', () => {
   });
 
   it('comments and attachments land on the timeline', () => {
-    const t = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
+    const t = os.records.create({ object: 'txn', data: { amount: 1, date: '2026-01-01' } });
     os.comments.add(t.id, 'Reimbursed by office');
     os.attachments.add({ entityId: t.id, name: 'receipt.jpg', uri: 'file:///x', kind: 'receipt' });
     const kinds = os.records.timeline.forEntity(t.id).map((e) => e.kind);
@@ -212,7 +212,7 @@ describe('relations, tags, comments, attachments', () => {
   });
 
   it('a record has at most one cover photo; replacing keeps the old one recoverable', () => {
-    const t = os.records.create({ type: 'txn', data: { amount: 1, date: '2026-01-01' } });
+    const t = os.records.create({ object: 'txn', data: { amount: 1, date: '2026-01-01' } });
     expect(os.attachments.cover(t.id)).toBeNull();
     const first = os.attachments.setCover({ entityId: t.id, name: 'a.jpg', mime: 'image/jpeg', uri: 'file:///a' });
     const second = os.attachments.setCover({ entityId: t.id, name: 'b.jpg', mime: 'image/jpeg', uri: 'file:///b' });
@@ -248,8 +248,8 @@ describe('automation', () => {
       conditions: [{ field: 'data.amount', op: 'gt', value: 1000 }],
       actions: [{ id: 'test.flag', config: { tag: 'big' } }, { id: 'core.addComment', config: { body: '{{title}} was {{data.amount}}' } }],
     });
-    const small = os.records.create({ type: 'txn', data: { amount: 10, date: '2026-01-01', merchant: 'S' } });
-    const big = os.records.create({ type: 'txn', data: { amount: 5000, date: '2026-01-01', merchant: 'Flight' } });
+    const small = os.records.create({ object: 'txn', data: { amount: 10, date: '2026-01-01', merchant: 'S' } });
+    const big = os.records.create({ object: 'txn', data: { amount: 5000, date: '2026-01-01', merchant: 'Flight' } });
     await new Promise((r) => setTimeout(r, 20));
     expect(os.tags.forEntity(small.id)).toHaveLength(0);
     expect(os.tags.forEntity(big.id).map((t) => t.name)).toEqual(['big']);
@@ -296,14 +296,14 @@ describe('nested transactions', () => {
   it('rolls back everything inside an outer transaction on failure', () => {
     expect(() =>
       os.db.transaction(() => {
-        os.records.create({ type: 'trip', data: { destination: 'A' } });
-        os.records.create({ type: 'trip', data: { destination: 'B' } });
+        os.records.create({ object: 'trip', data: { destination: 'A' } });
+        os.records.create({ object: 'trip', data: { destination: 'B' } });
         throw new Error('boom');
       }),
     ).toThrow('boom');
     expect(os.records.count('trip')).toBe(0);
     os.db.transaction(() => {
-      os.records.create({ type: 'trip', data: { destination: 'C' } });
+      os.records.create({ object: 'trip', data: { destination: 'C' } });
     });
     expect(os.records.count('trip')).toBe(1);
   });

@@ -82,7 +82,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   // Notes, tags and attachment names are part of a record's search text: reindex it when they change.
   const reindex = (entityId: string | null | undefined) => {
     const e = entityId ? entities.get(entityId) : undefined;
-    const def = e ? registry.objects.get(e.type) : undefined;
+    const def = e ? registry.objects.get(e.object) : undefined;
     if (e && def) entities.search.index(e, def);
   };
   const ownerOf = (table: 'comments' | 'attachments', id: string) => db.get<{ entity_id: string }>(`SELECT entity_id FROM ${table} WHERE id=?`, [id])?.entity_id;
@@ -151,7 +151,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   // Default cycles: new records get their type's templates; existing records get them once.
   ctx.cycles.onReading = (entityId, meter, actor) => {
     const e = entities.get(entityId);
-    const m = e && registry.objects.get(e.type)?.meters?.find((x) => x.meter === meter);
+    const m = e && registry.objects.get(e.object)?.meters?.find((x) => x.meter === meter);
     if (!e || !m) return;
     const latest = ctx.cycles.latestMeter(entityId, meter);
     if ((e.data as Record<string, unknown>)[m.field] !== latest) entities.update(entityId, { data: { [m.field]: latest ?? undefined } }, actor);
@@ -162,7 +162,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   };
   ctx.cycles.onChanged = (c) => {
     const e = entities.get(c.entityId);
-    const map = e && c.template ? registry.objects.get(e.type)?.cycleFields?.[c.template] : undefined;
+    const map = e && c.template ? registry.objects.get(e.object)?.cycleFields?.[c.template] : undefined;
     if (!e || !map) return;
     const data = e.data as Record<string, unknown>;
     const patch: Record<string, unknown> = {};
@@ -173,7 +173,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   };
   // Paused / cancelled records: their cycles leave Upkeep until the record is live again.
   const syncEnabled = (e: ObjectRecord) => {
-    const live = registry.objects.get(e.type)?.cycleActiveStatuses;
+    const live = registry.objects.get(e.object)?.cycleActiveStatuses;
     if (!live) return;
     const on = e.status == null || live.includes(e.status);
     for (const c of ctx.cycles.forEntity(e.id)) if (c.enabled !== on) ctx.cycles.update(c.id, { enabled: on });
@@ -181,7 +181,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   bus.on('entity.status', ({ entity }) => syncEnabled(entity));
   // Meters: a value typed into the mirrored field (odometerKm) becomes a reading.
   const mirrorMeters = (entity: ObjectRecord) => {
-    for (const m of registry.objects.get(entity.type)?.meters ?? []) {
+    for (const m of registry.objects.get(entity.object)?.meters ?? []) {
       const v = Number((entity.data as Record<string, unknown>)[m.field]);
       if (!Number.isFinite(v) || (entity.data as Record<string, unknown>)[m.field] == null) continue;
       if (ctx.cycles.latestMeter(entity.id, m.meter) === v) continue;
@@ -196,12 +196,12 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   });
   bus.on('entity.created', ({ entity }) => {
     mirrorMeters(entity);
-    ctx.cycles.applyTemplates(entity, registry.objects.get(entity.type));
+    ctx.cycles.applyTemplates(entity, registry.objects.get(entity.object));
     syncEnabled(entity);
   });
   bus.on('entity.updated', ({ entity, previous, changed }) => {
-    if (changed.some((k) => k.startsWith('data.'))) ctx.cycles.syncTemplates(entity, previous, registry.objects.get(entity.type));
-    const meters = registry.objects.get(entity.type)?.meters ?? [];
+    if (changed.some((k) => k.startsWith('data.'))) ctx.cycles.syncTemplates(entity, previous, registry.objects.get(entity.object));
+    const meters = registry.objects.get(entity.object)?.meters ?? [];
     if (meters.some((m) => changed.includes(m.field) || changed.includes(`data.${m.field}`))) mirrorMeters(entity);
   });
   if (!settings.get('cycles.enabledSynced', false)) {
@@ -239,7 +239,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
   ctx.automation.start();
   // You recategorised a transaction: that merchant keeps the category next time (SMS, notifications).
   bus.on('entity.updated', ({ entity, previous, actor }) => {
-    if (actor !== 'user' || entity.type !== 'transaction') return;
+    if (actor !== 'user' || entity.object !== 'transaction') return;
     const d = entity.data as { category?: string; merchant?: string };
     if (!d.category || d.category === (previous.data as { category?: string }).category) return;
     const others = learnCategory(ctx, d.merchant, d.category, entity.id);

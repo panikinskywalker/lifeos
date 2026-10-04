@@ -140,7 +140,7 @@ export const createAnythingTools: AiToolDef[] = [
         if (Object.keys(fill).length) os.records.update(e.id, { data: fill }, 'assistant');
         id = e.id;
       } else {
-        id = os.records.create({ type: 'person', title: name, data: fillDefaults(def, patch, name) }, 'assistant').id;
+        id = os.records.create({ object: 'person', title: name, data: fillDefaults(def, patch, name) }, 'assistant').id;
         created = true;
       }
       const day = parseDateish(i.metOn) ?? isoDay(new Date());
@@ -173,11 +173,11 @@ export const createAnythingTools: AiToolDef[] = [
       const days = (i.everyN ?? 30) * ({ day: 1, week: 7, month: 30, year: 365 } as const)[i.everyUnit ?? 'day'];
       const until = parseDateish(i.until);
       // Types that own the field get it through their cycle template, so the record page and the cycle agree.
-      if (i.kind === 'keep_in_touch' && e.type === 'person') {
+      if (i.kind === 'keep_in_touch' && e.object === 'person') {
         os.records.update(e.id, { data: { contactEvery: days } }, 'assistant');
         return withExtras({ ok: true, cycle: `Keep in touch every ${days} days` }, { undo: () => os.records.update(e.id, { data: { contactEvery: data.contactEvery } }, 'user') });
       }
-      if (i.kind === 'warranty' && e.type === 'asset' && until) {
+      if (i.kind === 'warranty' && e.object === 'asset' && until) {
         os.records.update(e.id, { data: { warrantyUntil: until } }, 'assistant');
         return withExtras({ ok: true, cycle: `Warranty until ${until}` }, { undo: () => os.records.update(e.id, { data: { warrantyUntil: data.warrantyUntil } }, 'user') });
       }

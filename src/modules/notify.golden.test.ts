@@ -21,9 +21,9 @@ afterEach(() => os.db.close());
 describe('morning brief', () => {
   it('from real data: sleep vs goal, step goal, what is on with times, spend', () => {
     saveHealthDays(os, [{ day: '2026-09-27', sleepMin: 400 }]);
-    os.records.create({ type: 'event', title: 'Dentist', data: { startAt: AT('2026-09-27T11:00:00') } });
-    os.records.create({ type: 'task', title: 'Call bank', data: { dueDate: '2026-09-27' } });
-    os.records.create({ type: 'transaction', data: { amount: 4200, kind: 'expense', category: 'food', date: '2026-09-05' } });
+    os.records.create({ object: 'event', title: 'Dentist', data: { startAt: AT('2026-09-27T11:00:00') } });
+    os.records.create({ object: 'task', title: 'Call bank', data: { dueDate: '2026-09-27' } });
+    os.records.create({ object: 'transaction', data: { amount: 4200, kind: 'expense', category: 'food', date: '2026-09-05' } });
     const b = morningBrief(os, AT('2026-09-27T08:00:00'));
     expect(b.title).toBe('Good morning — 2 things today');
     expect(b.lines[0]).toBe('Slept 6h 42m (goal 7h 00m)');

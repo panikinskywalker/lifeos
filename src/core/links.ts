@@ -17,7 +17,7 @@ const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 /** A [[title]] → record id: exact title first (case-insensitive), then a learned alias. Null when unsure. */
 export function resolveLink(os: LifeOSContext, title: string, exclude?: string): string | null {
   const t = norm(title);
-  const exact = os.records.search.search(title, { limit: 20 }).filter((h) => h.type !== 'fact' && h.type !== 'dump' && h.id !== exclude && norm(h.title) === t);
+  const exact = os.records.search.search(title, { limit: 20 }).filter((h) => h.object !== 'fact' && h.object !== 'dump' && h.id !== exclude && norm(h.title) === t);
   if (exact.length === 1) return exact[0]!.id;
   if (exact.length > 1) return null;
   const alias = os.aliases.lookup(title).find((a) => norm(a.alias) === t && a.entityId !== exclude);
@@ -26,7 +26,7 @@ export function resolveLink(os: LifeOSContext, title: string, exclude?: string):
 
 /** Text fields of a record that may carry [[links]]. */
 function linkText(os: LifeOSContext, e: ObjectRecord): string {
-  const def = os.registry.objects.get(e.type);
+  const def = os.registry.objects.get(e.object);
   if (!def) return '';
   return def.fields
     .filter((f) => f.type === 'text' || f.type === 'longtext')

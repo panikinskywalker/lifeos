@@ -34,7 +34,7 @@ export default function RemindersRoute() {
             iconColor={at < now ? t.colors.danger : t.colors.accents.red}
             last={i === items.length - 1}
             chevron={false}
-            onPress={entity ? () => router.push(`/entity/${entity.type}/${entity.id}`) : undefined}
+            onPress={entity ? () => router.push(`/entity/${entity.object}/${entity.id}`) : undefined}
             onLongPress={() => os.reminders.remove(r.id)}
             right={
               <View style={{ flexDirection: 'row' }}>

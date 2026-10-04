@@ -23,7 +23,7 @@ export function PersonSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx:
     const c = os.cycles.forEntity(entity.id).find((x) => x.template === 'person.contact');
     return c ? { cycle: c, status: os.cycles.status(c) } : null;
   }, [entity.id, entity.version]);
-  const txns = linked.filter((r) => r.other.type === 'transaction').slice(0, 5);
+  const txns = linked.filter((r) => r.other.object === 'transaction').slice(0, 5);
   const days = p.data.lastContactAt ? Math.floor((Date.now() - new Date(p.data.lastContactAt).getTime()) / 86400000) : null;
   const overdue = contact?.status.state === 'overdue' || (!!p.data.contactEvery && days != null && days > p.data.contactEvery);
   const bday = p.data.birthday ? nextBirthday(p.data.birthday) : null;

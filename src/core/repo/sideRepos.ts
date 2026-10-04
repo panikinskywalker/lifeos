@@ -53,7 +53,7 @@ export class LinkRepo {
        ORDER BY r.created_at DESC`,
       kind ? [id, id, id, id, kind] : [id, id, id, id],
     );
-    return rows.map((r) => ({ relation: toRelation(r), other: { id: r.o_id as string, type: r.o_type as string, title: r.o_title as string }, direction: r.direction as 'out' | 'in' }));
+    return rows.map((r) => ({ relation: toRelation(r), other: { id: r.o_id as string, object: r.o_type as string, title: r.o_title as string }, direction: r.direction as 'out' | 'in' }));
   }
 
   /** Ids of entities linked from `id` with a given kind (e.g. transaction → account). */

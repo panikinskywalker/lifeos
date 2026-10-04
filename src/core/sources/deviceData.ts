@@ -118,7 +118,7 @@ const METRICS: Array<[keyof HealthDayIn, string, string, (v: number) => number]>
 function upsertBySourceKey(os: LifeOSContext, type: string, key: string, data: Record<string, unknown>): 'created' | 'updated' | 'same' {
   const [hit] = os.records.query<Record<string, unknown>>(type, { filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 1 });
   if (!hit) {
-    os.records.create({ type, data: { ...data, sourceKey: key } }, 'system');
+    os.records.create({ object: type, data: { ...data, sourceKey: key } }, 'system');
     return 'created';
   }
   const changed = Object.entries(data).some(([k, v]) => hit.data[k] !== v);

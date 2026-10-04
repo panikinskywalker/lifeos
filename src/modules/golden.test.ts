@@ -72,7 +72,7 @@ afterEach(() => os.db.close());
 
 describe('golden flows (PRODUCT §7)', () => {
   it('1 · "Did the car service today, 6,400 at Hyundai" → service logged, expense linked, cycle rolled, card with Undo; zero taps but the money confirm', async () => {
-    const car = os.records.create({ type: 'vehicle', data: { make: 'Hyundai', model: 'Creta', odometerKm: 29400, nextServiceKm: 30000 } });
+    const car = os.records.create({ object: 'vehicle', data: { make: 'Hyundai', model: 'Creta', odometerKm: 29400, nextServiceKm: 30000 } });
     const service = os.cycles.forEntity(car.id).find((c) => c.template === 'vehicle.service')!;
     const r = await say('Did the car service today, 6,400 at Hyundai', [
       () => [{ name: 'resolve_entity', input: { text: 'the car' } }],
@@ -94,7 +94,7 @@ describe('golden flows (PRODUCT §7)', () => {
   });
 
   it('2 · "Recharged Jio 719 for 84 days" → plan updated, renewal done, next due +84 days, expense logged', async () => {
-    const jio = os.records.create({ type: 'subscription', status: 'active', data: { name: 'Jio', amount: 599, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: today(), autoPost: false } });
+    const jio = os.records.create({ object: 'subscription', status: 'active', data: { name: 'Jio', amount: 599, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: today(), autoPost: false } });
     const r = await say('Recharged Jio 719 for 84 days', [
       () => [{ name: 'resolve_entity', input: { text: 'Jio' } }],
       ([res]) => [{ name: 'update_entity', input: { id: res!.match.id, data: { amount: 719, rrule: 'FREQ=DAILY;INTERVAL=84' } } }],
@@ -107,8 +107,8 @@ describe('golden flows (PRODUCT §7)', () => {
   });
 
   it('3 · "did laundry" / "Washed the white sneakers" → routine and item cycles roll', async () => {
-    const laundry = os.records.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', lastDoneOn: daysFrom(-5) } });
-    const sneakers = os.records.create({ type: 'item', title: 'White sneakers', data: { quantity: 1 } });
+    const laundry = os.records.create({ object: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', lastDoneOn: daysFrom(-5) } });
+    const sneakers = os.records.create({ object: 'item', title: 'White sneakers', data: { quantity: 1 } });
     const wash = os.cycles.create({ entityId: sneakers.id, name: 'Wash', kind: 'interval', everyN: 3, everyUnit: 'week', lastDoneAt: Date.now() - 25 * 864e5 });
     const a = await say('did laundry', [() => [{ name: 'resolve_entity', input: { text: 'laundry' } }], ([res]) => [{ name: 'mark_cycle_done', input: { entityId: res!.match.id } }]]);
     expect(a).toMatchObject({ calls: ['resolve_entity', 'mark_cycle_done'], asked: [] });
@@ -119,8 +119,8 @@ describe('golden flows (PRODUCT §7)', () => {
   });
 
   it('4 · "Priya paid me back 2,600" → debt settled, money in, on her timeline (confirm card)', async () => {
-    const priya = os.records.create({ type: 'person', data: {}, title: 'Priya Sharma' });
-    os.records.create({ type: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 2600, reason: 'Toit', date: today(), kind: 'split' } });
+    const priya = os.records.create({ object: 'person', data: {}, title: 'Priya Sharma' });
+    os.records.create({ object: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 2600, reason: 'Toit', date: today(), kind: 'split' } });
     const r = await say('Priya paid me back 2,600', [
       () => [{ name: 'resolve_entity', input: { text: 'Priya', types: ['person'] } }],
       ([res]) => [
@@ -136,8 +136,8 @@ describe('golden flows (PRODUCT §7)', () => {
   });
 
   it('5 · "Dinner was 3,600, split with Arjun and Priya" → expense + two debts (confirm card)', async () => {
-    const arjun = os.records.create({ type: 'person', data: {}, title: 'Arjun Mehta' });
-    const priya = os.records.create({ type: 'person', data: {}, title: 'Priya Sharma' });
+    const arjun = os.records.create({ object: 'person', data: {}, title: 'Arjun Mehta' });
+    const priya = os.records.create({ object: 'person', data: {}, title: 'Priya Sharma' });
     const r = await say('Dinner was 3,600, split with Arjun and Priya', [
       () => [{ name: 'resolve_entity', input: { text: 'Arjun' } }, { name: 'resolve_entity', input: { text: 'Priya' } }],
       () => [{ name: 'create_entity', input: { type: 'transaction', data: { amount: 3600, kind: 'expense', category: 'food', merchant: 'Dinner', date: today() } } }],
@@ -150,10 +150,10 @@ describe('golden flows (PRODUCT §7)', () => {
   });
 
   it('8 · questions answer from data, change nothing and ask nothing', async () => {
-    const car = os.records.create({ type: 'vehicle', data: { make: 'Hyundai', model: 'Creta' } });
+    const car = os.records.create({ object: 'vehicle', data: { make: 'Hyundai', model: 'Creta' } });
     os.records.timeline.add({ entityId: car.id, kind: 'event', title: 'Tyre change', actor: 'user', occurredAt: Date.now() - 40 * 864e5 });
-    const priya = os.records.create({ type: 'person', data: {}, title: 'Priya Sharma' });
-    os.records.create({ type: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 900, date: today(), kind: 'loan' } });
+    const priya = os.records.create({ object: 'person', data: {}, title: 'Priya Sharma' });
+    os.records.create({ object: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 900, date: today(), kind: 'loan' } });
     os.facts.add({ text: 'The landlord is Suresh; rent is due on the 5th', source: 'talk' });
     const before = os.db.get<{ n: number }>('SELECT COUNT(*) n FROM changes')!.n;
 
@@ -187,7 +187,7 @@ async function offline(text: string) {
 
 describe('golden flows with no model (parser first)', () => {
   it('1 · car service with cost, vendor and the money confirm', async () => {
-    const car = os.records.create({ type: 'vehicle', data: { make: 'Hyundai', model: 'Creta', odometerKm: 29400, nextServiceKm: 30000 } });
+    const car = os.records.create({ object: 'vehicle', data: { make: 'Hyundai', model: 'Creta', odometerKm: 29400, nextServiceKm: 30000 } });
     const service = os.cycles.forEntity(car.id).find((c) => c.template === 'vehicle.service')!;
     const r = await offline('Did the car service today, 6,400 at Hyundai');
     expect(r).toMatchObject({ calls: ['log_event'], asked: ['log_event'] });
@@ -198,15 +198,15 @@ describe('golden flows with no model (parser first)', () => {
   });
 
   it('2 · Jio recharge', async () => {
-    const jio = os.records.create({ type: 'subscription', status: 'active', data: { name: 'Jio', amount: 599, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: today(), autoPost: false } });
+    const jio = os.records.create({ object: 'subscription', status: 'active', data: { name: 'Jio', amount: 599, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: today(), autoPost: false } });
     const r = await offline('Recharged Jio 719 for 84 days');
     expect(r).toMatchObject({ calls: ['update_entity', 'mark_cycle_done'], asked: ['update_entity', 'mark_cycle_done'] });
     expect(os.records.get<{ nextBillingAt: string; amount: number }>(jio.id)!.data).toMatchObject({ amount: 719, nextBillingAt: daysFrom(84) });
   });
 
   it('3 · did laundry / washed the white sneakers — no confirms', async () => {
-    const laundry = os.records.create({ type: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', lastDoneOn: daysFrom(-5) } });
-    const sneakers = os.records.create({ type: 'item', title: 'White sneakers', data: { quantity: 1 } });
+    const laundry = os.records.create({ object: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', lastDoneOn: daysFrom(-5) } });
+    const sneakers = os.records.create({ object: 'item', title: 'White sneakers', data: { quantity: 1 } });
     const wash = os.cycles.create({ entityId: sneakers.id, name: 'Wash', kind: 'interval', everyN: 3, everyUnit: 'week', lastDoneAt: Date.now() - 25 * 864e5 });
     expect(await offline('did laundry')).toMatchObject({ calls: ['mark_cycle_done'], asked: [] });
     expect(os.records.get<{ lastDoneOn: string }>(laundry.id)!.data.lastDoneOn).toBe(today());
@@ -215,16 +215,16 @@ describe('golden flows with no model (parser first)', () => {
   });
 
   it('4 · Priya paid me back', async () => {
-    const priya = os.records.create({ type: 'person', data: {}, title: 'Priya Sharma' });
-    os.records.create({ type: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 2600, date: today(), kind: 'split' } });
+    const priya = os.records.create({ object: 'person', data: {}, title: 'Priya Sharma' });
+    os.records.create({ object: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 2600, date: today(), kind: 'split' } });
     const r = await offline('Priya paid me back 2,600');
     expect(r).toMatchObject({ calls: ['settle_debt', 'create_entity'], asked: ['settle_debt', 'create_entity'] });
     expect(balanceWith(os, priya.id)).toBe(0);
   });
 
   it('5 · dinner split three ways', async () => {
-    const arjun = os.records.create({ type: 'person', data: {}, title: 'Arjun Mehta' });
-    const priya = os.records.create({ type: 'person', data: {}, title: 'Priya Sharma' });
+    const arjun = os.records.create({ object: 'person', data: {}, title: 'Arjun Mehta' });
+    const priya = os.records.create({ object: 'person', data: {}, title: 'Priya Sharma' });
     const r = await offline('Dinner was 3,600, split with Arjun and Priya');
     expect(r).toMatchObject({ calls: ['create_entity', 'split_transaction'], asked: ['create_entity', 'split_transaction'] });
     expect([balanceWith(os, arjun.id), balanceWith(os, priya.id)]).toEqual([1200, 1200]);
@@ -232,8 +232,8 @@ describe('golden flows with no model (parser first)', () => {
   });
 
   it('8 · who owes me money / what did I say about the landlord — read only', async () => {
-    const priya = os.records.create({ type: 'person', data: {}, title: 'Priya Sharma' });
-    os.records.create({ type: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 900, date: today(), kind: 'loan' } });
+    const priya = os.records.create({ object: 'person', data: {}, title: 'Priya Sharma' });
+    os.records.create({ object: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 900, date: today(), kind: 'loan' } });
     os.facts.add({ text: 'The landlord is Suresh; rent is due on the 5th', source: 'talk' });
     expect((await offline('who owes me money')).reply).toBe('Priya Sharma owes you ₹900.');
     expect((await offline('what did I say about the landlord')).reply).toBe('The landlord is Suresh; rent is due on the 5th.');
@@ -246,8 +246,8 @@ describe('golden flows with no model (parser first)', () => {
   });
 
   it('ambiguous or unknown sentences fall through (no model: a helpful note)', async () => {
-    os.records.create({ type: 'person', data: {}, title: 'Priya Sharma' });
-    os.records.create({ type: 'person', data: {}, title: 'Priya Menon' });
+    os.records.create({ object: 'person', data: {}, title: 'Priya Sharma' });
+    os.records.create({ object: 'person', data: {}, title: 'Priya Menon' });
     const r = await offline('Priya paid me back 500');
     expect(r.calls).toEqual([]);
     expect(r.reply).toMatch(/add a free Groq or Gemini key/);

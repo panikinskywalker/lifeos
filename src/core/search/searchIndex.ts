@@ -3,7 +3,7 @@ import type { ObjectRecord, ObjectDef } from '../domain/types';
 
 export interface SearchHit {
   id: string;
-  type: string;
+  object: string;
   title: string;
   subtitle?: string | null;
   snippet: string;
@@ -34,7 +34,7 @@ export class SearchIndex {
       .filter(Boolean)
       .join(' ');
     this.db.run(`DELETE FROM entities_fts WHERE id = ?`, [e.id]);
-    this.db.run(`INSERT INTO entities_fts(id,type,title,subtitle,body) VALUES (?,?,?,?,?)`, [e.id, e.type, e.title, e.subtitle ?? '', body]);
+    this.db.run(`INSERT INTO entities_fts(id,type,title,subtitle,body) VALUES (?,?,?,?,?)`, [e.id, e.object, e.title, e.subtitle ?? '', body]);
   }
 
   remove(id: string) {
@@ -64,7 +64,7 @@ export class SearchIndex {
        ORDER BY rank LIMIT ?`,
       params,
     );
-    return rows;
+    return rows.map(({ type, ...r }) => ({ ...r, object: type }));
   }
 
   private searchLike(term: string, opts: { types?: string[]; limit?: number }): SearchHit[] {
@@ -98,7 +98,7 @@ export class SearchIndex {
       // Facts and dumps live in the same index but aren't entities: keep their rows.
       this.db.run(`DELETE FROM entities_fts WHERE type NOT IN ('fact', 'dump')`);
       for (const e of entities) {
-        const d = defFor(e.type);
+        const d = defFor(e.object);
         if (d) this.index(e, d);
       }
     });

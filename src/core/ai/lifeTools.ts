@@ -19,7 +19,7 @@ const STOP = new Set(['the', 'my', 'a', 'an', 'our', 'his', 'her', 'their', 'of'
 
 export interface Candidate {
   id: string;
-  type: string;
+  object: string;
   title: string;
   subtitle: string | null;
   score: number;
@@ -40,10 +40,10 @@ export function resolveCandidates(os: LifeOSContext, text: string, types?: strin
   const words = q.split(' ').filter((w) => !STOP.has(w));
   const phrase = words.join(' ');
   const out = new Map<string, Candidate>();
-  const add = (e: { id: string; type: string; title: string; subtitle?: string | null }, score: number, why: string) => {
-    if (e.type === 'fact' || e.type === 'dump' || (types?.length && !types.includes(e.type))) return;
+  const add = (e: { id: string; object: string; title: string; subtitle?: string | null }, score: number, why: string) => {
+    if (e.object === 'fact' || e.object === 'dump' || (types?.length && !types.includes(e.object))) return;
     const prev = out.get(e.id);
-    if (!prev || prev.score < score) out.set(e.id, { id: e.id, type: e.type, title: e.title, subtitle: e.subtitle ?? null, score, why });
+    if (!prev || prev.score < score) out.set(e.id, { id: e.id, object: e.object, title: e.title, subtitle: e.subtitle ?? null, score, why });
   };
   for (const a of os.aliases.lookup(q)) {
     const e = os.records.get(a.entityId);
@@ -81,7 +81,7 @@ export function clearMatch(c: Candidate[]): Candidate | null {
   return a;
 }
 
-const recordCard = (os: LifeOSContext, e: ObjectRecord): ReplyCard => ({ kind: 'record', entityId: e.id, type: e.type, title: e.title, subtitle: [os.registry.objects.get(e.type)?.label, e.subtitle].filter(Boolean).join(' · '), icon: os.registry.objects.get(e.type)?.icon });
+const recordCard = (os: LifeOSContext, e: ObjectRecord): ReplyCard => ({ kind: 'record', entityId: e.id, type: e.object, title: e.title, subtitle: [os.registry.objects.get(e.object)?.label, e.subtitle].filter(Boolean).join(' · '), icon: os.registry.objects.get(e.object)?.icon });
 
 function dueText(os: LifeOSContext, c: Cycle): string {
   const s = cycleStatus(c, Date.now(), c.meter ? os.cycles.latestMeter(c.entityId, c.meter) : null);
@@ -142,7 +142,7 @@ export const lifeTools: AiToolDef[] = [
       const e = os.records.get(i.entityId);
       if (!e) return { error: 'record not found' };
       const image = !!i.mime?.startsWith('image/');
-      const a = os.attachments.add({ entityId: e.id, name: i.name, mime: i.mime ?? null, size: null, uri: i.uri, kind: image ? (e.type === 'transaction' ? 'receipt' : 'image') : 'file' }, 'assistant');
+      const a = os.attachments.add({ entityId: e.id, name: i.name, mime: i.mime ?? null, size: null, uri: i.uri, kind: image ? (e.object === 'transaction' ? 'receipt' : 'image') : 'file' }, 'assistant');
       return withExtras({ attached: i.name, to: e.title }, { undo: () => os.attachments.remove(a.id), card: recordCard(os, e) });
     },
   },
@@ -242,7 +242,7 @@ export const lifeTools: AiToolDef[] = [
       const i = input as { entityId: string; value: number; date?: string };
       const e = os.records.get(i.entityId);
       if (!e) return { error: 'record not found' };
-      const m = os.registry.objects.get(e.type)?.meters?.[0];
+      const m = os.registry.objects.get(e.object)?.meters?.[0];
       const id = os.cycles.logMeter(e.id, i.value, { at: at(i.date), meter: m?.meter, unit: m?.unit ?? 'km', label: m?.label }, 'assistant');
       return withExtras({ logged: `${m?.label ?? 'Reading'} ${i.value}` }, { undo: () => os.cycles.removeReading(id), card: recordCard(os, os.records.get(e.id)!) });
     },
@@ -256,7 +256,7 @@ export const lifeTools: AiToolDef[] = [
       const items = u.items.slice(0, (input as { limit?: number }).limit ?? 12);
       return withExtras(
         { overdue: u.overdue, items: items.map((i) => ({ record: i.entity.title, cycle: i.cycle.name, cycleId: i.cycle.id, entityId: i.entity.id, state: i.status.state, daysLeft: i.status.daysLeft, meterLeft: i.status.meterLeft })) },
-        { card: { kind: 'list', title: u.overdue ? `${u.overdue} overdue` : 'Coming up', items: items.map((i) => ({ entityId: i.entity.id, type: i.entity.type, title: i.cycle.name === i.entity.title ? i.entity.title : `${i.entity.title} · ${i.cycle.name}`, value: dueText(os, i.cycle) })) } },
+        { card: { kind: 'list', title: u.overdue ? `${u.overdue} overdue` : 'Coming up', items: items.map((i) => ({ entityId: i.entity.id, type: i.entity.object, title: i.cycle.name === i.entity.title ? i.entity.title : `${i.entity.title} · ${i.cycle.name}`, value: dueText(os, i.cycle) })) } },
       );
     },
   },

@@ -38,7 +38,7 @@ afterEach(() => os.db.close());
 
 describe('habits', () => {
   it('streaks: daily in a row; today not done yet doesn’t break it; a gap does', () => {
-    const yoga = os.records.create({ type: 'habit', title: 'Yoga', data: { frequency: 'daily' } });
+    const yoga = os.records.create({ object: 'habit', title: 'Yoga', data: { frequency: 'daily' } });
     for (const n of [-1, -2, -3, -5]) checkIn(os, yoga.id, day(n));
     const h = activeHabits(os)[0]!;
     expect(streakOf(h, doneDays(os, yoga.id, day(-30)), NOW)).toEqual({ count: 3, unit: 'day' });
@@ -49,21 +49,21 @@ describe('habits', () => {
   });
 
   it('weekday habits skip weekends; weekly habits count weeks that met the target', () => {
-    const standup = os.records.create({ type: 'habit', title: 'Journal', data: { frequency: 'weekdays' } });
+    const standup = os.records.create({ object: 'habit', title: 'Journal', data: { frequency: 'weekdays' } });
     // Mon 21 – Fri 25 Sep done; Sat/Sun not needed.
     for (const n of [-6, -5, -4, -3, -2]) checkIn(os, standup.id, day(n));
     const h = activeHabits(os).find((x) => x.id === standup.id)!;
     expect(streakOf(h, doneDays(os, standup.id, day(-30)), NOW).count).toBe(5);
-    const gym = os.records.create({ type: 'habit', title: 'Gym', data: { frequency: 'weekly', targetPerWeek: 3 } });
+    const gym = os.records.create({ object: 'habit', title: 'Gym', data: { frequency: 'weekly', targetPerWeek: 3 } });
     for (const n of [-1, -3, -5, -8, -10, -12, -15]) checkIn(os, gym.id, day(n));
     const g = activeHabits(os).find((x) => x.id === gym.id)!;
     expect(streakOf(g, doneDays(os, gym.id, day(-60)), NOW)).toEqual({ count: 2, unit: 'week' });
   });
 
   it('what counts as having done it: "did yoga", "went for a run", yesterday; not plans or misses', () => {
-    os.records.create({ type: 'habit', title: 'Yoga', data: {} });
-    os.records.create({ type: 'habit', title: 'Run', data: {} });
-    os.records.create({ type: 'habit', title: 'Read 20 pages', data: {} });
+    os.records.create({ object: 'habit', title: 'Yoga', data: {} });
+    os.records.create({ object: 'habit', title: 'Run', data: {} });
+    os.records.create({ object: 'habit', title: 'Read 20 pages', data: {} });
     expect(habitSaid(os, 'did yoga this morning', NOW)).toMatchObject({ habit: { title: 'Yoga' }, date: day(0) });
     expect(habitSaid(os, 'went for a run yesterday', NOW)).toMatchObject({ habit: { title: 'Run' }, date: day(-1) });
     expect(habitSaid(os, 'read for an hour before bed', NOW)).toMatchObject({ habit: { title: 'Read 20 pages' } });
@@ -73,7 +73,7 @@ describe('habits', () => {
   });
 
   it('a dump ticks the habit on the phone, logged in To check with Undo', async () => {
-    const yoga = os.records.create({ type: 'habit', title: 'Yoga', data: {} });
+    const yoga = os.records.create({ object: 'habit', title: 'Yoga', data: {} });
     const d = os.dumps.add({ body: 'Did yoga. Then had a long call with mom.', createdAt: NOW });
     await extractDump(os, d.id, null);
     expect(doneDays(os, yoga.id, day(-1)).has(day(0))).toBe(true);

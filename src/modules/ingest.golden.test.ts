@@ -54,7 +54,7 @@ describe('bank SMS → transactions', () => {
   });
 
   it('an existing account is found by its last digits', () => {
-    const mine = os.records.create({ type: 'account', title: 'My HDFC', data: { kind: 'credit', institution: 'HDFC Bank', last4: '5678' } });
+    const mine = os.records.create({ object: 'account', title: 'My HDFC', data: { kind: 'credit', institution: 'HDFC Bank', last4: '5678' } });
     ingestMessage(os, { source: 'sms', from: 'AD-HDFCBK', body: SWIGGY, receivedAt: at });
     expect(txs()[0]!.data.accountId).toBe(mine.id);
     expect(os.records.query('account')).toHaveLength(1);
@@ -188,9 +188,9 @@ describe('feedback round 1: currencies, mutual funds, keyword rules', () => {
   it('a range rule is sure only with a second signal (from the group, or soon after the turf payment); otherwise a flagged guess, and never again for a payer you corrected', async () => {
     const { setCategoryRules } = await import('@core/ingest/ingest');
     os.registry.objects.set('group', groupType as never);
-    const arjun = os.records.create({ type: 'person', title: 'Arjun Mehta', data: { upi: 'arjun.m@okaxis' } });
-    os.records.create({ type: 'person', title: 'Priya Nair', data: { upi: 'priya.n@okaxis' } });
-    const team = os.records.create({ type: 'group', data: { name: 'Football', memberIds: [arjun.id] } });
+    const arjun = os.records.create({ object: 'person', title: 'Arjun Mehta', data: { upi: 'arjun.m@okaxis' } });
+    os.records.create({ object: 'person', title: 'Priya Nair', data: { upi: 'priya.n@okaxis' } });
+    const team = os.records.create({ object: 'group', data: { name: 'Football', memberIds: [arjun.id] } });
     os.groups.setMembers(team.id, [arjun.id]);
     setCategoryRules(os, [{ keyword: '', min: 100, max: 200, direction: 'received', fromGroupId: team.id, afterKeyword: 'TURF', withinHours: 48, category: 'c_football' }]);
     const credit = (amt: number, vpa: string, when: string) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: `Rs.${amt}.00 credited to HDFC Bank A/c XX1234 on ${when} from VPA ${vpa} (UPI ${Math.floor(Math.random() * 1e12)})`, receivedAt: Date.parse(`20${when.slice(6)}-${when.slice(3, 5)}-${when.slice(0, 2)}T20:00:00`) });
@@ -267,7 +267,7 @@ describe('payees: one record per person or shop you pay', () => {
     const { placeType, orgType } = await import('./places/types');
     void placeType;
     os.registry.objects.set('org', orgType as never);
-    const john = os.records.create({ type: 'person', title: 'John Doe', data: {} });
+    const john = os.records.create({ object: 'person', title: 'John Doe', data: {} });
     const send = (body: string, dt: number) => ingestMessage(os, { source: 'sms', from: 'VM-HDFCBK', body, receivedAt: at + dt });
     const payeeOf = (txId: string) => os.links.forEntity(txId).find((r) => r.relation.kind === 'person' || r.relation.kind === 'payee');
     send('Sent Rs.1,300.00 From HDFC Bank A/C *1234 To JOHN D On 26/09/26', 0);
@@ -281,7 +281,7 @@ describe('payees: one record per person or shop you pay', () => {
     send('Sent Rs.500.00 From HDFC Bank A/C *1234 To JOHN D On 27/09/26', 86_400_000);
     const t2 = txs().find((t) => t.data.amount === 500)!;
     expect(payeeOf(t2.id)).toMatchObject({ other: { id: john.id }, relation: { confidence: 1 } });
-    expect(os.links.forEntity(john.id).filter((r) => r.other.type === 'transaction')).toHaveLength(2);
+    expect(os.links.forEntity(john.id).filter((r) => r.other.object === 'transaction')).toHaveLength(2);
     // A shop: one payee record however many times you pay it.
     send('Sent Rs.180.00 From HDFC Bank A/C *1234 To CANOE CAFE On 26/09/26', 2 * 86_400_000);
     send('Sent Rs.220.00 From HDFC Bank A/C *1234 To CANOE CAFE On 28/09/26', 3 * 86_400_000);
@@ -292,7 +292,7 @@ describe('payees: one record per person or shop you pay', () => {
     expect(payeeOf(t4.id)!.relation.confidence).toBeLessThan(1);
     rejectPayee(os, payeeOf(t4.id)!.relation.id);
     expect(payeeOf(t4.id)!.other.title).toBe('John');
-    expect(payeeOf(t4.id)!.other.type).toBe('org');
+    expect(payeeOf(t4.id)!.other.object).toBe('org');
   });
 
   it('subscriptions: an Adobe charge (any descriptor) is Adobe, Subscriptions, and joins one Adobe subscription record', () => {
@@ -379,7 +379,7 @@ describe('Gmail (M4.2b): receipts, tickets and bookings, each naming its mailbox
     send('Sent Rs.90.00 From HDFC Bank A/C *1234 To SHARMA GENERAL On 25/09/26', 5 * 86_400_000);
     expect(txs().find((t) => t.data.amount === 90)!.data.category).toBe('groceries');
     // A person: recategorising Arjun's money doesn't make all his money that category.
-    const arjun = os.records.create({ type: 'person', title: 'Arjun Mehta', data: { upi: 'arjun.m@okaxis' } });
+    const arjun = os.records.create({ object: 'person', title: 'Arjun Mehta', data: { upi: 'arjun.m@okaxis' } });
     void arjun;
     send('Rs.500.00 credited to HDFC Bank A/c XX1234 on 22-09-26 from VPA arjun.m@okaxis (UPI 426912345601)', 2 * 86_400_000);
     const fromArjun = txs().find((t) => t.data.amount === 500)!;

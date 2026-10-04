@@ -18,9 +18,9 @@ afterEach(() => os.db.close());
 
 describe('life graph model (v7)', () => {
   it('links carry provenance, confidence and can be removed one by one', () => {
-    const kendal = os.records.create({ type: 'person', title: 'Kendal', data: {} });
-    const canada = os.records.create({ type: 'place', title: 'Canada', data: { kind: 'country' } });
-    const flight = os.records.create({ type: 'event', title: 'Flight to Canada', data: { kind: 'flight', startAt: Date.parse('2026-09-08T12:00:00') } });
+    const kendal = os.records.create({ object: 'person', title: 'Kendal', data: {} });
+    const canada = os.records.create({ object: 'place', title: 'Canada', data: { kind: 'country' } });
+    const flight = os.records.create({ object: 'event', title: 'Flight to Canada', data: { kind: 'flight', startAt: Date.parse('2026-09-08T12:00:00') } });
     const r = os.links.link(flight.id, kendal.id, 'with', {}, 'assistant', { source: 'dump', sourceId: 'd1', confidence: 0.8 });
     os.links.link(flight.id, canada.id, 'to', {}, 'assistant', { source: 'dump', sourceId: 'd1' });
     expect(os.links.get(r.id)).toMatchObject({ kind: 'with', source: 'dump', sourceId: 'd1', confidence: 0.8 });
@@ -32,7 +32,7 @@ describe('life graph model (v7)', () => {
   });
 
   it('dumps can be about a record; To check lists unticked writes, flagged first', () => {
-    const k = os.records.create({ type: 'person', title: 'Kendal', data: {} });
+    const k = os.records.create({ object: 'person', title: 'Kendal', data: {} });
     const d = os.dumps.add({ body: 'her favourite colour is pink', subjectId: k.id });
     expect(os.dumps.get(d.id)!.subjectId).toBe(k.id);
     const a = os.dumps.addExtraction({ dumpId: d.id, kind: 'person', action: 'updated', entityId: k.id, label: 'Kendal · notes', before: { notes: null } });

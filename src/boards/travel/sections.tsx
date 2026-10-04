@@ -22,7 +22,7 @@ export function TripSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: L
         total: os.records.aggregate('transaction', { filter }, { sum: ['data.amount'], count: true }),
         byCat: os.records.groupBy('transaction', { filter }, 'data.category', { sum: ['data.amount'] }),
         recent: os.records.query('transaction', { filter, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 6 }),
-        docs: os.links.forEntity(entity.id, 'trip').filter((r) => r.other.type === 'document' || r.other.type === 'event'),
+        docs: os.links.forEntity(entity.id, 'trip').filter((r) => r.other.object === 'document' || r.other.object === 'event'),
       };
     },
     [entity.id],
@@ -66,7 +66,7 @@ export function TripSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: L
           <SectionHeader title="Bookings & documents" icon="doc" color={TRAVEL_COLOR} />
           <Card padded={false}>
             {data.docs.map((r, i) => (
-              <Row key={r.relation.id} title={r.other.title} subtitle={ctx.registry.objects.get(r.other.type)?.label} icon={ctx.registry.objects.get(r.other.type)?.icon} iconColor={paletteColor(ctx.registry.colorFor(r.other.type))} last={i === data.docs.length - 1} onPress={() => router.push(`/entity/${r.other.type}/${r.other.id}`)} />
+              <Row key={r.relation.id} title={r.other.title} subtitle={ctx.registry.objects.get(r.other.object)?.label} icon={ctx.registry.objects.get(r.other.object)?.icon} iconColor={paletteColor(ctx.registry.colorFor(r.other.object))} last={i === data.docs.length - 1} onPress={() => router.push(`/entity/${r.other.object}/${r.other.id}`)} />
             ))}
           </Card>
         </View>

@@ -17,8 +17,8 @@ afterEach(() => os.db.close());
 
 describe('Spend screen query', () => {
   it('this month vs last month by the same day, by category, filtered, sorted', () => {
-    const hdfc = os.records.create({ type: 'account', title: 'HDFC', data: { kind: 'bank' } }).id;
-    const tx = (date: string, amount: number, category: string, merchant: string, kind = 'expense', accountId?: string) => os.records.create({ type: 'transaction', data: { date, amount, category, merchant, kind, accountId } });
+    const hdfc = os.records.create({ object: 'account', title: 'HDFC', data: { kind: 'bank' } }).id;
+    const tx = (date: string, amount: number, category: string, merchant: string, kind = 'expense', accountId?: string) => os.records.create({ object: 'transaction', data: { date, amount, category, merchant, kind, accountId } });
     tx('2026-09-02', 1200, 'food', 'Swiggy', 'expense', hdfc);
     tx('2026-09-10', 300, 'transport', 'Uber');
     tx('2026-09-20', 800, 'food', 'Zomato', 'expense', hdfc);

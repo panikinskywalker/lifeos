@@ -21,15 +21,15 @@ export function nudgeText(i: UpkeepItem, daysLeft: number | null): string {
   const { cycle, entity } = i;
   const meterLeft = i.status.meterLeft;
   const d = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
-  if (entity.type === 'person' && cycle.template === 'person.contact') {
+  if (entity.object === 'person' && cycle.template === 'person.contact') {
     const since = cycle.lastDoneAt ? Math.max(1, Math.round((startOfDay(Date.now()) - startOfDay(cycle.lastDoneAt)) / DAY)) : null;
     return since ? `Haven’t been in touch with ${entity.title} in ${d(since)}` : `Time to catch up with ${entity.title}`;
   }
-  if (entity.type === 'subscription') {
+  if (entity.object === 'subscription') {
     if (daysLeft == null || daysLeft <= 0) return `${entity.title} renews today`;
     return `${entity.title} runs out in ${d(daysLeft)}`;
   }
-  if (entity.type === 'routine') return daysLeft != null && daysLeft < 0 ? `${entity.title} is ${d(-daysLeft)} late` : `${entity.title}’s due`;
+  if (entity.object === 'routine') return daysLeft != null && daysLeft < 0 ? `${entity.title} is ${d(-daysLeft)} late` : `${entity.title}’s due`;
   const what = cycle.name === entity.title ? entity.title : `${entity.title}: ${cycle.name.toLowerCase()}`;
   if (meterLeft != null && meterLeft <= 0) return `${what} is ${km(-meterLeft)} overdue`;
   if (daysLeft != null && daysLeft < 0) return `${what} is ${d(-daysLeft)} late`;

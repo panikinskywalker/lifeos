@@ -262,7 +262,7 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
   if (period.span !== 'day') {
     for (const [day, v] of daily(os, 'spend', from, to)) mark(day).spend = v;
     for (const d of dumps) mark(isoDay(d.createdAt)).dumps++;
-    for (const e of happened) if (e.type === 'event' && e.occurredAt) mark(isoDay(e.occurredAt)).events++;
+    for (const e of happened) if (e.object === 'event' && e.occurredAt) mark(isoDay(e.occurredAt)).events++;
   }
   const days = [...marks.values()].sort((x, y) => (x.day < y.day ? -1 : 1));
 
@@ -316,7 +316,7 @@ export function onThisDay(os: LifeOSContext, today = isoDay(Date.now()), maxYear
       items.push({ kind: 'person', id: r.id, type: 'person', title: `Met ${r.title}` });
     for (const r of os.db.all<{ id: string; entity_id: string; title: string }>(`SELECT id, entity_id, title FROM timeline_events WHERE kind='cycle.done' AND occurred_at BETWEEN ? AND ? LIMIT 5`, [a, b])) {
       const e = os.records.get(r.entity_id);
-      if (e) items.push({ kind: 'done', id: e.id, type: e.type, title: `${r.title} · ${e.title}` });
+      if (e) items.push({ kind: 'done', id: e.id, type: e.object, title: `${r.title} · ${e.title}` });
     }
     if (items.length) out.push({ ago, day, items });
   }

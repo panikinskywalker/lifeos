@@ -16,7 +16,7 @@ const km = (n: number) => `${Math.round(n).toLocaleString('en-IN')}`;
 /** Upkeep items (cycle + status) for one record. */
 export function useRecordCycles(entity: ObjectRecord): UpkeepItem[] {
   const os = useOS();
-  const def = os.registry.objects.get(entity.type);
+  const def = os.registry.objects.get(entity.object);
   return useLive((o) => o.cycles.forEntity(entity.id).map((cycle) => ({ cycle, entity, def, status: o.cycles.status(cycle) })), [entity.id, entity.version]);
 }
 

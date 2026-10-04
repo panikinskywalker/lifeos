@@ -46,7 +46,7 @@ export default function MemoryScreen() {
         <EmptyState icon="search" tint="memory" line={`Nothing about “${q}”.`} bare />
       ) : (
         groups.map((g) => (
-          <Section key={g.title} title={g.title} meta={`${g.facts.length}`} action={g.entityId ? 'Open' : undefined} onAction={g.entityId ? () => router.push(`/entity/${os.records.get(g.entityId!)!.type}/${g.entityId}` as never) : undefined}>
+          <Section key={g.title} title={g.title} meta={`${g.facts.length}`} action={g.entityId ? 'Open' : undefined} onAction={g.entityId ? () => router.push(`/entity/${os.records.get(g.entityId!)!.object}/${g.entityId}` as never) : undefined}>
             <View style={{ gap: 8 }}>
               {g.facts.map((f) => (
                 <View key={f.id} style={{ backgroundColor: t.c.bg.tile, borderRadius: t.radius.card, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
@@ -68,7 +68,7 @@ export default function MemoryScreen() {
         visible={!!active}
         onClose={() => setActive(null)}
         title={active?.text}
-        actions={active ? [...(active.subjectId ? [{ label: 'Open what it’s about', icon: 'chevron-right' as const, onPress: () => { const e = os.records.get(active.subjectId!); if (e) router.push(`/entity/${e.type}/${e.id}` as never); } }] : []), { label: 'Forget this', icon: 'trash' as const, destructive: true, onPress: () => forget(active) }] : []}
+        actions={active ? [...(active.subjectId ? [{ label: 'Open what it’s about', icon: 'chevron-right' as const, onPress: () => { const e = os.records.get(active.subjectId!); if (e) router.push(`/entity/${e.object}/${e.id}` as never); } }] : []), { label: 'Forget this', icon: 'trash' as const, destructive: true, onPress: () => forget(active) }] : []}
       />
       <AddFactSheet visible={adding} onClose={() => setAdding(false)} />
     </Screen>

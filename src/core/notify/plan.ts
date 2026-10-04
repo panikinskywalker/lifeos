@@ -107,13 +107,13 @@ export function notificationPlan(os: LifeOSContext, now = Date.now(), limit = 60
       const at = r.snoozedUntil ?? r.nextAt ?? r.dueAt;
       if (at <= now) continue;
       const entity = r.entityId ? os.records.get(r.entityId) : undefined;
-      out.push({ kind: 'reminder', at, title: r.title, body: r.body ?? entity?.title ?? '', data: { reminderId: r.id, entityId: r.entityId ?? undefined, entityType: entity?.type } });
+      out.push({ kind: 'reminder', at, title: r.title, body: r.body ?? entity?.title ?? '', data: { reminderId: r.id, entityId: r.entityId ?? undefined, entityType: entity?.object } });
     }
   }
   if (prefs.upkeep) {
     for (const n of cycleNudges(os, now)) {
       if (n.at <= now) continue;
-      out.push({ kind: 'upkeep', at: n.at, title: n.title, body: n.body, data: { cycleId: n.cycleId, entityId: n.entityId, entityType: os.records.get(n.entityId)?.type } });
+      out.push({ kind: 'upkeep', at: n.at, title: n.title, body: n.body, data: { cycleId: n.cycleId, entityId: n.entityId, entityType: os.records.get(n.entityId)?.object } });
     }
   }
   if (prefs.brief.on) {

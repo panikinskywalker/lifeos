@@ -48,10 +48,10 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Obj
       </View>
     );
   }
-  const def = os.registry.object(entity.type);
+  const def = os.registry.object(entity.object);
   const tint = tintForModule(def.module);
   const statusDef = def.statuses?.find((s) => s.value === entity.status);
-  const sections = os.registry.detailSections.filter((s) => s.entityType === '*' || s.entityType === entity.type);
+  const sections = os.registry.detailSections.filter((s) => s.entityType === '*' || s.entityType === entity.object);
   const close = () => setPanel(null);
 
   const remove = () => {
@@ -76,7 +76,7 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Obj
           actions={
             <>
               <IconButton icon="star" accessibilityLabel={entity.starred ? 'Unstar' : 'Star'} filled={entity.starred ? t.c.accent.mustard : 'overlay'} onPress={() => os.records.update(entity.id, { starred: !entity.starred })} />
-              <IconButton icon="edit" accessibilityLabel="Edit record" filled="overlay" onPress={() => router.push(`/entity/${entity.type}/${entity.id}/edit`)} />
+              <IconButton icon="edit" accessibilityLabel="Edit record" filled="overlay" onPress={() => router.push(`/entity/${entity.object}/${entity.id}/edit`)} />
               <IconButton icon="more" accessibilityLabel="More" filled="overlay" onPress={() => setPanel('menu')} />
             </>
           }
@@ -140,8 +140,8 @@ export function EntityDetailScreen({ id, say }: { id: string; say?: (entity: Obj
             label: 'Duplicate',
             icon: 'file',
             onPress: () => {
-              const copy = os.records.create({ type: entity.type, title: `${entity.title} (copy)`, data: entity.data, status: entity.status });
-              router.push(`/entity/${copy.type}/${copy.id}`);
+              const copy = os.records.create({ object: entity.object, title: `${entity.title} (copy)`, data: entity.data, status: entity.status });
+              router.push(`/entity/${copy.object}/${copy.id}`);
             },
           },
           { label: entity.archived ? 'Unarchive' : 'Archive', icon: 'archive', onPress: () => os.records.update(entity.id, { archived: !entity.archived }) },
@@ -219,7 +219,7 @@ function headerStats(os: LifeOSContext, entity: ObjectRecord, fields: FieldDef[]
 function DetailsCard({ entity, fields }: { entity: ObjectRecord; fields: FieldDef[] }) {
   const os = useOS();
   const router = useRouter();
-  const custom = useLive((o) => o.customFields.forType(entity.type), [entity.type]);
+  const custom = useLive((o) => o.customFields.forType(entity.object), [entity.object]);
   const all: FieldDef[] = [...fields, ...custom.map((c) => ({ key: `custom_${c.key}`, label: c.label, type: c.fieldType, options: c.options.options }))];
   const rows = all.filter((f) => hasValue(entity.data[f.key]));
   if (!rows.length) return null;
@@ -228,7 +228,7 @@ function DetailsCard({ entity, fields }: { entity: ObjectRecord; fields: FieldDe
       <Card>
         {rows.map((f, i) => {
           const r = renderValue(os, entity, f, entity.data[f.key]);
-          return <DetailRow key={f.key} label={f.label} value={r.text} stacked={f.type === 'longtext' ? true : undefined} divider={i < rows.length - 1} onPress={r.target ? () => router.push(`/entity/${r.target!.type}/${r.target!.id}`) : undefined} />;
+          return <DetailRow key={f.key} label={f.label} value={r.text} stacked={f.type === 'longtext' ? true : undefined} divider={i < rows.length - 1} onPress={r.target ? () => router.push(`/entity/${r.target!.object}/${r.target!.id}`) : undefined} />;
         })}
       </Card>
     </Section>
@@ -276,9 +276,9 @@ function BacklinksCard({ entity }: { entity: ObjectRecord }) {
     <Section title="Mentioned in" meta={String(notes.length + facts.length)} action={facts.length ? 'Memory' : undefined} onAction={facts.length ? () => router.push({ pathname: '/memory', params: { q: entity.title } }) : undefined}>
       <RowList>
         {notes.map((n) => {
-          const d = os.registry.objects.get(n.type);
+          const d = os.registry.objects.get(n.object);
           const body = String((n.data as Record<string, unknown>).body ?? n.subtitle ?? '').replace(/\[\[|\]\]/g, '');
-          return <RowItem key={n.id} icon={d?.icon ?? 'file'} tint={tintForModule(d?.module)} title={n.title} subtitle={body.slice(0, 90) || d?.label} onPress={() => router.push(`/entity/${n.type}/${n.id}`)} />;
+          return <RowItem key={n.id} icon={d?.icon ?? 'file'} tint={tintForModule(d?.module)} title={n.title} subtitle={body.slice(0, 90) || d?.label} onPress={() => router.push(`/entity/${n.object}/${n.id}`)} />;
         })}
         {facts.map((f) => (
           <RowItem key={f.id} icon="sparkle" tint="memory" title={f.text} subtitle="Remembered" onPress={() => router.push({ pathname: '/memory', params: { q: entity.title } })} />
@@ -296,7 +296,7 @@ function RelationsCard({ entity, onLink }: { entity: ObjectRecord; onLink: () =>
   // Incoming [[mentions]] have their own section (Mentioned in).
   const items = useLive((o) => neighbours(o, entity.id, { limit: 60 }).filter((n) => n.kind !== 'mention'), [entity.id]);
   if (!items.length) return null;
-  const def = os.registry.object(entity.type);
+  const def = os.registry.object(entity.object);
   const groups: Array<{ label: string; items: typeof items }> = [];
   for (const n of items) {
     const label = def.links?.find((r) => r.kind === n.kind)?.label ?? n.label;
@@ -399,7 +399,7 @@ function LinkSheet({ visible, onClose, entity }: { visible: boolean; onClose: ()
   const toast = useToast();
   const [kind, setKind] = useState('related');
   const [picking, setPicking] = useState(false);
-  const def = os.registry.object(entity.type);
+  const def = os.registry.object(entity.object);
   const kinds = [...new Set(['related', ...(def.links?.map((r) => r.kind) ?? [])])];
   const kindLabel = (k: string) => def.links?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
   return (
@@ -542,7 +542,7 @@ function AttachSheet({ visible, onClose, entity }: { visible: boolean; onClose: 
     const a = r.assets[0];
     const name = a.fileName ?? `photo-${Date.now()}.jpg`;
     const uri = await persistAttachment(a.uri, name);
-    os.attachments.add({ entityId: entity.id, name, mime: a.mimeType ?? 'image/jpeg', size: a.fileSize ?? null, uri, kind: entity.type === 'transaction' ? 'receipt' : 'image' });
+    os.attachments.add({ entityId: entity.id, name, mime: a.mimeType ?? 'image/jpeg', size: a.fileSize ?? null, uri, kind: entity.object === 'transaction' ? 'receipt' : 'image' });
   };
   return (
     <ActionSheet

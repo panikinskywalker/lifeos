@@ -15,11 +15,11 @@ export function localAnswer(os: LifeOSContext, question: string): { text: string
   const q = question.replace(/[?]/g, ' ').trim();
   const lines: string[] = [];
   const cards: ReplyCard[] = [];
-  const about = resolveCandidates(os, q).filter((c) => c.score >= 0.8 && c.why !== `a ${c.type}`).slice(0, 3);
+  const about = resolveCandidates(os, q).filter((c) => c.score >= 0.8 && c.why !== `a ${c.object}`).slice(0, 3);
   for (const c of about) {
     const e = os.records.get(c.id);
     if (!e) continue;
-    const def = os.registry.objects.get(e.type);
+    const def = os.registry.objects.get(e.object);
     const n = neighbours(os, e.id, { limit: 8 });
     const dated = n.filter((x) => x.at);
     const other = n.filter((x) => !x.at);
@@ -29,12 +29,12 @@ export function localAnswer(os: LifeOSContext, question: string): { text: string
     const notes = String((e.data as { notes?: string }).notes ?? '').split('\n').filter((l) => l.startsWith('•')).slice(0, 3);
     if (notes.length) lines.push(`  ${notes.join(' ')}`);
     for (const f of os.facts.list({ subjectId: e.id, limit: 2 })) lines.push(`  ${f.text}`);
-    cards.push({ kind: 'record', entityId: e.id, type: e.type, title: e.title, subtitle: [def?.label, e.subtitle].filter(Boolean).join(' · '), icon: def?.icon });
+    cards.push({ kind: 'record', entityId: e.id, type: e.object, title: e.title, subtitle: [def?.label, e.subtitle].filter(Boolean).join(' · '), icon: def?.icon });
   }
   const words = q.split(/\s+/).filter((w) => w.length > 2 && !/^(what|when|where|who|how|did|does|the|last|see|was|were|are|have|has|about|with|this|that|many|much)$/i.test(w)).join(' ');
   if (words) {
     for (const f of os.facts.search(words, 3)) if (!about.some((a) => a.id === f.subjectId)) lines.push(`• ${f.text}`);
-    const dumps = os.records.search.search(words, { limit: 6 }).filter((h) => h.type === 'dump').slice(0, 2);
+    const dumps = os.records.search.search(words, { limit: 6 }).filter((h) => h.object === 'dump').slice(0, 2);
     for (const h of dumps) {
       const d = os.dumps.get(h.id);
       if (d) lines.push(`You said on ${day(d.createdAt)}: “${d.body.replace(/\s+/g, ' ').slice(0, 140)}${d.body.length > 140 ? '…' : ''}”`);

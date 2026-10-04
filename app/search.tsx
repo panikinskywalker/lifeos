@@ -17,7 +17,7 @@ export default function SearchRoute() {
   const recent = useLive((o) => o.records.recent(12), []);
   const tags = useLive((o) => o.tags.counts().slice(0, 12), []);
   const commands = os.registry.quickActions.filter((a) => !query || a.label.toLowerCase().includes(query.toLowerCase()));
-  const typesInHits = [...new Set(hits.map((h) => h.type))];
+  const typesInHits = [...new Set(hits.map((h) => h.object))];
   const run = (a: (typeof commands)[number]) => (a.route ? router.push(a.route as never) : a.run?.(os));
   return (
     <Screen title="Search" onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
@@ -43,9 +43,9 @@ export default function SearchRoute() {
             <Section title={`${hits.length} ${hits.length === 1 ? 'result' : 'results'}`}>
               <RowList>
                 {hits.map((h) => {
-                  if (h.type === 'fact') return <RowItem key={h.id} title={h.title} subtitle={`Memory${h.subtitle ? ` · about ${h.subtitle}` : ''}`} icon="sparkle" tint="memory" onPress={() => router.push({ pathname: '/memory', params: { q: h.title.split(' ').slice(0, 3).join(' ') } })} />;
-                  const def = os.registry.objects.get(h.type);
-                  return <RowItem key={h.id} title={h.title} subtitle={`${def?.label ?? h.type}${h.subtitle ? ` · ${h.subtitle}` : ''}`} icon={def?.icon} tint={tintForModule(def?.module)} onPress={() => router.push(`/entity/${h.type}/${h.id}`)} />;
+                  if (h.object === 'fact') return <RowItem key={h.id} title={h.title} subtitle={`Memory${h.subtitle ? ` · about ${h.subtitle}` : ''}`} icon="sparkle" tint="memory" onPress={() => router.push({ pathname: '/memory', params: { q: h.title.split(' ').slice(0, 3).join(' ') } })} />;
+                  const def = os.registry.objects.get(h.object);
+                  return <RowItem key={h.id} title={h.title} subtitle={`${def?.label ?? h.object}${h.subtitle ? ` · ${h.subtitle}` : ''}`} icon={def?.icon} tint={tintForModule(def?.module)} onPress={() => router.push(`/entity/${h.object}/${h.id}`)} />;
                 })}
               </RowList>
             </Section>
