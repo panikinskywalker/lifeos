@@ -97,21 +97,65 @@ interface ModuleManifest {
     sentences?: SentenceRule[];        // on-phone parser patterns → tool calls, with confidence
     parsers?: MessageParser[];         // per-sender: { id, matches(msg), parse(msg) → filed records + confidence }
   };
-  sources?: SourceDef[];               // { id, label, modules, permission?, sync(os, since) → { readings?, messages? } }
+  sources?: SourceDef[];               // see Sources below
+  filing?: { parsers?: MessageParser[] };
+  filingTools?: (session: GraphSession) => AiToolDef[];
   aiTools?: AiToolDef[];               // unchanged: { name, description, input: zod, run, confirm?, describe? }; read and write
-  sources?: SourceDef[];               // { id, label, modules, permission?, sync(os, since) → { readings?, messages? } }
+  sources?: SourceDef[];               // see Sources below
+  filing?: { parsers?: MessageParser[] };
+  filingTools?: (session: GraphSession) => AiToolDef[];
   triggers?: TriggerDef[];             // automation contributions (no UI)
   actions?: ActionDef[];
   onInstall?(os): void; onStart?(os): void;
 }
 ```
 
-`filing.sentences` / `filing.parsers` and `linkWords` are not on the manifest
-yet: the parsers still live in `src/core/filing/parsers` and move into finance
-and deliveries in R1 / R7b. AI tool *names* (`create_entity`, `connections`…)
-keep their old words for now: they are the contract the model is prompted
-with and the golden fixtures are recorded against them; they change in R12
-when the local model is tuned.
+### Filing (R1, as built)
+
+```ts
+// src/core/filing/contract.ts
+interface MessageParser {
+  id: string; module: string;             // 'finance.money', 'deliveries.shipping', 'travel.bookings'
+  priority?: number;                      // lower runs first (shipping 10, bookings 20, money 30)
+  untrusted?: boolean;                    // reads SMS from senders you have not trusted (couriers, shops)
+  proposes?: boolean;                     // first-run history as proposals for the review screen
+  sender?(from, body): { name?, trusted? } | null;   // names bank senders, trusts them by default
+  label?(m: RawMessage): string | null;   // "HDFC Bank SMS", "GPay" in To check
+  read(os, m: RawMessage): ParserRead | null;        // what it understood, as JSON ({ kind: 'skip', reason } = mine, nothing to file)
+  file(os, m, read, ctx: FileContext): FileOutcome;  // records with provenance (os.filings); ctx.related links a ticket's payment to its flight
+}
+```
+
+Core keeps the queue (`src/core/filing/queue.ts`), sender trust and dispatch
+(`messages.ts`): every parser that read something files, in priority order;
+no parser → a dismissed leftover. A module declares `filing: { parsers }` and,
+for tools the model gets while filing a dump, `filingTools(session)` (finance:
+`log_spend`). `ObjectDef.enrich(os, data, { text })` fills defaults for a record
+made from a sentence (finance: the category), so core's generic tools never
+import a module.
+
+### Sources (R1, as built)
+
+```ts
+interface SourceDef {
+  id: string; label: string; modules: string[]; permission?: string;
+  kind: 'messages' | 'readings'; messageSource?: 'sms' | 'notification' | 'email';
+  history?: boolean; available?(os): Promise<boolean>;
+  sync(os, since, { mode }): Promise<{ messages?: Message[]; readings?: Reading[]; filed?: number; cursor?: string }>;
+}
+```
+
+A module's `sync` reads the phone through `os.device` (the `DeviceBridge` in
+`src/core/registry/context.ts`: sms, notifications, mail — platform fills it at
+boot) and never imports platform code. `runSource` in `src/core/filing/sources.ts`
+files messages through the parsers in batches, upserts readings by `sourceKey`
+(the Object's schema must keep that field) and records the source's state.
+Finance declares sms, notifications and gmail; usage, health and the phone
+sources stay in platform until R2 / R6.
+
+AI tool *names* (`create_entity`, `connections`…) keep their old words for
+now: they are the contract the model is prompted with and the golden fixtures
+are recorded against them; they change in R12 when the local model is tuned.
 
 Gone from the module: `screens`, `widgets`, `quickActions`, `detailSections`,
 `overview`, `defaultWidgets`. `aiTools` stay as they are: a module's read and

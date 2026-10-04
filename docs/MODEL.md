@@ -258,11 +258,13 @@ check items auto-approve after 15 days.
 
 ### Training the message parsers
 No model is trained; the parsers are rebuilt against your real texts.
-1. **Export** from the phone (You › Data sources › SMS › Export texts for the
-   parser): the last 12 months of texts from banks, shops and services, one-time
-   codes and personal numbers left out, each with what the parser read, what the
-   app filed, and **your corrections** (category changes, "not them" on a payee,
-   amounts fixed in To check).
+1. **Export** from the phone (You › Data sources › Export for the parser): the
+   last 12 months from every inbox — SMS, Gmail (the mail the app fetches:
+   receipts, alerts, statements, tickets), payment notifications — one-time
+   codes, promotions and personal senders left out, each with what the parser
+   read, what the app filed, and **your corrections** (category changes, "not
+   them" on a payee, amounts fixed in To check). It leaves the phone only through
+   the share sheet to the Mac.
 2. **Rebuild on the Mac**: every text is a fixture; corrections are the expected
    answer; misreads become sender rules or merchant cleanups; unread texts are
    the gap list.
@@ -400,10 +402,24 @@ The restructure, in one day, as a chain of commits that each kept typecheck,
 ### Then module by module (each: Objects in the new schema → filing rules and
 sources moved in → AI tools with tests → the six generic
 screens checked on the phone → overrides only where the default is wrong)
-- [ ] **R1 finance** — Account, Transaction, Debt, Subscription, Budget, Group;
-  SMS, notification and mail parsers; categories and rules; tools: balances,
-  spend by period and category, who owes whom, subscriptions run-rate, net
-  worth. Parser dataset export gains corrections. Spend screen on its board.
+- [x] **R1 finance** — done 4 Oct 2026. Objects as decided: Account (institution → Organisation
+  link, status), Transaction (fourth kind `investment`; payee link with merchant as the bank's
+  spelling; investment link; source / sourceRef / rawText, raw text cleared by the 60-day job),
+  Debt, Subscription (price history), **Investment** (instrument, invested, current value as a
+  meter, units, cost, SIP and maturity cycles); Budget folded into a monthly target per Category
+  (You › Categories). **Filing rules in the module**: a MessageParser contract in core (read →
+  JSON, file → records with provenance); finance's money parser (bank SMS, payment notifications,
+  receipt and bank-alert mail), rules, accounts, payees, merchants, FX; deliveries' shipping and
+  travel's bookings parsers moved with it, since one pipeline cannot be half-split. **Sources
+  declared by the module** (sms, notifications, gmail) reading the phone through a device bridge
+  core exposes; core runs a source. **Tools**: spend, subscriptions_run_rate, net_worth,
+  portfolio; log_spend moved home as a session-bound filing tool. **Board**: Spend as a board
+  screen, Investment hero, Investments on the Finance home. **Dataset**: all three inboxes, every
+  parser's read, what was filed, your corrections. 319 tests green; the web export builds.
+  *Deferred inside R1:* You › Data sources still lists sources from a platform table until every
+  source is declared by a module (R2 contacts / calendar / call log, R6 health / usage); the
+  SubscriptionHero does not yet draw the price history; a price feed for current value is R12+.
+  **Phone check pending**: migrations v11–v14 and the budget / institution folds run on first open.
 - [ ] **R2 crm** — Person; contacts source; payee and UPI matching; keep-in-touch
   and birthday cycles; tools: people to call, last met, balances per person.
 - [ ] **R3 places** — Place, Organisation; from calendar, mail and dumps.
