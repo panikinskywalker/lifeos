@@ -27,6 +27,7 @@ export default function SourcesScreen() {
   const [syncing, setSyncing] = useState(false);
   const info = useLive((o) => Object.fromEntries(SOURCES.map((s) => [s.id, sourceState(o, s.id)])), []);
   const gmail = useLive((o) => mailAccounts(o), []);
+  const turf = useLive((o) => sourceState(o, 'turf'), []);
   const proposed = useLive((o) => o.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ingest_queue WHERE status='proposed'`)?.n ?? 0, []);
 
   const refresh = useCallback(async () => {
@@ -155,6 +156,23 @@ export default function SourcesScreen() {
           ) : null}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button title={gmail.length ? 'Accounts' : 'Add a Gmail account'} size="sm" variant={gmail.length ? 'secondary' : 'primary'} icon={gmail.length ? 'list' : 'plus'} disabled={!mailAvailable} onPress={() => router.push('/settings/email' as never)} />
+          </View>
+        </View>
+        <View style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Icon name="target" size={18} color={turf.lastSync ? t.c.ok.sageText : t.c.fg.secondary} />
+            <Text variant="rowTitle" style={{ flex: 1 }}>
+              Turf Ledger
+            </Text>
+            <Text variant="labelMicro" color={turf.error ? t.c.alert.coralText : turf.lastSync ? t.c.ok.sageText : t.c.fg.secondary} style={{ textTransform: 'uppercase' }}>
+              {turf.error ? 'Needs attention' : turf.lastSync ? 'On' : 'Off'}
+            </Text>
+          </View>
+          <Text variant="caption" color="secondary">
+            Your football web app: matches, players, venues and who paid. Players become People in the Football group.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button title={turf.lastSync ? 'Settings' : 'Connect'} size="sm" variant={turf.lastSync ? 'secondary' : 'primary'} icon={turf.lastSync ? 'settings' : 'link'} onPress={() => router.push('/settings/turf' as never)} />
           </View>
         </View>
       </View>

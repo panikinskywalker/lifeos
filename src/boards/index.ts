@@ -12,6 +12,7 @@ import { habitsBoard } from './habits';
 import { projectsBoard } from './projects';
 import { financeBoard } from './finance';
 import { automationBoard } from './automation';
+import { turfBoard } from './turf';
 
 /**
  * The boards (docs/MODEL.md §3): what you see on screen. Companion boards
@@ -33,4 +34,5 @@ export const installedBoards: BoardManifest[] = [
   projectsBoard,
   financeBoard,
   automationBoard,
+  turfBoard,
 ];

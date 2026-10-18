@@ -15,6 +15,8 @@ const MODULE_TINT: Record<string, TintKey> = {
   documents: 'documents',
   places: 'travel',
   deliveries: 'upkeep',
+  games: 'health',
+  turf: 'health',
 };
 
 export function tintForModule(moduleId: string | undefined): TintKey {

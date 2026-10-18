@@ -153,6 +153,13 @@ files messages through the parsers in batches, upserts readings by `sourceKey`
 Finance declares sms, notifications and gmail; usage, health and the phone
 sources stay in platform until R2 / R6.
 
+`os.device.secrets` (get / set) is the phone's secure store for tokens a
+source needs; never settings, never a backup. Games declares `turf` (R9a): a
+`readings` source that fetches Turf Ledger's `GET /api/lifeos` with the token
+and applies the pull itself (`applyTurfPull`: Person / Place matching, the
+Football group, archive-not-delete, Debts), so it reports `filed` rather than
+handing back readings.
+
 AI tool *names* (`create_entity`, `connections`…) keep their old words for
 now: they are the contract the model is prompted with and the golden fixtures
 are recorded against them; they change in R12 when the local model is tuned.

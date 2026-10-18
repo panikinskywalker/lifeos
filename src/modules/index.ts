@@ -11,6 +11,7 @@ import { habitsModule } from './habits';
 import { inventoryModule } from './inventory';
 import { placesModule } from './places';
 import { deliveriesModule } from './deliveries';
+import { gamesModule } from './games';
 
 /**
  * The install list. Adding a module = adding one line here (or, later,
@@ -30,4 +31,5 @@ export const installedModules: ModuleManifest[] = [
   inventoryModule,
   placesModule,
   deliveriesModule,
+  gamesModule,
 ];

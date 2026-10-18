@@ -1,4 +1,5 @@
 import { PermissionsAndroid, Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import type { LifeOSContext } from '@core/registry/context';
 import { importSource, runSource } from '@core/filing/sources';
 import type { DeviceBridge } from '@core/registry/context';
@@ -98,9 +99,20 @@ export async function requestAccess(id: SourceId): Promise<boolean> {
  * and Gmail sources read through this and never import platform code. Many
  * messages at once are filed by core in batches with a breath between them.
  */
+/** Tokens for sources (Turf Ledger), in the phone's secure store. Web previews keep none. */
+const secrets: NonNullable<DeviceBridge['secrets']> = {
+  get: async (key) => (Platform.OS === 'web' ? null : SecureStore.getItemAsync(`lifeos.secret.${key}`).catch(() => null)),
+  set: async (key, value) => {
+    if (Platform.OS === 'web') return;
+    if (value) await SecureStore.setItemAsync(`lifeos.secret.${key}`, value);
+    else await SecureStore.deleteItemAsync(`lifeos.secret.${key}`).catch(() => {});
+  },
+};
+
 export function deviceBridge(os: LifeOSContext): DeviceBridge {
-  if (!Device) return {};
+  if (!Device) return { secrets };
   return {
+    secrets,
     sms: {
       access: () => access('sms'),
       read: (since, limit) => Device!.readSms(since, limit).then((xs) => xs.map((m) => ({ from: m.from, body: m.body, at: m.at }))),
@@ -168,7 +180,7 @@ export async function refreshFxRates(os: LifeOSContext) {
 let running: { at: number; p: Promise<void> } | null = null;
 
 /** A step that takes longer than this is given up on (it may still finish in the background) so the rest still run. */
-const STEP_LIMIT_MS = { fx: 10_000, phone: 90_000, device: 90_000, mail: 120_000 };
+const STEP_LIMIT_MS = { fx: 10_000, phone: 90_000, device: 90_000, mail: 120_000, turf: 60_000 };
 
 function withLimit<T>(name: string, ms: number, work: () => Promise<T>): Promise<void> {
   const t0 = Date.now();
@@ -207,6 +219,8 @@ export function syncSources(os: LifeOSContext): Promise<void> {
         });
       }
     }
+    // Turf Ledger (games): only once its address and token are set.
+    await withLimit('turf', STEP_LIMIT_MS.turf, () => syncRegistered(os, 'turf'));
     // Gmail last: a receipt then matches the SMS already filed for it (and the other way round).
     await withLimit('gmail', STEP_LIMIT_MS.mail, () => syncRegistered(os, 'gmail'));
   })().finally(() => {
