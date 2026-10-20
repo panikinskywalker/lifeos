@@ -597,11 +597,12 @@ screens checked on the phone → overrides only where the default is wrong)
     the photos) in `turf-web/.data/` (git-ignored), loaded by
     `scripts/import-turf-ledger.ts` (ids kept, opening entries, re-runnable;
     5 tests) into the local Turf web, its totals matching the export.
-    Versioned since 20 Oct (`turf-web/CHANGELOG.md`): **v0** the start, **v0.1**
-    the backend for the design additions (`turf-web/docs/design/ADDITIONS-v0.1.md`:
+    Versioned since 20 Oct (`turf-web/CHANGELOG.md`): **v0** the start, **v0.0.1**
+    the backend for the design additions (`turf-web/docs/design/ADDITIONS.md`:
     dues, mark-all-paid, audit log with undo, devices, own goals and a score that
     follows the goals, formations, guests, the copy / share texts, .ics,
-    settings); the D1 database is on Cloudflare, loaded. *Next*: the team
+    settings), **v0.0.2** private player links and phone keys; the D1 database
+    is on Cloudflare, loaded. *Next*: the team
     generator's tests, photos in sync, the first deploy (needs your `wrangler
     login` and the Access setup in its README).
   - [ ] **R9c The organiser flow in LifeOS**: the Turf source switches from
@@ -612,8 +613,17 @@ screens checked on the phone → overrides only where the default is wrong)
     player of the match, players and profiles, availability, venues, all of
     Leaders, WhatsApp shares, the SMS share match in To check, *sending* and
     offline. Screens follow the design when it lands.
-  - [ ] **R9d Turf web, the screens**: the organiser screens for the iPhone
-    and the friends' pages, restyled to the design; home-screen install.
+  - [x] **R9d Turf web, the screens** (v0.0.5–v0.0.6, 20 Oct 2026): every
+    organiser screen and every friends' page of the *Turf web · Noir* canvas,
+    built in `turf-web/app/ui/` from the artboards' own measurements
+    (`scripts/design-to-jsx.mjs`), on the real data: Home, Dues, Audit, Match
+    centre and history, Match (checklist, team view, log stats, pick teams,
+    record a payment), New / Edit match, Squad, Leaders, Player (+ edit, links),
+    Venues, Settings (accounts, phone keys, who you are, links, data), Sign in;
+    friends' match (RSVP from the open link or the private one), viewer link,
+    public profile, private page, availability, invite form, submission
+    review. Still to do: home-screen install polish (manifest, icons) and the
+    design gaps listed in `turf-web/docs/design/ADDITIONS.md` Part 4.
   - [ ] **R9e The switch**: a full export of Turf Ledger (every table and the
     photos) imported into Turf web once with ids kept, paid amounts as opening
     entries; the old address redirects to Turf web; Turf Ledger retired. Done

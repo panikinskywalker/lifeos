@@ -1,9 +1,10 @@
 # LifeOS — patch notes
 
 LifeOS is versioned like an app release: **v0** is where it stands on 20 Oct
-2026; every update after it is **0.1, 0.2, …**, each with patch notes here
-(newest on top, in plain words); **v1** is the first published release. Each
-version is a git tag (`v0`, `v0.1`, …) and the app's version in `app.json`.
+2026. Each change after it is a small step — 0.0.1, 0.0.2, … — with patch
+notes here (newest on top, in plain words). A published release is a whole
+number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
+version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
 ## v0 — 20 Oct 2026
