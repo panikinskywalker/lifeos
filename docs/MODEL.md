@@ -110,6 +110,59 @@ breakdown in data), filed by Usage access.
 | **Trip** | Travel with dates, people and spend | destination → Place, dates, companions, budget, currency | dumps, mail, calendar |
 | **Habit** | Something you do on a rhythm, chores included | cadence (daily / weekdays / N per week / every N weeks / weekday), kind (habit / chore), minutes; check-ins are Events; streaks where cadence is daily-ish | dumps, you |
 
+### Games (module `games`, agreed 17 Oct, revised 20 Oct; feeds the Turf board)
+The football you already run in **Turf Ledger**, your web app
+(github.com/panikinskywalker/Turf-App: Cloudflare D1 + R2, hosted and
+signed in by OpenAI Sites). **Since 20 Oct (plan 2, revised the same day for
+the iPhone)** the whole app is rebuilt as ours: **Turf web**, on your own
+Cloudflare account, holds the one true copy of every game, share, payment,
+player, venue and stat (layer 4, *Turf web*). The full organiser flow is in
+the Turf board in LifeOS on the S22, which keeps a synced copy and works
+offline, and in Turf web itself, signed in, on your iPhone. Friends use Turf
+web's public pages. Turf Ledger's data comes in once, at the switch, with
+every record keeping its Turf Ledger id, so the links your friends already
+have can keep working. Until the switch, Turf Ledger stays as it is and you
+keep adjusting it.
+| Object | Meaning | Key fields | Filed by |
+|---|---|---|---|
+| **Game** | One match | when (date + time), venue → Venue, format (side size), total cost, expected players, payment terms (tentative / prepaid / advance paid / postpaid), advance, fronted by → Person, score A–B, team colours, captains → Person, man of the match → Person, goal data quality, share link | Turf Ledger, you |
+| **Appearance** | One player in one game | game → Game, player → Person, share (money), amount paid (money; part payments; over the share is a credit), paid, paid on, RSVP, attendance (confirmed / late / no-show), team (A / B), position, goals, assists, saves, played in goal | Turf Ledger, you, a matched SMS |
+| **Player profile** | Your football view of a person | person → Person, positions (main, second, comfortable), preferred foot, speciality, playing style, starting level, ability, the six attributes (pace, stamina, defending, passing, dribbling, shooting), keeper willing and rating, jersey number, kit colours, boots, favourite player, clubs and countries supported, availability (regular / window only; all week / weekdays / weekends; available / injured / out of station, with periods), photo, share link | Turf Ledger, you |
+| **Venue** | A turf you book | place → Place, usual kick-off, format, usual cost, payment terms, advance, maps link, photo | Turf Ledger, you |
+
+Players are **Persons** (crm; name, phone, email, UPI from Turf Ledger's
+payment id) and members of the **Football** Group; a Venue's location is a
+**Place**. The football detail stays in games, so People stays clean.
+
+**Money.** A payment is an entry, never a tick: "+₹147 from Priya for Sat's
+game", with who recorded it, where (LifeOS, iPhone, a matched SMS) and when;
+a refund or a correction is its own entry. A share's amount paid is the sum of
+its entries: part payments are allowed, more than the share is a credit, and
+the person who fronted the cost counts as paid (Turf Ledger is adding part
+payments on 20 Oct: `amount_paid_cents`, a financial audit, no removing a paid
+player without a refund; its amounts become opening entries at the switch).
+Entries from two phones both count and never overwrite each other; the list
+of entries replaces Turf Ledger's payment and financial audit logs. In LifeOS
+each entry is an Event on the Appearance.
+Turf Ledger's `transactions` table is not written by the app, so nothing is
+imported from it as Transactions; your bank SMS already files the ₹147s, and
+importing them again would count them twice. Instead:
+- What is still owed on a share between you and someone is a **Debt** (they
+  owe you when you fronted; you owe when someone else did; nothing when
+  neither is you). "Which player is you" is a Turf board setting. The Debt
+  links to its Appearance, goes down with each payment and is settled at zero.
+- A money-in Transaction from a member of the Football group that matches an
+  open share (amount and the days after the game) goes to **To check**:
+  "Priya paid her ₹147 for Sat 19 Sep?" Yes records the payment on the
+  Appearance, links the Transaction to it and lowers the Debt. A smaller
+  amount is offered as a part payment.
+
+**The whole organiser flow is in LifeOS and in Turf web signed in** (layer 3, *Turf*): new and edited
+matches, shares and payments, attendance, scores and goals, teams and the
+team generator (Turf Ledger's `lib/team-balance.ts`, ported to games),
+captains and player of the match, players and their profiles, availability,
+venues, leaders, WhatsApp shares, reviewing what friends submit.
+
 ### Design follows the same tiers (added 5 Oct)
 Design is assembled the way the code is: the **Field type kit** (each type in a
 row, on the record page, as a form input, as a tile), then the **six generic
@@ -156,7 +209,8 @@ large OTP on Delivery).
 | comments | Facts |
 | reminders table | Cycles |
 
-Count: 19 domain Objects, down from 25 kinds plus two side tables.
+Count: 19 domain Objects, down from 25 kinds plus two side tables; 23 with
+the four games Objects added 17 Oct.
 
 ## 3. Three tiers: core, modules, boards + automations — agreed 4 Oct
 
@@ -185,8 +239,9 @@ what a Person is).
 (Asset, Vehicle) · `inventory` (Item) · `documents` (Document) · `health`
 (Measurement, Workout) · `habits` (Habit, Habit log, Routine) · `knowledge`
 (Note) · `places` (Place, Organisation) · `deliveries` (Delivery). `dashboard`
-and `automation` own no data and become boards. Later as wanted: `games`
-(matches, teams, scores), … Each module's Objects and Fields are settled in its
+and `automation` own no data and become boards. Added 17 Oct: `games` (Game,
+Appearance, Player profile, Venue; layer 2), for the Turf board. Later as
+wanted: … Each module's Objects and Fields are settled in its
 own milestone (layer 6), not before.
 
 ### Boards (the top tier: what you see on screen)
@@ -195,8 +250,23 @@ charts, reports and its own settings, and defines **no Objects**; if it needs a
 new Object, that is a new module. It may add filing hints scoped to itself
 (e.g. "₹147 in from someone in the Football group is a turf share").
 - **Turf**: People (players, Football group) + Money (shares in, who owes) +
-  Places (the turf) + Games (matches). One screen: this week's game, who paid,
-  who owes, settle up.
+  Places (the turf) + Games (matches). Keeps Turf Ledger's flow, which you are
+  used to (agreed 17 Oct), drawn in the LifeOS redesign:
+  - **Home**: money at a glance (games, collected, outstanding, games played),
+    recent games, who still owes (follow-ups).
+  - **Games**: Match centre (the upcoming match, counts, the last 13 weeks as
+    a grid, a month calendar, day of the week) and Match history (filter paid /
+    partial / unpaid, search venue or player).
+  - **+** (new match): venue fills format, cost and kick-off; pick players;
+    shares split.
+  - **Players**: Squad (search; filter unpaid / clear and by availability)
+    and Leaders (goals, assists, saves, wins, appearances).
+  - **Venues**: your turfs with their defaults.
+  - **Match**: score, teams and captains; *Payment checklist* (tick paid,
+    attendance) and *Team view*.
+  - **Player profile**: attributes chart, stats, kit colours, availability,
+    their dues.
+  Those five sections are the board's own; the LifeOS bottom bar stays.
 - **Today** and **Upkeep**: boards over every module, pinned to the bottom bar.
 - **Time**: what happened in a day / month / year, over every module.
 - Candidates: Trip planner (Agenda + Money + People + Places), Car (Things +
@@ -284,6 +354,42 @@ Each source declares: id, the modules it feeds, the permission it needs,
 sync, count today, last error). You › Data sources lists them with one
 "Sync all". Sources: you (typed / voice / share), SMS, payment notifications,
 Health Connect, Usage access, contacts, calendar, call log, Gmail (IMAP).
+
+### Turf web: the hosted home of Turf (added 17 Oct, revised 20 Oct)
+LifeOS keeps its data on the S22, and you also run games from your iPhone,
+where LifeOS can't go. So Turf's data lives on a host both phones and your
+friends can reach: **Turf web**, built from Turf Ledger's own code and moved
+to your own Cloudflare account (Workers, D1 for data, R2 for photos).
+- **The one true copy** of Turf is Turf web's database. The Turf board in
+  LifeOS keeps a synced copy.
+- **Three ways in**:
+  - *You on the iPhone*: Turf web saved to the home screen, signed in as
+    organiser with an emailed one-time code (Cloudflare Access; no
+    passwords). The full organiser flow.
+  - *You on the S22*: the Turf board in LifeOS, the full organiser flow,
+    offline too.
+  - *Friends*: the public pages, no sign-in, through per-match, per-player
+    and viewer links: RSVP, lineup, teams and score, squad, leaders, public
+    profiles, profile invites, availability.
+- **Sync with LifeOS**: every change on Turf web carries a change number;
+  LifeOS asks for everything since the last one it saw (when the board opens,
+  on pull-to-refresh, with Sync all, and on a timer while the app is open).
+  A change made in LifeOS is sent as an action with its own id, so sending it
+  twice is harmless; offline, actions wait in order, and until Turf web
+  confirms, the change shows *sending*.
+- **Two phones**: payments are entries, so both count. Any other edit (a
+  score, a venue, a player's details): the latest change wins, and the one it
+  replaced is kept in that record's history.
+- **Answers from friends** reach LifeOS in the same sync: RSVPs and
+  availability straight onto the Appearance or Player profile; a submitted
+  profile waits for your approval, in LifeOS's **To check** or on Turf web.
+- **Access**: Cloudflare Access guards the organiser pages and the sync API
+  (your email, plus any collaborator you add); LifeOS signs in with an Access
+  service token kept in its secure store (You › Data sources › Turf web).
+  The source contract (`sync` plus sending actions) is settled in PLUGINS.md
+  with R9c.
+- **Before the switch**, LifeOS can read Turf Ledger (R9a's pull) so the board
+  is checked on your real data while Turf Ledger is still the one you use.
 
 The pipeline, identity, provenance, To check and the Source contract live in
 core. Per-sender parsers and Object schemas belong to the module whose records
@@ -446,8 +552,72 @@ screens checked on the phone → overrides only where the default is wrong)
 - [ ] **R8 Today and Time** — Today tiles re-hung on module tools and core queries only; Time
   board from On this day; the route moves from `app/almanac/time.tsx` to
   `app/time.tsx`.
-- [ ] **R9 Turf** — the first user board: this week's game, who paid, who owes,
-  settle up; a `games` module if it needs a Game Object. Proves the tier.
+- [ ] **R9 Turf** — the first user board, the whole of Turf Ledger in LifeOS
+  (agreed 17 Oct; **plan 2 on 20 Oct**: the whole app rebuilt as ours, Turf web
+  on Cloudflare holds the data, LifeOS and the iPhone both run games; layer 2 *Games*, layer 3 *Turf*, layer 4 *Turf web*). Proves the
+  tier. Needs Person, Group and Place as R2 / R3 leave them. Order after 20
+  Oct: R9a (built) → R9b → R9c → R9d → R9e; the design is needed from R9c.
+  - [ ] **R9a Read** — LifeOS side built 18 Oct 2026; the Turf-App endpoint is
+    waiting (see below). Built: the `games` module (Game, Appearance, Player
+    profile, Venue; `src/modules/games`), the Turf Ledger source with the token
+    in the secure store, the pull (players matched to People by phone, email
+    or a unique name before one is made, only empty Person fields filled; the
+    Football group; venues → Places; archived, never deleted, when gone; Debts
+    with "which player is you", settled when ticked), four tools (who owes,
+    this week, a player's stats, leaders), the Turf board read-only (Home,
+    Games, a game with Payment checklist and Team view, Players with Squad and
+    Leaders, Venues), You › Data sources › Turf Ledger, tests over a recorded
+    sample pull. *Waiting*: the Turf-App `GET /api/lifeos` change (not written
+    yet: needs your go-ahead, since it serves the whole ledger to whoever holds
+    the token), its deploy through OpenAI Sites, the first real pull. The
+    Sites copy could not be fetched on 18 Oct (its git token had expired), so
+    GitHub is assumed to match the live app; on 20 Oct the live `/api/data`
+    (signed in, read only) confirmed it: 76 players, 32 games (18 Jul–20 Oct),
+    470 appearances, 10 venues, no part payments yet.
+    Agreed scope: in Turf-App, `GET /api/lifeos` behind the token (you
+    deploy it through OpenAI Sites); the `games` module (Game, Appearance,
+    Player profile, Venue) with the Turf Ledger source: players → Person and
+    the Football group, venues → Place, photos as files; Debts for open shares
+    between you and someone; tools (who owes, this week's game, a player's
+    stats, leaders). The Turf board's screens, read-only. Tests over a
+    recorded pull.
+  - [ ] **R9b Turf web, the backend**: Turf Ledger's code forked into its own
+    repo on your Cloudflare account; Cloudflare Access in place of the OpenAI
+    sign-in; every table gains a change number and soft delete; payments as
+    entries; the sync API (changes since N) and the actions API (with ids, in
+    order, idempotent); the money rules and the team generator with tests.
+    Needs no design.
+    *20 Oct, first slice done* in `~/Projects/turf-web` (commit 44bedad, local
+    only): wrangler config, Access sign-in verified in the Worker, migration
+    0017 (change numbers and tombstones by trigger, payments as entries,
+    opening entries for shares already paid), `GET /api/sync`, `POST
+    /api/actions`, the payment action, money-held guards; 19 tests; builds,
+    and checked end to end on the local Workers runtime. Your real data: a
+    read-only export of the live Turf Ledger (20 Oct, 14:09; GET /api/data and
+    the photos) in `turf-web/.data/` (git-ignored), loaded by
+    `scripts/import-turf-ledger.ts` (ids kept, opening entries, re-runnable;
+    5 tests) into the local Turf web, its totals matching the export.
+    Versioned since 20 Oct (`turf-web/CHANGELOG.md`): **v0** the start, **v0.1**
+    the backend for the design additions (`turf-web/docs/design/ADDITIONS-v0.1.md`:
+    dues, mark-all-paid, audit log with undo, devices, own goals and a score that
+    follows the goals, formations, guests, the copy / share texts, .ics,
+    settings); the D1 database is on Cloudflare, loaded. *Next*: the team
+    generator's tests, photos in sync, the first deploy (needs your `wrangler
+    login` and the Access setup in its README).
+  - [ ] **R9c The organiser flow in LifeOS**: the Turf source switches from
+    Turf Ledger's pull to Turf web's sync and actions; the board stops being
+    read-only: new and edited matches (venue defaults, terms, who fronted,
+    shares split), payment entries with part payments and credits,
+    attendance, scores and goals, teams and the generator, captains and
+    player of the match, players and profiles, availability, venues, all of
+    Leaders, WhatsApp shares, the SMS share match in To check, *sending* and
+    offline. Screens follow the design when it lands.
+  - [ ] **R9d Turf web, the screens**: the organiser screens for the iPhone
+    and the friends' pages, restyled to the design; home-screen install.
+  - [ ] **R9e The switch**: a full export of Turf Ledger (every table and the
+    photos) imported into Turf web once with ids kept, paid amounts as opening
+    entries; the old address redirects to Turf web; Turf Ledger retired. Done
+    when you have run a week's game from the two phones alone.
 - [ ] **R10 Automations** — multi-step with data passing, manual run from a
   button or a sentence, model step, run log per step; templates.
 - [ ] **R11 Activity and Links** — Activity board over trackers; Links screen and

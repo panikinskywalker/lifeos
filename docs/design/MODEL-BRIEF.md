@@ -154,11 +154,26 @@ and quiet hours, Backup and restore, App lock, Appearance (Light / Abyss), Local
 - **Person record** (crm, but shows money): balance with them, splits, groups.
 
 ### 4.8 Turf (the first user board; design the pattern)
-One screen: this week's game (date, place), who paid their share (₹147 chips
-with faces), who still owes, a Settle up action, last 8 weeks as a strip. It is
-assembled from crm (players, the Football group), finance (shares in, debts) and
-places (the turf). Design it so the same pattern serves a Trip planner and a Car
-board.
+Turf keeps the flow of Turf Ledger, the web app it replaces on the phone
+(`docs/MODEL.md` layer 3, *Turf*), drawn in these tokens; Turf Ledger's own
+themes are not carried over. Its five sections sit in the board under the
+LifeOS bottom bar:
+- **Home**: money at a glance (games, collected, outstanding, games played),
+  recent games, who still owes (₹147 chips with faces, a Settle up action).
+- **Games**: Match centre (the upcoming match, counts, the last 13 weeks as a
+  grid, a month calendar, day of the week) and Match history (filter paid /
+  partial / unpaid, search).
+- **+ New match**: venue fills format, cost and kick-off; pick players; shares
+  split.
+- **Players**: Squad (filters unpaid / clear and availability) and Leaders.
+- **Venues**: your turfs and their defaults.
+- **Match**: score, teams, captains; Payment checklist and Team view tabs.
+- **Player profile**: the six-attribute chart, stats, kit colours,
+  availability, their dues.
+A record waiting to reach Turf Ledger shows *sending*. It is assembled from
+games (matches, appearances, profiles, venues), crm (players, the Football
+group), finance (shares in, debts) and places (the turf). Design it so the
+same pattern serves a Trip planner and a Car board.
 
 ## Part 5 — how it will be built (constraints)
 
