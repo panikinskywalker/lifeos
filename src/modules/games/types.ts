@@ -2,10 +2,11 @@ import { z } from 'zod';
 import type { ObjectDef } from '@core/domain/types';
 
 /**
- * Games (docs/MODEL.md layer 2, agreed 17 Oct): the football you run in Turf
- * Ledger. Turf Ledger stays the source of truth; every record here keeps its
- * Turf Ledger id as `sourceKey` (`turf:<table>:<id>`). Players are People and
- * venues are Places; the football detail stays in these four Objects.
+ * Games (docs/MODEL.md layer 2, agreed 17 Oct, plan 2 on 20 Oct): the football
+ * you run in Turf web, which holds the one true copy. Every record here keeps
+ * its Turf web id (Turf Ledger's, kept at the import) as `sourceKey`
+ * (`turf:<table>:<id>`). Players are People and venues are Places; the
+ * football detail stays in these four Objects.
  */
 
 export const GAMES_COLOR = 'green';
@@ -45,7 +46,7 @@ export interface GameData {
   date: string;
   time?: string;
   venueId?: string;
-  /** The venue as Turf Ledger names it (kept when the venue record is missing). */
+  /** The venue as Turf web names it (kept when the venue record is missing). */
   venueName: string;
   sideSize?: number;
   totalCost: number;
@@ -62,6 +63,8 @@ export interface GameData {
   motmId?: string;
   goalData?: 'complete' | 'partial' | 'inconsistent' | 'missing';
   shareSlug?: string;
+  /** RSVPs by Turf web player id ("in" / "maybe" / "out"): a player can answer before they're in the lineup. */
+  rsvps?: Record<string, string>;
   sourceKey?: string;
 }
 
@@ -92,6 +95,7 @@ export const gameObject: ObjectDef<GameData> = {
     motmId: z.string().optional(),
     goalData: z.enum(['complete', 'partial', 'inconsistent', 'missing']).optional(),
     shareSlug: z.string().optional(),
+    rsvps: z.record(z.string(), z.string()).optional(),
     sourceKey: z.string().optional(),
   }),
   fields: [
@@ -127,6 +131,8 @@ export interface AppearanceData {
   /** The game's date, so lists sort and Today finds this week's without a join. */
   gameDate: string;
   share: number;
+  /** The sum of its payment entries (payments, refunds, corrections); more than the share is a credit. */
+  amountPaid?: number;
   paid: boolean;
   paidOn?: string;
   rsvp?: string;
@@ -134,6 +140,7 @@ export interface AppearanceData {
   team?: 'A' | 'B';
   position?: string;
   goals: number;
+  ownGoals?: number;
   assists: number;
   saves: number;
   inGoal: boolean;
@@ -152,6 +159,7 @@ export const appearanceObject: ObjectDef<AppearanceData> = {
     personId: z.string().min(1),
     gameDate: z.string(),
     share: z.coerce.number().default(0),
+    amountPaid: z.coerce.number().optional(),
     paid: z.boolean().default(false),
     paidOn: z.string().optional(),
     rsvp: z.string().optional(),
@@ -159,6 +167,7 @@ export const appearanceObject: ObjectDef<AppearanceData> = {
     team: z.enum(['A', 'B']).optional(),
     position: z.string().optional(),
     goals: z.coerce.number().default(0),
+    ownGoals: z.coerce.number().optional(),
     assists: z.coerce.number().default(0),
     saves: z.coerce.number().default(0),
     inGoal: z.boolean().default(false),
@@ -168,6 +177,7 @@ export const appearanceObject: ObjectDef<AppearanceData> = {
     { key: 'gameId', label: 'Game', type: 'link', linkTo: 'game', linkWord: 'played in', required: true },
     { key: 'personId', label: 'Player', type: 'link', linkTo: 'person', linkWord: 'player', required: true },
     { key: 'share', label: 'Share', type: 'money', summary: true },
+    { key: 'amountPaid', label: 'Paid so far', type: 'money' },
     { key: 'paid', label: 'Paid', type: 'boolean', summary: true },
     { key: 'paidOn', label: 'Paid on', type: 'date' },
     { key: 'attendance', label: 'Attendance', type: 'select', options: ATTENDANCE },
@@ -187,6 +197,8 @@ export const appearanceObject: ObjectDef<AppearanceData> = {
 /* ------------------------------------------------------------------ */
 
 export interface AvailabilityPeriod {
+  /** Turf web's id for the period, so a change or delete finds it. */
+  id?: string;
   status: 'AVL' | 'INJ' | 'OOS';
   startsAt: string;
   endsAt?: string | null;
@@ -195,7 +207,7 @@ export interface AvailabilityPeriod {
 
 export interface PlayerProfileData {
   personId: string;
-  /** The name Turf Ledger uses (the Person may be called something else). */
+  /** The name Turf web uses (the Person may be called something else). */
   name: string;
   position?: string;
   secondaryPosition?: string;
@@ -223,7 +235,7 @@ export interface PlayerProfileData {
   weekly?: 'all_week' | 'weekdays' | 'weekends';
   availability: 'AVL' | 'INJ' | 'OOS';
   periods?: AvailabilityPeriod[];
-  /** Turf Ledger's photo path (fetched with the same token). */
+  /** Turf web's photo key (fetched with the same key). */
   photoPath?: string;
   shareSlug?: string;
   notes?: string;
@@ -267,7 +279,7 @@ export const playerProfileObject: ObjectDef<PlayerProfileData> = {
     availabilityMode: z.enum(['regular', 'window_only']).optional(),
     weekly: z.enum(['all_week', 'weekdays', 'weekends']).optional(),
     availability: z.enum(['AVL', 'INJ', 'OOS']).default('AVL'),
-    periods: z.array(z.object({ status: z.enum(['AVL', 'INJ', 'OOS']), startsAt: z.string(), endsAt: z.string().nullable().optional(), note: z.string().nullable().optional() })).optional(),
+    periods: z.array(z.object({ id: z.string().optional(), status: z.enum(['AVL', 'INJ', 'OOS']), startsAt: z.string(), endsAt: z.string().nullable().optional(), note: z.string().nullable().optional() })).optional(),
     photoPath: z.string().optional(),
     shareSlug: z.string().optional(),
     notes: z.string().optional(),

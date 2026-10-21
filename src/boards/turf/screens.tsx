@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
@@ -10,8 +10,8 @@ import { useLive, useOS } from '@ui/hooks';
 import { Button, Card, EmptyState, RowItem, RowList, Screen, Section, Segmented, Stat, StatTrio, Text, useToast } from '@ui/kit';
 
 /**
- * The Turf board (docs/MODEL.md layer 3; R9a, read-only): Turf Ledger's own
- * flow — Home (money at a glance, who still owes, this week's game), Games
+ * The Turf board (docs/MODEL.md layer 3; R9a, R9c; read-only until R9c.2):
+ * Turf Ledger's flow, synced from Turf web — Home (money at a glance, who still owes, this week's game), Games
  * (match centre and history), Players (squad and leaders), Venues — over the
  * games, crm, places and finance records. Restyled with the redesign later.
  */
@@ -26,24 +26,43 @@ function useBack() {
   return () => (router.canGoBack() ? router.back() : router.replace('/browse'));
 }
 
-/** Pull-to-refresh and the Pull button: one Turf Ledger pull through core. */
+const EVERY_MS = 60_000;
+/** One sync at a time, however many board screens are open. */
+let inFlight = false;
+const stale = (os: LifeOSContext) => Date.now() - (sourceState(os, 'turf').lastSync ?? 0) > EVERY_MS - 5_000;
+
+/**
+ * A Turf web sync through core: when a board screen opens (if the last one is
+ * over a minute old), every minute while it stays open, and on pull-to-refresh.
+ * Only the pull-down says what went wrong; the quiet ones leave it on the
+ * source's state (You › Data sources).
+ */
 function usePull() {
   const os = useOS();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  const pull = async () => {
+  const pull = async (quiet = false) => {
     const src = os.registry.sources.get('turf');
-    if (!src) return;
-    setBusy(true);
+    if (!src || inFlight) return;
+    inFlight = true;
+    if (!quiet) setBusy(true);
     try {
-      if (src.available && !(await src.available(os))) toast.show({ message: 'Add Turf Ledger’s address and token first', icon: 'info' });
-      else await runSource(os, src);
+      if (src.available && !(await src.available(os))) {
+        if (!quiet) toast.show({ message: 'Add Turf web’s address and this phone’s key first', icon: 'info' });
+      } else await runSource(os, src);
     } catch (e) {
-      toast.show({ message: (e as Error).message, icon: 'info' });
+      if (!quiet) toast.show({ message: (e as Error).message, icon: 'info' });
     } finally {
-      setBusy(false);
+      inFlight = false;
+      if (!quiet) setBusy(false);
     }
   };
+  useEffect(() => {
+    if (stale(os)) void pull(true);
+    const timer = setInterval(() => stale(os) && void pull(true), EVERY_MS);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [os]);
   return { busy, pull };
 }
 
@@ -51,8 +70,8 @@ function NotConnected() {
   const router = useRouter();
   return (
     <View style={{ gap: 12 }}>
-      <EmptyState icon="target" line="Connect Turf Ledger to see your matches, players and who owes what." />
-      <Button title="Connect Turf Ledger" icon="link" onPress={() => router.push('/settings/turf' as never)} />
+      <EmptyState icon="target" line="Connect Turf web to see your matches, players and who owes what." />
+      <Button title="Connect Turf web" icon="link" onPress={() => router.push('/settings/turf' as never)} />
     </View>
   );
 }
@@ -71,7 +90,7 @@ export function TurfHome({ ctx }: Props) {
   }, []);
   const f = ctx.format.currency;
   return (
-    <Screen title="Turf" subtitle={data?.state.lastSync ? `From Turf Ledger · pulled ${formatDistanceToNow(data.state.lastSync, { addSuffix: true })}` : 'From Turf Ledger'} onBack={back} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Turf" subtitle={data?.state.lastSync ? `From Turf web · synced ${formatDistanceToNow(data.state.lastSync, { addSuffix: true })}` : 'From Turf web'} onBack={back} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       {!data ? (
         <NotConnected />
       ) : (
@@ -118,11 +137,11 @@ export function TurfHome({ ctx }: Props) {
               <RowItem icon="calendar" tint={TINT} title="Games" subtitle="Match centre and history" chevron onPress={() => router.push('/board/turf/games' as never)} />
               <RowItem icon="people" tint={TINT} title="Players" subtitle={`Squad of ${data.players} · leaders`} chevron onPress={() => router.push('/board/turf/players' as never)} />
               <RowItem icon="location" tint={TINT} title="Venues" chevron onPress={() => router.push('/board/turf/venues' as never)} />
-              <RowItem icon="settings" tint={TINT} title="Turf Ledger settings" subtitle="Address, token, which player is you" chevron onPress={() => router.push('/settings/turf' as never)} />
+              <RowItem icon="settings" tint={TINT} title="Turf web settings" subtitle="Address, key, which player is you" chevron onPress={() => router.push('/settings/turf' as never)} />
             </RowList>
           </Section>
           <Text variant="caption" color="tertiary">
-            Read-only for now. Pull down to refresh from Turf Ledger. Changes made here reach the web app in the next step.
+            Read-only for now. Syncs from Turf web every minute while open; pull down to sync now. Changes made here reach the web app in the next step.
           </Text>
         </>
       )}
@@ -234,7 +253,7 @@ export function TurfGame({ ctx, params }: Props) {
                 title={l.name}
                 subtitle={[l.appearance.data.attendance !== 'confirmed' ? ATTENDANCE.find((a) => a.value === l.appearance.data.attendance)?.label : null, l.appearance.data.rsvp ? `RSVP ${l.appearance.data.rsvp}` : null].filter(Boolean).join(' · ') || null}
                 value={f(l.appearance.data.share)}
-                meta={l.appearance.data.paid ? 'Paid' : 'Unpaid'}
+                meta={l.appearance.data.paid ? 'Paid' : l.appearance.data.amountPaid ? `${f(l.appearance.data.amountPaid)} paid` : 'Unpaid'}
                 metaTone={l.appearance.data.paid ? 'ok' : 'alert'}
                 onPress={() => router.push(`/entity/person/${l.appearance.data.personId}` as never)}
               />

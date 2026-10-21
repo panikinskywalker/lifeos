@@ -4,60 +4,63 @@ import { useRouter } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
 import { runSource } from '@core/filing/sources';
 import { sourceState } from '@core/sources/deviceData';
-import { allPlayers, SETTING_ME, TURF_TOKEN, TURF_URL, type PullResult } from '@modules/games';
+import { allPlayers, isTurfKey, SETTING_LAST, SETTING_ME, SETTING_REV, TURF_DEFAULT_URL, TURF_KEY, TURF_URL, type SyncResult } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
-import { Button, Screen, Section, SelectField, Text, TextField, useToast } from '@ui/kit';
+import { Button, Screen, Section, Text, TextField, useToast } from '@ui/kit';
 
 const STEPS = [
-  'In Turf Ledger’s hosting settings (OpenAI Sites), add a secret named LIFEOS_TOKEN: a long random string, at least 32 characters.',
-  'Deploy the Turf Ledger version that has the LifeOS endpoint (the lifeos-endpoint branch).',
-  'Paste the site’s address and the same token here, then tap Pull now.',
+  'On Turf web, signed in as organiser: Settings › Connected phones › Add a phone. Name it “LifeOS · S22”.',
+  'Copy the key it shows (it starts with tw_ and is shown once).',
+  'Paste it here with Turf web’s address, then tap Sync now. The first sync brings everything; after that only what changed.',
 ];
 
 /**
- * You › Data sources › Turf Ledger (R9a): the address, the token (kept in the
- * phone's secure store, never shown again), which player is you (it decides
- * who owes whom), and the last pull.
+ * You › Data sources › Turf web (R9c): the address, this phone's key (kept in
+ * the phone's secure store, never shown again), which player is you (set in
+ * Turf web, shown here), and the last sync.
  */
 export default function TurfSettings() {
   const os = useOS();
   const router = useRouter();
   const toast = useToast();
-  const [url, setUrl] = useState(os.settings.get<string>(TURF_URL, ''));
-  const [token, setToken] = useState('');
-  const [hasToken, setHasToken] = useState(false);
+  const [url, setUrl] = useState(os.settings.get<string>(TURF_URL, '') || TURF_DEFAULT_URL);
+  const [key, setKey] = useState('');
+  const [hasKey, setHasKey] = useState(false);
   const [busy, setBusy] = useState(false);
-  const players = useLive((o) => (o.registry.objects.has('player') ? allPlayers(o) : []), []);
-  const me = useLive((o) => o.settings.get<string | null>(SETTING_ME, null), []);
-  const state = useLive((o) => ({ src: sourceState(o, 'turf'), last: o.settings.get<(PullResult & { at: number }) | null>('turf.lastPull', null) }), []);
+  const me = useLive((o) => {
+    const id = o.settings.get<string | null>(SETTING_ME, null);
+    return id && o.registry.objects.has('player') ? allPlayers(o).find((p) => p.data.sourceKey === `turf:players:${id}`)?.data.name ?? null : null;
+  }, []);
+  const state = useLive((o) => ({ src: sourceState(o, 'turf'), last: o.settings.get<(SyncResult & { at: number }) | null>(SETTING_LAST, null) }), []);
 
   useEffect(() => {
-    void os.device?.secrets?.get(TURF_TOKEN).then((t) => setHasToken(!!t));
+    void os.device?.secrets?.get(TURF_KEY).then((k) => setHasKey(!!k));
   }, [os]);
 
   const save = async () => {
     os.settings.set(TURF_URL, url.trim());
-    if (token.trim()) {
-      if (token.trim().length < 32) return toast.show({ message: 'The token should be at least 32 characters', icon: 'info' });
-      await os.device?.secrets?.set(TURF_TOKEN, token.trim());
-      setToken('');
-      setHasToken(true);
+    if (key.trim()) {
+      if (!isTurfKey(key)) return toast.show({ message: 'That isn’t a Turf web key — it starts with tw_', icon: 'info' });
+      await os.device?.secrets?.set(TURF_KEY, key.trim());
+      setKey('');
+      setHasKey(true);
     }
     toast.show({ message: 'Saved', icon: 'check' });
   };
   const forget = async () => {
-    await os.device?.secrets?.set(TURF_TOKEN, null);
-    setHasToken(false);
-    toast.show({ message: 'Token removed from this phone', icon: 'trash' });
+    await os.device?.secrets?.set(TURF_KEY, null);
+    setHasKey(false);
+    toast.show({ message: 'Key removed from this phone', icon: 'trash' });
   };
-  const pull = async () => {
+  const sync = async (fromStart = false) => {
     const src = os.registry.sources.get('turf');
     if (!src) return;
     setBusy(true);
     try {
+      if (fromStart) os.settings.set(SETTING_REV, 0);
       await runSource(os, src);
-      const r = os.settings.get<PullResult | null>('turf.lastPull', null);
-      toast.show({ message: r ? `Pulled: ${r.created} new, ${r.updated} changed` : 'Pulled', icon: 'check' });
+      const r = os.settings.get<SyncResult | null>(SETTING_LAST, null);
+      toast.show({ message: r ? `Synced: ${r.created} new, ${r.updated} changed` : 'Synced', icon: 'check' });
     } catch (e) {
       toast.show({ message: (e as Error).message, icon: 'info' });
     } finally {
@@ -65,18 +68,16 @@ export default function TurfSettings() {
     }
   };
 
-  const meOptions = players.map((p) => ({ value: (p.data.sourceKey ?? '').replace('turf:players:', ''), label: p.data.name })).filter((o) => o.value);
-
   return (
-    <Screen title="Turf Ledger" subtitle="Your football, read from the web app" onBack={() => (router.canGoBack() ? router.back() : router.replace('/settings/sources' as never))}>
+    <Screen title="Turf web" subtitle="Your football, synced from the web app" onBack={() => (router.canGoBack() ? router.back() : router.replace('/settings/sources' as never))}>
       <Section title="Connection">
         <View style={{ gap: 12 }}>
-          <TextField label="Address" value={url} onChange={setUrl} placeholder="turf-ledger.chatgpt.site" keyboardType="url" autoCapitalize="none" autoCorrect={false} />
+          <TextField label="Address" value={url} onChange={setUrl} placeholder={TURF_DEFAULT_URL} keyboardType="url" autoCapitalize="none" autoCorrect={false} />
           <TextField
-            label={hasToken ? 'Token (saved on this phone)' : 'Token'}
-            value={token}
-            onChange={setToken}
-            placeholder={hasToken ? 'Paste a new one to replace it' : 'The LIFEOS_TOKEN you set in Turf Ledger'}
+            label={hasKey ? 'Key (saved on this phone)' : 'Key'}
+            value={key}
+            onChange={setKey}
+            placeholder={hasKey ? 'Paste a new one to replace it' : 'tw_… from Turf web › Settings › Connected phones'}
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
@@ -84,30 +85,25 @@ export default function TurfSettings() {
           />
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <Button title="Save" icon="check" size="sm" onPress={() => void save()} />
-            <Button title={busy ? 'Pulling…' : 'Pull now'} icon="refresh" size="sm" variant="secondary" disabled={busy || !url.trim() || !hasToken} onPress={() => void pull()} />
-            {hasToken ? <Button title="Remove token" icon="trash" size="sm" variant="ghost" onPress={() => void forget()} /> : null}
+            <Button title={busy ? 'Syncing…' : 'Sync now'} icon="refresh" size="sm" variant="secondary" disabled={busy || !url.trim() || !hasKey} onPress={() => void sync()} />
+            {hasKey ? <Button title="Remove key" icon="trash" size="sm" variant="ghost" onPress={() => void forget()} /> : null}
           </View>
           <Text variant="caption" color={state.src.error ? 'alert' : 'secondary'}>
             {state.src.error
               ? state.src.error
               : state.last
-                ? `Last pull ${formatDistanceToNow(state.last.at, { addSuffix: true })}: ${state.last.created} new, ${state.last.updated} changed, ${state.last.archived} archived · ${state.last.peopleMatched} players matched to People, ${state.last.peopleCreated} added`
-                : 'Not pulled yet.'}
+                ? `Last sync ${formatDistanceToNow(state.last.at, { addSuffix: true })} (change ${state.last.rev}): ${state.last.created} new, ${state.last.updated} changed, ${state.last.archived} archived, ${state.last.payments} payment entries · ${state.last.peopleMatched} players matched to People, ${state.last.peopleCreated} added`
+                : 'Not synced yet.'}
           </Text>
+          {state.last ? <Button title="Sync everything again" icon="refresh" size="sm" variant="ghost" disabled={busy || !hasKey} onPress={() => void sync(true)} /> : null}
         </View>
       </Section>
 
       <Section title="Which player is you">
         <View style={{ gap: 8 }}>
-          {meOptions.length ? (
-            <SelectField options={meOptions} value={me ?? undefined} onChange={(v) => os.settings.set(SETTING_ME, v ?? null)} />
-          ) : (
-            <Text variant="caption" color="secondary">
-              Your players appear here after the first pull.
-            </Text>
-          )}
+          <Text variant="rowTitle">{me ?? 'Not set'}</Text>
           <Text variant="caption" color="secondary">
-            Decides who owes whom: on a game you fronted, unpaid shares are owed to you; on someone else’s, your unpaid share is owed by you. Applied on the next pull.
+            Set in Turf web › Settings › Who you are, so both phones agree. It decides who owes whom: on a game you fronted, open shares are owed to you; on someone else’s, your open share is owed by you.
           </Text>
         </View>
       </Section>
@@ -125,7 +121,7 @@ export default function TurfSettings() {
             </View>
           ))}
           <Text variant="caption" color="tertiary">
-            Read-only for now: LifeOS reads matches, players, venues and who paid. Changes made in LifeOS reach Turf Ledger in the next step (R9b). Nothing is imported as a payment, because your bank texts already file those.
+            Read-only for now: LifeOS syncs matches, players, venues, RSVPs and every payment entry. Changes made in LifeOS reach Turf web in the next step. Nothing is imported as a Transaction, because your bank texts already file those.
           </Text>
         </View>
       </Section>

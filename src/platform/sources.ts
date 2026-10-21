@@ -99,7 +99,7 @@ export async function requestAccess(id: SourceId): Promise<boolean> {
  * and Gmail sources read through this and never import platform code. Many
  * messages at once are filed by core in batches with a breath between them.
  */
-/** Tokens for sources (Turf Ledger), in the phone's secure store. Web previews keep none. */
+/** Keys for sources (Turf web), in the phone's secure store. Web previews keep none. */
 const secrets: NonNullable<DeviceBridge['secrets']> = {
   get: async (key) => (Platform.OS === 'web' ? null : SecureStore.getItemAsync(`lifeos.secret.${key}`).catch(() => null)),
   set: async (key, value) => {
@@ -219,7 +219,7 @@ export function syncSources(os: LifeOSContext): Promise<void> {
         });
       }
     }
-    // Turf Ledger (games): only once its address and token are set.
+    // Turf web (games): only once its address and key are set.
     await withLimit('turf', STEP_LIMIT_MS.turf, () => syncRegistered(os, 'turf'));
     // Gmail last: a receipt then matches the SMS already filed for it (and the other way round).
     await withLimit('gmail', STEP_LIMIT_MS.mail, () => syncRegistered(os, 'gmail'));

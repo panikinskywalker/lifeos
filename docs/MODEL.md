@@ -151,11 +151,28 @@ importing them again would count them twice. Instead:
   owe you when you fronted; you owe when someone else did; nothing when
   neither is you). "Which player is you" is a Turf board setting. The Debt
   links to its Appearance, goes down with each payment and is settled at zero.
-- A money-in Transaction from a member of the Football group that matches an
-  open share (amount and the days after the game) goes to **To check**:
-  "Priya paid her ₹147 for Sat 19 Sep?" Yes records the payment on the
-  Appearance, links the Transaction to it and lowers the Debt. A smaller
-  amount is offered as a part payment.
+- A money-in Transaction is matched to a player by its **sender**: the UPI id
+  or the sender text in the SMS. The first time a sender is seen you are asked
+  once ("Who is priya.s@okicici?"); the answer is kept as an alias on that
+  Person, so every later message from it is known, for finance as well as
+  Turf (decided 22 Oct). Players' UPI ids from Turf web count as known from
+  the start.
+- **Sure → recorded on its own**: a known sender in the Football group, the
+  amount exactly what they owe (one share or their total; several shares are
+  paid oldest first), arriving in the days after the game, and only one player
+  fitting. The payment entry is made on the Appearance, the Transaction linked
+  to it, the Debt lowered, and the entry sent to Turf web; it shows in
+  **To check** as filed, with Undo.
+- **Otherwise asked in To check**: a new sender, an amount that is off (a part
+  payment, a round-up), one person paying for others, or more than one player
+  fitting: "Priya paid her ₹147 for Sat 19 Sep?" Yes records it as above; a
+  smaller amount is offered as a part payment.
+- Before recording, LifeOS checks the share against Turf web's latest copy: a
+  share already paid there is never paid twice; the Transaction is offered as
+  the proof of the payment already recorded.
+- The proof stays on the phone: the SMS and its Transaction live only in
+  LifeOS (finance). Turf web gets the payment entry alone (amount, who, when,
+  "matched SMS, LifeOS"), never the message.
 
 **The whole organiser flow is in LifeOS and in Turf web signed in** (layer 3, *Turf*): new and edited
 matches, shares and payments, attendance, scores and goals, teams and the
@@ -383,11 +400,12 @@ to your own Cloudflare account (Workers, D1 for data, R2 for photos).
 - **Answers from friends** reach LifeOS in the same sync: RSVPs and
   availability straight onto the Appearance or Player profile; a submitted
   profile waits for your approval, in LifeOS's **To check** or on Turf web.
-- **Access**: Cloudflare Access guards the organiser pages and the sync API
-  (your email, plus any collaborator you add); LifeOS signs in with an Access
-  service token kept in its secure store (You › Data sources › Turf web).
-  The source contract (`sync` plus sending actions) is settled in PLUGINS.md
-  with R9c.
+- **Access**: the organiser pages take a Turf web account or Cloudflare
+  Access; the sync and actions API take a **phone key** (`tw_…`, made in Turf
+  web › Settings › Connected phones, revocable there), which LifeOS keeps in
+  its secure store (You › Data sources › Turf web; built that way in Turf web
+  v0.0.2, noted 22 Oct). The source contract (`sync` plus sending actions) is
+  settled in PLUGINS.md with R9c.
 - **Before the switch**, LifeOS can read Turf Ledger (R9a's pull) so the board
   is checked on your real data while Turf Ledger is still the one you use.
 
@@ -612,7 +630,24 @@ screens checked on the phone → overrides only where the default is wrong)
     attendance, scores and goals, teams and the generator, captains and
     player of the match, players and profiles, availability, venues, all of
     Leaders, WhatsApp shares, the SMS share match in To check, *sending* and
-    offline. Screens follow the design when it lands.
+    offline. Screens follow the design when it lands. In slices (22 Oct):
+    - [x] **R9c.1 The sync** (LifeOS v0.0.1, 22 Oct): the `turf` source reads
+      Turf web's `GET /api/sync?since=N` with the phone key; the Turf Ledger
+      pull is gone. Payment entries are Events on the Appearance, paid so far
+      is their sum (part payments in who owes and the Debts); tombstones
+      archive; RSVPs before the lineup; "which player is you" from Turf web's
+      settings; guests not in the Football group; the board syncs on open and
+      every minute while open. Tests over a recorded sync page. *Phone check
+      pending.* Not in Turf web's sync yet: seasons, votes, stat and payment
+      claims, kit picks (a Turf web version adds them when LifeOS needs them).
+    - [ ] **R9c.2** The queue of changes and payments (part, refund,
+      correction), *sending* and offline.
+    - [ ] **R9c.3** Matches: new and edit, attendance, score and stats,
+      captains and player of the match.
+    - [ ] **R9c.4** Teams and the generator (rules copied into games).
+    - [ ] **R9c.5** Players, profiles, availability, venues; all of Leaders.
+    - [ ] **R9c.6** WhatsApp texts, the SMS share match (learned senders),
+      friends' submissions in To check.
   - [x] **R9d Turf web, the screens** (v0.0.5–v0.0.6, 20 Oct 2026): every
     organiser screen and every friends' page of the *Turf web · Noir* canvas,
     built in `turf-web/app/ui/` from the artboards' own measurements

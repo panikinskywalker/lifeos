@@ -1,6 +1,6 @@
 import { setCategoryTarget } from '@modules/finance/categories';
-import { applyTurfPull, SETTING_ME } from '@modules/games';
-import { samplePull } from '@modules/games/fixtures/samplePull';
+import { applyTurfSync } from '@modules/games';
+import { sampleSync } from '@modules/games/fixtures/sampleSync';
 import type { LifeOSContext } from '@core/registry/context';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -123,9 +123,8 @@ export function seedDemoData(os: LifeOSContext) {
 
     os.settings.set('demoSeeded', true);
   });
-  // The Turf board's sample: a recorded Turf Ledger pull (made-up players), with you as Rutvij.
+  // The Turf board's sample: a recorded Turf web sync page (made-up players), with you as Rutvij.
   if (os.registry.objects.has('game')) {
-    os.settings.set(SETTING_ME, 'p_rutvij');
-    applyTurfPull(os, samplePull);
+    applyTurfSync(os, sampleSync);
   }
 }

@@ -1,15 +1,18 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { SourceDef } from '@core/registry/types';
-import { applyTurfPull, type TurfPull } from './pull';
+import { applyTurfSync, isSyncPage, SETTING_REV, type TurfSyncPage } from './sync';
 
 /**
- * Turf Ledger as a Source (docs/MODEL.md layer 4, *Services that also write*;
- * R9a reads). Address in settings, token in the phone's secure store
- * (You › Data sources › Turf Ledger). The pull is the whole ledger every time.
+ * Turf web as a Source (docs/MODEL.md layer 4, *Turf web*; R9c). Address in
+ * settings, the phone's key (`tw_…`, made in Turf web › Settings › Connected
+ * phones) in the secure store (You › Data sources › Turf web). Each sync asks
+ * for what changed after the last change number applied; the cursor is
+ * Turf web's, so core's time-based `since` is not used.
  */
 
-export const TURF_URL = 'turf.url';
-export const TURF_TOKEN = 'turf.token';
+export const TURF_URL = 'turfweb.url';
+export const TURF_KEY = 'turfweb.key';
+export const TURF_DEFAULT_URL = 'https://turf-web.noboyyoudont.workers.dev';
 
 export function turfBase(os: LifeOSContext): string | null {
   const raw = os.settings.get<string>(TURF_URL, '').trim();
@@ -18,40 +21,50 @@ export function turfBase(os: LifeOSContext): string | null {
   return withScheme.replace(/\/+$/, '');
 }
 
-/** One GET /api/lifeos. Errors say what to do, in the words the settings screen uses. */
-export async function fetchTurfPull(os: LifeOSContext, doFetch: typeof fetch = fetch, timeoutMs = 45_000): Promise<TurfPull> {
+export const isTurfKey = (k: string) => /^tw_[A-Za-z0-9_-]{16,}$/.test(k.trim());
+
+/** One GET /api/sync?since=N. Errors say what to do, in the words the settings screen uses. */
+export async function fetchTurfSync(os: LifeOSContext, since: number, doFetch: typeof fetch = fetch, timeoutMs = 45_000): Promise<TurfSyncPage> {
   const base = turfBase(os);
-  const token = await os.device?.secrets?.get(TURF_TOKEN);
-  if (!base || !token) throw new Error('Add Turf Ledger’s address and token first');
+  const key = await os.device?.secrets?.get(TURF_KEY);
+  if (!base || !key) throw new Error('Add Turf web’s address and this phone’s key first');
   const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : undefined;
   try {
-    const r = await doFetch(`${base}/api/lifeos`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: ctl?.signal });
-    if (r.status === 401) throw new Error('Turf Ledger refused the token — check it matches LIFEOS_TOKEN');
-    if (r.status === 404) throw new Error('Turf Ledger doesn’t have the LifeOS endpoint turned on yet');
-    if (r.status === 403) throw new Error('Turf Ledger asked for a sign-in — the LifeOS endpoint must be reachable without one');
-    if (!r.ok) throw new Error(`Turf Ledger answered ${r.status}`);
+    const r = await doFetch(`${base}/api/sync?since=${Math.max(0, Math.floor(since))}`, { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' }, signal: ctl?.signal });
+    if (r.status === 401 || r.status === 403) throw new Error('Turf web refused this phone’s key — make a new one in Turf web › Settings › Connected phones');
+    if (r.status === 404) throw new Error('No Turf web at that address — check it');
+    if (!r.ok) throw new Error(`Turf web answered ${r.status}`);
     const type = r.headers.get('content-type') ?? '';
-    if (!type.includes('json')) throw new Error('Turf Ledger sent a page, not data — check the address');
-    return (await r.json()) as TurfPull;
+    if (!type.includes('json')) throw new Error('Turf web sent a page, not data — check the address');
+    const page = (await r.json()) as unknown;
+    if (!isSyncPage(page)) throw new Error('Turf web sent something that isn’t a sync page');
+    return page;
   } catch (e) {
-    if ((e as Error).name === 'AbortError') throw new Error('Turf Ledger took too long to answer');
+    if ((e as Error).name === 'AbortError') throw new Error('Turf web took too long to answer');
     throw e;
   } finally {
     if (timer) clearTimeout(timer);
   }
 }
 
-export const turfLedgerSource: SourceDef = {
+/** Sync from the last change number (0: everything). Returns what the page changed. */
+export async function syncTurf(os: LifeOSContext, doFetch: typeof fetch = fetch) {
+  const since = os.settings.get<number>(SETTING_REV, 0);
+  const r = applyTurfSync(os, await fetchTurfSync(os, since, doFetch));
+  console.log(`[turf] synced ${since} → ${r.rev}: ${r.created} new, ${r.updated} changed, ${r.archived} archived, ${r.payments} payment entries, people ${r.peopleMatched} matched / ${r.peopleCreated} added, ${r.debtsOpen} open debts`);
+  return r;
+}
+
+export const turfWebSource: SourceDef = {
   id: 'turf',
-  label: 'Turf Ledger',
+  label: 'Turf web',
   modules: ['games', 'crm', 'places', 'finance'],
-  permission: 'Address and token',
+  permission: 'Address and key',
   kind: 'readings',
-  available: async (os) => !!turfBase(os) && !!(await os.device?.secrets?.get(TURF_TOKEN)),
+  available: async (os) => !!turfBase(os) && !!(await os.device?.secrets?.get(TURF_KEY)),
   sync: async (os) => {
-    const r = applyTurfPull(os, await fetchTurfPull(os));
-    console.log(`[turf] pulled: ${r.created} new, ${r.updated} changed, ${r.archived} archived, people ${r.peopleMatched} matched / ${r.peopleCreated} added, ${r.debtsOpen} open debts`);
-    return { filed: r.created, cursor: String(Date.now()) };
+    const r = await syncTurf(os);
+    return { filed: r.created, cursor: String(r.rev) };
   },
 };

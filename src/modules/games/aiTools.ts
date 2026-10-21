@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { AiToolDef } from '@core/registry/types';
 import { currentGame, leaders, lineup, statsFor, summarise, whoOwes, allPlayers, type LeaderMetric } from './lib';
 
-/** The games tools (R9a): read-only. Writing back to Turf Ledger arrives with R9b. */
+/** The games tools (R9a): read-only. Sending changes to Turf web arrives with R9c.2. */
 
 function findPerson(os: Parameters<AiToolDef['run']>[1], name: string): string | null {
   const q = name.trim().toLowerCase();
@@ -16,13 +16,13 @@ function findPerson(os: Parameters<AiToolDef['run']>[1], name: string): string |
 export const gamesAiTools: AiToolDef[] = [
   {
     name: 'turf_who_owes',
-    description: 'Football (Turf Ledger): who still owes their share, how much and since when, biggest first.',
+    description: 'Football (Turf web): who still owes their share, how much and since when, biggest first.',
     input: z.object({}),
     run: async (_i, os) => whoOwes(os).map((o) => ({ name: o.name, amount: o.amount, shares: o.shares, since: o.oldest })),
   },
   {
     name: 'turf_this_week',
-    description: 'Football (Turf Ledger): the next game (or the latest if none is planned): when, where, cost, the lineup and who has paid.',
+    description: 'Football (Turf web): the next game (or the latest if none is planned): when, where, cost, the lineup and who has paid.',
     input: z.object({}),
     run: async (_i, os) => {
       const c = currentGame(os);
@@ -40,7 +40,7 @@ export const gamesAiTools: AiToolDef[] = [
   },
   {
     name: 'turf_player_stats',
-    description: 'Football (Turf Ledger): one player’s record — games, goals, assists, saves, wins / draws / losses, man of the match, paid and unpaid shares.',
+    description: 'Football (Turf web): one player’s record — games, goals, assists, saves, wins / draws / losses, man of the match, paid and unpaid shares.',
     input: z.object({ name: z.string().min(1).describe('The player, as you call them') }),
     run: async (input, os) => {
       const { name } = input as { name: string };
@@ -50,7 +50,7 @@ export const gamesAiTools: AiToolDef[] = [
   },
   {
     name: 'turf_leaders',
-    description: 'Football (Turf Ledger): the top players by games, goals, assists, saves, wins or man of the match.',
+    description: 'Football (Turf web): the top players by games, goals, assists, saves, wins or man of the match.',
     input: z.object({ metric: z.enum(['games', 'goals', 'assists', 'saves', 'wins', 'motm']).default('goals'), limit: z.number().int().min(1).max(25).default(5) }),
     run: async (input, os) => {
       const { metric, limit } = input as { metric: LeaderMetric; limit: number };

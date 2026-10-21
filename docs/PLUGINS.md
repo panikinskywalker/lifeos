@@ -154,11 +154,14 @@ Finance declares sms, notifications and gmail; usage, health and the phone
 sources stay in platform until R2 / R6.
 
 `os.device.secrets` (get / set) is the phone's secure store for tokens a
-source needs; never settings, never a backup. Games declares `turf` (R9a): a
-`readings` source that fetches Turf Ledger's `GET /api/lifeos` with the token
-and applies the pull itself (`applyTurfPull`: Person / Place matching, the
-Football group, archive-not-delete, Debts), so it reports `filed` rather than
-handing back readings.
+source needs; never settings, never a backup. Games declares `turf` (R9c.1):
+a `readings` source that fetches Turf web's `GET /api/sync?since=N` with the
+phone's key (`Authorization: Bearer tw_…`) and applies the page itself
+(`applyTurfSync`: Person / Place matching, the Football group, payment entries
+as Events, tombstones archived, Debts recomputed), so it reports `filed` rather
+than handing back readings. Its cursor is Turf web's change number, kept by
+the module (`turf.rev`); core's time-based `since` is not used. Sending
+changes (`POST /api/actions`, a queue in core) is added with R9c.2.
 
 AI tool *names* (`create_entity`, `connections`…) keep their old words for
 now: they are the contract the model is prompted with and the golden fixtures

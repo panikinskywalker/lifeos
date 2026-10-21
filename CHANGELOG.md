@@ -7,6 +7,23 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.1 — 22 Oct 2026
+
+The Turf board now syncs from **Turf web** instead of Turf Ledger (R9c.1).
+- You › Data sources › **Turf web**: the address and this phone's key (`tw_…`,
+  made in Turf web › Settings › Connected phones), kept in the secure store.
+- Each sync asks only for what changed since the last change number; the first
+  brings everything. The board syncs when it opens and every minute while it's
+  open; pull down to sync now. "Sync everything again" starts from zero.
+- Every payment entry (payments, refunds, corrections, the opening entries from
+  Turf Ledger) is on its Appearance's timeline; **paid so far** is their sum, so
+  part payments show ("₹200 paid") and count in who owes and the Debts.
+- Deleted on Turf web → archived here, never deleted; back when it returns.
+- RSVPs are kept even before a player is in the lineup; own goals synced.
+- "Which player is you" now comes from Turf web's settings, so both phones agree.
+- Guests become People but not members of the Football group.
+- Still read-only: changes made in LifeOS reach Turf web next (R9c.2).
+
 ## v0 — 20 Oct 2026
 
 Where LifeOS stands before versioning starts. 166 commits since 13 Sep 2026.

@@ -162,7 +162,7 @@ export default function SourcesScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Icon name="target" size={18} color={turf.lastSync ? t.c.ok.sageText : t.c.fg.secondary} />
             <Text variant="rowTitle" style={{ flex: 1 }}>
-              Turf Ledger
+              Turf web
             </Text>
             <Text variant="labelMicro" color={turf.error ? t.c.alert.coralText : turf.lastSync ? t.c.ok.sageText : t.c.fg.secondary} style={{ textTransform: 'uppercase' }}>
               {turf.error ? 'Needs attention' : turf.lastSync ? 'On' : 'Off'}

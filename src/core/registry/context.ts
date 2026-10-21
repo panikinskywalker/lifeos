@@ -80,7 +80,7 @@ export interface DeviceBridge {
     /** Runs the mailbox sync (IMAP, cursors, passwords live in platform); files through core; returns how many it filed. */
     sync(): Promise<number>;
   };
-  /** The phone's secure store (tokens a source needs, e.g. Turf Ledger's): never in settings, never in a backup. */
+  /** The phone's secure store (keys a source needs, e.g. Turf web's): never in settings, never in a backup. */
   secrets?: {
     get(key: string): Promise<string | null>;
     set(key: string, value: string | null): Promise<void>;

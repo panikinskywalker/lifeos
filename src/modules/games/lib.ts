@@ -1,7 +1,7 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import type { AppearanceData, GameData, PlayerProfileData, VenueData } from './types';
-import { SETTING_ME } from './pull';
+import { owedOn, SETTING_ME } from './sync';
 
 /** What the Turf board and the games tools read (pure queries over the games Objects). Archived records are left out. */
 
@@ -31,13 +31,14 @@ export interface Owing {
   appearanceIds: string[];
 }
 
-/** Unpaid shares per player, biggest first (whoever fronted the turf is counted paid by Turf Ledger already). */
+/** What is still owed per player, biggest first (part payments counted; whoever fronted the turf counts as paid in Turf web). */
 export function whoOwes(os: LifeOSContext): Owing[] {
   const by = new Map<string, Owing>();
   for (const a of allAppearances(os)) {
-    if (a.data.paid || !(a.data.share > 0)) continue;
+    const owed = owedOn(a.data);
+    if (!(owed > 0)) continue;
     const o = by.get(a.data.personId) ?? { personId: a.data.personId, name: nameOf(os, a.data.personId), amount: 0, shares: 0, oldest: a.data.gameDate, appearanceIds: [] };
-    o.amount += a.data.share;
+    o.amount += owed;
     o.shares++;
     if (a.data.gameDate < o.oldest) o.oldest = a.data.gameDate;
     o.appearanceIds.push(a.id);
@@ -56,9 +57,9 @@ export interface GameSummary {
 
 export function summarise(os: LifeOSContext, game: ObjectRecord<GameData>, apps = allAppearances(os)): GameSummary {
   const mine = apps.filter((a) => a.data.gameId === game.id);
-  const collected = mine.filter((a) => a.data.paid).reduce((s, a) => s + a.data.share, 0);
+  const outstanding = mine.reduce((s, a) => s + owedOn(a.data), 0);
   const due = mine.reduce((s, a) => s + a.data.share, 0);
-  return { game, players: mine.length, collected, outstanding: Math.max(0, due - collected), paidCount: mine.filter((a) => a.data.paid).length };
+  return { game, players: mine.length, collected: Math.max(0, due - outstanding), outstanding, paidCount: mine.filter((a) => a.data.paid).length };
 }
 
 /** The next game from today, else the latest one played. */
@@ -120,8 +121,8 @@ export function statsFor(os: LifeOSContext, personId: string, data = { games: al
     if (r === 'W') st.wins++;
     if (r === 'D') st.draws++;
     if (r === 'L') st.losses++;
-    if (a.data.paid) st.paid += a.data.share;
-    else st.unpaid += a.data.share;
+    st.unpaid += owedOn(a.data);
+    st.paid += a.data.share - owedOn(a.data);
     if (!st.lastPlayed || a.data.gameDate > st.lastPlayed) st.lastPlayed = a.data.gameDate;
   }
   st.motm = data.games.filter((g) => g.data.motmId === personId).length;
