@@ -7,9 +7,6 @@ current: add as we talk, move items out when they ship.
 
 ## Agreed in principle
 
-### Turf player app — 21 Oct
-Players get their own version of Turf web: sign in, see and edit their own profile (with their own dues and credit), see others' public profiles, log their own goals for a match (pending until you approve), vote player of the match, vote on sides and who to play with, RSVP, suggest a match or venue, vote the kit for a match, and Leaders by season. The plan, what each builds on, and five open decisions (what a season is, which profile edits need approval, POTM voting rules, which "sides" vote, sign-in by password or private link) are in `turf-web/docs/PLAYER-APP.md`. The richer profiles that carry it shipped in Turf web v0.0.17. The SMS → share match for payments stays in R9c.
-
 ### Nightly leftovers loop (via Gmail) — 28 Sep
 What the app couldn't handle goes through a nightly Claude run and comes back filed.
 - **Leftovers list in the app:** dumps not (fully) filed, texts / notifications / emails set aside as "didn't understand", anything marked "redo this".
