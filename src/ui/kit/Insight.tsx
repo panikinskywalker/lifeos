@@ -25,15 +25,16 @@ export function StatTrio({ stats }: { stats: TrioStat[] }) {
   const t = useTheme();
   const tone = (s: TrioStat) => (s.tone === 'alert' ? t.c.alert.coralText : s.tone === 'ok' ? t.c.ok.sageText : t.c.fg.primary);
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: t.c.bg.tile, borderRadius: t.radius.tile, padding: 4, gap: 4 }}>
+    // Noir metrics row: three quiet numbers in one card — 11/600 caps label (tertiary), 22/700 value.
+    <View style={{ flexDirection: 'row', backgroundColor: t.c.bg.tile, borderRadius: t.dark ? t.radius.card : t.radius.tile, padding: t.dark ? 16 : 4, gap: t.dark ? 12 : 4 }}>
       {stats.slice(0, 3).map((s) => {
         const body = (
-          <View style={{ padding: 12, gap: 4, backgroundColor: t.c.bg.tileRaised, borderRadius: t.radius.card, flex: 1 }}>
-            <Text variant="labelMicro" color="secondary" numberOfLines={1} style={{ textTransform: 'uppercase' }}>
+          <View style={{ padding: t.dark ? 0 : 12, gap: 4, backgroundColor: t.dark ? 'transparent' : t.c.bg.tileRaised, borderRadius: t.radius.card, flex: 1 }}>
+            <Text variant="labelCaps" color="tertiary" numberOfLines={1} style={{ textTransform: 'uppercase' }}>
               {s.label}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-              <Text variant="stat" color={tone(s)} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: s.value.length + (s.unit?.length ?? 0) > 8 ? 17 : 22, lineHeight: 26, flexShrink: 1 }}>
+              <Text variant="stat" color={tone(s)} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: s.value.length + (s.unit?.length ?? 0) > 8 ? 17 : 22, lineHeight: 26, letterSpacing: -0.5, flexShrink: 1 }}>
                 {s.value}
               </Text>
               {s.unit ? (

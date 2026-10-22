@@ -11,22 +11,24 @@ function HeaderAction({ action, onAction }: { action: string; onAction?: () => v
   const t = useTheme();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={action} hitSlop={12} onPress={onAction} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-      <Text variant="label">{action}</Text>
-      <Icon name="chevron-right" size={16} color={t.c.fg.primary} />
+      <Text variant="label" color="secondary" style={{ fontSize: 13, lineHeight: 17 }}>
+        {action}
+      </Text>
+      <Icon name="chevron-right" size={16} color={t.c.fg.secondary} />
     </Pressable>
   );
 }
 
-/** Canvas section: 17/800 heading (padding 4 4 0) with optional meta or action, then its content 8 apart. */
+/** Noir section header (padding 6 4 0): a 17/600 title, optional 13/400 meta, a grey "See all ›" action; content 8 apart. */
 export function Section({ title, meta, action, onAction, children, style }: { title: string; meta?: string; action?: string; onAction?: () => void; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[{ gap: 8 }, style]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 4, paddingHorizontal: 4 }}>
-        <Text variant="labelCaps" color="secondary" style={{ flex: 1, textTransform: 'uppercase' }} accessibilityRole="header" numberOfLines={1}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6, paddingHorizontal: 4 }}>
+        <Text variant="heading" style={{ flex: 1 }} accessibilityRole="header" numberOfLines={1}>
           {title}
         </Text>
         {meta ? (
-          <Text variant="caption" color="secondary" style={{ fontSize: 12, fontVariant: ['tabular-nums'] }}>
+          <Text variant="caption" color="secondary" style={{ fontVariant: ['tabular-nums'] }}>
             {meta}
           </Text>
         ) : null}
@@ -37,16 +39,16 @@ export function Section({ title, meta, action, onAction, children, style }: { ti
   );
 }
 
-/** List group (Transactions by day): 12/700 caps label with a total on the right, rows 8 apart. */
+/** List group (Transactions by day): an 11/600 caps label (+0.9, tertiary) with a total on the right, rows 8 apart. */
 export function ListGroup({ title, meta, children, style }: { title: string; meta?: string | null; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[{ gap: 8 }, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}>
-        <Text variant="labelCaps" color="secondary" style={{ flex: 1, textTransform: 'uppercase' }} accessibilityRole="header">
+        <Text variant="labelCaps" color="tertiary" style={{ flex: 1, textTransform: 'uppercase' }} accessibilityRole="header">
           {title}
         </Text>
         {meta ? (
-          <Text variant="labelCaps" color="secondary" style={{ letterSpacing: 0, fontVariant: ['tabular-nums'] }}>
+          <Text variant="labelCaps" color="tertiary" style={{ letterSpacing: 0, fontVariant: ['tabular-nums'] }}>
             {meta}
           </Text>
         ) : null}
@@ -57,8 +59,8 @@ export function ListGroup({ title, meta, children, style }: { title: string; met
 }
 
 /**
- * Tile-coloured card (radius 20, padding 16) with an optional header row —
- * 28 icon-box, tile title, meta — as the canvas's Notes and Timeline cards.
+ * Noir card (#1A1A1E, radius 28, padding 16) with an optional header row —
+ * 28 disc, tile title, meta — as the kit's widgets.
  */
 export function Card({ icon, tint, iconTone, title, meta, children, flush, style }: { icon?: IconName | (string & {}); tint?: TintKey; iconTone?: IconBoxTone; title?: string; meta?: string; children: React.ReactNode; flush?: boolean; style?: StyleProp<ViewStyle> }) {
   const t = useTheme();

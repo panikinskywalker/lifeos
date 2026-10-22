@@ -4,7 +4,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { useControlFill, useSurface } from './Surface';
 import { Text } from './Text';
 
-/** Stitch: pill track (white on the ground, control fill on a tile), 36-high segments, mustard selected. */
+/** Noir controls: a charcoal pill track (padding 4), 36-high segments, selected white with ground ink (mustard in light). */
 export function Segmented<T extends string>({ options, value, onChange }: { options: Array<{ value: T; label: string }>; value: T; onChange: (v: T) => void }) {
   const t = useTheme();
   const control = useControlFill();
@@ -14,8 +14,8 @@ export function Segmented<T extends string>({ options, value, onChange }: { opti
       {options.map((o) => {
         const sel = o.value === value;
         return (
-          <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: sel }} aria-selected={sel} onPress={() => onChange(o.value)} style={{ flex: 1, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.chip, backgroundColor: sel ? t.c.accent.mustard : 'transparent' }}>
-            <Text variant="tileTitle" color={sel ? t.c.accent.mustardInk : 'secondary'} numberOfLines={1}>
+          <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: sel }} aria-selected={sel} onPress={() => onChange(o.value)} style={{ flex: 1, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.chip, backgroundColor: sel ? (t.dark ? t.c.fg.primary : t.c.accent.mustard) : 'transparent' }}>
+            <Text variant="label" color={sel ? (t.dark ? t.c.bg.ground : t.c.accent.mustardInk) : 'secondary'} numberOfLines={1}>
               {o.label}
             </Text>
           </Pressable>

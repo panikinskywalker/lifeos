@@ -5,14 +5,14 @@ import { useTheme } from '../theme/ThemeProvider';
 import type { TintKey } from '../theme/tokens';
 import { Chip, type ChipTone } from './Chip';
 import { IconBox, type IconBoxTone } from './IconBox';
-import { Surface, useSurface } from './Surface';
+import { Surface, useControlFill, useSurface } from './Surface';
 import { Text } from './Text';
 
-/** Canvas checkbox: 24, radius 7, 2px tertiary border; ticked = sage with an ink check. */
+/** Noir tick: a 26 circle, 1.5px outline at 22%; ticked = lime with a ground check. */
 export function Checkbox({ checked, onChange, accessibilityLabel }: { checked: boolean; onChange?: (next: boolean) => void; accessibilityLabel: string }) {
   const t = useTheme();
   return (
-    <Pressable accessibilityRole="checkbox" accessibilityLabel={accessibilityLabel} accessibilityState={{ checked }} aria-checked={checked} hitSlop={12} onPress={() => onChange?.(!checked)} style={{ width: 24, height: 24, borderRadius: t.radius.checkbox, borderWidth: 2, borderColor: checked ? t.c.ok.sage : t.c.fg.tertiary, backgroundColor: checked ? t.c.ok.sage : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+    <Pressable accessibilityRole="checkbox" accessibilityLabel={accessibilityLabel} accessibilityState={{ checked }} aria-checked={checked} hitSlop={12} onPress={() => onChange?.(!checked)} style={{ width: 26, height: 26, borderRadius: 13, borderWidth: checked ? 0 : 1.5, borderColor: t.dark ? '#F5F5F738' : t.c.fg.tertiary, backgroundColor: checked ? t.c.ok.sage : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
       {checked ? <Icon name="check" size={16} strokeWidth={3} color={t.c.ok.sageInk} /> : null}
     </Pressable>
   );
@@ -54,9 +54,10 @@ export interface RowItemProps {
 }
 
 /**
- * Canvas row: its own card (tile colour, radius 16, padding 12), 36 icon-box,
- * title 15/700 and a 13/600 caption, trailing value column, then one action —
- * done button, checkbox, Done pill or chevron. Stack rows 8 apart.
+ * Noir row (NR-KitComponents · Row items): its own card (radius 24, padding
+ * 12 16 12 12, gap 14), a 40 disc, title 16/600 over a 13/400 "where", the
+ * value 16/700 and a pill or line under it, then one action — done button,
+ * tick, Done pill or chevron. Stack rows 8 apart.
  */
 export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, valueTone = 'default', strong, meta, metaTone = 'secondary', checked, onToggle, onDone, doneLabel, trailing, chevron, onPress, onLongPress, destructive, style }: RowItemProps) {
   const t = useTheme();
@@ -64,12 +65,13 @@ export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, val
   const done = checked === true;
   // On the ground a row is a tile; inside a tile it is a nested slab one level lighter (Stitch).
   const fill = useSurface() === 'tile' ? t.c.bg.tileRaised : t.c.bg.tile;
+  const control = useControlFill();
   const showChevron = chevron ?? (!!onPress && checked === undefined && !onDone && !trailing);
   const [pressed, setPressed] = React.useState(false);
   const interactive = !!onPress || !!onLongPress;
   // Trailing controls (done, checkbox, switch) sit beside the pressable body, never inside it — no nested buttons.
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 12, minHeight: 60, borderRadius: t.radius.card, backgroundColor: pressed ? t.c.bg.pressed : fill }, style]}>
+    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 16, minHeight: 64, borderRadius: t.radius.card, backgroundColor: pressed ? t.c.bg.pressed : fill }, style]}>
       <Surface kind="tile">
         <Pressable
           accessibilityRole={onPress ? 'button' : undefined}
@@ -78,10 +80,10 @@ export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, val
           onLongPress={onLongPress}
           onPressIn={() => setPressed(true)}
           onPressOut={() => setPressed(false)}
-          style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 12, alignSelf: 'stretch' }}
+          style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingLeft: 12, alignSelf: 'stretch' }}
         >
-          {icon ? <IconBox icon={icon} tint={tint} tone={iconTone} size={36} /> : null}
-          <View style={{ flex: 1, minWidth: 0, gap: tag ? 4 : 3 }}>
+          {icon ? <IconBox icon={icon} tint={tint} tone={iconTone} size={t.layout.iconBox} /> : null}
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text variant="rowTitle" numberOfLines={1} color={destructive ? t.c.alert.coralText : done ? 'secondary' : undefined} style={done ? { textDecorationLine: 'line-through' } : undefined}>
               {title}
             </Text>
@@ -103,12 +105,12 @@ export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, val
           {value || meta ? (
             <View style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
               {value ? (
-                <Text variant="rowTitle" color={tone(valueTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontSize: strong ? 15 : 14, fontWeight: strong ? '700' : '600' }}>
+                <Text variant="rowTitle" color={tone(valueTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontWeight: '700' }}>
                   {value}
                 </Text>
               ) : null}
               {meta ? (
-                <Text variant="label" color={tone(metaTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>
+                <Text variant="label" color={tone(metaTone)} numberOfLines={1} style={{ fontVariant: ['tabular-nums'], fontSize: 13, lineHeight: 17 }}>
                   {meta}
                 </Text>
               ) : null}
@@ -120,12 +122,12 @@ export function RowItem({ title, subtitle, icon, tint, iconTone, tag, value, val
         {checked !== undefined ? <Checkbox checked={checked} onChange={onToggle} accessibilityLabel={`Done: ${title}`} /> : null}
         {onDone ? (
           doneLabel ? (
-            <Pressable accessibilityRole="button" accessibilityLabel={`${doneLabel}: ${title}`} hitSlop={6} onPress={onDone} style={({ pressed: p }) => ({ height: 36, paddingLeft: 10, paddingRight: 12, borderRadius: t.radius.chip, backgroundColor: t.c.bg.pill, flexDirection: 'row', alignItems: 'center', gap: 6, opacity: p ? 0.75 : 1 })}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${doneLabel}: ${title}`} hitSlop={6} onPress={onDone} style={({ pressed: p }) => ({ height: 36, paddingLeft: 10, paddingRight: 12, borderRadius: t.radius.chip, backgroundColor: t.dark ? control : t.c.bg.pill, flexDirection: 'row', alignItems: 'center', gap: 6, opacity: p ? 0.75 : 1 })}>
               <Icon name="check" size={16} color={t.c.fg.primary} />
               <Text variant="label">{doneLabel}</Text>
             </Pressable>
           ) : (
-            <Pressable accessibilityRole="button" accessibilityLabel={`Done: ${title}`} hitSlop={6} onPress={onDone} style={({ pressed: p }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.pill, alignItems: 'center', justifyContent: 'center', opacity: p ? 0.75 : 1 })}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Done: ${title}`} hitSlop={6} onPress={onDone} style={({ pressed: p }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: t.dark ? control : t.c.bg.pill, alignItems: 'center', justifyContent: 'center', opacity: p ? 0.75 : 1 })}>
               <Icon name="check" size={18} color={t.c.fg.primary} />
             </Pressable>
           )

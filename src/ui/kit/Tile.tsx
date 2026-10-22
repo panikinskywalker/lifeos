@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { IconName } from '../icons';
-import { useTheme } from '../theme/ThemeProvider';
+import { OnBlock, useTheme } from '../theme/ThemeProvider';
 import type { TintKey } from '../theme/tokens';
 import { IconBox, type IconBoxTone } from './IconBox';
 import { Surface } from './Surface';
@@ -47,6 +47,8 @@ export interface TileProps {
   filled?: boolean;
   icon?: IconName | (string & {});
   label?: string;
+  /** Noir colour-block header: the label as an 11/600 caps line, no disc ("SPENT · SEP"). */
+  caps?: boolean;
   /** Right side of the header: a count, a date, or a node (a small chip). */
   meta?: React.ReactNode;
   /** Tile body — a stat, a short list, a chart. */
@@ -61,23 +63,27 @@ export interface TileProps {
 }
 
 /**
- * Bento cell: tile colour, radius 20, padding 16. Header = 28 icon-box +
- * tile title (14/700) + meta; body; optional footer. Inside a BentoGrid it
- * fills its cell; standalone it sizes to content (1×1 keeps a square).
+ * Noir tile (NR-KitComponents · Tiles): a dark widget (#1A1A1E, radius 28,
+ * padding 16), or with `filled` a colour block in the module's colour with
+ * everything on it ground-black. Header = 28 disc + tile title (15/600) +
+ * meta; body; optional footer. Inside a BentoGrid it fills its cell;
+ * standalone it sizes to content (1×1 keeps a square).
  */
-export function Tile({ size = '1x1', tint, iconTone, filled, icon, label, meta, children, bodyAlign = 'bottom', footer, onPress, accessibilityLabel, style }: TileProps) {
+export function Tile({ size = '1x1', tint, iconTone, filled, icon, label, caps, meta, children, bodyAlign = 'bottom', footer, onPress, accessibilityLabel, style }: TileProps) {
   const t = useTheme();
   const cell = useContext(CellContext);
   const tone = tint ? t.tints[tint] : null;
-  const bg = filled && tone ? tone.fill : t.c.bg.tile;
+  // Noir: a filled tile is a colour block (the module's colour); light keeps the soft tint.
+  const block = filled && tone ? (t.dark ? tone.ink : tone.fill) : null;
+  const bg = block ?? t.c.bg.tile;
   const sizing: ViewStyle = cell ? { flex: 1 } : TILE_SPAN[size].cols === 1 && TILE_SPAN[size].rows === 1 ? { aspectRatio: 1 } : {};
-  const body = (
+  const inner = (
     <Surface kind="tile">
       {icon || label || meta ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {icon ? <IconBox icon={icon} tint={tint} tone={filled && tone ? 'overlay' : iconTone} size={28} /> : null}
+          {icon && !caps ? <IconBox icon={icon} tint={tint} tone={filled && tone ? 'overlay' : iconTone} size={28} /> : null}
           {label ? (
-            <Text variant="tileTitle" numberOfLines={1} style={{ flex: 1 }}>
+            <Text variant={caps ? 'labelCaps' : 'tileTitle'} numberOfLines={1} style={[{ flex: 1 }, caps ? { textTransform: 'uppercase' } : null]}>
               {label}
             </Text>
           ) : (
@@ -96,6 +102,7 @@ export function Tile({ size = '1x1', tint, iconTone, filled, icon, label, meta, 
       {footer ? <View>{footer}</View> : null}
     </Surface>
   );
+  const body = block && t.dark ? <OnBlock>{inner}</OnBlock> : inner;
   const base: StyleProp<ViewStyle> = [{ backgroundColor: bg, borderRadius: t.radius.tile, padding: 16, gap: 12, overflow: 'hidden', justifyContent: 'space-between' }, sizing, style];
   if (!onPress) return <View style={base}>{body}</View>;
   return (
@@ -106,13 +113,14 @@ export function Tile({ size = '1x1', tint, iconTone, filled, icon, label, meta, 
 }
 
 /**
- * Big tabular number and a caption. Sizes from the canvas: 'hero' 36 (spend),
- * 'count' 40 (a tile's single number), default 28, 'small' 20 (header stats).
+ * Big tabular number and a caption (Noir: 700, −1.5 tracking). Sizes: 'hero'
+ * 44 (number card), 'count' 40 (a tile's single number), default 30 (a tile),
+ * 'small' 22 (metrics row).
  */
 export function Stat({ value, unit, caption, tone, color, size = 'default', large }: { value: string; unit?: string; caption?: string; tone?: 'alert' | 'ok'; color?: string; size?: 'hero' | 'count' | 'default' | 'small'; /** @deprecated size="hero" */ large?: boolean }) {
   const t = useTheme();
   const c = color ?? (tone === 'alert' ? t.c.alert.coral : t.c.fg.primary);
-  const fontSize = { hero: 36, count: 40, default: 28, small: 20 }[large ? 'hero' : size];
+  const fontSize = { hero: 44, count: 40, default: 30, small: 22 }[large ? 'hero' : size];
   return (
     <View style={{ gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
@@ -137,7 +145,8 @@ export function Stat({ value, unit, caption, tone, color, size = 'default', larg
 /** A Tile whose body is a single Stat. */
 export function StatTile({ value, unit, caption, tone, statSize, ...tile }: Omit<TileProps, 'children'> & { value: string; unit?: string; caption?: string; tone?: 'alert' | 'ok'; statSize?: 'hero' | 'count' | 'default' }) {
   const t = useTheme();
-  const color = tile.filled && tile.tint && tone !== 'alert' ? t.tints[tile.tint].ink : undefined;
+  // Light: the tint's ink on its soft fill. Noir: a colour block, where the number is black (OnBlock).
+  const color = !t.dark && tile.filled && tile.tint && tone !== 'alert' ? t.tints[tile.tint].ink : undefined;
   return (
     <Tile {...tile}>
       <Stat value={value} unit={unit} caption={caption} tone={tone} color={color} size={statSize ?? (tile.size === '2x2' ? 'hero' : 'default')} />

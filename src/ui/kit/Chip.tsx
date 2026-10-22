@@ -14,8 +14,9 @@ import { Text } from './Text';
 export type ChipTone = 'neutral' | 'muted' | 'alert' | 'alertText' | 'accent' | 'ok';
 
 /**
- * Static chip. md (7/12, 13/700) for checklists and related records; sm
- * (3/8, 11/700) for category tags and status. `overlay` puts it on a tinted band.
+ * Static chip. md: Noir option pill (30 tall, 13/600). sm: status pill (28
+ * tall, 12/600; lime good · coral late · grey quiet). `overlay` puts it on a
+ * colour block.
  */
 export function Chip({ label, tint, tone = 'neutral', icon, onPress, onLongPress, small, overlay, caps }: { label: string; tint?: TintKey; tone?: ChipTone; icon?: IconName | (string & {}); onPress?: () => void; onLongPress?: () => void; small?: boolean; overlay?: boolean; /** Stitch status pill: UPPERCASE micro label ('ACTIVE', 'URGENT', 'OPTIMAL'). */ caps?: boolean }) {
   const t = useTheme();
@@ -24,16 +25,16 @@ export function Chip({ label, tint, tone = 'neutral', icon, onPress, onLongPress
     ? [t.tints[tint].fill, t.tints[tint].ink]
     : {
         neutral: [control, t.c.fg.primary],
-        muted: [control, t.c.fg.secondary],
+        muted: [t.dark ? t.c.bg.dim : control, t.c.fg.secondary],
         alert: [t.c.alert.coralFill, t.c.alert.coralText],
         alertText: [control, t.c.alert.coralText],
         accent: [t.c.accent.mustard, t.c.accent.mustardInk],
         ok: [t.c.ok.sageFill, t.c.ok.sageText],
       }[tone];
   const body = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: small ? 3 : 7, paddingHorizontal: small ? 8 : 12, borderRadius: t.radius.chip, backgroundColor: overlay ? t.c.bg.overlay : bg, alignSelf: 'flex-start' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: small ? 28 : 30, paddingHorizontal: small ? 11 : 12, borderRadius: t.radius.chip, backgroundColor: overlay ? t.c.bg.overlay : bg, alignSelf: 'flex-start' }}>
       {icon ? <Icon name={icon} size={small ? 12 : 14} color={fg} /> : null}
-      <Text variant={caps ? 'labelMicro' : small ? 'nav' : 'label'} color={fg} numberOfLines={1} style={caps ? { textTransform: 'uppercase' } : undefined}>
+      <Text variant={small || caps ? 'labelMicro' : 'label'} color={fg} numberOfLines={1} style={[!small && !caps ? { fontSize: 13, lineHeight: 17 } : null, caps ? { textTransform: 'uppercase' } : null]}>
         {label}
       </Text>
     </View>
@@ -46,11 +47,12 @@ export function Chip({ label, tint, tone = 'neutral', icon, onPress, onLongPress
   );
 }
 
-/** Selectable filter pill (8/14, 13/700). Selected = mustard. 48dp target. */
+/** Noir chip (40 tall, 14/600). Selected = white with ground ink (mustard in light). 48dp target. */
 export function FilterChip({ label, selected, onPress, icon, count }: { label: string; selected?: boolean; onPress?: () => void; icon?: IconName | (string & {}); count?: number }) {
   const t = useTheme();
   const control = useControlFill();
-  const fg = selected ? t.c.accent.mustardInk : t.c.fg.primary;
+  const fg = selected ? (t.dark ? t.c.bg.ground : t.c.accent.mustardInk) : t.c.fg.primary;
+  const selectedBg = t.dark ? t.c.fg.primary : t.c.accent.mustard;
   return (
     <Pressable
       accessibilityRole="button"
@@ -59,7 +61,7 @@ export function FilterChip({ label, selected, onPress, icon, count }: { label: s
       accessibilityLabel={count != null ? `${label}, ${count}` : label}
       hitSlop={8}
       onPress={onPress}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: t.radius.chip, backgroundColor: selected ? t.c.accent.mustard : control, opacity: pressed ? 0.75 : 1 })}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 16, borderRadius: t.radius.chip, backgroundColor: selected ? selectedBg : pressed && t.dark ? t.c.bg.pressed : control, opacity: pressed && !t.dark ? 0.75 : 1 })}
     >
       {icon ? <Icon name={icon} size={14} color={fg} /> : null}
       <Text variant="label" color={fg}>

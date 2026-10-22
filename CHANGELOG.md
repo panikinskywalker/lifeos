@@ -7,6 +7,25 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.4 — 22 Oct 2026
+
+The app wears **v3 Noir**, the design language from the canvas (NR artboards).
+- Dark is Noir and the default: near-black ground, charcoal cards, lime
+  accent, text at 100 / 62 / 42 %; module discs in each module's colour.
+- Type and shapes from the kit: 22/700 titles with the caption above, 17/600
+  section headers, 16/600 rows, tight big numbers; pill buttons, round
+  actions, 24 row cards, 28 tiles, 32 sheets. JetBrains Mono added for
+  numbered labels and readouts.
+- New nav: a dark pill of icon discs (lime = where you are) with the lime
+  Dump disc beside it.
+- Chips and segments go white when selected; status pills lime / coral /
+  grey; the toast is a white pill; inputs get a white focus ring.
+- Colour-block tiles: a filled tile is the module's colour with everything
+  on it black. Today's Spend is the orange block; My day is the checklist
+  with ticks and time pills.
+- Browse shows the modules as the gradient stack.
+- Light appearance is unchanged in colour for now (You › Appearance).
+
 ## v0.0.3 — 22 Oct 2026
 
 Matches are run from the S22 too (R9c.3).

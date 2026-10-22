@@ -43,16 +43,17 @@ export function FormField({ label, required, hint, error, children }: { label?: 
 }
 
 /** Canvas input: 52 high, radius 14, the control fill, no border; coral border only on error. */
-function useInputBox(_focused: boolean, error?: string) {
+/** Noir input (NR-KitComponents · Inputs): #1A1A1E, radius 20, a hairline at rest, a white ring on focus, coral on error. */
+function useInputBox(focused: boolean, error?: string) {
   const t = useTheme();
   const fill = useControlFill();
   return {
     minHeight: 52,
     borderRadius: t.radius.input,
-    backgroundColor: fill,
-    borderWidth: 1.5,
-    borderColor: error ? t.c.alert.coral : 'transparent',
-    paddingHorizontal: 16,
+    backgroundColor: t.dark ? t.c.bg.tile : fill,
+    borderWidth: t.dark ? (error || focused ? 1.5 : 1) : 1.5,
+    borderColor: error ? t.c.alert.coral : t.dark ? (focused ? t.c.fg.primary : t.c.line) : 'transparent',
+    paddingHorizontal: 18,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: 8,
@@ -373,7 +374,7 @@ export function TagsField({ label, value, onChange, suggestions = [] }: { label?
 export function Toggle({ value, onChange, accessibilityLabel }: { value: boolean; onChange: (v: boolean) => void; accessibilityLabel: string }) {
   const t = useTheme();
   return (
-    <Pressable accessibilityRole="switch" accessibilityLabel={accessibilityLabel} accessibilityState={{ checked: value }} aria-checked={value} hitSlop={9} onPress={() => onChange(!value)} style={{ width: 50, height: 30, borderRadius: 15, padding: 3, backgroundColor: value ? t.c.accent.mustard : t.c.line, alignItems: value ? 'flex-end' : 'flex-start', justifyContent: 'center' }}>
+    <Pressable accessibilityRole="switch" accessibilityLabel={accessibilityLabel} accessibilityState={{ checked: value }} aria-checked={value} hitSlop={9} onPress={() => onChange(!value)} style={{ width: 50, height: 30, borderRadius: 15, padding: 3, backgroundColor: value ? t.c.accent.mustard : t.dark ? t.c.bg.tileRaised : t.c.line, alignItems: value ? 'flex-end' : 'flex-start', justifyContent: 'center' }}>
       <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: value ? t.c.accent.mustardInk : t.c.bg.pill }} />
     </Pressable>
   );

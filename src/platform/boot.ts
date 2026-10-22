@@ -60,7 +60,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   // Settings: DB → zustand, and zustand → DB on change.
   const stored = os.settings.all();
   useSettings.getState().hydrate({
-    appearance: (stored.appearance as never) ?? 'system',
+    appearance: (stored.appearance as never) ?? 'dark',
     locale: { ...useSettings.getState().locale, ...((stored.locale as object) ?? {}) },
     homeDashboardId: (stored.homeDashboardId as string) ?? null,
     aiModel: (stored.aiModel as string) ?? 'claude-sonnet-5',

@@ -34,7 +34,8 @@ export function bindSettingsPersistence(fn: (key: string, value: unknown) => voi
 }
 
 export const useSettings = create<AppSettings>((set) => ({
-  appearance: 'system',
+  // v3 Noir is the dark theme and the design language (22 Oct 2026); a choice already made is kept.
+  appearance: 'dark',
   locale: DEFAULT_LOCALE,
   homeDashboardId: null,
   aiModel: 'claude-sonnet-5',

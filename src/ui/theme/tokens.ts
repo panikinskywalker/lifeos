@@ -1,11 +1,11 @@
 /**
- * Design tokens — colours from the Stitch "LifeOS Android design system"
- * (M1.5), layout and components from the LifeOS Claude Design canvas; both
- * recorded in docs/DESIGN.md. Warm cream ground, tiles in surface levels,
- * gold/mustard accent, module tints from the Stitch data palette.
- *
- * No shadows, no gradients. A value the canvas does not specify is marked
- * "working value".
+ * Design tokens. Since 22 Oct 2026 the design language is **v3 Noir**
+ * (docs/DESIGN.md; the NR-* artboards on the LifeOS Claude Design canvas):
+ * the dark theme is Noir — near-black ground, charcoal cards, lime accent,
+ * colour blocks, pills — and the type scale and shapes are Noir's for both
+ * themes. The light theme keeps the v1.1 Stitch colours until it is redrawn.
+ * Token names are the old roles (`accent.mustard` is the accent: lime in
+ * Noir). A value the artboards do not specify is marked "working value".
  */
 
 /* ------------------------------------------------------------------ */
@@ -20,10 +20,11 @@ export interface Colors {
    * tracks and pressed controls.
    */
   /** overlay: controls on a photo or tinted record band; pill: the Done pill and an off toggle's thumb. */
-  bg: { ground: string; tile: string; tileRaised: string; lowest: string; container: string; dim: string; bar: string; pressed: string; scrim: string; overlay: string; pill: string };
+  bg: { ground: string; tile: string; tileRaised: string; lowest: string; container: string; dim: string; bar: string; pressed: string; scrim: string; overlay: string; pill: string; toast: string };
   /** onBar / onBarActive: nav bar icon+label, inactive and active (active is mustard for the icon). */
   /** onBarText: text on the bar colour (toast). */
-  fg: { primary: string; secondary: string; tertiary: string; onBar: string; onBarActive: string; onBarText: string };
+  /** onToast: text on the toast (Noir: a white pill, dark text). onAccent: ink on the accent and on colour blocks. */
+  fg: { primary: string; secondary: string; tertiary: string; onBar: string; onBarActive: string; onBarText: string; onToast: string; onAccent: string };
   /** Track: segmented, toggle and chip tracks, hairlines. */
   line: string;
   /** Unfilled part of a Ring. */
@@ -54,6 +55,7 @@ export const lightTokens: Colors = {
     scrim: '#1C1C1947',
     overlay: '#FFFFFFB3',
     pill: '#FFFFFF',
+    toast: '#1C1C19',
   },
   fg: {
     primary: '#1C1C19', // on-surface
@@ -62,6 +64,8 @@ export const lightTokens: Colors = {
     onBar: '#B5B0A6',
     onBarActive: '#F3C84B',
     onBarText: '#F3F0EB', // inverse-on-surface
+    onToast: '#F3F0EB',
+    onAccent: '#241A00',
   },
   line: '#DCDAD5', // surface-dim
   ringTrack: '#DCDAD5',
@@ -72,36 +76,39 @@ export const lightTokens: Colors = {
   ok: { sage: '#BFCC9E', sageText: '#57633D', sageInk: '#151F02', sageFill: '#D8E5B5' },
 };
 
-/** Derived by us — Stitch ships light only. Material-style dark roles of the same hues. */
+/** v3 Noir (NR-KitComponents, 22 Oct): measured from the artboards. Text levels are #F5F5F7 at 100 / 62 / 42 %. */
 export const darkTokens: Colors = {
   bg: {
-    ground: '#141311',
-    tile: '#252420',
-    tileRaised: '#1D1C19',
-    lowest: '#0F0E0C',
-    container: '#211F1C',
-    dim: '#3A3833',
-    bar: '#2B2A26',
-    pressed: '#33312C',
-    scrim: '#00000073',
-    overlay: '#0000004D',
-    pill: '#33312C',
+    ground: '#0B0B0D',
+    tile: '#1A1A1E', // cards, rows, row groups, inputs
+    tileRaised: '#26262B', // nested slab, chips, icon buttons, module discs, secondary button
+    lowest: '#26262B', // segmented track
+    container: '#1A1A1E',
+    dim: '#FFFFFF12', // rgba(255,255,255,0.07): quiet pill, bar track
+    bar: '#1A1A1E', // the nav pill
+    pressed: '#FFFFFF24', // rgba(255,255,255,0.14)
+    scrim: '#0000008C', // working value: "rises over a dimmed page"
+    overlay: '#0B0B0D24', // rgba(11,11,13,0.14): quiet control on a colour block
+    pill: '#F5F5F76B', // off toggle thumb
+    toast: '#F5F5F7', // white pill
   },
   fg: {
-    primary: '#E6E2DC',
-    secondary: '#D1C5AF',
-    tertiary: '#9A9079',
-    onBar: '#9A9079',
-    onBarActive: '#F3C84B',
-    onBarText: '#E6E2DC',
+    primary: '#F5F5F7',
+    secondary: '#F5F5F79E',
+    tertiary: '#F5F5F76B',
+    onBar: '#F5F5F79E',
+    onBarActive: '#0B0B0D', // icon on the lime disc
+    onBarText: '#F5F5F7',
+    onToast: '#0B0B0D',
+    onAccent: '#0B0B0D',
   },
-  line: '#3A3833',
-  ringTrack: '#3A3833',
-  rail: '#4D4635',
-  chart: ['#8FC0A8', '#9FBBD0', '#AEA2D0', '#E0B6C0', '#AEBB8E'],
-  accent: { mustard: '#F3C84B', mustardInk: '#241A00', mustardSoft: '#584400', gold: '#ECC245' },
-  alert: { coral: '#F07A71', coralText: '#FFB4AB', coralInk: '#1C1C19', coralFill: '#5C1F1A' },
-  ok: { sage: '#5B6741', sageText: '#BFCC9E', sageInk: '#E6E2DC', sageFill: '#404B27' },
+  line: '#FFFFFF14', // rgba(255,255,255,0.08) hairline
+  ringTrack: '#FFFFFF12',
+  rail: '#FFFFFF14',
+  chart: ['#D7F55C', '#A9C4FF', '#F4A8CE', '#F6E27F', '#C9A7F5'],
+  accent: { mustard: '#D7F55C', mustardInk: '#0B0B0D', mustardSoft: '#D7F55C29', gold: '#D7F55C' },
+  alert: { coral: '#FF5C47', coralText: '#FF8A7A', coralInk: '#0B0B0D', coralFill: '#FF5C472E' },
+  ok: { sage: '#D7F55C', sageText: '#D7F55C', sageInk: '#0B0B0D', sageFill: '#D7F55C29' },
 };
 
 export type TintKey = 'finance' | 'upkeep' | 'people' | 'tasks' | 'health' | 'memory' | 'travel' | 'documents';
@@ -122,16 +129,32 @@ export const lightTints: Record<TintKey, Tint> = {
   documents: { fill: '#E5E2DD', ink: '#4D4635' }, // stone
 };
 
+/** Noir module discs: a dark disc, the module's colour (NR-KitComponents · Module discs). */
 export const darkTints: Record<TintKey, Tint> = {
-  finance: { fill: '#584400', ink: '#FFE08F' },
-  upkeep: { fill: '#284938', ink: '#CFE2D8' },
-  people: { fill: '#5A2E3A', ink: '#F0DCE1' },
-  tasks: { fill: '#2E4A5C', ink: '#C9E6FD' },
-  health: { fill: '#404B27', ink: '#DAE8B8' },
-  memory: { fill: '#3D3361', ink: '#E1DCEF' },
-  travel: { fill: '#5E3418', ink: '#F5DCCB' },
-  documents: { fill: '#4D4635', ink: '#E5E2DD' },
+  finance: { fill: '#26262B', ink: '#F26B2B' },
+  upkeep: { fill: '#26262B', ink: '#A9C4FF' },
+  people: { fill: '#26262B', ink: '#F4A8CE' },
+  tasks: { fill: '#26262B', ink: '#C9A7F5' },
+  health: { fill: '#26262B', ink: '#D7F55C' },
+  memory: { fill: '#26262B', ink: '#B48CF2' },
+  travel: { fill: '#26262B', ink: '#FF8A6A' },
+  documents: { fill: '#26262B', ink: '#F6E27F' },
 };
+
+/** Noir colour blocks (tiles on a colour, faces): everything on them is ground-black. */
+export const blocks = { lime: '#D7F55C', sky: '#A9C4FF', orange: '#F26B2B', pink: '#F4A8CE', yellow: '#F6E27F', lilac: '#C9A7F5', mint: '#9FE0B5' } as const;
+
+/** Noir module gradients (Browse · module stack, hero tiles), 160°. */
+export const gradients = {
+  finance: ['#F2742B', '#9E2A2A'],
+  health: ['#3BA35E', '#145A66'],
+  tasks: ['#8E6CF0', '#3A47C8'],
+  people: ['#F25CA2', '#8E1F60'],
+  upkeep: ['#3E86E8', '#1A3A86'],
+  memory: ['#9B5CF6', '#2F2A8C'],
+  travel: ['#E8452F', '#6E2290'],
+  documents: ['#5E5E66', '#26262B'],
+} as const satisfies Record<TintKey, readonly [string, string]>;
 
 export const TINT_KEYS = Object.keys(lightTints) as TintKey[];
 
@@ -148,6 +171,9 @@ export const fonts = {
   800: 'PlusJakartaSans_800ExtraBold',
 } as const;
 export type FontWeightKey = keyof typeof fonts;
+
+/** JetBrains Mono (Noir: numbered labels and instrument readouts), loaded beside Plus Jakarta Sans. */
+export const monoFonts = { 500: 'JetBrainsMono_500Medium', 700: 'JetBrainsMono_700Bold' } as const;
 
 /** Maps a numeric/keyword fontWeight to the Plus Jakarta Sans face that carries it (Android ignores fontWeight on custom families). */
 export function fontForWeight(weight: string | number | undefined): string {
@@ -175,31 +201,39 @@ const face = (w: FontWeightKey, fontSize: number, lineHeight: number, em = 0, ta
   ...(tabular ? { fontVariant: ['tabular-nums' as const] } : null),
 });
 
-/** Stitch type scale (Plus Jakarta Sans): 600 headings, 400 body, tabular metrics, UPPERCASE labels (applied at the call site). */
+const mono = (w: keyof typeof monoFonts, fontSize: number, lineHeight: number, letterSpacing = 0): TypeStyle => ({ fontFamily: monoFonts[w], fontSize, lineHeight, letterSpacing, fontVariant: ['tabular-nums'] });
+
+/** v3 Noir type scale (NR-KitComponents): Plus Jakarta Sans 600 / 700, tabular numbers, tight big numerals, UPPERCASE labels at the call site. */
 const designType = {
-  /** Hero metric — 36/700, −0.025em, tabular (display-hero-mobile) */
-  display: face(700, 36, 42, -0.025, true),
-  /** Metric — 26/600, −0.015em, tabular (headline-metric-mobile) */
-  stat: face(600, 26, 32, -0.015, true),
-  /** Screen title — 30/700, −0.025em ("Good morning.") */
-  title: face(700, 30, 36, -0.025),
-  /** Tile / section headline — 19/600, −0.015em (headline-tile) */
-  heading: face(600, 19, 24, -0.015),
-  /** Row title — 15/600 */
-  rowTitle: face(600, 15, 20),
-  /** Body — 15/400, −0.005em (body-default) */
-  body: face(400, 15, 22, -0.005),
-  /** Tile title — 14/600 */
-  tileTitle: face(600, 14, 18),
-  /** Chip / field label — 13/600 */
-  label: face(600, 13, 17),
-  /** Caption — 13/400, secondary (body-sm) */
-  caption: face(400, 13, 18),
-  /** Label caps — 12/600, +0.06em, uppercase at the call site (label-telemetry) */
-  labelCaps: face(600, 12, 16, 0.06),
-  /** Micro label — 10/700, +0.05em, uppercase at the call site (label-micro) */
-  labelMicro: face(700, 10, 14, 0.05),
-  /** Nav — 11/600 */
+  /** Hero number — 44/700, −1.5 (number card) */
+  display: { ...face(700, 44, 46, 0, true), letterSpacing: -1.5 },
+  /** Number on a tile — 30/700, −1.5 */
+  stat: { ...face(700, 30, 32, 0, true), letterSpacing: -1.5 },
+  /** Quiet metric — 22/700, −0.5 (metrics row) */
+  metric: { ...face(700, 22, 26, 0, true), letterSpacing: -0.5 },
+  /** Screen title — 22/700, −0.5 (top bar) */
+  title: { ...face(700, 22, 25), letterSpacing: -0.5 },
+  /** Section header / sheet title — 17/600, −0.2 */
+  heading: { ...face(600, 17, 22), letterSpacing: -0.2 },
+  /** The sentence on a text widget — 24/600, −0.4 */
+  sentence: { ...face(600, 24, 30), letterSpacing: -0.4 },
+  /** Row title — 16/600 */
+  rowTitle: face(600, 16, 21),
+  /** Body — 15/400 */
+  body: face(400, 15, 21),
+  /** Tile title — 15/600 */
+  tileTitle: face(600, 15, 19),
+  /** Chip — 14/600 */
+  label: face(600, 14, 18),
+  /** Caption / where — 13/400 */
+  caption: face(400, 13, 17),
+  /** Section label — 11/600, +0.9, UPPERCASE at the call site, tertiary */
+  labelCaps: { ...face(600, 11, 14, 0, true), letterSpacing: 0.9 },
+  /** Status pill / micro — 12/600 */
+  labelMicro: face(600, 12, 16),
+  /** Numbered label / readout — JetBrains Mono 10/500, +0.6, UPPERCASE at the call site */
+  mono: mono(500, 10, 13, 0.6),
+  /** Nav — 11/600 (Noir's nav has no labels; kept for the old bar) */
   nav: face(600, 11, 13),
 };
 
@@ -227,19 +261,22 @@ export type TypeVariant = keyof typeof type;
 /* Shape & space                                                       */
 /* ------------------------------------------------------------------ */
 
+/** Noir shapes: pills everywhere, cards 24 / 28, sheets 32. */
 export const radius = {
-  tile: 24,
-  /** card, row, sheet body */
-  card: 16,
-  sheet: 24,
-  /** bottom corners of the record header band */
+  /** tiles, text widgets, number cards */
+  tile: 28,
+  /** card, row card, row group, sheet body */
+  card: 24,
+  sheet: 32,
+  /** bottom corners of the record header band (working value) */
   band: 28,
-  button: 14,
-  input: 14,
-  iconBox: 10,
-  checkbox: 7,
-  /** stacked-bar segment (14 tall) */
-  bar: 7,
+  button: 999,
+  input: 20,
+  /** module disc / face: round */
+  iconBox: 999,
+  checkbox: 999,
+  /** progress bar (22 tall) */
+  bar: 11,
   chip: 999,
   /** @deprecated */ sm: 10,
   /** @deprecated */ md: 14,
@@ -253,12 +290,16 @@ export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32
 export const layout = {
   gutter: 20,
   gridGap: 12,
-  bar: { height: 66, radius: 22, inset: 20 },
-  iconBox: 32,
+  /** Noir nav: a 64-tall pill of 52 discs (6 padding) and a 64 lime Dump disc beside it. */
+  bar: { height: 64, radius: 999, inset: 20, disc: 52, fab: 64 },
+  /** module disc / face in a row */
+  iconBox: 40,
   touch: 48,
+  /** buttons: 52 full, 44 compact; round actions 44 */
+  button: { tall: 52, compact: 44, round: 44 },
 } as const;
 
-/** Canvas: 2px stroke everywhere; sizes 22 nav · 18 row · 16 tile · 14 chip. */
+/** 2px stroke everywhere; sizes 22 nav · 18 row · 16 tile · 14 chip. */
 export const icon = { stroke: 2, strokeInBox: 2, size: 24, nav: 22, row: 18, tile: 16, chip: 14 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -360,6 +401,9 @@ export interface Theme {
   /** DESIGN.md colour tokens. */
   c: Colors;
   tints: Record<TintKey, Tint>;
+  /** Noir colour blocks and module gradients (same in both themes). */
+  blocks: typeof blocks;
+  gradients: typeof gradients;
   type: typeof type;
   radius: typeof radius;
   spacing: typeof spacing;
@@ -381,6 +425,8 @@ export function makeTheme(dark: boolean): Theme {
     paletteColor: (c) => paletteColor(c, dark),
     c: dark ? darkTokens : lightTokens,
     tints: dark ? darkTints : lightTints,
+    blocks,
+    gradients,
     type,
     radius,
     spacing,

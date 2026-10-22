@@ -183,9 +183,13 @@ venues, leaders, WhatsApp shares, reviewing what friends submit.
 ### Design follows the same tiers (added 5 Oct)
 Design is assembled the way the code is: the **Field type kit** (each type in a
 row, on the record page, as a form input, as a tile), then the **six generic
-screens** drawn once, then the **boards**. The brief for Claude Design is
-`docs/design/MODEL-BRIEF.md` (Light first; Abyss, `docs/design/ABYSS-BRIEF.md`,
-is a theme on the same parts). Each module milestone includes its board's design.
+screens** drawn once, then the **boards**. Each module milestone includes its
+board's design.
+**Since 22 Oct the design language is v3 Noir**: the *v3 Noir* page of the
+Claude Design canvas (artboards `NR-*`: Today, the kit, the Field type kit),
+which Rutvij extends as features are added; `docs/DESIGN.md` has its tokens.
+Earlier briefs (`docs/design/MODEL-BRIEF.md` Light, `ABYSS-BRIEF.md`) are
+history.
 
 ### Field types — proposed 4 Oct
 

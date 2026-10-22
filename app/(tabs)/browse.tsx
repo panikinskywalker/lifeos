@@ -5,7 +5,7 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ToCheckBell } from '../../src/screens/ToCheckBell';
 import { shortNameForModule, tintForModule } from '@ui/theme/moduleTint';
-import { Icon, IconBox, IconButton, RowList, Screen, Section, Text, RowItem } from '@ui/kit';
+import { Icon, IconBox, IconButton, ModuleStack, RowList, Screen, Section, Text, RowItem } from '@ui/kit';
 import { RecordRow } from '@ui/components/RecordRow';
 
 /** Browse (docs/MODEL.md §5): search, Boards, Modules in their tints, Memory, Recent. */
@@ -45,6 +45,17 @@ export default function BrowseTab() {
         </Section>
       ) : null}
       <Section title="Modules">
+        {t.dark ? (
+          // Noir: the module stack (NR-KitComponents), each module its gradient card.
+          <ModuleStack
+            items={modules.map((m) => {
+              const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
+              const n = types.reduce((sum, ty) => sum + (counts[ty.id] ?? 0), 0);
+              const unit = types.length === 1 ? types[0]!.labelPlural.toLowerCase() : 'records';
+              return { key: m.id, title: shortNameForModule(m.id, m.name), line: `${n.toLocaleString('en-IN')} ${unit}`, icon: m.icon, tint: tintForModule(m.id), onPress: () => router.push(`/module/${m.id}`) };
+            })}
+          />
+        ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
           {modules.map((m) => {
             const tint = tintForModule(m.id);
@@ -69,6 +80,7 @@ export default function BrowseTab() {
           })}
           {modules.length % 2 ? <View style={{ flexBasis: '40%', flexGrow: 1 }} /> : null}
         </View>
+        )}
       </Section>
       <RowItem icon="sparkle" tint="memory" title="Memory" subtitle={facts ? `${facts} thing${facts === 1 ? '' : 's'} you’ve told me` : 'What Talk remembers for you'} onPress={() => router.push('/memory')} />
       {recent.length ? (

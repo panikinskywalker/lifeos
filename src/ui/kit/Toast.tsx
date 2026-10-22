@@ -32,8 +32,8 @@ export function useToast(): ToastApi {
 }
 
 /**
- * One toast at a time on the bar colour, above the bottom bar (`bottomOffset`).
- * A new toast replaces the current one.
+ * One toast at a time, above the nav (`bottomOffset`): Noir's white pill with
+ * a lime (or coral) disc. A new toast replaces the current one.
  */
 export function ToastProvider({ children, bottomOffset = 0 }: { children: React.ReactNode; bottomOffset?: number }) {
   const [toast, setToast] = useState<(ToastOptions & { id: number }) | null>(null);
@@ -71,9 +71,13 @@ function ToastView({ toast, dismiss, bottomOffset }: { toast: ToastOptions & { i
       accessibilityLiveRegion="polite"
       style={{ position: 'absolute', left: t.layout.gutter, right: t.layout.gutter, bottom: insets.bottom + bottomOffset + 12, opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingLeft: 14, paddingRight: 8, borderRadius: t.radius.card, backgroundColor: t.c.bg.bar }}>
-        {toast.icon ? <Icon name={toast.icon} size={18} color={t.c.fg.onBarText} /> : null}
-        <Text variant="tileTitle" color={t.c.fg.onBarText} style={{ flex: 1, paddingVertical: 12 }} numberOfLines={2}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingLeft: 12, paddingRight: 18, borderRadius: t.dark ? 999 : t.radius.card, backgroundColor: t.c.bg.toast, shadowColor: '#000', shadowOpacity: t.dark ? 0.4 : 0, shadowRadius: 30, shadowOffset: { width: 0, height: 12 }, elevation: t.dark ? 12 : 0 }}>
+        {toast.icon ? (
+          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: toast.icon === 'info' || toast.icon === 'warning' ? t.c.alert.coral : t.c.accent.mustard, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={toast.icon} size={16} color={t.c.fg.onAccent} />
+          </View>
+        ) : null}
+        <Text variant="tileTitle" color={t.c.fg.onToast} style={{ flex: 1, paddingVertical: 12 }} numberOfLines={2}>
           {toast.message}
         </Text>
         {toast.undo || toast.action ? (
@@ -90,8 +94,8 @@ function ToastView({ toast, dismiss, bottomOffset }: { toast: ToastOptions & { i
             }}
             style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 8, opacity: pressed ? 0.7 : 1 })}
           >
-            {toast.undo ? <Icon name="undo" size={16} color={t.c.accent.mustard} /> : null}
-            <Text variant="tileTitle" color={t.c.accent.mustard} style={{ fontWeight: '700' }}>
+            {toast.undo ? <Icon name="undo" size={16} color={t.dark ? t.c.fg.onToast : t.c.accent.mustard} /> : null}
+            <Text variant="label" color={t.dark ? t.c.fg.onToast : t.c.accent.mustard} style={{ fontWeight: '700' }}>
               {toast.undo ? 'Undo' : toast.action!.label}
             </Text>
           </Pressable>

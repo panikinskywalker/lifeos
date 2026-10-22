@@ -9,8 +9,8 @@ import { Surface } from './Surface';
 import { Text } from './Text';
 
 /**
- * Canvas empty state: centred 56 icon-box, 17/800 title, one 13/600 line,
- * one calm secondary action. Sits in a tile unless `bare`.
+ * Noir empty state: a centred 56 disc, 17/600 title, one 13/400 line, one
+ * quiet secondary action. Sits in a card (padding 18) unless `bare`.
  */
 export function EmptyState({ icon, tint, title, line, action, actionIcon = 'plus', onAction, bare }: { icon: IconName | (string & {}); tint?: TintKey; title?: string; line: string; action?: string; actionIcon?: IconName; onAction?: () => void; bare?: boolean }) {
   const t = useTheme();
@@ -30,7 +30,7 @@ export function EmptyState({ icon, tint, title, line, action, actionIcon = 'plus
   );
   if (bare) return body;
   return (
-    <View style={{ backgroundColor: t.c.bg.tile, borderRadius: t.radius.tile, padding: 16 }}>
+    <View style={{ backgroundColor: t.c.bg.tile, borderRadius: t.radius.tile, padding: 18 }}>
       <Surface kind="tile">{body}</Surface>
     </View>
   );

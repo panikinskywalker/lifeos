@@ -8,10 +8,10 @@ import { useControlFill } from './Surface';
 export type IconBoxTone = 'alert' | 'accent' | 'overlay' | 'plain';
 
 /**
- * Rounded square holding one icon: module tint with its ink, or a tone —
- * alert (coral fill / text), accent (soft mustard, for reminders), overlay
- * (on a tinted band), plain (the control fill). Canvas sizes: 28 tile
- * header · 32 · 36 row · 48 record header · 56 empty state.
+ * Noir disc holding one icon: the module's colour on a dark disc, or a tone —
+ * alert (coral), accent (soft lime), overlay (on a colour block), plain (the
+ * control fill). Round at every size: 28 tile header · 32 · 40 row · 48
+ * record header · 56 empty state.
  */
 export function IconBox({ icon, tint, tone, size = 32, color, background, style }: { icon: IconName | (string & {}); tint?: TintKey; tone?: IconBoxTone; size?: number; color?: string; background?: string; style?: StyleProp<ViewStyle> }) {
   const t = useTheme();
@@ -26,7 +26,7 @@ export function IconBox({ icon, tint, tone, size = 32, color, background, style 
           : tint && tone !== 'plain'
             ? [t.tints[tint].fill, t.tints[tint].ink]
             : [control, t.c.fg.primary];
-  const r = size >= 56 ? 16 : size >= 48 ? 14 : t.radius.iconBox;
+  const r = size / 2;
   const glyph = size >= 56 ? 28 : size >= 48 ? 24 : size >= 36 ? 18 : 16;
   return (
     <View style={[{ width: size, height: size, borderRadius: r, backgroundColor: background ?? bg, alignItems: 'center', justifyContent: 'center' }, style]}>

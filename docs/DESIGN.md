@@ -1,4 +1,62 @@
-# LifeOS — design system (v1.1, 25 Sep 2026)
+# LifeOS — design system
+
+## v3 Noir — the design language from 22 Oct 2026
+
+**Source of truth:** the **v3 Noir** page of the LifeOS Claude Design canvas
+(https://claude.ai/artifact/RVT9hLfcQ7tvgXvZN1x6cF), artboards
+`project/NR-*.dc.html`: Today, Kit · components, Kit · charts, Kit · records &
+profiles, Kit · trips, Kit · instruments, Field type kit (15 types × 4
+places). Rutvij adds to it as features are added; read the matching artboard
+(Artifact tool, `action: read`, `path`) before building or restyling a screen,
+and copy its sizes and colours exactly rather than guessing. A saved export of
+the same page: `~/Downloads/LifeOSdardnoir.html`. Turf web already wears Noir
+(its own `TF-*` / `W-*` / `P-*` artboards on the same canvas).
+
+Measured from the NR artboards on 22 Oct (the artboards win if they differ):
+
+| Token | Value | Use |
+|---|---|---|
+| ground | `#0B0B0D` | screen background; ink on lime and on light blocks |
+| card | `#1A1A1E` | cards, tiles, row groups |
+| raised | `#26262B` | nested slab, secondary button, chips, inputs |
+| hairline | `rgba(255,255,255,0.08)` (1px) | dividers, card edges |
+| outline | `1.5px rgba(245,245,247,0.22)` | outlined pills and buttons |
+| text | `#F5F5F7` · secondary 62% · tertiary 42% | body, meta, labels |
+| accent · lime | `#D7F55C`; soft `rgba(215,245,92,0.16)`; glow `0 10px 30px rgba(215,245,92,0.25)` | primary action, today, selected, the big number block |
+| colour blocks | sky `#A9C4FF` · orange `#F26B2B` · pink `#F4A8CE` · yellow `#F6E27F` · lilac `#C9A7F5` | tiles on a colour, module discs, chart series |
+| gradients | teal `#2E7F94 → #5FB7C8 → #8AD3DD` · warm `#D9602E → #F0A050 → #F7B26A` (radial, with dot-matrix) | hero tiles, records, trips |
+| alert | `#FF5C47` · soft text `#FF8A7A` | overdue, errors |
+| instruments | orange `#F0622E` on charcoal | gauges and readouts |
+
+- **Type**: Plus Jakarta Sans; weights 600 / 700 (400 for body). Sizes 11 ·
+  12 · 13 · 15 · 16 · 22, numbers 30 / 34 / 44 at 700 with −1.5px tracking
+  and tabular numerals. Section labels 11 / 600, UPPERCASE, +0.9px, tertiary.
+  **JetBrains Mono** 10 / 500 UPPERCASE +0.6px for numbered labels and
+  instrument readouts; a serif (Playfair Display) only for the rare display
+  line on records and trips.
+- **Shape**: pills `999` (chips, status, option pills, buttons, nav); cards
+  20 / 24 / 28; inner slabs 16 / 22; small 9 / 12. Buttons 52 tall, 15 / 700:
+  lime with ground ink (primary), raised with text (secondary).
+- **Depth**: soft shadows on sheets and toasts (`0 -8px 24px rgba(0,0,0,0.35)`),
+  the lime glow on the primary block, blur 10 on pills over photos. Gradients
+  and dot-matrix are allowed; glass is not.
+- **Icons**: unchanged: inline SVG, 2px strokes (below).
+
+**In code since LifeOS v0.0.4 (22 Oct):** the dark theme is Noir and the
+default appearance (`src/ui/theme/tokens.ts`: colours, module discs, colour
+blocks, gradients; Noir type and shapes for both themes); JetBrains Mono is
+installed and loaded (Playfair Display is not yet: no screen needs it). The
+kit follows NR-KitComponents: pill buttons 52 / 44, round 44 actions, chips
+40 with white selected, status pills 28, option pills 30, row cards 24 with
+40 discs, 17/600 section headers, the caption-over-title top bar, inputs 20
+with a hairline / white focus ring, the 32 sheet, the white toast pill, the
+metrics row, colour-block tiles (`filled`, everything black via `OnBlock`),
+the 22 progress bar, the nav (a pill of 52 discs + the 64 lime Dump disc),
+and the Browse module stack (`ModuleStack`). Today's My day is the NR
+checklist and Spend the orange block. The light theme keeps the v1.1 colours
+until it is redrawn or dropped (Rutvij's call).
+
+## History: v1.1 Calm bento (25 Sep 2026, retired 22 Oct)
 
 Sources of truth: **colours** from the Stitch "LifeOS Android design system" (M1.5, `stitch_lifeos_android_design_system.zip`, Material 3 roles); **layout and components** from the **LifeOS** Claude Design canvas (https://claude.ai/artifact/RVT9hLfcQ7tvgXvZN1x6cF) and, phase by phase (MILESTONES M1.5), the Stitch screens. Code lives in `src/ui/theme/tokens.ts`.
 

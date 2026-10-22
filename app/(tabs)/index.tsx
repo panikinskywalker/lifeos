@@ -189,12 +189,22 @@ function SpendTile() {
   const p = useLive((o) => (o.registry.objects.has('transaction') ? spendPace(o) : null), []);
   if (!p) return null;
   const diff = p.usualByToday != null ? p.spent - p.usualByToday : null;
-  const series = [{ label: 'This month', color: t.tints.finance.ink, values: p.thisMonth }, ...(p.usual.length ? [{ label: 'Usual', color: t.c.fg.tertiary, values: p.usual.slice(0, 31), dashed: true }] : [])];
+  // Noir: an orange colour block, black ink (NR-Today · "SPENT · SEP").
+  const ink = t.dark ? t.c.bg.ground : t.tints.finance.ink;
+  const series = [{ label: 'This month', color: ink, values: p.thisMonth }, ...(p.usual.length ? [{ label: 'Usual', color: t.dark ? `${ink}6B` : t.c.fg.tertiary, values: p.usual.slice(0, 31), dashed: true }] : [])];
   return (
-    <Tile size="2x1" tint="finance" icon="wallet" label="Spend this month" meta={format(new Date(), 'MMM')} onPress={() => router.push('/spend' as never)}>
+    <Tile size="2x1" tint="finance" icon="wallet" filled={t.dark} caps={t.dark} label={t.dark ? `Spent · ${format(new Date(), 'MMM')}` : 'Spend this month'} meta={t.dark ? undefined : format(new Date(), 'MMM')} onPress={() => router.push('/spend' as never)}>
       {p.spent || p.usual.length ? (
         <View style={{ gap: 8 }}>
-          <Stat value={os.format.currency(p.spent)} size="count" caption={diff == null ? 'Your usual month shows after a month of data' : `${os.format.currency(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'} than usual by today${p.usualMonth ? ` · usual month ${os.format.currency(p.usualMonth)}` : ''}`} tone={diff != null && diff > 0 ? 'alert' : undefined} />
+          {t.dark && diff != null ? (
+            // On the colour block the number stays black; over / under usual is a black pill (lime under, coral over).
+            <View style={{ alignSelf: 'flex-start', height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: t.c.bg.ground }}>
+              <Text variant="labelMicro" color={diff > 0 ? t.c.alert.coral : t.c.accent.mustard}>
+                {`${diff > 0 ? '+' : '−'}${os.format.currency(Math.abs(diff))} vs usual`}
+              </Text>
+            </View>
+          ) : null}
+          <Stat value={os.format.currency(p.spent)} size="count" caption={diff == null ? 'Your usual month shows after a month of data' : `${os.format.currency(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'} than usual by today${p.usualMonth ? ` · usual month ${os.format.currency(p.usualMonth)}` : ''}`} tone={!t.dark && diff != null && diff > 0 ? 'alert' : undefined} />
           <LineChart series={series} labels={Array.from({ length: Math.max(p.thisMonth.length, p.usual.length ? 31 : 0) }, (_, i) => (i % 7 === 0 ? String(i + 1) : ''))} height={90} minZero formatY={(n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)))} accessibilityLabel="Spend this month vs your usual month" />
         </View>
       ) : (
@@ -304,14 +314,36 @@ function MyDayTile({ u }: { u: Upkeep }) {
                   <Text variant="labelMicro" color={t.c.alert.coralText}>{format(now, 'h:mm a')}</Text>
                 </View>
               ) : null}
-              <Pressable accessibilityRole="button" disabled={!i.entityId} onPress={() => i.entityId && router.push(`/entity/${i.type}/${i.entityId}` as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, opacity: i.done ? 0.5 : 1 }}>
-                <Text variant="caption" color="secondary" style={{ width: 54, fontVariant: ['tabular-nums'] }}>{i.allDay ? 'Today' : format(i.at, 'h:mm a')}</Text>
-                <Icon name={DAY_ICON[i.kind]} size={16} color={i.late ? t.c.alert.coralText : t.c.fg.secondary} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text variant="label" numberOfLines={1} style={i.done ? { textDecorationLine: 'line-through' } : undefined}>{i.title}</Text>
-                  {i.sub ? <Text variant="caption" color={i.late ? t.c.alert.coralText : 'secondary'} numberOfLines={1}>{i.sub}</Text> : null}
-                </View>
-              </Pressable>
+              {t.dark ? (
+                // Noir checklist (NR-Today): a 26 tick, title 16/600 over where, the time as a quiet pill; hairlines between.
+                <Pressable accessibilityRole="button" disabled={!i.entityId} onPress={() => i.entityId && router.push(`/entity/${i.type}/${i.entityId}` as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 8, borderTopWidth: k === 0 || k === firstLater ? 0 : 1, borderTopColor: t.c.line }}>
+                  {i.done ? (
+                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: t.c.ok.sage, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="check" size={15} strokeWidth={3} color={t.c.ok.sageInk} />
+                    </View>
+                  ) : (
+                    <View style={{ width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: i.late ? t.c.alert.coral : '#F5F5F738', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name={DAY_ICON[i.kind]} size={13} color={i.late ? t.c.alert.coralText : t.c.fg.tertiary} />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, minWidth: 0, gap: 2, opacity: i.done ? 0.4 : 1 }}>
+                    <Text variant="rowTitle" numberOfLines={1}>{i.title}</Text>
+                    {i.sub ? <Text variant="caption" color={i.late ? t.c.alert.coralText : 'secondary'} numberOfLines={1}>{i.sub}</Text> : null}
+                  </View>
+                  <View style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: i.late ? t.c.alert.coralFill : t.c.bg.dim }}>
+                    <Text variant="labelMicro" color={i.late ? t.c.alert.coralText : 'secondary'} style={{ fontVariant: ['tabular-nums'] }}>{i.late ? 'late' : i.allDay ? 'today' : format(i.at, 'h:mm a')}</Text>
+                  </View>
+                </Pressable>
+              ) : (
+                <Pressable accessibilityRole="button" disabled={!i.entityId} onPress={() => i.entityId && router.push(`/entity/${i.type}/${i.entityId}` as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, opacity: i.done ? 0.5 : 1 }}>
+                  <Text variant="caption" color="secondary" style={{ width: 54, fontVariant: ['tabular-nums'] }}>{i.allDay ? 'Today' : format(i.at, 'h:mm a')}</Text>
+                  <Icon name={DAY_ICON[i.kind]} size={16} color={i.late ? t.c.alert.coralText : t.c.fg.secondary} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="label" numberOfLines={1} style={i.done ? { textDecorationLine: 'line-through' } : undefined}>{i.title}</Text>
+                    {i.sub ? <Text variant="caption" color={i.late ? t.c.alert.coralText : 'secondary'} numberOfLines={1}>{i.sub}</Text> : null}
+                  </View>
+                </Pressable>
+              )}
             </React.Fragment>
           ))}
           {items.length > shown.length ? <Text variant="caption" color="secondary">+ {items.length - shown.length} more</Text> : null}

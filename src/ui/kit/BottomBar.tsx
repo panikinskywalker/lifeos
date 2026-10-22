@@ -3,21 +3,19 @@ import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '../icons';
 import { useTheme } from '../theme/ThemeProvider';
-import { Text } from './Text';
 
 export interface BottomBarItem {
   key: string;
   label: string;
   icon: IconName;
-  /** The centre action (Talk): a raised mustard disc instead of a plain tab. */
+  /** The Dump action: the lime disc beside the pill instead of a plain tab. */
   primary?: boolean;
 }
 
-/** Canvas: the bar sits 20 above the bottom edge (inset 20). */
+/** The nav sits 20 above the bottom edge (inset 20). */
 const BAR_BOTTOM_GAP = 20;
-const RAISED = 58;
 
-/** Space a tab screen must leave at the bottom so content clears the floating bar. */
+/** Space a tab screen must leave at the bottom so content clears the floating nav. */
 export function useBottomBarInset(): number {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -25,25 +23,26 @@ export function useBottomBarInset(): number {
 }
 
 /**
- * Canvas bottom bar: dark pill 66 high, radius 22, inset 20. Tabs are a 22
- * icon over an 11/700 label; the selected one is mustard. The centre Talk is
- * a 58 mustard disc (the brain: Dump) rising 26 above the bar, its label under it.
+ * Noir nav (NR-KitComponents · Nav): a dark pill (padding 6, hairline edge)
+ * of 52 icon discs — the lime disc is where you are — and beside it, 10
+ * apart, the 64 lime Dump disc with its glow. No labels; each disc says its
+ * tab to a screen reader.
  */
 export function BottomBar({ items, active, onPress, onLongPress, floating = true }: { items: BottomBarItem[]; active: string; onPress: (key: string) => void; onLongPress?: (key: string) => void; floating?: boolean }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { height, radius, inset } = t.layout.bar;
+  const { inset, disc, fab } = t.layout.bar;
+  const tabs = items.filter((i) => !i.primary);
+  const action = items.find((i) => i.primary);
   return (
     <View
       accessibilityRole="tablist"
-      style={[
-        { height, borderRadius: radius, backgroundColor: t.c.bg.bar, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6 },
-        floating ? { position: 'absolute', left: inset, right: inset, bottom: insets.bottom + BAR_BOTTOM_GAP } : null,
-      ]}
+      pointerEvents="box-none"
+      style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }, floating ? { position: 'absolute', left: inset, right: inset, bottom: insets.bottom + BAR_BOTTOM_GAP } : null]}
     >
-      {items.map((item) => {
-        const selected = item.key === active;
-        if (item.primary) {
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 999, backgroundColor: t.c.bg.bar, borderWidth: t.dark ? 1 : 0, borderColor: t.c.line }}>
+        {tabs.map((item) => {
+          const selected = item.key === active;
           return (
             <Pressable
               key={item.key}
@@ -53,39 +52,26 @@ export function BottomBar({ items, active, onPress, onLongPress, floating = true
               aria-selected={selected}
               onPress={() => onPress(item.key)}
               onLongPress={onLongPress ? () => onLongPress(item.key) : undefined}
-              style={{ flex: 1, height, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 14 }}
+              style={({ pressed }) => ({ width: disc, height: disc, borderRadius: disc / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? t.c.accent.mustard : pressed ? t.c.bg.pressed : 'transparent' })}
             >
-              {({ pressed }) => (
-                <>
-                  <View style={{ position: 'absolute', top: -26, width: RAISED, height: RAISED, borderRadius: RAISED / 2, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.95 : 1 }] }}>
-                    <Icon name={item.icon} size={24} color={t.c.accent.mustardInk} />
-                  </View>
-                  <Text variant="nav" color={selected ? t.c.fg.onBarActive : t.c.fg.onBar}>
-                    {item.label}
-                  </Text>
-                </>
-              )}
+              <Icon name={item.icon} size={22} color={selected ? t.c.accent.mustardInk : t.c.fg.onBar} />
             </Pressable>
           );
-        }
-        return (
-          <Pressable
-            key={item.key}
-            accessibilityRole="tab"
-            accessibilityLabel={item.label}
-            accessibilityState={{ selected }}
-                aria-selected={selected}
-            onPress={() => onPress(item.key)}
-            onLongPress={onLongPress ? () => onLongPress(item.key) : undefined}
-            style={({ pressed }) => ({ flex: 1, height, alignItems: 'center', justifyContent: 'center', gap: 5, opacity: pressed ? 0.7 : 1 })}
-          >
-            <Icon name={item.icon} size={22} color={selected ? t.c.fg.onBarActive : t.c.fg.onBar} />
-            <Text variant="nav" color={selected ? t.c.fg.onBarActive : t.c.fg.onBar} numberOfLines={1}>
-              {item.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+        })}
+      </View>
+      {action ? (
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityLabel={action.label}
+          accessibilityState={{ selected: action.key === active }}
+          aria-selected={action.key === active}
+          onPress={() => onPress(action.key)}
+          onLongPress={onLongPress ? () => onLongPress(action.key) : undefined}
+          style={({ pressed }) => ({ width: fab, height: fab, borderRadius: fab / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: t.c.accent.mustard, transform: [{ scale: pressed ? 0.95 : 1 }], shadowColor: t.c.accent.mustard, shadowOpacity: t.dark ? 0.25 : 0, shadowRadius: 30, shadowOffset: { width: 0, height: 10 }, elevation: t.dark ? 10 : 0 })}
+        >
+          <Icon name={action.icon} size={26} color={t.c.accent.mustardInk} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
