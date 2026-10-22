@@ -7,6 +7,27 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.8 — 22 Oct 2026
+
+**Places** (R3), built in its own session and merged here.
+- **Place**: twelve kinds (Turf's venues stay venues), address, map pin, what
+  it is *in* (Koramangala in Bengaluru in India), a maps link. A Place's city
+  and country become Places of their own, once; a maps link sitting in notes
+  moves to its Field.
+- **Organisation**: ten kinds, UPI ids, website, phone, the branch it is
+  *at*. Known by any of its UPI ids, like a Person.
+- **Filed on their own**: an Event with a location is linked *at* its Place
+  (one you have, or a new one shown in To check with Undo); a hotel stay is
+  at the hotel, in its city. A table booking by mail becomes a reservation at
+  the restaurant; mail from an Organisation's website lands on its timeline.
+  From a dump, "Toit is a brewpub in Indiranagar" files Toit, a restaurant,
+  in Indiranagar, Bengaluru.
+- **Tools**: places been, place info (visits, last here, spent there, km from
+  home), places near, organisations.
+- **The Places board** in v3 Noir: Places by city, the Place card and its
+  drawn map, visits, what is here and inside; an Organisation's payments and
+  branch. The map is drawn, not a real map, until a provider is chosen.
+
 ## v0.0.7 — 22 Oct 2026
 
 **People** (R2), built in its own session and merged here.

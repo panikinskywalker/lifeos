@@ -28,6 +28,7 @@ export const EDGE_WORDS: Record<string, EdgeWord> = {
   subscription: { out: 'Subscription', in: 'Charges' },
   about: { out: 'About', in: 'Mentioned in' },
   located_in: { out: 'In', in: 'Contains' },
+  sent_by: { out: 'Sent by', in: 'Sent' },
 };
 
 /** Edges that read the same both ways (stored once, either direction). */
