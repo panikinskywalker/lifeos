@@ -2,7 +2,8 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { SendAnswer, SourceDef } from '@core/registry/types';
 import type { OutboxItem } from '@core/repo/outboxRepo';
 import { applyTurfSync, isSyncPage, SETTING_REV, type TurfSyncPage } from './sync';
-import { localMade, remapLocalMatch, resolveLocal, undoRefused, type TurfAction } from './changes';
+import { localMade, remapLocal, resolveLocal, undoRefused, type TurfAction } from './changes';
+import { SETTING_SUBMISSIONS, type TurfSubmission } from './inbox';
 
 /**
  * Turf web as a Source (docs/MODEL.md layer 4, *Turf web*; R9c). Address in
@@ -124,7 +125,7 @@ export async function sendTurfActions(os: LifeOSContext, items: OutboxItem[], do
         answers.push({ id: item.id, state: 'waiting', error: 'Waiting for the one before it' });
         stop = true;
       } else if (x.status >= 200 && x.status < 300) {
-        if (action.creates && x.result?.id) remapLocalMatch(os, action.creates, String(x.result.id));
+        if (action.creates && x.result?.id) remapLocal(os, action.createsKind ?? 'games', action.creates, String(x.result.id));
         answers.push({ id: item.id, state: 'sent', result: x.result });
       } else if (x.status >= 400 && x.status < 500) {
         undoRefused(os, item);
@@ -142,6 +143,33 @@ export async function sendTurfActions(os: LifeOSContext, items: OutboxItem[], do
   const done = new Set(answers.map((a) => a.id));
   for (const item of items) if (!done.has(item.id)) answers.push({ id: item.id, state: 'waiting', error: 'Waiting for the one before it' });
   return answers;
+}
+
+/**
+ * Approve or turn down a profile a friend submitted. Turf web reviews these on
+ * `/api/invites`, outside the changes queue, so this needs Turf web to answer
+ * now; the approved profile arrives with the next sync.
+ */
+export async function reviewTurfSubmission(os: LifeOSContext, submissionId: string, decision: 'approve' | 'reject', doFetch: typeof fetch = fetch): Promise<void> {
+  const base = turfBase(os);
+  const key = await os.device?.secrets?.get(TURF_KEY);
+  if (!base || !key) throw new Error('Add Turf web’s address and this phone’s key first');
+  let r: Response;
+  try {
+    r = await doFetch(`${base}/api/invites`, { method: 'PATCH', headers: { Authorization: `Bearer ${key}`, Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId, decision }) });
+  } catch {
+    throw new Error('Turf web needs to be reachable to review this — try again when you’re online');
+  }
+  if (r.status === 401 || r.status === 403) throw new Error('Turf web refused this phone’s key');
+  const body = (await r.json().catch(() => null)) as { error?: string } | null;
+  if (!r.ok) throw new Error(body?.error ?? `Turf web answered ${r.status}`);
+  const subs = os.settings.get<Record<string, TurfSubmission>>(SETTING_SUBMISSIONS, {});
+  const s = subs[submissionId];
+  if (s) {
+    subs[submissionId] = { ...s, status: decision === 'approve' ? 'approved' : 'rejected' };
+    os.settings.set(SETTING_SUBMISSIONS, subs);
+    if (s.filingId) os.filings.setChecked(s.filingId);
+  }
 }
 
 /** Sync from the last change number (0: everything). Returns what the page changed. */

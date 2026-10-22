@@ -216,8 +216,20 @@ interface BoardManifest {
   overrides?: ObjectOverride[];        // per Object: { object, record?: sections on the Record screen (hero at the top or cards) }
   quickActions?: QuickAction[];        // the global "+" menu
   buttons?: ManualRun[];               // manual-run automations shown on this board (R10)
+  checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds
 }
 ```
+
+A board can put its own questions in **To check**: a module adds a filing of
+its own `kind` (`os.filings.add`), and the board's `checkCards[kind]` is drawn
+for it in place of the usual tick / edit / cancel row (`app/check.tsx`). Turf:
+`turf-payment-ask` (an SMS that may pay a share — Yes / Not this),
+`turf-payment` (a share recorded from an SMS — Undo), `turf-submission` (a
+friend's profile — Review / Later).
+
+A board screen's query parameters must not be called `id`: the route
+`/board/[id]/[page]` already uses `id` for the board, so `?id=` never reaches
+the screen (Turf uses `?game=`, `?player=`, `?venue=`, `?sub=`).
 
 Every module has a companion board of the same id in `src/boards/<module>`
 holding its overview, screens, quick actions and record sections (the Vehicle

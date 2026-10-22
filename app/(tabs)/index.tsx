@@ -18,6 +18,7 @@ import { activeHabits } from '@core/habits/habits';
 import { trackerSummary, trackers } from '@core/activity/trackers';
 import { ActivityRow } from '../../src/screens/ActivityGrid';
 import { HabitChecklist, HabitWeek } from '@boards/habits';
+import { TurfTodayTile } from '@boards/turf/today';
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -104,6 +105,8 @@ function TodayTile({ id, u }: { id: TileId; u: Upkeep }) {
       return <OnThisDayTile />;
     case 'myday':
       return <MyDayTile u={u} />;
+    case 'turf':
+      return <TurfTodayTile />;
     case 'done':
       return <DoneTile />;
     case 'progress':

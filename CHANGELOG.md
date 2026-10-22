@@ -7,6 +7,46 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.6 — 22 Oct 2026
+
+The rest of the Turf board (R9c.5 and R9c.6), every screen drawn from the
+*Turf · Noir* artboards.
+- **Home**: money at a glance, the next match as the lime card with its RSVP
+  link, the recent games as a wallet of match cards, Turf's To check items,
+  who still owes with Copy all, and what's sending.
+- **The section switcher** on every screen: Home · Games · + · Players ·
+  Venues.
+- **Dues** (owed to you, you owe, settled, credit held; tick to mark paid,
+  open a row for one game at a time, reminders to copy or share) and the
+  **Audit log** from Turf web.
+- **Games**: the Match centre (season so far, what's booked as a stack of
+  cards, 13 weeks of activity, a month calendar, when you play) and Match
+  history (search, paid / partial / unpaid).
+- **Match**: the Payment checklist and the pay sheet redrawn, every WhatsApp
+  text (payment status, short, who's still to pay, details, result), **Log
+  stats** for the whole match at once, and the formation picker with mini
+  pitches.
+- **New match** redrawn: venue defaults, a suggested day, kick-off chips,
+  steppers, who fronted, the squad picker with availability, the shares.
+- **Players**: the Squad (search, unpaid / clear, availability), **Leaders**
+  (Turf web's thirteen tables: podium, places with ▲▼, not ranked yet,
+  share), the **Player** profile (attributes, overall and form, stats, kits,
+  availability, their dues), the **Stats card**, and **Edit player** with
+  availability. New players are made here too.
+- **Venues** and **Edit venue**, new venues included.
+- **Turf settings** redrawn, with the squad name and your UPI from Turf web.
+- **States**: not connected, loading, offline with what's waiting, couldn't
+  reach Turf web; the sync pill says which.
+- **SMS**: money in that pays a share is recorded on its own when the sender
+  is known and the amount exact (with Undo in To check); otherwise To check
+  asks, and a Yes teaches LifeOS that sender.
+- **Friends' profile submissions** arrive in To check; review and approve or
+  turn down (needs Turf web online).
+- **Today** gets a Turf tile: the next match, who's in, what's still to
+  collect.
+- Not yet: photos, squad-join requests, and undo from the audit log (all on
+  Turf web); the stats card shares as text, not an image.
+
 ## v0.0.5 — 22 Oct 2026
 
 Teams and the generator, on the new kit (R9c.4), drawn from the *Turf · Noir*

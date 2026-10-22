@@ -672,9 +672,29 @@ screens checked on the phone → overrides only where the default is wrong)
       with" picks, side wishes or kit votes, so the generator here balances
       on ratings, positions and chemistry; the Captains suggestion stays on
       Turf web. *Phone check pending.*
-    - [ ] **R9c.5** Players, profiles, availability, venues; all of Leaders.
-    - [ ] **R9c.6** WhatsApp texts, the SMS share match (learned senders),
-      friends' submissions in To check.
+    - [x] **R9c.5 Players, venues, Leaders** (LifeOS v0.0.6, 22 Oct): new and
+      edited players (a Person and a Player profile, the Football group;
+      Turf web's id replaces the local one), availability (mode, days,
+      periods), new and edited venues (with their Place), Turf web's
+      Leaders copied in (`games/leaders.ts`: thirteen tables, ranking rules,
+      places before the last match day), dues and every WhatsApp text from
+      Turf web's own `dues.ts` / `messages.ts` (copied; `games/money.ts`).
+      Board: Home, Dues, Audit log, Games (centre and history), the match's
+      Payment checklist and pay sheet, New match, Log stats, Formations,
+      Squad, Leaders, Player, Stats card, Edit player, Venues, Edit venue,
+      Turf settings, the section switcher and the sync states, per the
+      *Turf · Noir* artboards. *Phone check pending.*
+    - [x] **R9c.6 To check, SMS, texts** (v0.0.6, 22 Oct): friends' profile
+      submissions sync into To check and are approved or turned down on the
+      Submission screen (a direct call to Turf web's `/api/invites`, so it
+      needs a connection); the audit log syncs; the SMS share match as
+      decided in layer 2 *Money* (`games/smsMatch.ts`: sender = UPI id or the
+      bank's name; known = a learned alias in core `aliases`, a player's UPI,
+      or finance's Person; sure → recorded with Undo; else a question, and a
+      Yes learns the sender); boards can now give To check their own cards
+      (`BoardManifest.checkCards`). Gaps: squad-invite requests (new players
+      asking to join) and photos aren't in the sync yet; undoing a change
+      from the audit log stays on Turf web.
   - [x] **R9d Turf web, the screens** (v0.0.5–v0.0.6, 20 Oct 2026): every
     organiser screen and every friends' page of the *Turf web · Noir* canvas,
     built in `turf-web/app/ui/` from the artboards' own measurements

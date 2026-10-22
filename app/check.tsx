@@ -1,3 +1,4 @@
+import React from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { Filing } from '@core/repo/filingRepo';
@@ -19,6 +20,8 @@ export default function ToCheckScreen() {
   const router = useRouter();
   const toast = useToast();
   const items = useLive((o) => o.filings.toCheck(), []);
+  // A board's own To check cards (Turf's SMS questions and submissions), by filing kind.
+  const cards = Object.assign({}, ...[...os.registry.boards.values()].map((b) => b.checkCards ?? {})) as Record<string, React.ComponentType<{ filing: Filing }>>;
   // Group by what was said, keeping the list order (flagged first, newest first).
   // By what it came from: a dump, or one SMS / notification / other source item.
   const groups: Array<{ key: string; dumpId: string | null; source: string; sourceRef: string | null; items: Filing[] }> = [];
@@ -65,7 +68,11 @@ export default function ToCheckScreen() {
                   ) : null}
                 </Pressable>
                 <View style={{ backgroundColor: t.c.bg.tileRaised, borderRadius: 16, paddingVertical: 4 }}>
-                  {g.items.map((x) => (
+                  {g.items.map((x) => cards[x.kind] ? (
+                    <View key={x.id} style={{ padding: 4 }}>
+                      {React.createElement(cards[x.kind]!, { filing: x })}
+                    </View>
+                  ) : (
                     <View key={x.id} style={{ paddingLeft: 12, paddingRight: 4, paddingVertical: 4, gap: 2 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
                         <Icon name={kindIcon(x.kind)} size={16} color={x.flag ? t.c.accent.gold : t.tints.memory.ink} />
