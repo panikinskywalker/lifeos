@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { importContacts, personForContact, type DeviceContact } from '@core/sources/phone';
+import type { DeviceContact } from '@core/registry/context';
+import { importContacts, personForContact } from '@modules/crm';
 import { useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Checkbox, EmptyState, Icon, IconButton, ScreenHeader, Text, useToast } from '@ui/kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { loadDeviceContacts } from '../../src/platform/phoneSources';
 
 /**
- * Pick contacts to add to People (M4.2b) — never the whole phonebook.
+ * Pick contacts to add to People (M4.2b; crm's contacts source since R2) — never the whole phonebook.
  * Search, tick, add. People already in LifeOS are marked and get their
  * missing phone / email / birthday filled if you tick them.
  */
@@ -25,7 +25,7 @@ export default function ContactsPicker() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    loadDeviceContacts()
+    (os.device?.contacts?.read() ?? Promise.resolve([]))
       .then((c) => (c.length ? setAll(c) : (setDenied(true), setAll([]))))
       .catch(() => (setDenied(true), setAll([])));
   }, []);

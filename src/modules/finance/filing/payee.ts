@@ -1,12 +1,15 @@
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
+import { whoIs } from '@core/identity';
 
 /**
  * Payees (M4.2c): everyone you pay or get paid by is one record, and every
  * payment links to it — so paying John ₹1,300 then ₹500 lands on one John.
- * A person already in People is matched by UPI ID, a name you confirmed
- * before, or their name; a close-but-unsure name is linked as a flagged
- * guess you confirm on the payment ("We think JOHN D is John Doe").
+ * A person already in People is matched by UPI ID, a sender learned before
+ * (an alias, shared with Turf), the mobile number inside a UPI ID (core's
+ * `whoIs`, R2), a name you confirmed before, or their name; a
+ * close-but-unsure name is linked as a flagged guess you confirm on the
+ * payment ("We think JOHN D is John Doe").
  */
 
 export interface PayeeMatch {
@@ -47,8 +50,8 @@ export function payeeFor(os: LifeOSContext, name: string | null | undefined, vpa
   const orgs = hasOrgs ? os.records.query<{ upi?: string; kind?: string }>('org', {}, { limit: 5000 }) : [];
   const v = vpa?.toLowerCase();
   const byUpi = <T extends { data: { upi?: string } }>(list: T[]) => (v ? list.find((e) => (e.data.upi ?? '').toLowerCase().split(/[,\s]+/).includes(v)) : undefined);
-  const p1 = byUpi(people);
-  if (p1) return { id: p1.id, type: 'person', created: false, guess: null, confidence: 1 };
+  const known = v ? whoIs(os, { upi: v }, ['person', 'org']) : null;
+  if (known) return { id: known.record.id, type: known.record.object as 'person' | 'org', created: false, guess: null, confidence: 1 };
   const o1 = byUpi(orgs);
   if (o1) return { id: o1.id, type: 'org', created: false, guess: null, confidence: 1 };
   // A name you confirmed before.

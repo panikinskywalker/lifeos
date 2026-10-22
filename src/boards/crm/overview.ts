@@ -1,13 +1,13 @@
 import type { LifeOSContext } from '@core/registry/context';
 import { upkeep } from '@core/cycles/upkeep';
-import { peopleToCall } from '@core/dashboard/metrics';
+import { peopleToCall } from '@modules/crm';
 import { DAY_MS, type ModuleOverview, type OverviewBlock } from '@core/dashboard/overview';
 
 /** People at a glance: who to call, birthdays coming, who you've been in touch with, how your people split. */
 export function peopleOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
   const u = upkeep(os, 'All', now);
   const people = os.records.query<{ relationship?: string; lastContactAt?: string }>('person', {}, { limit: 5000 });
-  const call = peopleToCall(os, 8, now, u);
+  const call = peopleToCall(os, { withinDays: 7, birthdayDays: 14, limit: 8 }, now).map((c) => ({ title: c.name, why: c.why, entityId: c.id, late: c.late }));
   const birthdays = u.items
     .filter((i) => i.entity.object === 'person' && i.cycle.template === 'person.birthday' && i.cycle.nextDueAt != null && i.cycle.nextDueAt - now <= 30 * DAY_MS)
     .sort((a, b) => a.cycle.nextDueAt! - b.cycle.nextDueAt!);

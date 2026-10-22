@@ -4,7 +4,8 @@ import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
-import { applyCallLog, importContacts, personForContact, resyncContacts, saveCalendarEvents } from '@core/sources/phone';
+import { saveCalendarEvents } from '@core/sources/phone';
+import { applyCallLog, importContacts, personForContact, resyncContacts } from './crm';
 import { personType, groupType } from './crm/types';
 import { eventType } from './projects/types';
 

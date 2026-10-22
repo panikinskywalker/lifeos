@@ -591,11 +591,29 @@ screens checked on the phone → overrides only where the default is wrong)
   screen, Investment hero, Investments on the Finance home. **Dataset**: all three inboxes, every
   parser's read, what was filed, your corrections. 319 tests green; the web export builds.
   *Deferred inside R1:* You › Data sources still lists sources from a platform table until every
-  source is declared by a module (R2 contacts / calendar / call log, R6 health / usage); the
+  source is declared by a module (R2 contacts / call log — done; calendar with R4; R6 health / usage); the
   SubscriptionHero does not yet draw the price history; a price feed for current value is R12+.
   **Phone check pending**: migrations v11–v14 and the budget / institution folds run on first open.
-- [ ] **R2 crm** — Person; contacts source; payee and UPI matching; keep-in-touch
-  and birthday cycles; tools: people to call, last met, balances per person.
+- [x] **R2 crm** — built 22 Oct 2026 (branch `claude/r2-people-058675`; no migration). Person and
+  Group as agreed (layer 2, *People*): phone and email are contact Fields, keep in touch a cadence
+  select (old day counts snap to the nearest), Works at → Organisation and Lives in → Place with
+  the typed text kept (folded once on start, then whenever the text is typed), a photo, About;
+  Group gains sport (Football moved once), default split, place, photo. **Sources declared by
+  the module**: contacts (the people you picked, re-filled) and call log, through `os.device`
+  (`contacts`, `callLog`), run by core like finance's; the contacts picker reads the bridge.
+  **Payee and UPI matching**: core's `whoIs` (`src/core/identity.ts`) matches a UPI id, a phone
+  or an email against `ObjectDef.identity` (Person gives its UPI IDs, phone, email), then against
+  a sender learned as an alias in core's `aliases` (the same table Turf's "Who is
+  priya.s@okicici?" writes), then the mobile number inside a UPI id; finance's `payeeFor` asks it
+  first. **Last spoke** moves on its own: a call (call log), an Event with them, a payment linked
+  to them (not an unconfirmed guess); it rolls the Keep in touch cycle. **Cycles**: Keep in touch
+  (interval) and Birthday (yearly, 7 days' notice). **Tools**: `people_to_call`, `last_met`,
+  `who_is`; *balances per person* stay finance's `balances` (one home for money; the Person
+  profile shows it and Settle). **Board** (v3 Noir, NR-KitRecords): Person · Profile as the
+  record's hero (a new `placement: 'hero'` on record sections), the People home with the People
+  strip (a lime ring = due), Call or message, Birthdays, Groups; the keep-in-touch nudge.
+  355 tests green; the web export builds. *Left for later:* the calendar source moves with **R4**
+  (it files Events); Organisation's Fields are **R3**'s. **Phone check pending.**
 - [ ] **R3 places** — Place, Organisation; from calendar, mail and dumps.
 - [ ] **R4 projects** — Task, Project, Goal, Event; calendar source.
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
