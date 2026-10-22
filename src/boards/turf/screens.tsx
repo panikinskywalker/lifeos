@@ -3,10 +3,11 @@ import { RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
-import { runSource } from '@core/filing/sources';
 import { sourceState } from '@core/sources/deviceData';
 import { allGames, allPlayers, allVenues, currentGame, isSending, markPaid, mePersonId, turfBase, leaders, lineup, moneyAtAGlance, owedOn, recordPayment, statsFor, summarise, turfChanges, whoOwes, ATTENDANCE, PAYMENT_TERMS, type AppearanceData, type LeaderMetric, type PaymentKind } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
+import { usePull } from './useTurfSync';
+import { MatchPlayerSheet, ScoreSheet } from './match';
 import { Button, Card, EmptyState, NumberField, RowItem, RowList, Screen, Section, Segmented, Sheet, Stat, StatTrio, Text, TextField, useToast } from '@ui/kit';
 
 /**
@@ -24,46 +25,6 @@ const shortDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString
 function useBack() {
   const router = useRouter();
   return () => (router.canGoBack() ? router.back() : router.replace('/browse'));
-}
-
-const EVERY_MS = 60_000;
-/** One sync at a time, however many board screens are open. */
-let inFlight = false;
-const stale = (os: LifeOSContext) => Date.now() - (sourceState(os, 'turf').lastSync ?? 0) > EVERY_MS - 5_000;
-
-/**
- * A Turf web sync through core: when a board screen opens (if the last one is
- * over a minute old), every minute while it stays open, and on pull-to-refresh.
- * Only the pull-down says what went wrong; the quiet ones leave it on the
- * source's state (You › Data sources).
- */
-function usePull() {
-  const os = useOS();
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
-  const pull = async (quiet = false) => {
-    const src = os.registry.sources.get('turf');
-    if (!src || inFlight) return;
-    inFlight = true;
-    if (!quiet) setBusy(true);
-    try {
-      if (src.available && !(await src.available(os))) {
-        if (!quiet) toast.show({ message: 'Add Turf web’s address and this phone’s key first', icon: 'info' });
-      } else await runSource(os, src);
-    } catch (e) {
-      if (!quiet) toast.show({ message: (e as Error).message, icon: 'info' });
-    } finally {
-      inFlight = false;
-      if (!quiet) setBusy(false);
-    }
-  };
-  useEffect(() => {
-    if (stale(os)) void pull(true);
-    const timer = setInterval(() => stale(os) && void pull(true), EVERY_MS);
-    return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [os]);
-  return { busy, pull };
 }
 
 function NotConnected() {
@@ -177,7 +138,7 @@ export function TurfGames({ ctx }: Props) {
     />
   );
   return (
-    <Screen title="Games" subtitle="Match centre and history" onBack={back} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Games" subtitle="Match centre and history" onBack={back} right={<Button title="New match" icon="plus" size="sm" onPress={() => router.push('/board/turf/match' as never)} />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       {!games.upcoming.length && !games.past.length ? <NotConnected /> : null}
       {games.upcoming.length ? (
         <Section title="Match centre">
@@ -200,6 +161,8 @@ export function TurfGame({ ctx, params }: Props) {
   const back = useBack();
   const [tab, setTab] = useState<'payments' | 'teams'>('payments');
   const [paying, setPaying] = useState<string | null>(null);
+  const [player, setPlayer] = useState<string | null>(null);
+  const [scoring, setScoring] = useState(false);
   const { pull } = usePull();
   const d = useLive((o) => {
     const g = params.game ? o.records.get(params.game) : undefined;
@@ -219,7 +182,7 @@ export function TurfGame({ ctx, params }: Props) {
   const terms = PAYMENT_TERMS.find((x) => x.value === g.paymentTerms)?.label;
   const team = (t: 'A' | 'B' | undefined) => d.lineup.filter((l) => l.appearance.data.team === t);
   return (
-    <Screen title={d.game.title} subtitle={[g.time, g.sideSize ? `${g.sideSize}-a-side` : null, terms].filter(Boolean).join(' · ')} onBack={back}>
+    <Screen title={d.game.title} subtitle={[g.time, g.sideSize ? `${g.sideSize}-a-side` : null, terms].filter(Boolean).join(' · ')} onBack={back} right={<Button title="Edit" icon="edit" size="sm" variant="secondary" onPress={() => router.push(`/board/turf/match?game=${d.game.id}` as never)} />}>
       <StatTrio
         stats={[
           { label: 'Turf cost', value: f(g.totalCost) },
@@ -241,8 +204,11 @@ export function TurfGame({ ctx, params }: Props) {
               Man of the match: {d.motm}
             </Text>
           ) : null}
+          <Button title={g.scoreLocked ? 'Change score · set by hand' : 'Change score'} icon="edit" size="sm" variant="ghost" onPress={() => setScoring(true)} />
         </Card>
-      ) : null}
+      ) : (
+        <Button title="Add the score" icon="plus" variant="secondary" onPress={() => setScoring(true)} />
+      )}
       <Segmented options={[{ value: 'payments', label: 'Payment checklist' }, { value: 'teams', label: 'Team view' }]} value={tab} onChange={setTab} />
       {tab === 'payments' ? (
         <Section title={`${d.sum.paidCount} of ${d.sum.players} paid`} meta={d.fronted ? `Fronted by ${d.fronted}` : undefined}>
@@ -275,8 +241,11 @@ export function TurfGame({ ctx, params }: Props) {
                       icon="user"
                       tint={TINT}
                       title={l.name}
-                      subtitle={[l.appearance.data.position, l.appearance.data.inGoal ? 'in goal' : null].filter(Boolean).join(' · ') || null}
-                      value={[l.appearance.data.goals ? `${l.appearance.data.goals} G` : null, l.appearance.data.assists ? `${l.appearance.data.assists} A` : null, l.appearance.data.saves ? `${l.appearance.data.saves} S` : null].filter(Boolean).join(' ') || null}
+                      subtitle={[(t === 'A' ? g.captainAId : t === 'B' ? g.captainBId : undefined) === l.appearance.data.personId ? 'Captain' : null, g.motmId === l.appearance.data.personId ? 'Player of the match' : null, l.appearance.data.position, l.appearance.data.inGoal ? 'in goal' : null, l.appearance.data.attendance !== 'confirmed' ? ATTENDANCE.find((x) => x.value === l.appearance.data.attendance)?.label : null].filter(Boolean).join(' · ') || null}
+                      value={[l.appearance.data.goals ? `${l.appearance.data.goals} G` : null, l.appearance.data.assists ? `${l.appearance.data.assists} A` : null, l.appearance.data.saves ? `${l.appearance.data.saves} S` : null, l.appearance.data.ownGoals ? `${l.appearance.data.ownGoals} OG` : null].filter(Boolean).join(' ') || null}
+                      meta={l.sending ? 'Sending…' : undefined}
+                      chevron
+                      onPress={() => setPlayer(l.appearance.id)}
                     />
                   ))}
                 </RowList>
@@ -293,6 +262,8 @@ export function TurfGame({ ctx, params }: Props) {
         </Section>
       ) : null}
       <PaymentSheet appearanceId={paying} onClose={() => setPaying(null)} onRecorded={() => void pull(true)} />
+      <MatchPlayerSheet appearanceId={player} onClose={() => setPlayer(null)} onChanged={() => void pull(true)} />
+      <ScoreSheet gameId={scoring ? d.game.id : null} onClose={() => setScoring(false)} onChanged={() => void pull(true)} />
     </Screen>
   );
 }

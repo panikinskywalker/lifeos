@@ -649,8 +649,15 @@ screens checked on the phone → overrides only where the default is wrong)
       correction, note; Mark paid), shown at once as *sending* and counted in
       who owes and the Debts until the confirmed entry replaces it. *Phone
       check pending.*
-    - [ ] **R9c.3** Matches: new and edit, attendance, score and stats,
-      captains and player of the match.
+    - [x] **R9c.3 Matches** (LifeOS v0.0.3, 22 Oct): New / Edit match (venue
+      defaults, terms, who fronted, shares split; squad changes keep teams,
+      stats and payments; a paid share needs a refund before removal),
+      attendance, goals / assists / saves / own goals / in goal, captains,
+      player of the match, the score (follows the goals unless set by hand).
+      Turf web's rules for these are copied into `games/rules.ts` (from
+      Turf web v0.0.61) so the board shows the same offline. A match made
+      here is `local-<change id>` until Turf web answers with its id; queued
+      changes naming it are sent with the real one. *Phone check pending.*
     - [ ] **R9c.4** Teams and the generator (rules copied into games).
     - [ ] **R9c.5** Players, profiles, availability, venues; all of Leaders.
     - [ ] **R9c.6** WhatsApp texts, the SMS share match (learned senders),

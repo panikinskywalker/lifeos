@@ -56,6 +56,8 @@ export interface GameData {
   frontedById?: string;
   scoreA?: number;
   scoreB?: number;
+  /** Set by hand, so it no longer follows the goals. */
+  scoreLocked?: boolean;
   colorA?: string;
   colorB?: string;
   captainAId?: string;
@@ -88,6 +90,7 @@ export const gameObject: ObjectDef<GameData> = {
     frontedById: z.string().optional(),
     scoreA: z.coerce.number().optional(),
     scoreB: z.coerce.number().optional(),
+    scoreLocked: z.boolean().optional(),
     colorA: z.string().optional(),
     colorB: z.string().optional(),
     captainAId: z.string().optional(),

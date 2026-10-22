@@ -176,6 +176,15 @@ it on a refusal, since only it knows what it showed. Games: `recordPayment` /
 `markPaid` queue a Turf web `PATCH /api/data` `{ action: 'payment' }` and add a
 *sending* payment Event; `send` posts them to `POST /api/actions`; the synced
 payment row carrying the same `action_id` replaces the sending Event.
+Every other games change (`games/changes.ts`: attendance, stats, score,
+captain, player of the match, new and edited matches) is applied to the
+records at once and queued with an `undo` (the records as they were, the
+records it made), which a refusal restores. A new match is made with the
+source key `turf:games:local-<change id>`; when Turf web answers with its id,
+`remapLocalMatch` re-keys it and its shares, and `resolveLocal` fills the
+real id into changes queued after it (the batch is cut until it is known).
+`runSource` does not sync while changes still wait after sending, so a
+change shown here is never overwritten by the source's older copy.
 
 AI tool *names* (`create_entity`, `connections`…) keep their old words for
 now: they are the contract the model is prompted with and the golden fixtures

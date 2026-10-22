@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -39,7 +39,7 @@ const delta = (since: number, rev: number, tables: TurfSyncPage['tables'], delet
 const q = <T = Record<string, unknown>>(object: string) => os.records.query<T>(object, { includeArchived: true }, { limit: 1000 });
 const live = <T = Record<string, unknown>>(object: string) => q<T>(object).filter((r) => !r.archived);
 const person = (name: string) => q<{ phone?: string; upi?: string; email?: string }>('person').find((p) => p.title === name)!;
-const appearance = (name: string, date: string) => q<{ personId: string; gameDate: string; paid: boolean; amountPaid?: number; paidOn?: string; rsvp?: string; goals: number }>('appearance').find((a) => a.data.personId === person(name).id && a.data.gameDate === date)!;
+const appearance = (name: string, date: string) => q<{ personId: string; gameDate: string; paid: boolean; amountPaid?: number; paidOn?: string; rsvp?: string; goals: number; sourceKey?: string }>('appearance').find((a) => a.data.personId === person(name).id && a.data.gameDate === date)!;
 const row = (table: string, match: (r: Record<string, unknown>) => boolean) => ({ ...sampleSync.tables[table]!.find(match)! });
 const NOW = Date.parse('2026-10-18T12:00:00+05:30');
 
@@ -336,7 +336,8 @@ describe('payments recorded in LifeOS (R9c.2)', () => {
     turfWeb(() => (n++ === 0 ? 500 : 201));
     const a = recordPayment(os, appearance('Karan', '2026-10-17').id, { amount: 100 });
     const b = recordPayment(os, appearance('Arjun', '2026-10-17').id, { amount: 50 });
-    await runSource(os, src());
+    // No sync while they wait: it would put back Turf web's older copy over what's shown.
+    await expect(runSource(os, src())).rejects.toThrow(/2 changes still waiting/);
     expect(turfChanges(os).sending.map((i) => i.id)).toEqual([a.id, b.id]);
     expect(os.outbox.get(b.id)!.error).toBe('Waiting for the one before it');
   });
@@ -349,5 +350,148 @@ describe('payments recorded in LifeOS (R9c.2)', () => {
     expect(() => recordPayment(os, priya.id, { amount: 0 })).toThrow(/Enter an amount/);
     expect(() => recordPayment(os, priya.id, { amount: -5 })).toThrow(/without a minus/);
     expect(markPaid(os, appearance('Rutvij', '2026-10-17').id)).toBeNull(); // nothing owed
+  });
+});
+
+const debt = (name: string, date: string) => q<{ personId: string; date: string; amount: number }>('debt').find((d) => d.data.personId === person(name).id && d.data.date === date)!;
+
+describe('matches changed in LifeOS (R9c.3)', () => {
+  const KEY = `tw_${'k'.repeat(30)}`;
+  const src = () => os.registry.sources.get('turf')!;
+  const game = (date: string) => q<Record<string, unknown> & { date: string; scoreA?: number; scoreB?: number; scoreLocked?: boolean; captainAId?: string; motmId?: string; sourceKey?: string }>('game').find((g) => g.data.date === date)!;
+  const profile = (name: string) => q('player').find((p) => p.title === name)!.id;
+  const venue = (name: string) => q<{ name: string }>('venue').find((v) => v.data.name === name)!.id;
+  /** Turf web stand-in: every action taken; a new match gets id g_new and comes back in the sync with its shares. */
+  const turfWeb = (refuse: (body: Record<string, unknown>) => boolean = () => false) => {
+    const taken: Array<{ id: string; method: string; body: Record<string, unknown> }> = [];
+    let rev = 40;
+    const pending: TurfSyncPage['tables'] = {};
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('/api/actions')) {
+        const { actions } = JSON.parse(String(init!.body)) as { actions: typeof taken };
+        const results = actions.map((a) => {
+          if (refuse(a.body)) return { id: a.id, status: 400, result: { error: 'Complete the game and select its players.' } };
+          taken.push(a);
+          if (a.method === 'POST' && a.body.action === 'game') {
+            const ids = a.body.playerIds as string[];
+            pending.games = [{ id: 'g_new', date: a.body.date, time: a.body.time, venue: a.body.venue, venue_id: a.body.venueId, side_size: a.body.sideSize, total_amount: a.body.totalAmount, expected_players: a.body.expectedPlayers, payment_terms: a.body.paymentTerms, fronted_by_player_id: a.body.frontedByPlayerId || null, team_a_color: '#D7F55C', team_b_color: '#A9C4FF', goal_data_quality: 'missing', score_locked: 0 }];
+            pending.game_players = ids.map((pid) => ({ game_id: 'g_new', player_id: pid, share_amount: Math.round((Number(a.body.totalAmount) / ids.length) * 100) / 100, paid: pid === a.body.frontedByPlayerId ? 1 : 0, goals: 0, assists: 0, saves: 0, own_goals: 0, played_goalkeeper: 0, attendance_status: 'confirmed' }));
+            return { id: a.id, status: 201, result: { id: 'g_new' } };
+          }
+          return { id: a.id, status: 200, result: { ok: true } };
+        });
+        return new Response(JSON.stringify({ results }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      const page = delta(rev, rev + 1, { ...pending });
+      for (const k of Object.keys(pending)) delete pending[k];
+      rev = page.rev;
+      return new Response(JSON.stringify(page), { status: 200, headers: { 'content-type': 'application/json' } });
+    }));
+    return taken;
+  };
+
+  beforeEach(() => {
+    applyTurfSync(os, first());
+    os.settings.set(TURF_URL, 'https://turf-web.example.dev');
+    secrets.set(TURF_KEY, KEY);
+  });
+
+  it('attendance and stats show at once; the score follows the goals (own goals count for the other team) until set by hand', () => {
+    const karan = appearance('Karan', '2026-10-17');
+    expect(setAttendance(os, karan.id, 'late')!.payload.body).toEqual({ action: 'attendance', gameId: 'g_sat', playerId: 'p_karan', status: 'late' });
+    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ attendance: 'late' });
+    expect(setAttendance(os, karan.id, 'late')).toBeNull(); // no change, nothing queued
+
+    // Karan (team A) gets a 5th goal, Priya (B) an own goal: 7–5 becomes 9–5.
+    const item = setStats(os, karan.id, { goals: 5, assists: 0, saves: 0, ownGoals: 0, inGoal: false });
+    expect(item.payload.body).toEqual({ action: 'matchStats', gameId: 'g_sat', playerId: 'p_karan', goals: 5, assists: 0, saves: 0, ownGoals: 0, playedGoalkeeper: false });
+    setStats(os, appearance('Priya', '2026-10-17').id, { goals: 1, assists: 2, saves: 0, ownGoals: 1, inGoal: false });
+    // Followed from the goals now logged: A = 2 + 5 + B's own goal; B = Priya's 1.
+    expect(game('2026-10-17').data).toMatchObject({ scoreA: 8, scoreB: 1 });
+
+    setScore(os, game('2026-10-17').id, 7, 5);
+    expect(game('2026-10-17').data).toMatchObject({ scoreA: 7, scoreB: 5, scoreLocked: true });
+    setStats(os, karan.id, { goals: 6, assists: 0, saves: 0, ownGoals: 0, inGoal: false });
+    expect(game('2026-10-17').data).toMatchObject({ scoreA: 7, scoreB: 5 }); // set by hand: stays
+    expect(followGoals(os, game('2026-10-17').id).payload.body).toEqual({ action: 'score', gameId: 'g_sat', follow: true });
+    expect(game('2026-10-17').data).toMatchObject({ scoreA: 9, scoreB: 1 });
+    expect(game('2026-10-17').data.scoreLocked).toBeUndefined();
+    expect(() => setScore(os, game('2026-10-17').id, -1, 2)).toThrow(/both scores/);
+  });
+
+  it('captain toggles on the player’s team; player of the match moves or clears', () => {
+    const priya = appearance('Priya', '2026-10-17'); // team B, already captain
+    const karan = appearance('Karan', '2026-10-17'); // team A
+    expect(toggleCaptain(os, priya.id).payload.body).toEqual({ action: 'captain', gameId: 'g_sat', playerId: 'p_priya', team: 'B' });
+    expect(game('2026-10-17').data.captainBId).toBeUndefined();
+    toggleCaptain(os, karan.id);
+    expect(game('2026-10-17').data.captainAId).toBe(person('Karan').id);
+    expect(() => toggleCaptain(os, appearance('Priya', '2026-10-24').id)).toThrow(/on a team/);
+
+    expect(setMotm(os, game('2026-10-17').id, priya.id)!.payload.body).toEqual({ action: 'motm', gameId: 'g_sat', playerId: 'p_priya' });
+    expect(game('2026-10-17').data.motmId).toBe(person('Priya').id);
+    expect(setMotm(os, game('2026-10-17').id, null)!.payload.body).toMatchObject({ playerId: '' });
+    expect(game('2026-10-17').data.motmId).toBeUndefined();
+  });
+
+  it('a refused change is put back exactly', async () => {
+    turfWeb((b) => b.action === 'matchStats');
+    const karan = appearance('Karan', '2026-10-17');
+    setStats(os, karan.id, { goals: 9, assists: 3, saves: 0, ownGoals: 0, inGoal: true });
+    expect(game('2026-10-17').data).toMatchObject({ scoreA: 11 });
+    await runSource(os, src());
+    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ goals: 4, assists: 0, inGoal: false });
+    expect(game('2026-10-17').data).toMatchObject({ scoreA: 7, scoreB: 5 });
+    expect(turfChanges(os).refused).toHaveLength(1);
+  });
+
+  it('a new match: venue defaults, shares split, whoever fronted counts as paid; Turf web’s id replaces the local one, so the sync adds no second copy', async () => {
+    expect(matchDefaults(os, venue('Dome Turf'))).toMatchObject({ time: '07:00', sideSize: 5, totalCost: 1500, paymentTerms: 'advance_paid', advance: 500 });
+    const taken = turfWeb();
+    const { gameId, item } = createMatch(os, { ...matchDefaults(os, venue('Dome Turf')), date: '2026-10-28', venueId: venue('Dome Turf'), totalCost: 1500, paymentTerms: 'advance_paid', advance: 500, playerIds: [profile('Rutvij'), profile('Karan'), profile('Arjun')], frontedById: profile('Rutvij') } as Parameters<typeof createMatch>[1]);
+    expect(item.payload.body).toMatchObject({ action: 'game', date: '2026-10-28', time: '07:00', venue: 'Dome Turf', venueId: 'v_dome', totalAmount: 1500, paymentTerms: 'advance_paid', advanceAmount: 500, sideSize: 5, playerIds: ['p_rutvij', 'p_karan', 'p_arjun'], expectedPlayers: 10, frontedByPlayerId: 'p_rutvij' });
+    expect(item.payload.method).toBe('POST');
+    const made = os.records.get<{ sourceKey: string }>(gameId)!;
+    expect(made.data.sourceKey).toMatch(/^turf:games:local-/);
+    expect(appearance('Karan', '2026-10-28').data).toMatchObject({ share: 500, paid: false });
+    expect(appearance('Rutvij', '2026-10-28').data).toMatchObject({ share: 500, paid: true });
+    expect(debt('Karan', '2026-10-28').data.amount).toBe(500); // you fronted: he owes you
+
+    // Offline, a goal is logged on the new match: it names the local id.
+    const goal = setStats(os, appearance('Karan', '2026-10-28').id, { goals: 2, assists: 0, saves: 0, ownGoals: 0, inGoal: false });
+    expect(goal.payload.body.gameId).toMatch(/^local-/);
+
+    await runSource(os, src());
+    // Sent in order; the goal went with Turf web's id for the match.
+    expect(taken.map((a) => [a.method, a.body.action, a.body.gameId ?? null])).toEqual([['POST', 'game', null], ['PATCH', 'matchStats', 'g_new']]);
+    expect(os.records.get<{ sourceKey: string }>(gameId)!.data.sourceKey).toBe('turf:games:g_new');
+    expect(q<{ date: string }>('game').filter((g) => g.data.date === '2026-10-28')).toHaveLength(1);
+    expect(q<{ gameDate: string }>('appearance').filter((a) => a.data.gameDate === '2026-10-28')).toHaveLength(3);
+    expect(appearance('Karan', '2026-10-28').data.sourceKey).toBe('turf:game_players:g_new:p_karan');
+    expect(turfChanges(os).sending).toHaveLength(0);
+  });
+
+  it('a refused new match goes, and so does what was queued on it', async () => {
+    turfWeb((b) => b.action === 'game');
+    const { gameId } = createMatch(os, { date: '2026-10-29', venueId: venue('Playground Arena'), totalCost: 1800, paymentTerms: 'postpaid', playerIds: [profile('Priya'), profile('Karan')] });
+    setAttendance(os, appearance('Priya', '2026-10-29').id, 'late');
+    await runSource(os, src());
+    expect(os.records.get(gameId)).toBeFalsy();
+    expect(q<{ gameDate: string }>('appearance').filter((a) => a.data.gameDate === '2026-10-29')).toHaveLength(0);
+    expect(turfChanges(os).refused.map((i) => i.error)).toEqual(['The match it belongs to wasn’t made in Turf web', 'Complete the game and select its players.']);
+  });
+
+  it('an edit splits the shares again, keeps who stays as they were, adds and takes off; someone who paid needs a refund first', () => {
+    const sat = game('2026-10-17');
+    const base = { date: '2026-10-17', time: '20:00', venueId: venue('Playground Arena'), totalCost: 1800, paymentTerms: 'postpaid' as const, sideSize: 6, frontedById: profile('Rutvij') };
+    expect(() => editMatch(os, sat.id, { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Priya')] })).toThrow(/Arjun paid towards this match/);
+
+    const item = editMatch(os, sat.id, { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Priya'), profile('Arjun'), profile('Neel (guest)')] });
+    expect(item.payload).toMatchObject({ method: 'PUT', body: { action: 'game', id: 'g_sat', playerIds: ['p_rutvij', 'p_karan', 'p_priya', 'p_arjun', 'p_guest'] } });
+    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ share: 360, goals: 4, team: 'A', paid: false });
+    expect(appearance('Priya', '2026-10-17').data).toMatchObject({ share: 360, paid: true, amountPaid: 450 }); // ₹90 credit
+    expect(appearance('Neel (guest)', '2026-10-17').data).toMatchObject({ share: 360, paid: false, sourceKey: 'turf:game_players:g_sat:p_guest' });
+    // Not set by hand, so like Turf web the score follows the goals logged after an edit (2 + 4 for A, 1 for B).
+    expect(game('2026-10-17').data).toMatchObject({ scoreA: 6, scoreB: 1 });
   });
 });

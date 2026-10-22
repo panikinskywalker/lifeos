@@ -7,6 +7,27 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.3 — 22 Oct 2026
+
+Matches are run from the S22 too (R9c.3).
+- **New match** (Games): pick the venue and it fills kick-off, format, cost
+  and booking terms; pick the day and the players; the shares split as you
+  go (₹1,800 ÷ 12 = ₹150 each); choose who fronted the cost (needed for
+  prepaid and advance-paid bookings; they count as paid).
+- **Edit** a match from its screen: day, kick-off, venue, cost, terms, squad.
+  Shares are split again; everyone kept keeps their team, stats and
+  payments; someone who has paid needs a refund before being taken off.
+- **Tap a player in Team view**: on time / late / no-show, goals, assists,
+  saves, own goals, played in goal, captain of their team, player of the
+  match.
+- **Score**: follows the goals logged (own goals count for the other team),
+  as on Turf web; set it by hand, or let it follow the goals again.
+- Everything shows at once, is sent to Turf web, waits while offline, and is
+  put back exactly if Turf web says no. A match made here gets Turf web's id
+  when it arrives, so it never appears twice; changes made to it before then
+  go with the right id.
+- No sync while a change is still waiting to send, so it can't be overwritten.
+
 ## v0.0.2 — 22 Oct 2026
 
 Payments recorded on the S22 reach Turf web (R9c.2).

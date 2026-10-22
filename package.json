@@ -1,6 +1,6 @@
 {
   "name": "lifeos",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",

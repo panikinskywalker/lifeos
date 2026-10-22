@@ -1,7 +1,8 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { OutboxItem } from '@core/repo/outboxRepo';
 import type { AppearanceData } from './types';
-import { dropPending, owedOn, recountPaid, refreshTurfDebts } from './sync';
+import { owedOn, recountPaid, refreshTurfDebts } from './sync';
+import { queueTurf, turfShareIds, type TurfAction } from './changes';
 
 /**
  * Payments made in LifeOS (docs/MODEL.md layer 2, *Money*; R9c.2). A payment
@@ -13,21 +14,7 @@ import { dropPending, owedOn, recountPaid, refreshTurfDebts } from './sync';
  * on the board with Turf web's words.
  */
 
-export const TURF_SOURCE = 'turf';
-
 export type PaymentKind = 'payment' | 'refund' | 'correction';
-
-/** One request, exactly as Turf web's own screens send it to /api/data. */
-export interface TurfAction {
-  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  body: Record<string, unknown>;
-}
-
-/** Turf web's ids for a share, from its source key `turf:game_players:<game>:<player>`. */
-export function turfShareIds(a: AppearanceData): { gameId: string; playerId: string } | null {
-  const m = /^turf:game_players:([^:]+):([^:]+)$/.exec(a.sourceKey ?? '');
-  return m ? { gameId: m[1]!, playerId: m[2]! } : null;
-}
 
 const shortDay = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
@@ -54,7 +41,7 @@ export function recordPayment(os: LifeOSContext, appearanceId: string, input: { 
 
   let item!: OutboxItem<TurfAction>;
   os.db.transaction(() => {
-    item = os.outbox.add<TurfAction>({ source: TURF_SOURCE, label, recordId: a.id, payload: { method: 'PATCH', body: { action: 'payment', ...ids, kind, amount, ...(note ? { note } : {}), ...(input.via ? { via: input.via } : {}) } } });
+    item = queueTurf(os, { label, recordId: a.id, action: { method: 'PATCH', body: { action: 'payment', ...ids, kind, amount, ...(note ? { note } : {}), ...(input.via ? { via: input.via } : {}) } } });
     os.records.timeline.add({
       entityId: a.id,
       kind: 'payment',
@@ -77,22 +64,3 @@ export function markPaid(os: LifeOSContext, appearanceId: string): OutboxItem<Tu
   const owed = owedOn(a.data);
   return owed > 0 ? recordPayment(os, appearanceId, { amount: owed, note: 'Marked paid' }) : null;
 }
-
-/** Turf web said no: what the change showed here goes. */
-export function undoRefused(os: LifeOSContext, item: OutboxItem): void {
-  if (!item.recordId) return;
-  os.db.transaction(() => {
-    if (dropPending(os, item.recordId!, item.id)) {
-      recountPaid(os, item.recordId!);
-      refreshTurfDebts(os);
-    }
-  });
-}
-
-/** For the board: what is sending and what Turf web refused, newest refusals first. */
-export function turfChanges(os: LifeOSContext) {
-  return { sending: os.outbox.waiting<TurfAction>(TURF_SOURCE), refused: os.outbox.refused<TurfAction>(TURF_SOURCE) };
-}
-
-/** Is anything for this share still on its way? */
-export const isSending = (os: LifeOSContext, appearanceId: string) => os.outbox.forRecord(appearanceId).some((i) => i.state === 'waiting');

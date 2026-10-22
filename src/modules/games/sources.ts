@@ -2,7 +2,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { SendAnswer, SourceDef } from '@core/registry/types';
 import type { OutboxItem } from '@core/repo/outboxRepo';
 import { applyTurfSync, isSyncPage, SETTING_REV, type TurfSyncPage } from './sync';
-import { undoRefused, type TurfAction } from './payments';
+import { localMade, remapLocalMatch, resolveLocal, undoRefused, type TurfAction } from './changes';
 
 /**
  * Turf web as a Source (docs/MODEL.md layer 4, *Turf web*; R9c). Address in
@@ -51,49 +51,97 @@ export async function fetchTurfSync(os: LifeOSContext, since: number, doFetch: t
   }
 }
 
-type ActionResult = { id: string; status: number | 'skipped'; result?: { error?: string } | null; repeated?: boolean };
+type ActionResult = { id: string; status: number | 'skipped'; result?: { error?: string; id?: string } | null; repeated?: boolean };
 
-/**
- * POST /api/actions: the waiting changes in order, each with its id (Turf web
- * stores every answer, so a resend gets the same answer and applies nothing
- * twice). 2xx → sent; 4xx → refused, and what it showed here is undone; a
- * server error stops Turf web there, so it and the rest keep waiting.
- */
-export async function sendTurfActions(os: LifeOSContext, items: OutboxItem[], doFetch: typeof fetch = fetch, timeoutMs = 45_000): Promise<SendAnswer[]> {
+/** One POST /api/actions with the key. */
+async function postActions(os: LifeOSContext, actions: Array<{ id: string; method: string; body: Record<string, unknown> }>, doFetch: typeof fetch, timeoutMs: number): Promise<ActionResult[]> {
   const base = turfBase(os);
   const key = await os.device?.secrets?.get(TURF_KEY);
   if (!base || !key) throw new Error('Add Turf web’s address and this phone’s key first');
-  const batch = items.slice(0, 100);
   const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : undefined;
-  let results: ActionResult[];
   try {
     const r = await doFetch(`${base}/api/actions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actions: batch.map((i) => ({ id: i.id, ...(i.payload as TurfAction) })) }),
+      body: JSON.stringify({ actions }),
       signal: ctl?.signal,
     });
     if (r.status === 401 || r.status === 403) throw new Error('Turf web refused this phone’s key — make a new one in Turf web › Settings › Connected phones');
     if (!r.ok) throw new Error(`Turf web answered ${r.status}`);
-    results = ((await r.json()) as { results?: ActionResult[] }).results ?? [];
+    return ((await r.json()) as { results?: ActionResult[] }).results ?? [];
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw new Error('Turf web took too long to answer');
     throw e;
   } finally {
     if (timer) clearTimeout(timer);
   }
-  const byId = new Map(results.map((x) => [x.id, x]));
-  return batch.map((item): SendAnswer => {
-    const x = byId.get(item.id);
-    if (!x || x.status === 'skipped') return { id: item.id, state: 'waiting', error: 'Waiting for the one before it' };
-    if (x.status >= 200 && x.status < 300) return { id: item.id, state: 'sent', result: x.result };
-    if (x.status >= 400 && x.status < 500) {
-      undoRefused(os, item);
-      return { id: item.id, state: 'refused', error: x.result?.error ?? `Turf web said no (${x.status})`, result: x.result };
+}
+
+/**
+ * POST /api/actions: the waiting changes in order, each with its id (Turf web
+ * stores every answer, so a resend gets the same answer and applies nothing
+ * twice). 2xx → sent; 4xx → refused, and what it showed here is undone; a
+ * server error stops Turf web there, so it and the rest keep waiting.
+ * A change that names a match made here waits for Turf web's id for it: the
+ * batch is cut there, sent, and the rest goes once the id is known; if the
+ * match was refused, so is the change.
+ */
+export async function sendTurfActions(os: LifeOSContext, items: OutboxItem[], doFetch: typeof fetch = fetch, timeoutMs = 45_000): Promise<SendAnswer[]> {
+  const answers: SendAnswer[] = [];
+  const refusedLocal = new Set<string>();
+  let rest = items.slice(0, 100);
+  while (rest.length) {
+    const batch: Array<{ item: OutboxItem; body: Record<string, unknown> }> = [];
+    for (const item of rest) {
+      const action = item.payload as TurfAction;
+      const { body, missing } = resolveLocal(os, action.body);
+      if (missing.some((m) => refusedLocal.has(m) || localMade(os, m) === 'refused' || localMade(os, m) === null)) {
+        // Its match was refused (or is gone): this can't be made either.
+        if (!batch.length) {
+          undoRefused(os, item);
+          answers.push({ id: item.id, state: 'refused', error: 'The match it belongs to wasn’t made in Turf web' });
+          rest = rest.slice(1);
+          continue;
+        }
+        break;
+      }
+      if (missing.length) break;
+      batch.push({ item, body });
     }
-    return { id: item.id, state: 'waiting', error: `Turf web answered ${x.status}; trying again next sync` };
-  });
+    if (!batch.length) {
+      // The first change waits for a match Turf web hasn't answered yet.
+      for (const item of rest) answers.push({ id: item.id, state: 'waiting', error: 'Waiting for its match to reach Turf web' });
+      break;
+    }
+    const results = await postActions(os, batch.map(({ item, body }) => ({ id: item.id, method: (item.payload as TurfAction).method, body })), doFetch, timeoutMs);
+    const byId = new Map(results.map((x) => [x.id, x]));
+    let stop = false;
+    for (const { item } of batch) {
+      const action = item.payload as TurfAction;
+      const x = byId.get(item.id);
+      if (stop || !x || x.status === 'skipped') {
+        answers.push({ id: item.id, state: 'waiting', error: 'Waiting for the one before it' });
+        stop = true;
+      } else if (x.status >= 200 && x.status < 300) {
+        if (action.creates && x.result?.id) remapLocalMatch(os, action.creates, String(x.result.id));
+        answers.push({ id: item.id, state: 'sent', result: x.result });
+      } else if (x.status >= 400 && x.status < 500) {
+        undoRefused(os, item);
+        if (action.creates) refusedLocal.add(action.creates);
+        answers.push({ id: item.id, state: 'refused', error: x.result?.error ?? `Turf web said no (${x.status})`, result: x.result });
+      } else {
+        answers.push({ id: item.id, state: 'waiting', error: `Turf web answered ${x.status}; trying again next sync` });
+        stop = true;
+      }
+    }
+    const done = new Set(answers.map((a) => a.id));
+    rest = stop ? [] : rest.filter((i) => !done.has(i.id));
+  }
+  // Anything not reached keeps its place.
+  const done = new Set(answers.map((a) => a.id));
+  for (const item of items) if (!done.has(item.id)) answers.push({ id: item.id, state: 'waiting', error: 'Waiting for the one before it' });
+  return answers;
 }
 
 /** Sync from the last change number (0: everything). Returns what the page changed. */

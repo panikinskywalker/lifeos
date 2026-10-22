@@ -67,6 +67,9 @@ export async function runSource(os: LifeOSContext, src: SourceDef, opts: { mode?
   const since = opts.since ?? (st.cursor ? Number(st.cursor) : Date.now() - DAY);
   try {
     await sendWaiting(os, src);
+    // A change still waiting is shown here already; reading now would put back the source's older copy.
+    const left = src.send ? os.outbox.waiting(src.id).length : 0;
+    if (left) throw new Error(`${left} change${left === 1 ? '' : 's'} still waiting to send; syncing once ${left === 1 ? 'it goes' : 'they go'}`);
     const r = await src.sync(os, since, { mode });
     let n = r.filed ?? 0;
     if (r.messages?.length && src.kind === 'messages') {

@@ -282,6 +282,7 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
         frontedById: personOf(tg.fronted_by_player_id),
         scoreA: num(tg, 'team_a_score'),
         scoreB: num(tg, 'team_b_score'),
+        scoreLocked: bool(tg, 'score_locked') || undefined,
         colorA: str(tg, 'team_a_color'),
         colorB: str(tg, 'team_b_color'),
         captainAId: personOf(tg.captain_a_player_id),
