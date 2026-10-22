@@ -5,13 +5,13 @@ import { formatDistanceToNow } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import { runSource } from '@core/filing/sources';
 import { sourceState } from '@core/sources/deviceData';
-import { allGames, allPlayers, allVenues, currentGame, mePersonId, leaders, lineup, moneyAtAGlance, statsFor, summarise, whoOwes, ATTENDANCE, PAYMENT_TERMS, type LeaderMetric } from '@modules/games';
+import { allGames, allPlayers, allVenues, currentGame, isSending, markPaid, mePersonId, turfBase, leaders, lineup, moneyAtAGlance, owedOn, recordPayment, statsFor, summarise, turfChanges, whoOwes, ATTENDANCE, PAYMENT_TERMS, type AppearanceData, type LeaderMetric, type PaymentKind } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
-import { Button, Card, EmptyState, RowItem, RowList, Screen, Section, Segmented, Stat, StatTrio, Text, useToast } from '@ui/kit';
+import { Button, Card, EmptyState, NumberField, RowItem, RowList, Screen, Section, Segmented, Sheet, Stat, StatTrio, Text, TextField, useToast } from '@ui/kit';
 
 /**
- * The Turf board (docs/MODEL.md layer 3; R9a, R9c; read-only until R9c.2):
- * Turf Ledger's flow, synced from Turf web — Home (money at a glance, who still owes, this week's game), Games
+ * The Turf board (docs/MODEL.md layer 3; R9a, R9c): Turf Ledger's flow,
+ * synced from Turf web; payments are recorded here and sent (R9c.2) — Home (money at a glance, who still owes, this week's game), Games
  * (match centre and history), Players (squad and leaders), Venues — over the
  * games, crm, places and finance records. Restyled with the redesign later.
  */
@@ -132,6 +132,7 @@ export function TurfHome({ ctx }: Props) {
               </Text>
             )}
           </Section>
+          <TurfChanges />
           <Section title="On this board">
             <RowList>
               <RowItem icon="calendar" tint={TINT} title="Games" subtitle="Match centre and history" chevron onPress={() => router.push('/board/turf/games' as never)} />
@@ -141,7 +142,7 @@ export function TurfHome({ ctx }: Props) {
             </RowList>
           </Section>
           <Text variant="caption" color="tertiary">
-            Read-only for now. Syncs from Turf web every minute while open; pull down to sync now. Changes made here reach the web app in the next step.
+            Syncs with Turf web every minute while open; pull down to sync now. Payments you record here are sent to Turf web, and wait on this phone while you’re offline.
           </Text>
         </>
       )}
@@ -198,11 +199,13 @@ export function TurfGame({ ctx, params }: Props) {
   const router = useRouter();
   const back = useBack();
   const [tab, setTab] = useState<'payments' | 'teams'>('payments');
+  const [paying, setPaying] = useState<string | null>(null);
+  const { pull } = usePull();
   const d = useLive((o) => {
     const g = params.game ? o.records.get(params.game) : undefined;
     if (!g || g.object !== 'game') return null;
     const game = g as unknown as ReturnType<typeof allGames>[number];
-    return { game, sum: summarise(o, game), lineup: lineup(o, game.id), venue: game.data.venueId ? o.records.get(game.data.venueId) : undefined, motm: game.data.motmId ? o.records.get(game.data.motmId)?.title : undefined, fronted: game.data.frontedById ? o.records.get(game.data.frontedById)?.title : undefined };
+    return { game, sum: summarise(o, game), lineup: lineup(o, game.id).map((l) => ({ ...l, sending: isSending(o, l.appearance.id) })), venue: game.data.venueId ? o.records.get(game.data.venueId) : undefined, motm: game.data.motmId ? o.records.get(game.data.motmId)?.title : undefined, fronted: game.data.frontedById ? o.records.get(game.data.frontedById)?.title : undefined };
   }, [params.game]);
   const f = ctx.format.currency;
   if (!d) {
@@ -253,9 +256,9 @@ export function TurfGame({ ctx, params }: Props) {
                 title={l.name}
                 subtitle={[l.appearance.data.attendance !== 'confirmed' ? ATTENDANCE.find((a) => a.value === l.appearance.data.attendance)?.label : null, l.appearance.data.rsvp ? `RSVP ${l.appearance.data.rsvp}` : null].filter(Boolean).join(' · ') || null}
                 value={f(l.appearance.data.share)}
-                meta={l.appearance.data.paid ? 'Paid' : l.appearance.data.amountPaid ? `${f(l.appearance.data.amountPaid)} paid` : 'Unpaid'}
-                metaTone={l.appearance.data.paid ? 'ok' : 'alert'}
-                onPress={() => router.push(`/entity/person/${l.appearance.data.personId}` as never)}
+                meta={l.sending ? 'Sending…' : owedOn(l.appearance.data) === 0 ? 'Paid' : l.appearance.data.amountPaid ? `${f(l.appearance.data.amountPaid)} paid` : 'Unpaid'}
+                metaTone={l.sending ? undefined : owedOn(l.appearance.data) === 0 ? 'ok' : 'alert'}
+                onPress={() => setPaying(l.appearance.id)}
               />
             ))}
           </RowList>
@@ -289,7 +292,133 @@ export function TurfGame({ ctx, params }: Props) {
           </RowList>
         </Section>
       ) : null}
+      <PaymentSheet appearanceId={paying} onClose={() => setPaying(null)} onRecorded={() => void pull(true)} />
     </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+const KINDS: Array<{ value: PaymentKind; label: string }> = [
+  { value: 'payment', label: 'Payment' },
+  { value: 'refund', label: 'Refund' },
+  { value: 'correction', label: 'Correction' },
+];
+
+/**
+ * One share's money: paid so far, what's owed, every entry (sending ones
+ * marked), and a new entry — a payment (part payments allowed, more than the
+ * share is a credit), a refund or a correction. Recorded here at once, sent
+ * to Turf web straight after, kept on the phone while offline.
+ */
+function PaymentSheet({ appearanceId, onClose, onRecorded }: { appearanceId: string | null; onClose: () => void; onRecorded: () => void }) {
+  const os = useOS();
+  const router = useRouter();
+  const toast = useToast();
+  const [kind, setKind] = useState<PaymentKind>('payment');
+  const [amount, setAmount] = useState<number | undefined>(undefined);
+  const [less, setLess] = useState<'more' | 'less'>('more');
+  const [note, setNote] = useState('');
+  const d = useLive((o) => {
+    const a = appearanceId ? o.records.get<AppearanceData>(appearanceId) : undefined;
+    if (!a || a.object !== 'appearance') return null;
+    const entries = o.records.timeline.forEntity(a.id, 200).filter((e) => e.kind === 'payment');
+    return { a, name: o.records.get(a.data.personId)?.title ?? 'Someone', owed: owedOn(a.data), entries, sending: isSending(o, a.id) };
+  }, [appearanceId]);
+  useEffect(() => {
+    setKind('payment');
+    setAmount(undefined);
+    setLess('more');
+    setNote('');
+  }, [appearanceId]);
+  if (!d) return null;
+  const f = os.format.currency;
+  const paid = d.a.data.amountPaid ?? 0;
+  const done = (message: string) => {
+    toast.show({ message, icon: 'check' });
+    onRecorded();
+    onClose();
+  };
+  const record = () => {
+    try {
+      const value = kind === 'correction' && less === 'less' ? -(amount ?? 0) : amount ?? 0;
+      recordPayment(os, d.a.id, { amount: value, kind, note });
+      done('Recorded · sending to Turf web');
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+    }
+  };
+  const settle = () => {
+    if (markPaid(os, d.a.id)) done(`Marked paid · ${f(d.owed)} sending to Turf web`);
+  };
+  return (
+    <Sheet
+      visible={!!appearanceId}
+      onClose={onClose}
+      title={`${d.name} · ${f(d.a.data.share)}`}
+      footer={<Button title={kind === 'payment' ? 'Record payment' : kind === 'refund' ? 'Record refund' : 'Record correction'} icon="check" block disabled={!amount} onPress={record} />}
+    >
+      <View style={{ gap: 14 }}>
+        <StatTrio
+          stats={[
+            { label: 'Share', value: f(d.a.data.share) },
+            { label: 'Paid so far', value: f(paid), tone: paid ? 'ok' : undefined },
+            { label: paid > d.a.data.share ? 'Credit' : 'Still owed', value: f(paid > d.a.data.share ? paid - d.a.data.share : d.owed), tone: d.owed ? 'alert' : undefined },
+          ]}
+        />
+        {d.owed > 0 ? <Button title={`Mark paid · ${f(d.owed)}`} icon="cash" variant="secondary" onPress={settle} /> : null}
+        <Segmented options={KINDS} value={kind} onChange={setKind} />
+        {kind === 'correction' ? <Segmented options={[{ value: 'more', label: 'Add to paid' }, { value: 'less', label: 'Take off paid' }]} value={less} onChange={setLess} /> : null}
+        <NumberField label="Amount ₹" value={amount} onChange={setAmount} placeholder={kind === 'payment' && d.owed ? String(d.owed) : '0'} />
+        <TextField label="Note" value={note} onChange={setNote} placeholder={kind === 'refund' ? 'Didn’t play' : 'Optional'} />
+        {d.entries.length ? (
+          <Section title="Entries">
+            <RowList>
+              {d.entries.map((e) => (
+                <RowItem
+                  key={e.id}
+                  icon={e.meta.pending ? 'refresh' : 'cash'}
+                  tint={TINT}
+                  title={e.title}
+                  subtitle={[formatDistanceToNow(e.occurredAt, { addSuffix: true }), e.meta.via === 'lifeos' ? 'LifeOS' : e.meta.via === 'web' ? 'Turf web' : e.meta.via === 'import' ? 'Turf Ledger' : e.meta.via === 'sms' ? 'matched SMS' : null, e.body].filter(Boolean).join(' · ')}
+                  meta={e.meta.pending ? 'Sending…' : undefined}
+                />
+              ))}
+            </RowList>
+          </Section>
+        ) : null}
+        <Button title={`Open ${d.name}`} icon="user" variant="ghost" size="sm" onPress={() => { onClose(); router.push(`/entity/person/${d.a.data.personId}` as never); }} />
+      </View>
+    </Sheet>
+  );
+}
+
+/** What waits for Turf web and what it refused, on Home; nothing when all is sent. */
+function TurfChanges() {
+  const os = useOS();
+  const c = useLive((o) => ({ ...turfChanges(o), connected: !!turfBase(o) }), []);
+  if (!c.sending.length && !c.refused.length) return null;
+  return (
+    <>
+      {c.sending.length ? (
+        <Section title="Sending" meta={!c.connected ? 'Turf web isn’t connected' : c.sending[0]!.error ? 'Waiting to connect' : undefined}>
+          <RowList>
+            {c.sending.map((i) => (
+              <RowItem key={i.id} icon="refresh" tint={TINT} title={i.label} subtitle={i.error ?? (c.connected ? 'On its way to Turf web' : 'Waits here until you connect Turf web')} />
+            ))}
+          </RowList>
+        </Section>
+      ) : null}
+      {c.refused.length ? (
+        <Section title="Not sent" meta="Turf web said no">
+          <RowList>
+            {c.refused.map((i) => (
+              <RowItem key={i.id} icon="warning" tint={TINT} title={i.label} subtitle={i.error} meta="Dismiss" metaTone="alert" onPress={() => os.outbox.dismiss(i.id)} />
+            ))}
+          </RowList>
+        </Section>
+      ) : null}
+    </>
   );
 }
 

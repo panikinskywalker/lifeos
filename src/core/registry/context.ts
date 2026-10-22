@@ -10,6 +10,7 @@ import type { FactRepo } from '../repo/factRepo';
 import type { DumpRepo } from '../repo/dumpRepo';
 import type { FilingRepo } from '../repo/filingRepo';
 import type { QuestionRepo } from '../repo/questionRepo';
+import type { OutboxRepo } from '../repo/outboxRepo';
 import type { Scheduler } from '../automation/scheduler';
 
 /**
@@ -31,6 +32,8 @@ export interface LifeOSContext {
   /** What filing wrote, with provenance; the To check list. */
   filings: FilingRepo;
   questions: QuestionRepo;
+  /** Changes waiting to be sent to a source that also writes (Turf web); shown as *sending*. */
+  outbox: OutboxRepo;
   reminders: ReminderRepo;
   customFields: CustomFieldRepo;
   views: ViewRepo;

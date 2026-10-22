@@ -735,4 +735,28 @@ export const migrations: Migration[] = [
       `UPDATE changes SET tbl = 'filings' WHERE tbl = 'dump_extractions'`,
     ],
   },
+  {
+    version: 14,
+    name: 'outbox',
+    // docs/MODEL.md layer 4 (R9c.2): changes made in LifeOS for a source that
+    // also writes (Turf web), waiting in order until it answers.
+    up: [
+      `CREATE TABLE IF NOT EXISTS outbox (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        payload TEXT NOT NULL,
+        label TEXT NOT NULL,
+        record_id TEXT,
+        state TEXT NOT NULL CHECK (state IN ('waiting', 'sent', 'refused')),
+        error TEXT,
+        result TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_outbox_source ON outbox(source, state, seq)`,
+      `CREATE INDEX IF NOT EXISTS idx_outbox_record ON outbox(record_id)`,
+    ],
+  },
 ];

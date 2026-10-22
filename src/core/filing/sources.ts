@@ -29,13 +29,44 @@ async function fileMany(os: LifeOSContext, msgs: RawMessage[], mode: 'live' | 'i
   return out;
 }
 
-/** Sync one source now. Returns how many records it filed (or proposed, on import). */
+/**
+ * Send what waits for a source that also writes, in order (docs/MODEL.md
+ * layer 4). Unanswered changes keep waiting in their place; a throw (offline)
+ * leaves every one waiting with the reason. Returns how many were taken.
+ */
+export async function sendWaiting(os: LifeOSContext, src: SourceDef): Promise<number> {
+  if (!src.send) return 0;
+  const items = os.outbox.waiting(src.id);
+  if (!items.length) return 0;
+  let answers: Awaited<ReturnType<NonNullable<SourceDef['send']>>>;
+  try {
+    answers = await src.send(os, items);
+  } catch (e) {
+    const why = (e as Error).message ?? String(e);
+    for (const it of items) os.outbox.retry(it.id, why);
+    throw e;
+  }
+  let sent = 0;
+  const byId = new Map(answers.map((a) => [a.id, a]));
+  for (const it of items) {
+    const a = byId.get(it.id);
+    if (a?.state === 'sent') {
+      os.outbox.sent(it.id, a.result);
+      sent++;
+    } else if (a?.state === 'refused') os.outbox.refuse(it.id, a.error ?? 'Refused', a.result);
+    else os.outbox.retry(it.id, a?.error ?? 'Not sent yet');
+  }
+  return sent;
+}
+
+/** Sync one source now: first send what waits for it, then read. Returns how many records it filed (or proposed, on import). */
 export async function runSource(os: LifeOSContext, src: SourceDef, opts: { mode?: 'live' | 'import'; since?: number } = {}): Promise<number> {
   const mode = opts.mode ?? 'live';
   const st = sourceState(os, src.id);
   if (src.available && !(await src.available(os))) return 0;
   const since = opts.since ?? (st.cursor ? Number(st.cursor) : Date.now() - DAY);
   try {
+    await sendWaiting(os, src);
     const r = await src.sync(os, since, { mode });
     let n = r.filed ?? 0;
     if (r.messages?.length && src.kind === 'messages') {

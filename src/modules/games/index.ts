@@ -7,6 +7,7 @@ export * from './types';
 export * from './sync';
 export * from './lib';
 export * from './sources';
+export * from './payments';
 
 /** games (docs/MODEL.md layer 2; R9a, R9c): the football you run in Turf web, synced into LifeOS. Sending changes back is R9c.2. */
 export const gamesModule: ModuleManifest = {

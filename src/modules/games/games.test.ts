@@ -1,5 +1,6 @@
-/** games (R9a, R9c): Turf web sync pages into People, Places, Games, Appearances, payment entries and Debts; the queries and tools over them; the fetch. */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+/** games (R9a, R9c): Turf web sync pages into People, Places, Games, Appearances, payment entries and Debts; the queries and tools over them; the fetch; payments recorded here and sent. */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { runSource } from '@core/filing/sources';
 import { createBetterSqliteAdapter } from '@core/db/betterSqliteAdapter';
 import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
@@ -9,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -27,7 +28,10 @@ beforeEach(async () => {
   os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules, registry: new Registry() });
   os.device = { secrets: { get: async (k) => secrets.get(k) ?? null, set: async (k, v) => void (v ? secrets.set(k, v) : secrets.delete(k)) } };
 });
-afterEach(() => os.db.close());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  os.db.close();
+});
 
 const first = (): TurfSyncPage => JSON.parse(JSON.stringify(sampleSync)) as TurfSyncPage;
 /** A later page: only what changed after `since`. */
@@ -221,5 +225,129 @@ describe('fetchTurfSync', () => {
     os.settings.set(TURF_URL, 'https://x.example');
     secrets.set(TURF_KEY, KEY);
     expect(await src.available!(os)).toBe(true);
+  });
+});
+
+describe('payments recorded in LifeOS (R9c.2)', () => {
+  const KEY = `tw_${'k'.repeat(30)}`;
+  const src = () => os.registry.sources.get('turf')!;
+  const entries = (id: string) => os.records.timeline.forEntity(id).filter((e) => e.kind === 'payment');
+  const debt = (name: string, date: string) => q<{ personId: string; date: string; amount: number }>('debt').find((d) => d.data.personId === person(name).id && d.data.date === date)!;
+  /** A Turf web stand-in: answers /api/actions with `answer`, /api/sync with what it took (each payment as a row carrying the action id). */
+  const turfWeb = (answer: (a: { id: string; body: Record<string, unknown> }) => number, opts: { offline?: boolean } = {}) => {
+    const taken: Array<{ id: string; method: string; body: Record<string, unknown> }> = [];
+    let rev = 40;
+    const rows: Record<string, unknown>[] = [];
+    const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (opts.offline) throw new TypeError('Network request failed');
+      const u = String(url);
+      if (u.includes('/api/actions')) {
+        const { actions } = JSON.parse(String(init!.body)) as { actions: Array<{ id: string; method: string; body: Record<string, unknown> }> };
+        let stopped = false;
+        const results = actions.map((a) => {
+          if (stopped) return { id: a.id, status: 'skipped' };
+          const status = answer(a);
+          if (status >= 500) stopped = true;
+          if (status < 300) {
+            taken.push(a);
+            rows.push({ id: `pay_${a.id.slice(-6)}`, game_id: a.body.gameId, player_id: a.body.playerId, amount_cents: Math.round(Number(a.body.amount) * 100), kind: a.body.kind, via: 'lifeos', action_id: a.id, created_at: new Date().toISOString() });
+          }
+          return { id: a.id, status, result: status < 300 ? { ok: true } : { error: status === 404 ? 'Player not found in this match.' : 'Could not apply those changes.' } };
+        });
+        return new Response(JSON.stringify({ results }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      const page = delta(rev, rev + rows.length, { payments: rows.splice(0) });
+      rev = page.rev;
+      return new Response(JSON.stringify(page), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchFn);
+    return { taken, fetchFn };
+  };
+
+  beforeEach(() => {
+    applyTurfSync(os, first());
+    os.settings.set(TURF_URL, 'https://turf-web.example.dev');
+    secrets.set(TURF_KEY, KEY);
+  });
+
+  it('a part payment shows at once as sending: paid so far, who owes and the Debt all move; the change waits with its own id', () => {
+    const karan = appearance('Karan', '2026-10-17');
+    const item = recordPayment(os, karan.id, { amount: 200, note: 'Cash at the turf' });
+    expect(item.payload).toEqual({ method: 'PATCH', body: { action: 'payment', gameId: 'g_sat', playerId: 'p_karan', kind: 'payment', amount: 200, note: 'Cash at the turf' } });
+    expect(item.label).toMatch(/^Karan paid .*200.* · Sat, 17 Oct|^Karan paid .*200.* · Sat 17 Oct/);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(200);
+    expect(entries(karan.id)).toEqual([expect.objectContaining({ meta: expect.objectContaining({ pending: true, actionId: item.id, amount: 200 }) })]);
+    expect(isSending(os, karan.id)).toBe(true);
+    expect(debt('Karan', '2026-10-17').data.amount).toBe(250);
+    expect(whoOwes(os).find((o) => o.name === 'Karan')!.amount).toBe(750);
+    expect(turfChanges(os).sending).toHaveLength(1);
+  });
+
+  it('sent before the sync; the entry Turf web confirms (same action id) replaces the sending one', async () => {
+    const web = turfWeb(() => 201);
+    const karan = appearance('Karan', '2026-10-17');
+    const item = recordPayment(os, karan.id, { amount: 450 });
+    await runSource(os, src());
+    expect(web.taken.map((a) => a.id)).toEqual([item.id]);
+    expect(String(web.fetchFn.mock.calls[0]![0])).toBe('https://turf-web.example.dev/api/actions');
+    expect(new Headers(web.fetchFn.mock.calls[0]![1]!.headers).get('authorization')).toBe(`Bearer ${KEY}`);
+    expect(os.outbox.get(item.id)!.state).toBe('sent');
+    const after = entries(karan.id);
+    expect(after).toHaveLength(1);
+    expect(after[0]!.meta).toMatchObject({ amount: 450, via: 'lifeos' });
+    expect(after[0]!.meta.pending).toBeUndefined();
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(450);
+    expect(isSending(os, karan.id)).toBe(false);
+    expect(os.records.get(debt('Karan', '2026-10-17').id)!.status).toBe('settled');
+  });
+
+  it('offline: the change keeps waiting, in order, with why; it goes when Turf web is back', async () => {
+    turfWeb(() => 201, { offline: true });
+    const first = recordPayment(os, appearance('Karan', '2026-10-17').id, { amount: 100 });
+    const second = markPaid(os, appearance('Arjun', '2026-10-17').id)!;
+    expect(second.payload.body).toMatchObject({ amount: 250, note: 'Marked paid' });
+    await expect(runSource(os, src())).rejects.toThrow(/Network/);
+    expect(turfChanges(os).sending.map((i) => [i.id, i.error])).toEqual([[first.id, 'Network request failed'], [second.id, 'Network request failed']]);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(100); // still shown as paid so far
+
+    const web = turfWeb(() => 201);
+    await runSource(os, src());
+    expect(web.taken.map((a) => a.id)).toEqual([first.id, second.id]);
+    expect(turfChanges(os).sending).toHaveLength(0);
+    expect(appearance('Arjun', '2026-10-17').data.amountPaid).toBe(450);
+  });
+
+  it('refused: what it showed is undone and the refusal waits on the board with Turf web’s words until dismissed', async () => {
+    turfWeb(() => 404);
+    const karan = appearance('Karan', '2026-10-17');
+    const item = recordPayment(os, karan.id, { amount: 450 });
+    await runSource(os, src());
+    expect(os.outbox.get(item.id)).toMatchObject({ state: 'refused', error: 'Player not found in this match.' });
+    expect(entries(karan.id)).toHaveLength(0);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(0);
+    expect(debt('Karan', '2026-10-17').data.amount).toBe(450);
+    expect(turfChanges(os).refused.map((i) => i.label)).toEqual([item.label]);
+    os.outbox.dismiss(item.id);
+    expect(turfChanges(os).refused).toHaveLength(0);
+  });
+
+  it('a server error stops there: it and everything after keep waiting, nothing is sent out of order', async () => {
+    let n = 0;
+    turfWeb(() => (n++ === 0 ? 500 : 201));
+    const a = recordPayment(os, appearance('Karan', '2026-10-17').id, { amount: 100 });
+    const b = recordPayment(os, appearance('Arjun', '2026-10-17').id, { amount: 50 });
+    await runSource(os, src());
+    expect(turfChanges(os).sending.map((i) => i.id)).toEqual([a.id, b.id]);
+    expect(os.outbox.get(b.id)!.error).toBe('Waiting for the one before it');
+  });
+
+  it('refunds go as negative amounts, corrections either way; nonsense is refused before it is queued', () => {
+    const priya = appearance('Priya', '2026-10-17');
+    expect(recordPayment(os, priya.id, { amount: 50, kind: 'refund', note: 'Left early' }).payload.body).toMatchObject({ kind: 'refund', amount: -50 });
+    expect(appearance('Priya', '2026-10-17').data.amountPaid).toBe(400);
+    expect(recordPayment(os, priya.id, { amount: -20, kind: 'correction' }).payload.body).toMatchObject({ kind: 'correction', amount: -20 });
+    expect(() => recordPayment(os, priya.id, { amount: 0 })).toThrow(/Enter an amount/);
+    expect(() => recordPayment(os, priya.id, { amount: -5 })).toThrow(/without a minus/);
+    expect(markPaid(os, appearance('Rutvij', '2026-10-17').id)).toBeNull(); // nothing owed
   });
 });

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useLive, useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Icon, IconBox, RowItem, RowList, Screen, Section, Segmented, Sheet, SwitchField, Text, useToast } from '@ui/kit';
+import Constants from 'expo-constants';
 import { seedDemoData } from '../../src/platform/seed';
 import { PROVIDER_PRESETS } from '@core/ai/providers';
 
@@ -55,7 +56,7 @@ export default function YouTab() {
           <RowItem icon="moon" tint="memory" title="Appearance" subtitle={APPEARANCE[s.appearance]} onPress={() => setAppearanceOpen(true)} />
           <SwitchField icon="activity" label="Haptics" hint="A light tap on buttons and toggles" value={s.hapticsEnabled} onChange={(v) => s.set('hapticsEnabled', v)} />
           <RowItem icon="share" tint="health" title="Lock & backup" subtitle="Fingerprint lock, encrypted backup and restore" onPress={() => router.push('/settings/data')} />
-          <RowItem icon="info" tint="documents" title="About" subtitle={`LifeOS 0.1.0 · on this phone only · schema v${schema}`} chevron={false} />
+          <RowItem icon="info" tint="documents" title="About" subtitle={`LifeOS ${Constants.expoConfig?.version ?? ''} · on this phone only · schema v${schema}`} chevron={false} />
         </RowList>
       </Section>
 

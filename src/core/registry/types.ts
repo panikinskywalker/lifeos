@@ -4,6 +4,7 @@ import type { ObjectRecord, ObjectDef, WidgetSize } from '../domain/types';
 import type { CoreEvents, EventName } from '../events/bus';
 import type { LifeOSContext } from './context';
 import type { MessageParser } from '../filing/contract';
+import type { OutboxItem } from '../repo/outboxRepo';
 
 /* ------------------------------------------------------------------ */
 /* Plugin API — the ONLY contract between core and a module / board.   */
@@ -198,6 +199,21 @@ export interface SourceDef {
    * (mail, whose IMAP bookkeeping lives in platform). Readings become records.
    */
   sync: (os: LifeOSContext, since: number | null, opts: { mode: 'live' | 'import' }) => Promise<{ readings?: Reading[]; messages?: Message[]; filed?: number; cursor?: string }>;
+  /**
+   * Sources that also write (Turf web): send the changes waiting in
+   * `os.outbox`, in order, before each sync. Answer each one: sent, refused
+   * (with the source's words) or waiting (not answered: offline, a server
+   * error; tried again next time). Core marks the outbox; the module undoes
+   * what a refused change showed, since it knows what that was.
+   */
+  send?: (os: LifeOSContext, items: OutboxItem[]) => Promise<SendAnswer[]>;
+}
+
+export interface SendAnswer {
+  id: string;
+  state: 'sent' | 'refused' | 'waiting';
+  error?: string;
+  result?: unknown;
 }
 
 /* ------------------------------------------------------------------ */

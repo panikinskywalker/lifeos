@@ -14,7 +14,8 @@ import type { AppearanceData, AvailabilityPeriod, GameData, PlayerProfileData, V
  * - venues → a Place each + a Venue;
  * - games → a Game each, game_players → Appearances, match_rsvps onto both;
  * - payments → one Event per entry on its Appearance; the Appearance's
- *   amount paid is their sum;
+ *   amount paid is their sum, with entries still *sending* from LifeOS; an
+ *   entry carrying a LifeOS action id replaces its sending one;
  * - settings.ownerPlayerId is "which player is you";
  * - a tombstone archives the record here, never deletes it (a payment entry,
  *   being an event, is removed);
@@ -368,6 +369,8 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
       const a = apps.get(turfKey('game_players', `${r.game_id}:${r.player_id}`));
       dropEntry(id);
       if (!a) continue;
+      // Made in LifeOS: the entry Turf web confirmed takes the place of the sending one.
+      if (r.action_id) dropPending(os, a.id, String(r.action_id));
       const kind = str(r, 'kind') ?? 'payment';
       const cents = num(r, 'amount_cents') ?? 0;
       const amount = (kind === 'refund' ? -Math.abs(cents) : cents) / 100;
@@ -405,13 +408,7 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
     os.settings.set(SETTING_PAYMENTS, entries);
 
     /* ---------- amount paid = the sum of the entries ---------- */
-    for (const id of touchedApps) {
-      const a = os.records.get<AppearanceData>(id);
-      if (!a) continue;
-      const sum = os.records.timeline.forEntity(id, 1000).filter((e) => e.kind === 'payment' && String(e.meta.sourceKey ?? '').startsWith('turf:payments:')).reduce((s, e) => s + Number(e.meta.amount ?? 0), 0);
-      const amountPaid = Math.round(sum * 100) / 100;
-      if (a.data.amountPaid !== amountPaid) os.records.update<AppearanceData>(id, { data: { ...a.data, amountPaid } }, ACTOR);
-    }
+    for (const id of touchedApps) recountPaid(os, id);
 
     /* ---------- Debts between you and someone ---------- */
     res.debtsOpen = syncDebts(os, profiles);
@@ -419,6 +416,30 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
   });
   os.settings.set(SETTING_LAST, { at: Date.now(), ...res });
   return res;
+}
+
+/** A payment entry on an Appearance's timeline: confirmed by Turf web, or still sending from LifeOS. */
+const isEntry = (e: { kind: string; meta: Record<string, unknown> }) => e.kind === 'payment' && (String(e.meta.sourceKey ?? '').startsWith('turf:payments:') || e.meta.pending === true);
+
+/** Remove the sending entry a change made (confirmed or refused). */
+export function dropPending(os: LifeOSContext, appearanceId: string, actionId: string): boolean {
+  const hit = os.records.timeline.forEntity(appearanceId, 1000).filter((e) => e.kind === 'payment' && e.meta.pending === true && e.meta.actionId === actionId);
+  for (const e of hit) os.records.timeline.remove(e.id);
+  return hit.length > 0;
+}
+
+/** Amount paid = the sum of the entries, sending ones included. */
+export function recountPaid(os: LifeOSContext, appearanceId: string) {
+  const a = os.records.get<AppearanceData>(appearanceId);
+  if (!a) return;
+  const sum = os.records.timeline.forEntity(appearanceId, 1000).filter(isEntry).reduce((s, e) => s + Number(e.meta.amount ?? 0), 0);
+  const amountPaid = Math.round(sum * 100) / 100;
+  if (a.data.amountPaid !== amountPaid) os.records.update<AppearanceData>(appearanceId, { data: { ...a.data, amountPaid } }, ACTOR);
+}
+
+/** Debts again, after a change made here (a payment recorded or refused). */
+export function refreshTurfDebts(os: LifeOSContext): number {
+  return syncDebts(os, bySourceKey<PlayerProfileData>(os, 'player'));
 }
 
 /** What is still owed on a share: nothing once ticked paid (whoever fronted counts as paid). */

@@ -29,6 +29,7 @@ export const BACKUP_TABLES = [
   'source_state',
   'usage_daily',
   'usage_app_daily',
+  'outbox',
 ] as const;
 
 /** Rebuilt or re-derived on this device, so not worth carrying in a backup. */

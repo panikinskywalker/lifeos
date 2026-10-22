@@ -142,6 +142,8 @@ interface SourceDef {
   kind: 'messages' | 'readings'; messageSource?: 'sms' | 'notification' | 'email';
   history?: boolean; available?(os): Promise<boolean>;
   sync(os, since, { mode }): Promise<{ messages?: Message[]; readings?: Reading[]; filed?: number; cursor?: string }>;
+  /** Sources that also write (R9c.2): send what waits in os.outbox, in order. */
+  send?(os, items: OutboxItem[]): Promise<Array<{ id: string; state: 'sent' | 'refused' | 'waiting'; error?: string; result?: unknown }>>;
 }
 ```
 
@@ -160,8 +162,20 @@ phone's key (`Authorization: Bearer tw_…`) and applies the page itself
 (`applyTurfSync`: Person / Place matching, the Football group, payment entries
 as Events, tombstones archived, Debts recomputed), so it reports `filed` rather
 than handing back readings. Its cursor is Turf web's change number, kept by
-the module (`turf.rev`); core's time-based `since` is not used. Sending
-changes (`POST /api/actions`, a queue in core) is added with R9c.2.
+the module (`turf.rev`); core's time-based `since` is not used.
+
+**Sources that also write** (R9c.2). A change made in LifeOS for such a source
+is added to `os.outbox` (`src/core/repo/outboxRepo.ts`, table `outbox`,
+migration v14, in backups) with its own id, a label in your words, the record
+it is about and a payload only the module reads. `runSource` sends what waits
+for the source (`sendWaiting`) before it syncs: the module's `send` answers
+each item sent, refused (with the source's words) or waiting; core marks the
+outbox; unanswered items keep their place, and a throw (offline) leaves every
+one waiting with the reason. The module shows the change at once and undoes
+it on a refusal, since only it knows what it showed. Games: `recordPayment` /
+`markPaid` queue a Turf web `PATCH /api/data` `{ action: 'payment' }` and add a
+*sending* payment Event; `send` posts them to `POST /api/actions`; the synced
+payment row carrying the same `action_id` replaces the sending Event.
 
 AI tool *names* (`create_entity`, `connections`…) keep their old words for
 now: they are the contract the model is prompted with and the golden fixtures

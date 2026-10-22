@@ -640,8 +640,15 @@ screens checked on the phone → overrides only where the default is wrong)
       every minute while open. Tests over a recorded sync page. *Phone check
       pending.* Not in Turf web's sync yet: seasons, votes, stat and payment
       claims, kit picks (a Turf web version adds them when LifeOS needs them).
-    - [ ] **R9c.2** The queue of changes and payments (part, refund,
-      correction), *sending* and offline.
+    - [x] **R9c.2 Sending** (LifeOS v0.0.2, 22 Oct): changes wait in core's
+      outbox (migration v14) with their own ids and go to Turf web's
+      `POST /api/actions` before each sync, in order; offline they wait,
+      listed on Home as *Sending*; a refusal is undone and listed as *Not
+      sent* with Turf web's reason. First change: payment entries from the
+      match's Payment checklist (payment with part payments, refund,
+      correction, note; Mark paid), shown at once as *sending* and counted in
+      who owes and the Debts until the confirmed entry replaces it. *Phone
+      check pending.*
     - [ ] **R9c.3** Matches: new and edit, attendance, score and stats,
       captains and player of the match.
     - [ ] **R9c.4** Teams and the generator (rules copied into games).

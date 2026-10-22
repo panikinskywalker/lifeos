@@ -7,6 +7,24 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.2 — 22 Oct 2026
+
+Payments recorded on the S22 reach Turf web (R9c.2).
+- On a match's Payment checklist, tap a player: their share, paid so far,
+  what's still owed (or their credit) and every entry. Record a payment (part
+  payments allowed), a refund or a correction, with a note; or **Mark paid**
+  for what's still owed in one tap.
+- It shows at once, marked **Sending…**, and counts straight away in who owes
+  and the Debts. It's sent to Turf web right after, and the confirmed entry
+  replaces the sending one on the next sync.
+- Offline, changes wait on the phone in order and go when you're back; Home
+  lists what's **Sending**. Nothing is applied twice, however often it's sent.
+- If Turf web says no, what it showed is undone and Home lists it under
+  **Not sent** with Turf web's reason, until you dismiss it.
+- You › About shows the real version (it said 0.1.0).
+- Under the hood: one new table (`outbox`, migration v14, in backups) and a
+  `send` step on sources that also write.
+
 ## v0.0.1 — 22 Oct 2026
 
 The Turf board now syncs from **Turf web** instead of Turf Ledger (R9c.1).
