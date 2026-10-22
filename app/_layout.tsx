@@ -14,6 +14,7 @@ import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/70
 import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium';
 import { JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono/700Bold';
+import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue/400Regular';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { OSProvider } from '@ui/hooks/useOS';
@@ -39,7 +40,7 @@ export default function RootLayout() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   // Native builds embed these via the expo-font plugin; this also covers web and dev clients.
-  const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold, JetBrainsMono_500Medium, JetBrainsMono_700Bold });
+  const [fontsLoaded, fontError] = useFonts({ PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold, JetBrainsMono_500Medium, JetBrainsMono_700Bold, BebasNeue_400Regular });
   const fontsReady = fontsLoaded || !!fontError;
   // Android share sheet (M3): "Share → LifeOS" opens Talk with the text, link or file. No-op in Expo Go.
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent({ resetOnBackground: true });

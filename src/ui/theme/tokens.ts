@@ -175,6 +175,9 @@ export type FontWeightKey = keyof typeof fonts;
 /** JetBrains Mono (Noir: numbered labels and instrument readouts), loaded beside Plus Jakarta Sans. */
 export const monoFonts = { 500: 'JetBrainsMono_500Medium', 700: 'JetBrainsMono_700Bold' } as const;
 
+/** Bebas Neue (Turf · Noir: team letters, crests, scores and formations). */
+export const displayFont = 'BebasNeue_400Regular';
+
 /** Maps a numeric/keyword fontWeight to the Plus Jakarta Sans face that carries it (Android ignores fontWeight on custom families). */
 export function fontForWeight(weight: string | number | undefined): string {
   const w = weight === 'bold' ? 700 : weight === 'normal' || weight === undefined ? 400 : Number(weight);

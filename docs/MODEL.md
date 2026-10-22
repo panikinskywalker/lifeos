@@ -662,7 +662,16 @@ screens checked on the phone → overrides only where the default is wrong)
       Turf web v0.0.61) so the board shows the same offline. A match made
       here is `local-<change id>` until Turf web answers with its id; queued
       changes naming it are sent with the real one. *Phone check pending.*
-    - [ ] **R9c.4** Teams and the generator (rules copied into games).
+    - [x] **R9c.4 Teams** (LifeOS v0.0.5, 22 Oct): Turf web v0.0.61's ratings
+      (`games/ratings.ts`), team generator (`games/balance.ts`), kits and
+      formations (`games/kits.ts`) copied in; `games/teams.ts` feeds them
+      from the records. The board's Match screen, Team view (the pitch in
+      formation, side lists) and Pick teams follow the *Turf · Noir*
+      artboards 4b and 4d; Save teams sends one `team` change per player
+      who moved, formations their own. Gap: Turf web doesn't sync "play well
+      with" picks, side wishes or kit votes, so the generator here balances
+      on ratings, positions and chemistry; the Captains suggestion stays on
+      Turf web. *Phone check pending.*
     - [ ] **R9c.5** Players, profiles, availability, venues; all of Leaders.
     - [ ] **R9c.6** WhatsApp texts, the SMS share match (learned senders),
       friends' submissions in To check.

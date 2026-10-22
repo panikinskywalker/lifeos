@@ -1,8 +1,9 @@
 {
   "name": "lifeos",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "main": "index.ts",
   "dependencies": {
+    "@expo-google-fonts/bebas-neue": "^0.4.1",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "@expo/metro-runtime": "~57.0.15",

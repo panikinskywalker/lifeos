@@ -53,7 +53,10 @@ with a hairline / white focus ring, the 32 sheet, the white toast pill, the
 metrics row, colour-block tiles (`filled`, everything black via `OnBlock`),
 the 22 progress bar, the nav (a pill of 52 discs + the 64 lime Dump disc),
 and the Browse module stack (`ModuleStack`). Today's My day is the NR
-checklist and Spend the orange block. The light theme keeps the v1.1 colours
+checklist and Spend the orange block. The Turf board follows the *Turf · Noir*
+page (`TF-*`): Bebas Neue (installed, `displayFont`) for team letters, crests,
+scores and formations; crests, faces, the L / S toggle and the pitch live in
+`src/boards/turf/teams.tsx` (v0.0.5: Match, Team view, Pick teams). The light theme keeps the v1.1 colours
 until it is redrawn or dropped (Rutvij's call).
 
 ## History: v1.1 Calm bento (25 Sep 2026, retired 22 Oct)

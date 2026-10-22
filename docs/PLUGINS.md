@@ -185,6 +185,10 @@ source key `turf:games:local-<change id>`; when Turf web answers with its id,
 real id into changes queued after it (the batch is cut until it is known).
 `runSource` does not sync while changes still wait after sending, so a
 change shown here is never overwritten by the source's older copy.
+Turf web's pure rules live beside the module's code as copies, each naming the
+Turf web version and file it came from (`rules.ts`, `ratings.ts`,
+`balance.ts`, `kits.ts`); they decide what LifeOS shows at once and offline,
+and Turf web's answer on the next sync wins.
 
 AI tool *names* (`create_entity`, `connections`…) keep their old words for
 now: they are the contract the model is prompted with and the golden fixtures

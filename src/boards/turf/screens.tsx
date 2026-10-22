@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import { sourceState } from '@core/sources/deviceData';
-import { allGames, allPlayers, allVenues, currentGame, isSending, markPaid, mePersonId, turfBase, leaders, lineup, moneyAtAGlance, owedOn, recordPayment, statsFor, summarise, turfChanges, whoOwes, ATTENDANCE, PAYMENT_TERMS, type AppearanceData, type LeaderMetric, type PaymentKind } from '@modules/games';
+import { allGames, allPlayers, allVenues, currentGame, isSending, markPaid, mePersonId, turfBase, leaders, lineup, moneyAtAGlance, owedOn, recordPayment, statsFor, summarise, turfChanges, whoOwes, kitsOf, ATTENDANCE, PAYMENT_TERMS, type AppearanceData, type LeaderMetric, type PaymentKind } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
+import { useTheme } from '@ui/theme/ThemeProvider';
 import { usePull } from './useTurfSync';
 import { MatchPlayerSheet, ScoreSheet } from './match';
-import { Button, Card, EmptyState, NumberField, RowItem, RowList, Screen, Section, Segmented, Sheet, Stat, StatTrio, Text, TextField, useToast } from '@ui/kit';
+import { Crest, Display, Face, GoalBall, Pitch, SideLists, SyncPill, pitchPlayers } from './teams';
+import { Button, Card, EmptyState, Icon, IconButton, NumberField, RowItem, RowList, Screen, Section, Segmented, Sheet, Stat, StatTrio, Text, TextField, useToast } from '@ui/kit';
 
 /**
  * The Turf board (docs/MODEL.md layer 3; R9a, R9c): Turf Ledger's flow,
@@ -163,12 +165,13 @@ export function TurfGame({ ctx, params }: Props) {
   const [paying, setPaying] = useState<string | null>(null);
   const [player, setPlayer] = useState<string | null>(null);
   const [scoring, setScoring] = useState(false);
+  const theme = useTheme();
   const { pull } = usePull();
   const d = useLive((o) => {
     const g = params.game ? o.records.get(params.game) : undefined;
     if (!g || g.object !== 'game') return null;
     const game = g as unknown as ReturnType<typeof allGames>[number];
-    return { game, sum: summarise(o, game), lineup: lineup(o, game.id).map((l) => ({ ...l, sending: isSending(o, l.appearance.id) })), venue: game.data.venueId ? o.records.get(game.data.venueId) : undefined, motm: game.data.motmId ? o.records.get(game.data.motmId)?.title : undefined, fronted: game.data.frontedById ? o.records.get(game.data.frontedById)?.title : undefined };
+    return { game, sum: summarise(o, game), pitch: pitchPlayers(o, game.id), lineup: lineup(o, game.id).map((l) => ({ ...l, sending: isSending(o, l.appearance.id) })), venue: game.data.venueId ? o.records.get(game.data.venueId) : undefined, motm: game.data.motmId ? o.records.get(game.data.motmId)?.title : undefined, fronted: game.data.frontedById ? o.records.get(game.data.frontedById)?.title : undefined };
   }, [params.game]);
   const f = ctx.format.currency;
   if (!d) {
@@ -179,38 +182,126 @@ export function TurfGame({ ctx, params }: Props) {
     );
   }
   const g = d.game.data;
-  const terms = PAYMENT_TERMS.find((x) => x.value === g.paymentTerms)?.label;
-  const team = (t: 'A' | 'B' | undefined) => d.lineup.filter((l) => l.appearance.data.team === t);
+  const kits = kitsOf(g);
+  const names = new Map(d.lineup.map((l) => [l.appearance.data.personId, l.name]));
+  const played = g.scoreA != null && g.scoreB != null;
+  const upcoming = g.date >= new Date().toISOString().slice(0, 10) && !played;
+  const scorers = (side: 'A' | 'B') => d.lineup.filter((l) => l.appearance.data.team === side && (l.appearance.data.goals ?? 0) > 0).sort((a, b) => (b.appearance.data.goals ?? 0) - (a.appearance.data.goals ?? 0));
+  const captainName = (side: 'A' | 'B') => {
+    const id = side === 'A' ? g.captainAId : g.captainBId;
+    return id ? names.get(id)?.split(/\s+/)[0] : undefined;
+  };
+  const motmLine = d.motm ? [d.motm, (() => { const a = d.lineup.find((l) => l.appearance.data.personId === g.motmId)?.appearance.data; return a?.goals ? `${a.goals} goal${a.goals === 1 ? '' : 's'}` : null; })()].filter(Boolean).join(' · ') : null;
+  const crestColumn = (side: 'A' | 'B') => (
+    <View style={{ width: 96, alignItems: 'center', gap: 8 }}>
+      <Crest kit={kits[side]} size={64} />
+      <Display size={20}>{kits[side].name}</Display>
+      <Text variant="caption" color="tertiary" numberOfLines={1}>
+        {captainName(side) ? `C · ${captainName(side)}` : ' '}
+      </Text>
+    </View>
+  );
+  const pill = (label: string) => (
+    <View key={label} style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: theme.c.bg.dim }}>
+      <Text variant="labelMicro" color="secondary" numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
   return (
-    <Screen title={d.game.title} subtitle={[g.time, g.sideSize ? `${g.sideSize}-a-side` : null, terms].filter(Boolean).join(' · ')} onBack={back} right={<Button title="Edit" icon="edit" size="sm" variant="secondary" onPress={() => router.push(`/board/turf/match?game=${d.game.id}` as never)} />}>
-      <StatTrio
-        stats={[
-          { label: 'Turf cost', value: f(g.totalCost) },
-          { label: 'Collected', value: f(d.sum.collected), tone: 'ok' },
-          { label: 'To collect', value: f(d.sum.outstanding), tone: d.sum.outstanding ? 'alert' : undefined },
-        ]}
-      />
-      {g.scoreA != null && g.scoreB != null ? (
-        <Card>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
-            <Stat value={String(g.scoreA)} caption="Team A" size="count" />
-            <Text variant="title" color="secondary">
-              –
+    <Screen
+      title="Match"
+      subtitle="Turf › Games"
+      onBack={back}
+      right={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <SyncPill />
+          <IconButton icon="edit" accessibilityLabel="Edit match" filled onPress={() => router.push(`/board/turf/match?game=${d.game.id}` as never)} />
+        </View>
+      }
+    >
+      {/* 4b hero (TF-MatchTeams): crests, the Bebas score, scorers, pills, player of the match. */}
+      <View style={{ backgroundColor: theme.c.bg.tile, borderRadius: 28, padding: 16, gap: 14 }}>
+        <View style={{ alignSelf: 'flex-start', height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: played ? theme.c.accent.mustard : theme.c.bg.dim }}>
+          <Text variant="labelMicro" color={played ? theme.c.accent.mustardInk : 'secondary'}>
+            {played ? 'Full time' : upcoming ? 'Upcoming' : 'No score yet'}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {crestColumn('A')}
+          <Pressable accessibilityRole="button" accessibilityLabel={played ? `Score ${g.scoreA} to ${g.scoreB}. Change score` : 'Add the score'} onPress={() => setScoring(true)} style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Display size={64} color={kits.A.text}>
+                {played ? String(g.scoreA) : '–'}
+              </Display>
+              <Display size={40} color="#F5F5F738">
+                –
+              </Display>
+              <Display size={64} color={kits.B.text}>
+                {played ? String(g.scoreB) : '–'}
+              </Display>
+            </View>
+            <Text variant="caption" color="secondary">
+              {[format(new Date(`${g.date}T12:00:00`), 'EEE d MMM'), g.time].filter(Boolean).join(' · ')}
             </Text>
-            <Stat value={String(g.scoreB)} caption="Team B" size="count" />
+          </Pressable>
+          {crestColumn('B')}
+        </View>
+        {scorers('A').length || scorers('B').length ? (
+          <View style={{ flexDirection: 'row', gap: 16, paddingHorizontal: 4 }}>
+            {(['A', 'B'] as const).map((side) => (
+              <View key={side} style={{ flex: 1, gap: 2, alignItems: side === 'A' ? 'flex-start' : 'flex-end' }}>
+                {scorers(side).map((l) => (
+                  <View key={l.appearance.id} style={{ flexDirection: side === 'A' ? 'row' : 'row-reverse', alignItems: 'center', gap: 6 }}>
+                    <GoalBall n={l.appearance.data.goals ?? 0} size={14} id={`hero-${l.appearance.id}`} />
+                    <Text variant="labelMicro" color="secondary" style={{ lineHeight: 18 }} numberOfLines={1}>
+                      {`${l.name}${(l.appearance.data.goals ?? 0) > 1 ? ` ×${l.appearance.data.goals}` : ''}`}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ))}
           </View>
-          {d.motm ? (
-            <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
-              Man of the match: {d.motm}
+        ) : null}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {[d.venue?.title ?? g.venueName, g.sideSize ? `${g.sideSize}-a-side` : null, PAYMENT_TERMS.find((x) => x.value === g.paymentTerms)?.label, `${d.sum.paidCount} of ${d.sum.players} paid`].filter((x): x is string => !!x).map(pill)}
+        </View>
+        {motmLine ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 18, backgroundColor: theme.c.bg.dim }}>
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: theme.c.accent.mustard, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="star" size={16} color={theme.c.accent.mustardInk} />
+            </View>
+            <Face id={g.motmId!} name={d.motm!} size={32} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="caption" color="tertiary">
+                Player of the match
+              </Text>
+              <Text variant="label" style={{ fontWeight: '700' }} numberOfLines={1}>
+                {motmLine}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+      {/* The two tab pills (40 tall, selected lime). */}
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        {([['payments', 'Payment checklist'], ['teams', 'Team view']] as const).map(([key, label]) => (
+          <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: tab === key }} onPress={() => setTab(key)} style={{ flex: 1, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: tab === key ? theme.c.accent.mustard : theme.c.bg.tile }}>
+            <Text variant="label" color={tab === key ? theme.c.accent.mustardInk : 'secondary'} style={{ fontSize: 13, fontWeight: '700' }}>
+              {label}
             </Text>
-          ) : null}
-          <Button title={g.scoreLocked ? 'Change score · set by hand' : 'Change score'} icon="edit" size="sm" variant="ghost" onPress={() => setScoring(true)} />
-        </Card>
-      ) : (
-        <Button title="Add the score" icon="plus" variant="secondary" onPress={() => setScoring(true)} />
-      )}
-      <Segmented options={[{ value: 'payments', label: 'Payment checklist' }, { value: 'teams', label: 'Team view' }]} value={tab} onChange={setTab} />
+          </Pressable>
+        ))}
+      </View>
       {tab === 'payments' ? (
+        <>
+        <StatTrio
+          stats={[
+            { label: 'Turf cost', value: f(g.totalCost) },
+            { label: 'Collected', value: f(d.sum.collected), tone: 'ok' },
+            { label: 'To collect', value: f(d.sum.outstanding), tone: d.sum.outstanding ? 'alert' : undefined },
+          ]}
+        />
         <Section title={`${d.sum.paidCount} of ${d.sum.players} paid`} meta={d.fronted ? `Fronted by ${d.fronted}` : undefined}>
           <RowList>
             {d.lineup.map((l) => (
@@ -229,29 +320,19 @@ export function TurfGame({ ctx, params }: Props) {
             ))}
           </RowList>
         </Section>
+        </>
       ) : (
         <>
-          {(['A', 'B', undefined] as const).map((t) =>
-            team(t).length ? (
-              <Section key={t ?? 'none'} title={t ? `Team ${t}` : 'No team yet'}>
-                <RowList>
-                  {team(t).map((l) => (
-                    <RowItem
-                      key={l.appearance.id}
-                      icon="user"
-                      tint={TINT}
-                      title={l.name}
-                      subtitle={[(t === 'A' ? g.captainAId : t === 'B' ? g.captainBId : undefined) === l.appearance.data.personId ? 'Captain' : null, g.motmId === l.appearance.data.personId ? 'Player of the match' : null, l.appearance.data.position, l.appearance.data.inGoal ? 'in goal' : null, l.appearance.data.attendance !== 'confirmed' ? ATTENDANCE.find((x) => x.value === l.appearance.data.attendance)?.label : null].filter(Boolean).join(' · ') || null}
-                      value={[l.appearance.data.goals ? `${l.appearance.data.goals} G` : null, l.appearance.data.assists ? `${l.appearance.data.assists} A` : null, l.appearance.data.saves ? `${l.appearance.data.saves} S` : null, l.appearance.data.ownGoals ? `${l.appearance.data.ownGoals} OG` : null].filter(Boolean).join(' ') || null}
-                      meta={l.sending ? 'Sending…' : undefined}
-                      chevron
-                      onPress={() => setPlayer(l.appearance.id)}
-                    />
-                  ))}
-                </RowList>
-              </Section>
-            ) : null,
-          )}
+          <View style={{ backgroundColor: theme.c.bg.tile, borderRadius: 28, padding: 12, gap: 10 }}>
+            <Pitch game={g} players={d.pitch} />
+            <SideLists game={g} apps={d.lineup.map((l) => l.appearance)} names={names} onOpen={setPlayer} />
+          </View>
+          {d.lineup.some((l) => !l.appearance.data.team && l.appearance.data.attendance !== 'no_show') ? (
+            <Text variant="caption" color="tertiary">
+              {`${d.lineup.filter((l) => !l.appearance.data.team && l.appearance.data.attendance !== 'no_show').length} without a side yet`}
+            </Text>
+          ) : null}
+          <Button title="Pick teams" icon="people" variant="secondary" block onPress={() => router.push(`/board/turf/teams?game=${d.game.id}` as never)} />
         </>
       )}
       {d.venue ? (

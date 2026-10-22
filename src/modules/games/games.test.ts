@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -493,5 +493,63 @@ describe('matches changed in LifeOS (R9c.3)', () => {
     expect(appearance('Neel (guest)', '2026-10-17').data).toMatchObject({ share: 360, paid: false, sourceKey: 'turf:game_players:g_sat:p_guest' });
     // Not set by hand, so like Turf web the score follows the goals logged after an edit (2 + 4 for A, 1 for B).
     expect(game('2026-10-17').data).toMatchObject({ scoreA: 6, scoreB: 1 });
+  });
+});
+
+describe('teams and the generator (R9c.4)', () => {
+  beforeEach(() => applyTurfSync(os, first()));
+  const sat = () => q<{ date: string; captainAId?: string; captainBId?: string; scoreA?: number; scoreB?: number; formationA?: string }>('game').find((g) => g.data.date === '2026-10-17')!;
+  const app = (name: string) => appearance(name, '2026-10-17');
+
+  it('the ratings are Turf web’s: a match rating from 6.0, an overall from the profile plus form', () => {
+    expect(matchRating({ goals: 2, assists: 1, saves: 0, ownGoals: 0, inGoal: false, role: 'MID', outcome: 'W', conceded: 5, potm: false, teamBest: false, late: false })).toEqual({ rating: 7.9, partial: false });
+    const r = squadRatings(os).players;
+    expect(r.get(person('Rutvij').id)).toMatchObject({ matches: 2, provisional: true });
+    expect(r.get(person('Rutvij').id)!.overall).toBeGreaterThan(30);
+  });
+
+  it('suggest teams splits everyone into equal sides, the keeper and the two strongest apart; reshuffle stays as fair', () => {
+    const s = suggestTeams(os, sat().id)!;
+    expect(Object.keys(s.teams)).toHaveLength(4);
+    const sides = Object.values(s.teams);
+    expect(sides.filter((x) => x === 'A')).toHaveLength(2);
+    expect(s.result.explanation.join(' ')).toMatch(/Average overall/);
+    let n = 0;
+    const again = suggestTeams(os, sat().id, () => (n++ % 7) / 7)!;
+    expect(Object.values(again.teams).filter((x) => x === 'A')).toHaveLength(2);
+    expect(suggestTeams(os, (appearance('Priya', '2026-10-24').data as unknown as { gameId: string }).gameId)).toBeNull(); // one player
+  });
+
+  it('save teams sends one change per player who moved; a captain moved off loses the armband; the score follows the goals', () => {
+    // Rutvij (A, captain) and Karan (A) swap with Priya (B, captain) and Arjun (B).
+    const n = saveTeams(os, sat().id, { [app('Rutvij').id]: 'B', [app('Karan').id]: 'A', [app('Priya').id]: 'A', [app('Arjun').id]: 'B' });
+    expect(n).toBe(2);
+    const bodies = turfChanges(os).sending.map((i) => i.payload.body);
+    expect(bodies).toEqual([
+      { action: 'team', gameId: 'g_sat', playerId: 'p_rutvij', team: 'B', fieldPosition: 'CM' },
+      { action: 'team', gameId: 'g_sat', playerId: 'p_priya', team: 'A', fieldPosition: 'CB' },
+    ]);
+    // The sample match wears Blue v Red.
+    expect(turfChanges(os).sending.map((i) => i.label)).toEqual([expect.stringMatching(/^Rutvij → Red/), expect.stringMatching(/^Priya → Blue/)]);
+    expect(sat().data.captainAId).toBeUndefined();
+    expect(sat().data.captainBId).toBeUndefined();
+    // Goals logged: Karan 4 + Priya 1 for A, Rutvij 2 for B.
+    expect(sat().data).toMatchObject({ scoreA: 5, scoreB: 2 });
+    expect(saveTeams(os, sat().id, { [app('Karan').id]: 'A' })).toBe(0);
+  });
+
+  it('formations: a shape that fits the format, sent and shown; one that doesn’t is refused here', () => {
+    expect(validFormation('2-2-1', 6)).toBe(true);
+    expect(setFormation(os, sat().id, 'A', '1-2-2')!.payload.body).toEqual({ action: 'formation', gameId: 'g_sat', team: 'A', formation: '1-2-2' });
+    expect(sat().data.formationA).toBe('1-2-2');
+    expect(() => setFormation(os, sat().id, 'B', '3-3-3')).toThrow(/doesn’t fit 6-a-side/);
+  });
+
+  it('kits: names and letters from the colours; a plain shuffle alternates with keepers first', () => {
+    expect(kitName('#2f80ed')).toBe('Blue');
+    expect(kitsOf(sat().data as never)).toMatchObject({ A: { name: 'Blue', letter: 'B' }, B: { name: 'Red', letter: 'R' } });
+    const apps = q<{ gameDate: string; inGoal: boolean }>('appearance').filter((a) => a.data.gameDate === '2026-10-17') as never[];
+    const s = shuffleTeams(apps, (a) => (a as { inGoal: boolean }).inGoal, () => 0.3);
+    expect(Object.values(s).filter((x) => x === 'A')).toHaveLength(2);
   });
 });

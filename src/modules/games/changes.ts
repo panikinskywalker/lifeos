@@ -4,7 +4,8 @@ import type { OutboxItem } from '@core/repo/outboxRepo';
 import { newId } from '@core/domain/ids';
 import type { AppearanceData, GameData, PlayerProfileData, VenueData } from './types';
 import { dropPending, recountPaid, refreshTurfDebts } from './sync';
-import { advanceFor, clampStat, DEFAULT_KITS, expectedFor, followedAfterEdit, followedScore, needsFronter, splitShare } from './rules';
+import { advanceFor, clampStat, expectedFor, followedAfterEdit, followedScore, needsFronter, splitShare } from './rules';
+import { DEFAULT_KITS, kitOf, validFormation } from './kits';
 
 /**
  * Changes made in LifeOS for Turf web (docs/MODEL.md layer 4, *Turf web*;
@@ -205,6 +206,56 @@ export function setMotm(os: LifeOSContext, gameId: string, appearanceId: string 
   });
 }
 
+/* ---------- teams ---------- */
+
+/**
+ * Save teams (Pick teams): one `team` change per player whose side changed,
+ * as Turf web's screen sends them; someone moved off a side stops being its
+ * captain; the score follows the goals again. Returns how many changed.
+ */
+export function saveTeams(os: LifeOSContext, gameId: string, teams: Record<string, 'A' | 'B' | null>): number {
+  const { g } = game(os, gameId);
+  const kitName = (t: 'A' | 'B') => kitOf(t === 'A' ? g.data.colorA : g.data.colorB, t === 'A' ? DEFAULT_KITS.A : DEFAULT_KITS.B).name;
+  let n = 0;
+  os.db.transaction(() => {
+    for (const [appearanceId, team] of Object.entries(teams)) {
+      const { a, ids, name } = share(os, appearanceId);
+      if ((a.data.team ?? null) === team) continue;
+      n++;
+      change(os, {
+        label: `${name} → ${team ? kitName(team) : 'no team'} · ${shortDay(a.data.gameDate)}`,
+        recordId: a.id,
+        touches: [a.id, g.id],
+        body: { action: 'team', ...ids, team: team ?? '', fieldPosition: a.data.position ?? '' },
+        apply: () => {
+          replaceData<AppearanceData>(os, a.id, { ...a.data, team: team ?? undefined });
+          const cur = os.records.get<GameData>(g.id)!;
+          const captains = { captainAId: team !== 'A' && cur.data.captainAId === a.data.personId ? undefined : cur.data.captainAId, captainBId: team !== 'B' && cur.data.captainBId === a.data.personId ? undefined : cur.data.captainBId };
+          if (captains.captainAId !== cur.data.captainAId || captains.captainBId !== cur.data.captainBId) replaceData<GameData>(os, g.id, { ...cur.data, ...captains });
+          follow(os, g.id);
+        },
+      });
+    }
+  });
+  return n;
+}
+
+/** A side's shape ("2-2-1"), or null for the format's default. */
+export function setFormation(os: LifeOSContext, gameId: string, team: 'A' | 'B', formation: string | null) {
+  const { g, id } = game(os, gameId);
+  if (formation !== null && !validFormation(formation, g.data.sideSize ?? null)) throw new Error(`That shape doesn’t fit ${g.data.sideSize ? `${g.data.sideSize}-a-side` : 'this match'}`);
+  const key = team === 'A' ? 'formationA' : 'formationB';
+  if ((g.data[key] ?? null) === formation) return null;
+  const kit = kitOf(team === 'A' ? g.data.colorA : g.data.colorB, team === 'A' ? DEFAULT_KITS.A : DEFAULT_KITS.B).name;
+  return change(os, {
+    label: `${kit} ${formation ?? 'shape cleared'} · ${shortDay(g.data.date)}`,
+    recordId: g.id,
+    touches: [g.id],
+    body: { action: 'formation', gameId: id, team, formation },
+    apply: () => replaceData<GameData>(os, g.id, { ...g.data, [key]: formation ?? undefined }),
+  });
+}
+
 /* ---------- the score ---------- */
 
 /** A score set by hand: it stops following the goals. */
@@ -322,7 +373,7 @@ export function createMatch(os: LifeOSContext, m: MatchInput): { gameId: string;
   let gameId!: string;
   let item!: OutboxItem<TurfAction>;
   os.db.transaction(() => {
-    const g = os.records.create<GameData>({ object: 'game', data: gameData(os, m, c, { ...DEFAULT_KITS, goalData: 'missing' }, `turf:games:${local}`) }, ACTOR);
+    const g = os.records.create<GameData>({ object: 'game', data: gameData(os, m, c, { colorA: DEFAULT_KITS.A, colorB: DEFAULT_KITS.B, goalData: 'missing' }, `turf:games:${local}`) }, ACTOR);
     gameId = g.id;
     const made = [g.id];
     for (const p of c.players) {

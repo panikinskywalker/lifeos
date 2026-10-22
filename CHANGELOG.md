@@ -7,6 +7,29 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.5 — 22 Oct 2026
+
+Teams and the generator, on the new kit (R9c.4), drawn from the *Turf · Noir*
+artboards (4b Team view, 4d Pick teams).
+- **Match** screen redrawn: crests in the kit colours, the score in big Bebas
+  numerals (tap to change it), scorers, venue / format / paid pills, player of
+  the match, and the two tab pills.
+- **Team view**: the pitch with each side in its formation — faces in kit
+  rings, goals as a football, the captain's C, the keeper's glove, the star —
+  then both sides as lists with positions and G / A / S, and **Pick teams**.
+- **Pick teams**: tap L or S (or the kit letters) on each player; **Balance
+  by rating** runs Turf web's own generator (every split tried: keepers split,
+  the two strongest apart, the closest average overall, then positions and who
+  plays well together), with its reasons and **Reshuffle**; **Shuffle** for a
+  quick random split; each side's **formation**; **Save teams** sends one
+  change per player who moved.
+- Turf web's ratings (match ratings, overall, form) are copied in, so the
+  numbers match on both phones and work offline.
+- Kit names and letters come from the match's colours (Lime, Sky, Blue…);
+  Bebas Neue added for the Turf numerals and letters.
+- Not yet on the S22: "play well with" picks, side wishes and kit votes, which
+  Turf web doesn't sync yet; captains are suggested on Turf web.
+
 ## v0.0.4 — 22 Oct 2026
 
 The app wears **v3 Noir**, the design language from the canvas (NR artboards).

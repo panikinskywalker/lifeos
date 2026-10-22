@@ -1,6 +1,7 @@
 import type { BoardManifest } from '@core/registry/types';
 import { TurfGame, TurfGames, TurfHome, TurfPlayers, TurfVenues } from './screens';
 import { TurfMatchForm } from './match';
+import { TurfPickTeams } from './teams';
 
 /** Turf (docs/MODEL.md layer 3; R9): the first user board, over games + crm + places + finance. A Browse › Boards tile. */
 export const turfBoard: BoardManifest = {
@@ -14,6 +15,7 @@ export const turfBoard: BoardManifest = {
     { key: 'games', title: 'Games', component: TurfGames },
     { key: 'game', title: 'Game', component: TurfGame },
     { key: 'match', title: 'Match', component: TurfMatchForm },
+    { key: 'teams', title: 'Pick teams', component: TurfPickTeams },
     { key: 'players', title: 'Players', component: TurfPlayers },
     { key: 'venues', title: 'Venues', component: TurfVenues },
   ],

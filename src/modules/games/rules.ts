@@ -20,9 +20,6 @@ export const advanceFor = (terms: GameData['paymentTerms'], total: number, advan
 /** Planned players: as given, else both sides full, else whoever is picked. */
 export const expectedFor = (given: number | undefined, sideSize: number | undefined, picked: number) => given || (sideSize ? sideSize * 2 : picked);
 
-/** Turf web's own kit colours for a new match (Lime and Sky). */
-export const DEFAULT_KITS = { colorA: '#D7F55C', colorB: '#A9C4FF' } as const;
-
 /**
  * The score follows the goals: team A is A's goals plus B's own goals, and
  * the other way round. Only once teams are known (someone is on A or B and

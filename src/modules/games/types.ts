@@ -58,6 +58,9 @@ export interface GameData {
   scoreB?: number;
   /** Set by hand, so it no longer follows the goals. */
   scoreLocked?: boolean;
+  /** Each side's shape, outfield rows from the back ("2-2-1"). */
+  formationA?: string;
+  formationB?: string;
   colorA?: string;
   colorB?: string;
   captainAId?: string;
@@ -91,6 +94,8 @@ export const gameObject: ObjectDef<GameData> = {
     scoreA: z.coerce.number().optional(),
     scoreB: z.coerce.number().optional(),
     scoreLocked: z.boolean().optional(),
+    formationA: z.string().optional(),
+    formationB: z.string().optional(),
     colorA: z.string().optional(),
     colorB: z.string().optional(),
     captainAId: z.string().optional(),
@@ -144,6 +149,8 @@ export interface AppearanceData {
   position?: string;
   goals: number;
   ownGoals?: number;
+  /** A match rating set by hand on Turf web (1–10); otherwise worked out. */
+  ratingOverride?: number;
   assists: number;
   saves: number;
   inGoal: boolean;
@@ -171,6 +178,7 @@ export const appearanceObject: ObjectDef<AppearanceData> = {
     position: z.string().optional(),
     goals: z.coerce.number().default(0),
     ownGoals: z.coerce.number().optional(),
+    ratingOverride: z.coerce.number().optional(),
     assists: z.coerce.number().default(0),
     saves: z.coerce.number().default(0),
     inGoal: z.boolean().default(false),
