@@ -130,9 +130,17 @@ Core keeps the queue (`src/core/filing/queue.ts`), sender trust and dispatch
 (`messages.ts`): every parser that read something files, in priority order;
 no parser → a dismissed leftover. A module declares `filing: { parsers }` and,
 for tools the model gets while filing a dump, `filingTools(session)` (finance:
-`log_spend`). `ObjectDef.enrich(os, data, { text })` fills defaults for a record
-made from a sentence (finance: the category), so core's generic tools never
-import a module.
+`log_spend`; places: `file_place`). `ObjectDef.enrich(os, data, { text })` fills defaults for a record
+made from a sentence (finance: the category; places: a Place's or
+Organisation's kind from its name), so core's generic tools never import a
+module; core's `upsertNode` calls it for every record it makes from a name (R3).
+
+Places (R3) files without a source of its own: it listens for Events created
+or edited with a `location` (whoever wrote them: core's calendar reading,
+travel's booking parser, a dump) and links them *at* a Place, and its mail
+parser `places.mail` runs last (priority 90) so it can mark what the other
+parsers filed from a mail as *sent by* the Organisation whose website matches
+the sender; when it is the only reader the mail stays a dismissed leftover.
 
 ### Sources (R1, as built)
 

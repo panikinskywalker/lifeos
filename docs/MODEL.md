@@ -59,7 +59,8 @@ attachments, and can carry links, facts, events, cycles and notes.
 |---|---|---|---|
 | **Person** | Someone in your life | relationship, phone, email, birthday (yearly cycle), company → Organisation link, keep-in-touch cycle | you, dumps, contacts, SMS/UPI payer match |
 | **Group** | A set of people (Goa gang, flat, family) | members, kind | you, dumps, splits |
-| **Organisation** | A company, shop, bank, payee | kind (employer / shop / payee / bank / brand), UPI ids, category | SMS, mail, dumps, you |
+
+Organisation is in the `places` module (decided 22 Oct, R3); see Places below.
 
 ### Things
 | Object | Meaning | Key fields | Filed by |
@@ -96,10 +97,38 @@ breakdown in data), filed by Usage access.
 | **Note** | Long-form text, markdown, `[[links]]` | kind (idea / journal / meeting / reference), body | you, dumps |
 | **Fact** | One line about a record | subject, text, when, source, confidence, active | dumps, you, filing |
 
-### Places
+### Places (module `places`; Objects and Fields agreed 22 Oct, R3)
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
-| **Place** | Somewhere you go | kind (home / city / restaurant / gym / …), address, coordinates, parent → Place | dumps, calendar, mail |
+| **Place** | Somewhere you go | kind, address, coordinates, parent → Place, maps link, notes | dumps, calendar, mail, Turf |
+| **Organisation** | A company, shop, bank, payee | see below | SMS, mail, dumps, you |
+
+**Place** (Object id `place`), agreed 22 Oct:
+| Field | Type | Notes |
+|---|---|---|
+| kind | select | home · work · city · country · area (neighbourhood) · restaurant / café / bar · venue (turf, ground, hall) · gym · shop · stay (hotel, Airbnb) · airport / station · other. `venue` is what Turf files. |
+| address | text | as written ("80 Ft Rd, Koramangala 4th Block") |
+| coordinates | location | the map pin |
+| parent | link → Place, word *in* | Koramangala *in* Bengaluru *in* India; replaces the old city and country text Fields, which become parent Places on first open (a city in its country) |
+| maps link | contact (url) | a Google Maps / Apple Maps link, tap to open |
+| notes | long text | |
+
+Derived, not Fields: visits (Events linked *at* the Place), last been, what was
+spent there (Transactions whose payee is an Organisation *at* the Place), the
+Places inside it.
+
+**Organisation** (Object id `org`), agreed 22 Oct:
+| Field | Type | Notes |
+|---|---|---|
+| kind | select | employer / company · shop / brand · restaurant / food · bank / card / broker · service (telco, utility, insurer, app) · airline / travel · school / college · club / gym · payee (not sure yet) · other. Finance files `payee`, `shop` and `bank` on its own. |
+| UPI ids | text | comma-separated, as finance learns them from payments |
+| website | contact (url) | its domain files mail from that sender to it |
+| phone | contact (phone) | |
+| place | link → Place, word *at* | the branch you go to (Toit *at* Indiranagar) |
+| notes | long text | |
+
+No category Field: finance's payee rules already learn the category per payee.
+Person's company becomes a link to an Organisation (*works at*) in R2.
 
 ### Agenda (module `agenda`; the day / month / year view keeps the name Time)
 | Object | Meaning | Key fields | Filed by |
@@ -557,7 +586,37 @@ screens checked on the phone → overrides only where the default is wrong)
   **Phone check pending**: migrations v11–v14 and the budget / institution folds run on first open.
 - [ ] **R2 crm** — Person; contacts source; payee and UPI matching; keep-in-touch
   and birthday cycles; tools: people to call, last met, balances per person.
-- [ ] **R3 places** — Place, Organisation; from calendar, mail and dumps.
+- [x] **R3 places** — done 22 Oct 2026. Objects as agreed (layer 2, *Places*):
+  Place (kind with the twelve options, `venue` kept for Turf; address; map pin;
+  parent → Place, word *in*; maps link; notes) and Organisation (ten kinds;
+  UPI ids; website; phone; place → Place, word *at*; notes), both in
+  `src/modules/places`. **The fold** (once, on first open): a Place's city and
+  country text become parent Places, a city in its country; notes that are
+  only a maps link (Turf venues) move to the maps link Field, also for venues
+  Turf makes later. **Filing**: an Event with a location — the calendar,
+  travel's stays and bookings, anything else — is linked *at* its Place (one
+  you have is matched by name; a location with an address, or an event that
+  says what kind of place, makes one, shown in To check with Undo; meeting
+  links and bare rooms stay text; a stay's Place is the hotel, in its city);
+  events filed before R3 are linked once. Mail: a table booking becomes an
+  Event (kind *reservation*) at the restaurant; mail from an Organisation's
+  website domain lands on its timeline and what other parsers filed from it is
+  *sent by* it (a new core link word); a mail only that matched stays a
+  leftover. Dumps: a record made from a bare name gets its kind from the
+  Object (`enrich`, now called by core's `upsert_node`: "Toit brewpub" is a
+  restaurant, "HDFC Bank" a bank) and the model has `file_place` ("Toit is in
+  Indiranagar, Bengaluru"), logged on the dump with Undo. **Tools**:
+  places_been, place_info (in, visits, last here, organisations, spent there,
+  km from home), places_near (by map pin), organisations. **Board** (v3 Noir,
+  from NR-KitRecords · Place · card and NR-KitTrips · Header · a place and Map
+  with the route): the Places screen (a header per city, Place · cards with
+  visits, kind chips), the Place record's card and drawn map (km from home,
+  opens your maps app), visits, who is here and what is inside, the
+  Organisation's payments and branch, the Overview (been in the last 30 days,
+  paid most), quick actions. Demo data has a few Places. 357 tests green; the
+  web export builds. *Not in R3*: Person's company → Organisation is R2's;
+  maps are drawn, not tiled, so there is no real map until a provider is
+  chosen; no migration (Fields live in record JSON). **Phone check pending.**
 - [ ] **R4 projects** — Task, Project, Goal, Event; calendar source.
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
   Upkeep; Upkeep re-hung on cycles from every module.

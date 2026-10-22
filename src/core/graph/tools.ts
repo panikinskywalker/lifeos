@@ -115,7 +115,8 @@ export function upsertNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, opt
     const type = pickType(os, r.type, r.name);
     const def = os.registry.objects.get(type)!;
     const title = titleCase(r.name);
-    const data = baseData(def, title);
+    // The Object fills what a bare name implies (places: "Toit brewpub" is a restaurant).
+    const data = { ...baseData(def, title), ...(def.enrich?.(os, baseData(def, title) as never, { text: r.name }) ?? {}) };
     const e = os.records.create({ object: type, title, data }, 'assistant');
     id = e.id;
     created = true;
