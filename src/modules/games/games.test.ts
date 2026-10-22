@@ -706,4 +706,11 @@ describe('shares paid by SMS (R9c.6)', () => {
     sms(999, '2026-12-30', 'KARAN MEHTA', 'Rs.999 credited from VPA karan.m@okhdfc');
     expect(asks()).toHaveLength(1);
   });
+
+  it('one of several UPI ids on their Person is known at once (core identity)', () => {
+    os.records.update(person('Karan').id, { data: { upi: 'karan@ybl, karan.m@okhdfc' } });
+    sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited from VPA karan.m@okhdfc');
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹500 · Wed, 14 Oct/)]);
+  });
 });

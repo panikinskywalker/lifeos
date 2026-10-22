@@ -79,10 +79,22 @@ export interface EntityDetailSection {
   entityType: string | '*';
   key: string;
   title: string;
-  component: ComponentType<{ entity: ObjectRecord<any>; ctx: LifeOSContext }>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  component: ComponentType<{ entity: ObjectRecord<any>; ctx: LifeOSContext; controls?: RecordControls }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   order?: number;
-  /** 'top': above the details card (Stitch stat trio, attention, quick actions). Default: below it. */
-  placement?: 'top' | 'body';
+  /**
+   * 'hero': replaces the record header (R2: Person · Profile, edge to edge), and gets the header's controls.
+   * 'top': above the details card (Stitch stat trio, attention, quick actions). Default: below it.
+   */
+  placement?: 'hero' | 'top' | 'body';
+}
+
+/** What the record header offers, handed to a 'hero' section that draws its own. */
+export interface RecordControls {
+  back(): void;
+  edit(): void;
+  more(): void;
+  /** Change the record's cover photo. */
+  cover(): void;
 }
 
 /* ------------------------------------------------------------------ */

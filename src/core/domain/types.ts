@@ -90,6 +90,13 @@ export interface ObjectDef<TData = Record<string, unknown>> {
    * category of a spend from its merchant and text). Returns only the fields to
    * add; never overwrites what was given. Core calls it from its generic tools.
    */
+  /**
+   * How a record of this Object is known from outside (R2): the UPI ids, phone
+   * numbers and emails a payment, a call or a contact carries. Core's `whoIs`
+   * (src/core/identity.ts) matches on them, so finance and games find a Person
+   * without importing crm.
+   */
+  identity?: (data: TData) => { upi?: string[]; phone?: string[]; email?: string[] };
   enrich?: (os: import('../registry/context').LifeOSContext, data: Partial<TData>, context: { text?: string }) => Partial<TData>;
 }
 

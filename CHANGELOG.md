@@ -7,6 +7,26 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.7 — 22 Oct 2026
+
+**People** (R2), built in its own session and merged here.
+- **Person**: phone and email you can call or write to, a photo, About,
+  *Works at* an Organisation and *Lives in* a Place (what you typed is kept
+  when nothing is picked), and **Keep in touch** as a cadence — every week to
+  every year.
+- **Group**: a Sport kind (the Football group moves to it once), a default
+  split, a place and a photo.
+- **Contacts and the call log** are crm's own sources now: pick the contacts
+  that become People; a call moves *Last spoke*.
+- **Last spoke** also moves with an Event with them or a payment, and rolls
+  the Keep in touch nudge.
+- **Who is this?** One lookup for a UPI id, a learned sender, the mobile
+  number inside a UPI id, or an email. Finance's payee matching and Turf's
+  SMS payments both ask it, so a player with two UPI ids is known by either.
+- **Tools**: people to call, last met, who is.
+- **The People board** in v3 Noir: the Profile at the top of a Person, People
+  home with the strip, Call or message, Birthdays and Groups.
+
 ## v0.0.6 — 22 Oct 2026
 
 The rest of the Turf board (R9c.5 and R9c.6), every screen drawn from the

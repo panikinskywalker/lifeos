@@ -2,6 +2,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import type { Filing } from '@core/repo/filingRepo';
 import type { AppearanceData, GameData } from './types';
+import { whoIs } from '@core/identity';
 import { owedOn } from './sync';
 import { recordPayment } from './payments';
 
@@ -9,8 +10,8 @@ import { recordPayment } from './payments';
  * Turf shares paid by SMS (docs/MODEL.md layer 2, *Money*; R9c.6). When finance
  * files a money-in Transaction, games looks for the share it pays:
  * - the **sender** is the UPI id in the text, else the name the bank wrote;
- *   a sender is *known* when it is a learned alias (core `aliases`), a
- *   player's UPI id, or the Person finance already matched;
+ *   a sender is *known* when it is a learned alias (core `aliases`), one of a
+ *   player's UPI ids (core `whoIs`), or the Person finance already matched;
  * - **sure** — a known sender in the Football group, the amount exactly what
  *   they owe (one share, or several paid oldest first), within ten days after
  *   the game: the payment is recorded on its own (via 'sms'), the Transaction
@@ -69,12 +70,13 @@ function footballPeople(os: LifeOSContext): Set<string> {
 function whoSent(os: LifeOSContext, tx: Tx): { personId: string | null; known: boolean } {
   const members = footballPeople(os);
   const { vpa, name } = senderOf(tx);
-  const people = os.records.query<{ upi?: string }>('person', {}, { limit: 100_000 });
+  const people = os.records.query('person', {}, { limit: 100_000 });
   if (vpa) {
     const alias = os.aliases.lookup(vpa).find((a) => members.has(a.entityId));
     if (alias) return { personId: alias.entityId, known: true };
-    const byUpi = people.find((p) => p.data.upi?.toLowerCase() === vpa && members.has(p.id));
-    if (byUpi) return { personId: byUpi.id, known: true };
+    // One of their UPI ids, or the mobile number inside it (core identity).
+    const hit = whoIs(os, { upi: vpa }, ['person']);
+    if (hit && members.has(hit.record.id)) return { personId: hit.record.id, known: true };
   }
   if (name) {
     const alias = os.aliases.lookup(name).find((a) => members.has(a.entityId));

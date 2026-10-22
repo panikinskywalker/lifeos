@@ -152,8 +152,19 @@ A module's `sync` reads the phone through `os.device` (the `DeviceBridge` in
 boot) and never imports platform code. `runSource` in `src/core/filing/sources.ts`
 files messages through the parsers in batches, upserts readings by `sourceKey`
 (the Object's schema must keep that field) and records the source's state.
-Finance declares sms, notifications and gmail; usage, health and the phone
-sources stay in platform until R2 / R6.
+Finance declares sms, notifications and gmail; crm declares contacts and
+calllog (R2: `os.device.contacts` reads the phone's contacts, `os.device.callLog`
+the calls; both are `readings` sources that file their own records and report
+`filed`); usage, health and the calendar stay in platform until R6 / R4.
+
+**Who a sender is** (R2). `ObjectDef.identity?(data) → { upi?, phone?, email? }`
+says how a record is known from outside (crm's Person: its UPI IDs, phone and
+email). Core's `whoIs(os, { upi, phone, email }, objects?)`
+(`src/core/identity.ts`) returns the one record it is, and by what: a UPI id on
+the record, a UPI id learned as an alias in `os.aliases` (shared with Turf's
+"learn a sender once"), the mobile number inside a UPI id, the email; an
+ambiguous phone or email is no match. Finance's `payeeFor` asks it first; a
+module that matches payments never imports crm.
 
 `os.device.secrets` (get / set) is the phone's secure store for tokens a
 source needs; never settings, never a backup. Games declares `turf` (R9c.1):
@@ -213,7 +224,7 @@ interface BoardManifest {
   overview?: OverviewFn;               // the module's Overview (Browse › module, Today's area card); pure
   tiles?: TileDef[];                   // { type, name, sizes, component } — for Today and grid boards (R8)
   screens?: BoardScreen[];             // 'index' is the home; others at /module/<m>/<key> or /board/<b>/<key>
-  overrides?: ObjectOverride[];        // per Object: { object, record?: sections on the Record screen (hero at the top or cards) }
+  overrides?: ObjectOverride[];        // per Object: { object, record?: sections on the Record screen; placement 'hero' replaces the header (gets RecordControls: back, edit, more, cover), 'top' above the details, else cards }
   quickActions?: QuickAction[];        // the global "+" menu
   buttons?: ManualRun[];               // manual-run automations shown on this board (R10)
   checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds

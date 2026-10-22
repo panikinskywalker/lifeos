@@ -221,7 +221,7 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
       let gid = os.settings.get<string | null>(SETTING_GROUP, null);
       let group = gid ? os.records.get<{ name: string; memberIds: string[] }>(gid) : undefined;
       if (!group) group = os.records.query<{ name: string; memberIds: string[] }>('group', {}, { limit: 1000 }).find((g) => g.data.name.trim().toLowerCase() === 'football');
-      if (!group) group = os.records.create({ object: 'group', data: { name: 'Football', kind: 'friends', memberIds: [] } }, ACTOR);
+      if (!group) group = os.records.create({ object: 'group', data: { name: 'Football', kind: 'sport', memberIds: [] } }, ACTOR);
       gid = group.id;
       os.settings.set(SETTING_GROUP, gid);
       const members = [...new Set([...(group.data.memberIds ?? []), ...regulars])];
