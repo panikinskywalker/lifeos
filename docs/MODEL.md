@@ -54,12 +54,51 @@ also listed under Mind and Agenda below because that is where you browse them).
 Every record of any Object has: title, created / updated, archived, tags,
 attachments, and can carry links, facts, events, cycles and notes.
 
-### People
+### People (module `crm`; Person agreed 22 Oct in R2)
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
-| **Person** | Someone in your life | relationship, phone, email, birthday (yearly cycle), company → Organisation link, keep-in-touch cycle | you, dumps, contacts, SMS/UPI payer match |
+| **Person** | Someone in your life | see below | you, dumps, contacts, call log, calendar, SMS/UPI payer match, Turf web |
 | **Group** | A set of people (Goa gang, flat, family) | members, kind | you, dumps, splits |
 | **Organisation** | A company, shop, bank, payee | kind (employer / shop / payee / bank / brand), UPI ids, category | SMS, mail, dumps, you |
+
+**Person's Fields** (agreed 22 Oct). The keys stay as they were (`phone`,
+`email`, `upi`, `relationship`…) so Turf web's sync and old backups keep working.
+| Field | Type | Notes |
+|---|---|---|
+| Relationship | select | family · friend · partner · colleague · client · vendor / service · acquaintance |
+| Phone | contact (phone) | tap to call; matched on its last 10 digits (contacts, call log, SMS) |
+| Email | contact (email) | tap to mail; matched on calendar attendees |
+| UPI IDs | text, comma-separated | the UPI ids you know (typed, from contacts, from Turf web); a payment from one is theirs for sure |
+| Birthday | date, year optional | drives a yearly **Birthday** Cycle, 7 days' notice |
+| Works at | link → Organisation, word "works at", **and** the typed text | the link when a record is picked; the text stays as the fallback (`company`) |
+| Role | text | |
+| Lives in | link → Place, word "lives in", **and** the typed text | as Works at (`city`) |
+| Keep in touch | select cadence | off · every week · 2 weeks · month · 3 months · 6 months · year; drives the **Keep in touch** Cycle (old day counts snap to the nearest) |
+| Last spoke | date | filled on its own by a call in the call log, an Event with them (met, call, a calendar meeting they are in, a dump), and a payment to or from them; it is the cycle's last done |
+| Photo | file | the profile hero; from the phone contact |
+| About | long text | was Notes; one-liners stay Facts |
+| *(hidden)* contact id | source key | the phone contact it came from, so re-syncs fill gaps |
+
+**Senders are aliases** (shared with Turf, decided 22 Oct): a payment sender
+learned once ("Who is priya.s@okicici?") is kept in core's `aliases` table on
+the Person, beside the UPI IDs Field. Matching a payment checks the UPI IDs,
+then the aliases, then the name.
+
+**Group's Fields** (agreed 22 Oct).
+| Field | Type | Notes |
+|---|---|---|
+| Name | text | the title |
+| Kind | select | home · trip · friends · family · work · sport (new; the Football group moves to sport once, Turf's sync still finds it by name) |
+| Members | link → Person, many, word "member" | each member's default share and joined / left stay in core's `group_members` |
+| Default split | select | equally · by shares; how a bill in this group splits unless you say otherwise |
+| Place | link → Place, word "at" | where the group is (Flat 4B) |
+| Photo | file | the group's cover |
+| About | long text | was Notes |
+
+**Organisation** is settled in **R3 places** (decided 22 Oct): it stays in the
+`places` module and R3 decides its Fields. People only links to it (a Person
+works at one, a Transaction's payee is one) and payee matching reads its UPI
+ids as R3 leaves them.
 
 ### Things
 | Object | Meaning | Key fields | Filed by |
