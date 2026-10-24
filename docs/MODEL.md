@@ -997,6 +997,13 @@ A trip filed from booking mail already knows the days, the place and why.
   plants, tell the squad you're out on Thursday.
 - **Back**: "the fridge is probably empty — here's a list."
 
+### The morning brief on Today (agreed 24 Oct)
+Today keeps its tiles and gains a **Morning brief** section on top: the
+morning pass's nudges in a few lines (what's going off, what's due, what's
+coming up, the one dish to cook), each line opening its record or its To
+check card. The evening pass updates it. The tiles stay below, as R8 has
+them.
+
 ### Words (to add to layer 1)
 - **Stock** (agreed 24 Oct) — the Object for something kept at home that
   runs out or goes off (butter, detergent, a medicine): product, space,
@@ -1004,16 +1011,14 @@ A trip filed from booking mail already knows the days, the place and why.
   a record. Clothes are Assets.
 - **Space** (agreed 24 Oct) — a part of Home that holds Stock and Assets
   (Fridge, Clothes); not a Place, which is somewhere on a map.
-- **Nudge** (proposed) — what the brain brings you (one of the four kinds); it lives in
+- **Nudge** (agreed 24 Oct) — what the brain brings you (one of the four kinds); it lives in
   To check.
-- **Skill** (proposed) — instructions and rules the brain has learned, kept as data.
+- **Skill** (agreed 24 Oct) — instructions and rules the brain has learned, kept as data.
 
 ### Open questions
 - **Where it runs when the phone is idle.** Android limits background work:
   scheduled passes from the phone, or the Mac (R12, always on over Tailscale)
   as the runner with the phone showing the cards?
-- **Today**: does it become the brief (LifeOS speaks first, the tiles hang
-  off it), or stay tiles with the brief on top?
 - **Layer 7's job** widens from filing and answering to noticing and
   proposing; the chain becomes Claude first for the brain, local models for
   filing, until R12–R14 can take the brain too.
