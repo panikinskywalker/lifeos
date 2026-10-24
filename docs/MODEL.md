@@ -875,3 +875,138 @@ providers as fallback only.
 - **Not wanted**: Odysseus's chat / email / calendar screens. LifeOS already has
   the records; the model serves them.
 
+*24 Oct: layer 8 proposes widening this job — Claude as the brain that
+notices, with what it learns kept here so a local model can take over. Not
+decided; until it is, this layer stands.*
+
+## 8. The brain: LifeOS comes to you first — proposed 24 Oct
+
+From a brainstorm on 24 Oct, after Anthropic's Claude Duet (an agent that
+comes to you with what needs you, keeps working, and asks before it acts).
+Duet is built for work; personal life is its weak side, and that is LifeOS's
+side. Nothing here is built. It widens layer 7 and touches R5, R7e, R8, R10
+and R12; those are settled when this layer is agreed.
+
+**The idea.** Anything you are missing, LifeOS already suggests: the butter
+running out, the paneer to use before it turns, the filter that is due, what
+to pack for Friday's flight, what you can cook tonight from what is left. It
+uses the Claude API (you have it now) as the brain, and keeps everything it
+learns on the phone.
+
+### How it works: code notices, Claude judges
+- **Candidates, in code.** Each module offers what might need you, cheaply,
+  from its own records: Turf (Thursday has 3 in of 10), People (9 days since
+  Dad), Stock (butter bought 18 days ago, rebought every 21), Upkeep (filter
+  five months old), travel (you fly Friday). No model call to find them.
+- **Claude gets the short list**, not the database, and does what code
+  cannot: judges what matters today, joins things up ("you fly Friday: use the
+  paneer and spinach first, skip Sunday's order"), and turns a notice into
+  something you can act on ("eggs, spinach, paneer, half a cream: palak paneer
+  tonight?"). It brings world knowledge your data lacks: shelf lives,
+  seasons, packing, recipes.
+- **What comes to you is one To check**, in three shapes, with the same
+  verbs everywhere: *done, undo?* (filed on its own) · *is this right?*
+  (unsure) · *shall I?* (something outward: a text written and ready to send,
+  a payment to mark, a list to order). LifeOS never sends, pays or orders by
+  itself; the last step is yours (Send in WhatsApp, open Zepto). Money is
+  never moved.
+
+### Four kinds of nudge (every module offers its own)
+| Kind | Examples |
+|---|---|
+| **Running out** | butter, detergent, medicines, the gas cylinder, water cans |
+| **Going off** | paneer, milk, a medicine's expiry, a passport or policy expiring |
+| **Due** | Upkeep's Cycles: the filter, the AC, the car by km; keep in touch; a Turf share owed |
+| **Coming up** | a trip, a match, guests, a birthday — and what each needs from you |
+
+### It learns, and keeps what it learned here
+- **Claude teaches the code.** Every answer worth keeping is stored: Amul
+  butter keeps about 30 days (on the product, so the next butter costs no
+  call); the packing list for a four-day beach trip; "Not this" on a nudge
+  (it does not come back); how fast you get through milk. The API is asked
+  only about what is new, so the cost falls as LifeOS learns.
+- **Stored as data in LifeOS**, never in Claude's memory: learned answers as
+  records, and **skills** (the instructions and rules it has built up) as
+  files you can read and export. If the subscription goes, the local model
+  (R12) runs on the same skills and memory, and they are the training set for
+  your own fine-tune (R14).
+
+### Privacy and cost
+- **What leaves the phone is records, never raw input**: "Butter, Amul 100 g,
+  bought 4 Oct" goes; a bank SMS, a mail, a photo do not — unless you pressed
+  the button that sends that one (a fridge photo, an invoice to read).
+- **Scheduled sends**: a morning and an evening pass, plus a few on events;
+  only what changed since the last pass; the unchanging part of each request
+  (skills, preferences) cached by the API.
+- **A Sent to Claude log** in You: what left, when, and why. Seeing it is
+  what makes the privacy believable.
+- **Code before Claude**: order mails and invoices are read by parsers, not
+  the model; a small model for small questions ("what kind of thing is
+  this?"), the large one only for the passes. A daily budget, as in You ›
+  Agent.
+
+### Groceries come in on their own (about 90% are online)
+- **Order mails** (Zepto, Instamart, BigBasket — to check which send them),
+  through the mail source finance already reads; a parser per shop.
+- **Blinkit sends no mail.** Its delivery notification and the bank / UPI SMS
+  say an order arrived and what it cost; a card follows — "Blinkit, ₹437,
+  just delivered. Share the invoice and I'll stock the fridge" — and the
+  shared invoice PDF is read by code (if the PDF is only a picture, Claude
+  reads it). Skipped, the order is still logged. *To check*: one real Blinkit
+  invoice, text or picture.
+- **Offline (the rest)**: a photo of the receipt, or a dump.
+
+### The Kitchen board (name open: Kitchen or Home)
+A board over a revived inventory module (R7e), as Turf sits over games.
+- **Shelves**: Fridge · Freezer · Pantry · Bathroom · Cleaning.
+- **Every thing on a shelf is a pill**, coloured by state, moving on its own:
+  lime = fresh · mustard = use soon · faded = probably gone (its estimated
+  life has passed; waiting for you). Tap = used up (and LifeOS learns your
+  rate); long-press = half left, or still good.
+- **Use soon** strip on top, then **Cook tonight** (a dish from what is lime
+  and mustard).
+- **Running low → the shopping list**, pills again; the last step is Copy
+  list · open the app.
+- **The fridge photo**: snap the fridge, Claude compares it with the pills,
+  the differences light up ("no butter · found coriander"), you tap to
+  accept or fix.
+
+### Travel through the same brain
+A trip filed from booking mail already knows the days, the place and why.
+- **Packing as pills**, scaled to the days, tuned to the weather there (a
+  free weather service, to choose), remembering what you forgot last time.
+- **Before you go**: use the fridge up, skip the Sunday order, water the
+  plants, tell the squad you're out on Thursday.
+- **Back**: "the fridge is probably empty — here's a list."
+
+### Proposed words (to agree, layer 1)
+- **Stock** — the Object for something you keep that runs out or goes off
+  (butter, detergent, a medicine): product, shelf, bought, quantity, life,
+  rate. Not "item", which layer 1 retires for a record.
+- **Nudge** — what the brain brings you (one of the four kinds); it lives in
+  To check.
+- **Skill** — instructions and rules the brain has learned, kept as data.
+
+### Open questions
+- **Where it runs when the phone is idle.** Android limits background work:
+  scheduled passes from the phone, or the Mac (R12, always on over Tailscale)
+  as the runner with the phone showing the cards?
+- **Today**: does it become the brief (LifeOS speaks first, the tiles hang
+  off it), or stay tiles with the brief on top?
+- **How many nudges a day** before it is noise; the first slices offer fewer
+  kinds, each one landing.
+- **Layer 7's job** widens from filing and answering to noticing and
+  proposing; the chain becomes Claude first for the brain, local models for
+  filing, until R12–R14 can take the brain too.
+
+### First slices, when this is agreed
+1. **Stock and the Kitchen board** — the Object, shelves and pills by hand
+   and from dumps; Use soon from shelf life.
+2. **Groceries in on their own** — one shop's mail parser, the Blinkit
+   invoice share, the receipt photo.
+3. **The brain's first pass** — candidates from Stock and Upkeep, one
+   morning nudge pass through Claude, the learned store, the Sent to Claude
+   log.
+4. **Cook tonight and the fridge photo.**
+5. **Travel** — packing and before you go.
+6. **Every module offers candidates** — Turf, People, Money, Documents.
