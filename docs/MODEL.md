@@ -919,6 +919,18 @@ learns on the phone.
 | **Due** | Upkeep's Cycles: the filter, the AC, the car by km; keep in touch; a Turf share owed |
 | **Coming up** | a trip, a match, guests, a birthday — and what each needs from you |
 
+### How many (agreed 24 Oct)
+What waits for you and what interrupts you are limited apart:
+- **In To check and the morning brief**: no overall limit, at most **two
+  nudges per module a day**, so no one module crowds out the rest.
+- **As a phone notification**: at most **three a day across all of
+  LifeOS**.
+- **Urgent ones always notify** (going off today, a match short tomorrow, a
+  share due today); they count toward the three, and take the slots first.
+- **It adjusts from what you do**: a module whose nudges you keep turning
+  down with Not this gets fewer, one whose nudges you act on keeps its two.
+  The limits are where it starts; what it learns is stored like the rest.
+
 ### It learns, and keeps what it learned here
 - **Claude teaches the code.** Every answer worth keeping is stored: Amul
   butter keeps about 30 days (on the product, so the next butter costs no
@@ -964,9 +976,11 @@ everything kept at home, in **spaces**.
 - **Every thing in a space is a pill**, coloured by state, moving on its own.
   Food and supplies: lime = fresh · mustard = use soon · faded = probably
   gone (its estimated life has passed; waiting for you); tap = used up (and
-  LifeOS learns your rate), long-press = half left, or still good. Clothes
-  don't run out: their pills say clean · in the wash · packed, and packing
-  for a trip picks from them.
+  LifeOS learns your rate), long-press = half left, or still good.
+- **Clothes are Assets** (agreed 24 Oct; layer 2, Things), not Stock: they
+  don't run out. Asset gains the category *clothing* and a **space**, so
+  Home shows them in Clothes; their pills say clean · in the wash · packed,
+  and packing for a trip picks from them. Settled in R7a.
 - **Use soon** strip on top, then **Cook tonight** (a dish from what is lime
   and mustard).
 - **Running low → the shopping list**, pills again; the last step is Copy
@@ -983,16 +997,16 @@ A trip filed from booking mail already knows the days, the place and why.
   plants, tell the squad you're out on Thursday.
 - **Back**: "the fridge is probably empty — here's a list."
 
-### Proposed words (to agree, layer 1)
-- **Stock** (agreed 24 Oct) — the Object for something kept at home (butter, detergent, a
-  medicine, a shirt): product, space, bought, quantity, life, rate, state.
-  Not "item", which layer 1 retires for a record. *Open*: whether clothes
-  are Stock or Asset (layer 2, Things); Stock keeps them in Home's spaces.
-- **Space** — a part of Home that holds Stock (Fridge, Clothes); not a Place,
-  which is somewhere on a map.
-- **Nudge** — what the brain brings you (one of the four kinds); it lives in
+### Words (to add to layer 1)
+- **Stock** (agreed 24 Oct) — the Object for something kept at home that
+  runs out or goes off (butter, detergent, a medicine): product, space,
+  bought, quantity, life, rate, state. Not "item", which layer 1 retires for
+  a record. Clothes are Assets.
+- **Space** (agreed 24 Oct) — a part of Home that holds Stock and Assets
+  (Fridge, Clothes); not a Place, which is somewhere on a map.
+- **Nudge** (proposed) — what the brain brings you (one of the four kinds); it lives in
   To check.
-- **Skill** — instructions and rules the brain has learned, kept as data.
+- **Skill** (proposed) — instructions and rules the brain has learned, kept as data.
 
 ### Open questions
 - **Where it runs when the phone is idle.** Android limits background work:
@@ -1000,8 +1014,6 @@ A trip filed from booking mail already knows the days, the place and why.
   as the runner with the phone showing the cards?
 - **Today**: does it become the brief (LifeOS speaks first, the tiles hang
   off it), or stay tiles with the brief on top?
-- **How many nudges a day** before it is noise; the first slices offer fewer
-  kinds, each one landing.
 - **Layer 7's job** widens from filing and answering to noticing and
   proposing; the chain becomes Claude first for the brain, local models for
   filing, until R12–R14 can take the brain too.
