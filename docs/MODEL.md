@@ -435,8 +435,30 @@ when online). Decided 24 Oct:
 - **The phone talks to Notion** with an internal-integration token you paste
   once (You › Data sources › Notion; kept in the secure store, like Turf
   web's key) and the database shared with it.
-- *Open until the database is read:* which Notion property is which Field
-  (and properties with no Field yet), where the extras go on the page, Groups.
+- **The database** (read 24 Oct): *Pipeline › Beta › Personal CRM ›
+  🫂 Contacts*, 83 people; properties Name, Associations (multi-select),
+  Birthday, Last Contacted, Last Update? (one line), Status (a formula); every
+  page from one template (How do I know them, Address, Family members, Likes,
+  Gift ideas, About them / Miscellaneous notes, Life Updates, Lore). No phone,
+  email or UPI on any page, so the first match is by name.
+- **The mapping** (agreed 24 Oct):
+
+  | Notion | LifeOS | How |
+  |---|---|---|
+  | Name | the Person's title | exact name; an unsure match is asked once in To check |
+  | Last Contacted | Last spoke | the later date wins both ways |
+  | Birthday | Birthday | month and day only: Notion's year is a placeholder (2024 / 2025), so it is ignored; LifeOS writes back the next birthday's date, as you keep it now |
+  | Last Update? | the newest Fact | a new Last Update? becomes a Fact; a Fact said in LifeOS becomes Last Update? |
+  | Associations | **tags**, one per association, both ways | relationship is filled once where it is plain (Family / Extended Family → family, Girlfriend → partner, Colleague → colleague, Friend / Inner Circle → friend) |
+  | page bullets | **Facts**, each remembering its section | Talk can answer "what does Kunal like?"; a Fact said in LifeOS goes under Life Updates, dated |
+  | *(new)* LifeOS log | the timeline | calls, meetings and payments appended to a section at the end of the page, written by LifeOS only |
+  | Status | — | Notion's formula; LifeOS only reads it |
+  | *(new properties)* Phone, Email, UPI IDs, Relationship, Works at, Role, City, Keep in touch, Balance, LifeOS id | the Fields of the same name; Balance is ₹, + they owe you; LifeOS id is the Person's id | added to the database once by LifeOS (your columns and views stay) |
+
+  Groups are not in Notion. Address and Family members stay page text (read
+  as Facts) until Person has Fields for them.
+- *Found on the way:* a birthday with no year (Notion, phone contacts) must be
+  stored as no year, not this year, or People says "turns 0"; fixed with R2b.
 
 ### Turf web: the hosted home of Turf (added 17 Oct, revised 20 Oct)
 LifeOS keeps its data on the S22, and you also run games from your iPhone,
@@ -638,7 +660,7 @@ screens checked on the phone → overrides only where the default is wrong)
   355 tests green; the web export builds. *Left for later:* the calendar source moves with **R4**
   (it files Events); Organisation's Fields are **R3**'s. **Phone check pending.**
 - [ ] **R2b Notion** — your Notion People CRM kept in step with People, both ways (layer 4,
-  *Notion*; agreed 24 Oct). Waiting: reading the database's layout to settle the mapping.
+  *Notion*; agreed 24 Oct, mapping agreed the same day). Next: build it.
 - [ ] **R3 places** — Place, Organisation; from calendar, mail and dumps.
 - [ ] **R4 projects** — Task, Project, Goal, Event; calendar source.
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
