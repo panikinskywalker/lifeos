@@ -415,6 +415,29 @@ sync, count today, last error). You › Data sources lists them with one
 "Sync all". Sources: you (typed / voice / share), SMS, payment notifications,
 Health Connect, Usage access, contacts, calendar, call log, Gmail (IMAP).
 
+### Notion: your People CRM, kept in step (agreed 24 Oct)
+Your People CRM in Notion and People in LifeOS keep each other up to date: a
+change in either is stored in the other. It is crm's **notion** source, one
+that also writes (the Turf web pattern: changes wait in `os.outbox` and send
+when online). Decided 24 Oct:
+- **Everyone, both ways.** Every Person in LifeOS has a page in the Notion
+  database and every page there is a Person (payees and Turf players
+  included). A page is matched to a Person by its Notion id once known, before
+  that by phone, email or a unique name (as contacts and Turf do), never
+  making a second Person.
+- **Newest edit wins, per Field.** When both sides changed the same Field
+  between syncs, the later change is kept and the other is shown once in
+  To check, so nothing is lost silently.
+- **Beyond the Fields**, LifeOS also writes last spoke and keep in touch, the
+  balance (owes you / you owe), Facts as notes on the page and the timeline
+  (calls, meetings, payments) as a log, *placed to fit your database's
+  layout*, decided once it has been read.
+- **The phone talks to Notion** with an internal-integration token you paste
+  once (You › Data sources › Notion; kept in the secure store, like Turf
+  web's key) and the database shared with it.
+- *Open until the database is read:* which Notion property is which Field
+  (and properties with no Field yet), where the extras go on the page, Groups.
+
 ### Turf web: the hosted home of Turf (added 17 Oct, revised 20 Oct)
 LifeOS keeps its data on the S22, and you also run games from your iPhone,
 where LifeOS can't go. So Turf's data lives on a host both phones and your
@@ -614,6 +637,8 @@ screens checked on the phone → overrides only where the default is wrong)
   strip (a lime ring = due), Call or message, Birthdays, Groups; the keep-in-touch nudge.
   355 tests green; the web export builds. *Left for later:* the calendar source moves with **R4**
   (it files Events); Organisation's Fields are **R3**'s. **Phone check pending.**
+- [ ] **R2b Notion** — your Notion People CRM kept in step with People, both ways (layer 4,
+  *Notion*; agreed 24 Oct). Waiting: reading the database's layout to settle the mapping.
 - [ ] **R3 places** — Place, Organisation; from calendar, mail and dumps.
 - [ ] **R4 projects** — Task, Project, Goal, Event; calendar source.
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
