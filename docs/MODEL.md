@@ -984,7 +984,7 @@ A trip filed from booking mail already knows the days, the place and why.
 - **Back**: "the fridge is probably empty — here's a list."
 
 ### Proposed words (to agree, layer 1)
-- **Stock** — the Object for something kept at home (butter, detergent, a
+- **Stock** (agreed 24 Oct) — the Object for something kept at home (butter, detergent, a
   medicine, a shirt): product, space, bought, quantity, life, rate, state.
   Not "item", which layer 1 retires for a record. *Open*: whether clothes
   are Stock or Asset (layer 2, Things); Stock keeps them in Home's spaces.
