@@ -956,13 +956,17 @@ learns on the phone.
   invoice, text or picture.
 - **Offline (the rest)**: a photo of the receipt, or a dump.
 
-### The Kitchen board (name open: Kitchen or Home)
-A board over a revived inventory module (R7e), as Turf sits over games.
-- **Shelves**: Fridge · Freezer · Pantry · Bathroom · Cleaning.
-- **Every thing on a shelf is a pill**, coloured by state, moving on its own:
-  lime = fresh · mustard = use soon · faded = probably gone (its estimated
-  life has passed; waiting for you). Tap = used up (and LifeOS learns your
-  rate); long-press = half left, or still good.
+### The Home board (named 24 Oct)
+A board over a revived inventory module (R7e), as Turf sits over games:
+everything kept at home, in **spaces**.
+- **Spaces**: Fridge · Kitchen · Cabinets · Clothes · Bathroom · Cleaning, and
+  any you add, rename or reorder. Each space opens to its own page of pills.
+- **Every thing in a space is a pill**, coloured by state, moving on its own.
+  Food and supplies: lime = fresh · mustard = use soon · faded = probably
+  gone (its estimated life has passed; waiting for you); tap = used up (and
+  LifeOS learns your rate), long-press = half left, or still good. Clothes
+  don't run out: their pills say clean · in the wash · packed, and packing
+  for a trip picks from them.
 - **Use soon** strip on top, then **Cook tonight** (a dish from what is lime
   and mustard).
 - **Running low → the shopping list**, pills again; the last step is Copy
@@ -973,16 +977,19 @@ A board over a revived inventory module (R7e), as Turf sits over games.
 
 ### Travel through the same brain
 A trip filed from booking mail already knows the days, the place and why.
-- **Packing as pills**, scaled to the days, tuned to the weather there (a
+- **Packing as pills** from Home's Clothes and Bathroom, scaled to the days, tuned to the weather there (a
   free weather service, to choose), remembering what you forgot last time.
 - **Before you go**: use the fridge up, skip the Sunday order, water the
   plants, tell the squad you're out on Thursday.
 - **Back**: "the fridge is probably empty — here's a list."
 
 ### Proposed words (to agree, layer 1)
-- **Stock** — the Object for something you keep that runs out or goes off
-  (butter, detergent, a medicine): product, shelf, bought, quantity, life,
-  rate. Not "item", which layer 1 retires for a record.
+- **Stock** — the Object for something kept at home (butter, detergent, a
+  medicine, a shirt): product, space, bought, quantity, life, rate, state.
+  Not "item", which layer 1 retires for a record. *Open*: whether clothes
+  are Stock or Asset (layer 2, Things); Stock keeps them in Home's spaces.
+- **Space** — a part of Home that holds Stock (Fridge, Clothes); not a Place,
+  which is somewhere on a map.
 - **Nudge** — what the brain brings you (one of the four kinds); it lives in
   To check.
 - **Skill** — instructions and rules the brain has learned, kept as data.
@@ -1000,7 +1007,7 @@ A trip filed from booking mail already knows the days, the place and why.
   filing, until R12–R14 can take the brain too.
 
 ### First slices, when this is agreed
-1. **Stock and the Kitchen board** — the Object, shelves and pills by hand
+1. **Stock and the Home board** — the Object, spaces and pills by hand
    and from dumps; Use soon from shelf life.
 2. **Groceries in on their own** — one shop's mail parser, the Blinkit
    invoice share, the receipt photo.
