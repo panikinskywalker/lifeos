@@ -66,7 +66,7 @@ Organisation is in the `places` module (decided 22 Oct, R3); see Places below.
 `email`, `upi`, `relationship`…) so Turf web's sync and old backups keep working.
 | Field | Type | Notes |
 |---|---|---|
-| Relationship | select | family · friend · partner · colleague · client · vendor / service · acquaintance |
+| Relationship | select, **you can add options** (30 Oct) | family · friend · partner · colleague · client · vendor / service · acquaintance are the defaults; "New…" in the form adds one you can reuse (Mentor, Neighbour), with its own colour |
 | Phone | contact (phone) | tap to call; matched on its last 10 digits (contacts, call log, SMS) |
 | Email | contact (email) | tap to mail; matched on calendar attendees |
 | UPI IDs | text, comma-separated | the UPI ids you know (typed, from contacts, from Turf web); a payment from one is theirs for sure |
@@ -77,8 +77,17 @@ Organisation is in the `places` module (decided 22 Oct, R3); see Places below.
 | Keep in touch | select cadence | off · every week · 2 weeks · month · 3 months · 6 months · year; drives the **Keep in touch** Cycle (old day counts snap to the nearest) |
 | Last spoke | date | filled on its own by a call in the call log, an Event with them (met, call, a calendar meeting they are in, a dump), and a payment to or from them; it is the cycle's last done |
 | Photo | file | the profile hero; from the phone contact |
+| Likes | text list (chips, like UPI IDs; 30 Oct) | filter coffee, pottery, RCB; kept in step with the Likes section of your Notion pages (R2b); what gift ideas are drawn from |
 | About | long text | was Notes; one-liners stay Facts |
 | *(hidden)* contact id | source key | the phone contact it came from, so re-syncs fill gaps |
+
+**Birthdays, decided 30 Oct with the NR-People designs; both come from the
+brain (layer 8), so the People screens show their slot until it is built.**
+- **Gift ideas**: a *coming up* nudge before a birthday; Claude suggests gift
+  ideas from their Likes (with prices).
+- **The wish**: on the day Claude drafts a wish; you pick a mood (Simple ·
+  Funny · Warm), edit it and *Send on WhatsApp* opens WhatsApp with the text
+  ready. LifeOS never sends by itself.
 
 **Senders are aliases** (shared with Turf, decided 22 Oct): a payment sender
 learned once ("Who is priya.s@okicici?") is kept in core's `aliases` table on
@@ -276,7 +285,7 @@ large OTP on Delivery).
 | money | Transaction amount | amount + currency | sum by period / category | INR value stored alongside |
 | date / datetime | birthday, when | relative + absolute | day / week / month / year buckets | |
 | duration | workout length, Habit minutes | h m | sum | |
-| select / multi-select | direction, Event kind | chip | group by | options fixed per Object |
+| select / multi-select | direction, Event kind | chip | group by | options fixed per Object, unless the Field lets you add options (each with its own colour, stored as a setting like Categories; R2, 30 Oct) |
 | boolean | Task done | tick | count | |
 | link | company → Organisation | chip, opens record | related to | to one Object, or to any; stored as a Link record |
 | contact | phone, email, URL | tap to call / mail / open | equals | |
@@ -443,6 +452,59 @@ Each source declares: id, the modules it feeds, the permission it needs,
 sync, count today, last error). You › Data sources lists them with one
 "Sync all". Sources: you (typed / voice / share), SMS, payment notifications,
 Health Connect, Usage access, contacts, calendar, call log, Gmail (IMAP).
+
+### Notion: your People CRM, kept in step (agreed 24 Oct)
+Your People CRM in Notion and People in LifeOS keep each other up to date: a
+change in either is stored in the other. It is crm's **notion** source, one
+that also writes (the Turf web pattern: changes wait in `os.outbox` and send
+when online). Decided 24 Oct:
+- **Everyone, both ways.** Every Person in LifeOS has a page in the Notion
+  database and every page there is a Person (payees and Turf players
+  included). A page is matched to a Person by its Notion id once known, before
+  that by phone, email or a unique name (as contacts and Turf do), never
+  making a second Person.
+- **Newest edit wins, per Field.** When both sides changed the same Field
+  between syncs, the later change is kept and the other is shown once in
+  To check, so nothing is lost silently.
+- **Beyond the Fields**, LifeOS also writes last spoke and keep in touch, the
+  balance (owes you / you owe), Facts as notes on the page and the timeline
+  (calls, meetings, payments) as a log, *placed to fit your database's
+  layout*, decided once it has been read.
+- **Never the original** (decided 30 Oct): LifeOS never writes to your
+  existing Contacts database or its pages. All of R2b, the Likes sync
+  included, targets a duplicate: **📇 Personal CRM (1)**
+  (https://app.notion.com/p/40991ce13f8281bba4dff0ff4d0d830d, under Pipeline ›
+  Beta; its Contacts database is `collection://d5691ce1-3f82-8389-945f-87d26161f264`),
+  made 30 Oct with all 83 people. LifeOS is pointed at that one; the original
+  (`collection://90150d9b-31a4-46dc-84ad-280e5388783b`) is only ever read.
+- **The phone talks to Notion** with an internal-integration token you paste
+  once (You › Data sources › Notion; kept in the secure store, like Turf
+  web's key) and the database shared with it.
+- **The database** (read 24 Oct): *Pipeline › Beta › Personal CRM ›
+  🫂 Contacts*, 83 people; properties Name, Associations (multi-select),
+  Birthday, Last Contacted, Last Update? (one line), Status (a formula); every
+  page from one template (How do I know them, Address, Family members, Likes,
+  Gift ideas, About them / Miscellaneous notes, Life Updates, Lore). No phone,
+  email or UPI on any page, so the first match is by name.
+- **The mapping** (agreed 24 Oct):
+
+  | Notion | LifeOS | How |
+  |---|---|---|
+  | Name | the Person's title | exact name; an unsure match is asked once in To check |
+  | Last Contacted | Last spoke | the later date wins both ways |
+  | Birthday | Birthday | month and day only: Notion's year is a placeholder (2024 / 2025), so it is ignored; LifeOS writes back the next birthday's date, as you keep it now |
+  | Last Update? | the newest Fact | a new Last Update? becomes a Fact; a Fact said in LifeOS becomes Last Update? |
+  | Associations | **tags**, one per association, both ways | relationship is filled once where it is plain (Family / Extended Family → family, Girlfriend → partner, Colleague → colleague, Friend / Inner Circle → friend) |
+  | page bullets | **Facts**, each remembering its section | Talk can answer "what does Kunal like?"; a Fact said in LifeOS goes under Life Updates, dated |
+  | *(new)* LifeOS log | the timeline | calls, meetings and payments appended to a section at the end of the page, written by LifeOS only |
+  | Status | — | Notion's formula; LifeOS only reads it |
+  | *(new properties)* Phone, Email, UPI IDs, Relationship, Works at, Role, City, Keep in touch, Balance, LifeOS id | the Fields of the same name; Balance is ₹, + they owe you; LifeOS id is the Person's id | added to the database once by LifeOS (your columns and views stay) |
+
+  Groups are not in Notion. Address and Family members stay page text (read
+  as Facts) until Person has Fields for them. **Likes** is kept in step with
+  the page's Likes section (each bullet a like; 30 Oct), not read as Facts.
+- *Found on the way:* a birthday with no year (Notion, phone contacts) must be
+  stored as no year, not this year, or People says "turns 0"; fixed with R2b.
 
 ### Turf web: the hosted home of Turf (added 17 Oct, revised 20 Oct)
 LifeOS keeps its data on the S22, and you also run games from your iPhone,
@@ -643,6 +705,23 @@ screens checked on the phone → overrides only where the default is wrong)
   strip (a lime ring = due), Call or message, Birthdays, Groups; the keep-in-touch nudge.
   355 tests green; the web export builds. *Left for later:* the calendar source moves with **R4**
   (it files Events); Organisation's Fields are **R3**'s. **Phone check pending.**
+  **Designed 30 Oct** (`NR-People-*` on the canvas: Home, Profile, ProfileStates, Parts, Form,
+  Group, List, ListAZ, Contacts, WhoIs, Tile, Loading); Likes, gift ideas, the drafted wish and
+  relationships you add were decided with it (layer 2); gift ideas and the wish wait for layer 8.
+  **Rebuilt to it 30 Oct**: the People home (search, quick filters, the Due strip, Call or message,
+  Birthdays, Not spoken in a while, Groups), the Person page and its states (no photo, no phone,
+  overdue, birthday today, just added, vendor, owes / owe with Settle and Pay · UPI, plays football,
+  long and one-word names), the Group page (shares, balances per member with Settle), the person form
+  (relationship pills + New…, UPI IDs and Likes as chip inputs, Works at / Lives in with *Keep as
+  typed* or *New organisation…*, a birthday with "I know the year"), the People and Groups list (by
+  relationship or A–Z with the rail), Pick contacts (suggested from the call log), **Who is this?**
+  in To check (finance files a `payee-who` item for a new UPI sender; *This* moves the payments to
+  the person and learns the sender as an alias), the People tile on Today, loading skeletons. Gift
+  ideas and the wish are slots until layer 8. Since then a typed company or city links only to an
+  Organisation or Place you already have (the form's *Keep as typed*); one is made only by *New
+  organisation…*. A birthday with no year is kept without one (no "turns 0"). Phone check pending.
+- [ ] **R2b Notion** — your Notion People CRM kept in step with People, both ways (layer 4,
+  *Notion*; agreed 24 Oct, mapping agreed the same day). Next: build it.
 - [x] **R3 places** — done 22 Oct 2026. Objects as agreed (layer 2, *Places*):
   Place (kind with the twelve options, `venue` kept for Turf; address; map pin;
   parent → Place, word *in*; maps link; notes) and Organisation (ten kinds;

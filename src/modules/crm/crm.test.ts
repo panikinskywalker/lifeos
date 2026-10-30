@@ -38,15 +38,21 @@ describe('Person (agreed 22 Oct)', () => {
 
   it('a typed company and city become Works at → Organisation and Lives in → Place; the text stays', () => {
     const zomato = os.records.create({ object: 'org', title: 'Zomato', data: { kind: 'company' } });
+    const blr = os.records.create({ object: 'place', title: 'Bengaluru', data: { kind: 'city' } });
     const k = person('Karan', { company: 'zomato', city: 'Bengaluru' });
     const now = os.records.get<PersonData>(k.id)!.data;
     expect(now.worksAtId).toBe(zomato.id);
     expect(now.company).toBe('zomato');
-    expect(os.records.get(now.livesInId!)).toMatchObject({ object: 'place', title: 'Bengaluru', data: { kind: 'city' } });
+    expect(now.livesInId).toBe(blr.id);
     expect(os.links.forEntity(k.id, 'works at').map((l) => l.other.id)).toEqual([zomato.id]);
-    // The text changes: the link follows it.
+    // The text changes to an Organisation you have: the link follows it; to one you don't: text only (Keep as typed).
+    const swiggy = os.records.create({ object: 'org', title: 'Swiggy', data: { kind: 'company' } });
     os.records.update<PersonData>(k.id, { data: { company: 'Swiggy' } });
-    expect(os.records.get(os.records.get<PersonData>(k.id)!.data.worksAtId!)!.title).toBe('Swiggy');
+    expect(os.records.get<PersonData>(k.id)!.data.worksAtId).toBe(swiggy.id);
+    os.records.update<PersonData>(k.id, { data: { company: 'Blinkit' } });
+    expect(os.records.get<PersonData>(k.id)!.data).toMatchObject({ company: 'Blinkit', worksAtId: '' });
+    expect(os.links.forEntity(k.id, 'works at')).toEqual([]);
+    expect(os.records.query('org').some((o) => o.title === 'Blinkit')).toBe(false);
   });
 
   it('the fold on start: old people are linked once, and the Football group becomes sport', () => {
@@ -135,5 +141,37 @@ describe('AI tools', () => {
     expect(m).toMatchObject({ name: 'Priya Sharma', daysAgo: 5, keepInTouch: 'Every week', lastEvent: { title: 'Lunch at Toit' } });
     expect(await tool('last_met').run({ person: 'priya' }, os)).toMatchObject({ id: p.id, daysAgo: 5 });
     expect(await tool('who_is').run({ upi: 'nobody@ybl' }, os)).toEqual({ id: null });
+  });
+});
+
+describe('People design decisions (30 Oct)', () => {
+  it('a relationship you add is kept, with its own colour, and can be picked for anyone', async () => {
+    const { addRelationship } = await import('./relationships');
+    const field = crmModule.objects![0]!.fields.find((f) => f.key === 'relationship')!;
+    const mentor = field.onCreateOption!('mentor')!;
+    expect(mentor).toMatchObject({ value: 'mentor', label: 'Mentor', color: 'purple' });
+    expect(field.options!.map((o) => o.value)).toContain('mentor');
+    expect(addRelationship(os, 'Mentor')).toEqual(mentor);
+    const p = person('Asha', { relationship: 'mentor' });
+    expect(p.data.relationship).toBe('mentor');
+  });
+
+  it('a contact without a birth year is kept without one: no age, the birthday cycle still yearly', async () => {
+    const { importContacts, birthdayParts, nextBirthday } = await import('.');
+    importContacts(os, [{ id: 'c7', name: 'Nani', phones: [], emails: [], birthday: { day: 23, month: 9 } }]);
+    const n = os.records.query<PersonData>('person').find((p) => p.title === 'Nani')!;
+    expect(birthdayParts(n.data.birthday)).toEqual({ month: 10, day: 23, year: null });
+    expect(nextBirthday(n.data.birthday!)!.age).toBeNull();
+    expect(os.cycles.forEntity(n.id).find((c) => c.template === 'person.birthday')!.nextDueAt).toBeGreaterThan(Date.now() - DAY);
+  });
+});
+
+describe('nextBirthday', () => {
+  it('a birthday today is 0 days away, tomorrow 1; no year means no age', async () => {
+    const { nextBirthday } = await import('.');
+    const now = new Date(2026, 9, 30, 15, 0);
+    expect(nextBirthday('1994-10-30', now)).toEqual({ days: 0, age: 32 });
+    expect(nextBirthday('1994-10-31', now)).toEqual({ days: 1, age: 32 });
+    expect(nextBirthday('1900-10-29', now)).toEqual({ days: 364, age: null });
   });
 });

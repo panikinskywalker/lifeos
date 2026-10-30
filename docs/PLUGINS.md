@@ -47,6 +47,9 @@ interface Field {
   linkTo?: string | string[] | 'any';  // link: Object id(s)
   linkWord?: string;                   // link: the Link's word ("works at", "paid")
   contactKind?: 'phone' | 'email' | 'url';
+  list?: boolean;                      // text: comma-separated, shown and typed as chips (R2: UPI IDs, Likes)
+  pattern?: RegExp; patternHint?: string; // text list: what each item must look like ("{item}" in the hint)
+  onCreateOption?: (label) => FieldOption | null; // select: options you add ("New…"; finance categories, crm relationships)
 }
 ```
 
@@ -232,7 +235,8 @@ interface BoardManifest {
   overview?: OverviewFn;               // the module's Overview (Browse › module, Today's area card); pure
   tiles?: TileDef[];                   // { type, name, sizes, component } — for Today and grid boards (R8)
   screens?: BoardScreen[];             // 'index' is the home; others at /module/<m>/<key> or /board/<b>/<key>
-  overrides?: ObjectOverride[];        // per Object: { object, record?: sections on the Record screen; placement 'hero' replaces the header (gets RecordControls: back, edit, more, cover), 'top' above the details, else cards }
+  overrides?: ObjectOverride[];        // per Object: { object, form?: the Object's form (new and edit; R2), record?: sections on the Record screen — placement 'page' draws the whole page, 'hero' replaces the header (both get RecordControls: back, edit, more, cover, link, tags, attach; 'page' also gets `say`), 'top' above the details, else cards }
+  checkCards?: Record<string, ComponentType<{ filing }>>; // To check cards for filing kinds (Turf's SMS questions; crm's 'payee-who')
   quickActions?: QuickAction[];        // the global "+" menu
   buttons?: ManualRun[];               // manual-run automations shown on this board (R10)
   checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds

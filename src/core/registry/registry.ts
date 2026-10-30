@@ -1,5 +1,6 @@
 import type { ObjectDef } from '../domain/types';
-import type { ActionDef, AiToolDef, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, SourceDef, TileDef, TriggerDef } from './types';
+import type { ActionDef, AiToolDef, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, RecordFormProps, SourceDef, TileDef, TriggerDef } from './types';
+import type { ComponentType } from 'react'; // type-only (deps.test allows `import type`)
 import type { MessageParser } from '../filing/contract';
 
 /**
@@ -18,6 +19,8 @@ export class Registry {
   readonly parsers = new Map<string, MessageParser>();
   readonly quickActions: QuickAction[] = [];
   readonly detailSections: EntityDetailSection[] = [];
+  /** Form overrides by Object id (a board's `overrides[].form`). */
+  readonly forms = new Map<string, ComponentType<RecordFormProps>>();
 
   register(m: ModuleManifest) {
     for (const dep of m.dependencies ?? []) {
@@ -43,6 +46,7 @@ export class Registry {
       else this.quickActions.push(q);
     }
     for (const o of b.overrides ?? []) {
+      if (o.form && o.object !== '*') this.forms.set(o.object, o.form);
       for (const s of o.record ?? []) {
         const sec = { ...s, entityType: o.object };
         const i = this.detailSections.findIndex((x) => x.key === sec.key && x.entityType === sec.entityType);

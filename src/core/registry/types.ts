@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'; // type-only: core has no runtime dependency on React (deps.test allows `import type`)
+import type { ComponentType, ReactNode } from 'react'; // type-only: core has no runtime dependency on React (deps.test allows `import type`)
 import type { ZodTypeAny } from 'zod';
 import type { ObjectRecord, ObjectDef, WidgetSize } from '../domain/types';
 import type { CoreEvents, EventName } from '../events/bus';
@@ -79,22 +79,30 @@ export interface EntityDetailSection {
   entityType: string | '*';
   key: string;
   title: string;
-  component: ComponentType<{ entity: ObjectRecord<any>; ctx: LifeOSContext; controls?: RecordControls }>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** `say`: the app shell's "Tell me about …" bar, for a 'page' section to place. */
+  component: ComponentType<{ entity: ObjectRecord<any>; ctx: LifeOSContext; controls?: RecordControls; say?: ReactNode }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   order?: number;
   /**
-   * 'hero': replaces the record header (R2: Person · Profile, edge to edge), and gets the header's controls.
+   * 'page': the board draws the whole record page (R2: Person and Group, from NR-People-*), with the page's controls.
+   * 'hero': replaces the record header (edge to edge), and gets the header's controls.
    * 'top': above the details card (Stitch stat trio, attention, quick actions). Default: below it.
    */
-  placement?: 'hero' | 'top' | 'body';
+  placement?: 'page' | 'hero' | 'top' | 'body';
 }
 
-/** What the record header offers, handed to a 'hero' section that draws its own. */
+/** What the record page offers, handed to a 'page' or 'hero' section that draws its own. */
 export interface RecordControls {
   back(): void;
   edit(): void;
   more(): void;
   /** Change the record's cover photo. */
   cover(): void;
+  /** Link it to a record (the link picker). */
+  link(): void;
+  /** Edit its tags. */
+  tags(): void;
+  /** Attach a file or photo. */
+  attach(): void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -129,6 +137,17 @@ export interface ObjectOverride {
   object: string | '*';
   /** Extra sections on the Record screen (hero at the top, cards in the body). */
   record?: EntityDetailSection[];
+  /** The Object's own form in place of the generic one (R2: Person, from NR-People-Form); used by New and Edit. */
+  form?: ComponentType<RecordFormProps>;
+}
+
+/** What a form override gets: the record to edit (none = new), prefilled values, and what to do once saved (default: open the record). */
+export interface RecordFormProps {
+  id?: string;
+  initial?: Record<string, unknown>;
+  onSaved?: (e: ObjectRecord) => void;
+  /** Link the new record to this one once saved (/entity/<type>/new?linkId=…&linkKind=…). */
+  linkTo?: { id: string; kind: string };
 }
 
 /** The Overview screen's content for a module: numbers, charts, what needs you. Pure. */

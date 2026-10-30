@@ -54,6 +54,8 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
   const sections = os.registry.detailSections.filter((s) => s.entityType === '*' || s.entityType === entity.object);
   // A board may draw the whole header (Person · Profile); the first one wins.
   const hero = sections.find((s) => s.placement === 'hero');
+  const page = sections.find((s) => s.placement === 'page');
+  const controls = { back, edit: () => router.push(`/entity/${entity.object}/${entity.id}/edit`), more: () => setPanel('menu'), cover: () => setPanel('cover'), link: () => setPanel('link'), tags: () => setPanel('tags'), attach: () => setPanel('attach') };
   const close = () => setPanel(null);
 
   const remove = () => {
@@ -65,8 +67,11 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
   return (
     <View style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
-        {hero ? (
-          <hero.component entity={entity} ctx={os} controls={{ back, edit: () => router.push(`/entity/${entity.object}/${entity.id}/edit`), more: () => setPanel('menu'), cover: () => setPanel('cover') }} />
+        {page ? (
+          <page.component entity={entity} ctx={os} controls={controls} say={say ? say(entity) : null} />
+        ) : null}
+        {page ? null : hero ? (
+          <hero.component entity={entity} ctx={os} controls={controls} />
         ) : (
           <RecordHeader
             tint={tint}
@@ -88,7 +93,7 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
           />
         )}
 
-        <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 20, gap: 20 }}>
+        {page ? null : <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 20, gap: 20 }}>
           {entity.archived ? <Chip label="Archived" icon="archive" tone="muted" /> : null}
           {say ? say(entity) : null}
 
@@ -127,7 +132,7 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
           <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>
             Created {os.format.dateTime(entity.createdAt)} · updated {os.format.dateTime(entity.updatedAt)}
           </Text>
-        </View>
+        </View>}
       </ScrollView>
 
       <ActionSheet

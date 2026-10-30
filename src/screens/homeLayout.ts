@@ -16,7 +16,7 @@ export const TILES: Record<TileId, { label: string; line: string; wide: boolean 
   areas: { label: 'Areas', line: 'A card per part of life with its number and trend', wide: true },
   upcoming: { label: 'Upcoming', line: 'The next two weeks', wide: true },
   screen: { label: 'Screen time', line: 'Today, top apps, 7 days', wide: true },
-  people: { label: 'People to call', line: 'Keep-in-touch and birthdays', wide: false },
+  people: { label: 'People', line: 'Who to call, who’s overdue, a birthday this week', wide: false },
   overdue: { label: 'Overdue', line: 'Upkeep that’s late', wide: false },
   onthisday: { label: 'On this day', line: 'A month, six months, years ago', wide: true },
 };

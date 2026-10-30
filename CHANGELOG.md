@@ -7,6 +7,26 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.9 — 30 Oct 2026
+
+**People, redrawn** from the *NR-People* artboards, built in its own session
+and merged here.
+- **People home**: search, quick filters, the strip with a lime ring when
+  something is due, Call or message, Birthdays, Not spoken in a while,
+  Groups; the People and Groups list by relationship or A–Z with the rail.
+- **A Person's page** and its states (no photo, no phone, overdue, birthday
+  today, just added, a vendor, owes you / you owe, plays football); the
+  **Group** page with shares, a balance per member and Settle.
+- **The form**: relationships you add yourself (Mentor, Neighbour) with
+  their own colour, **Likes**, several UPI ids as chips, Works at / Lives
+  in with Keep as typed, a birthday with or without the year.
+- **Gift ideas and a drafted birthday wish** have their place on the page;
+  they fill in when the brain (MODEL.md layer 8) is built.
+- **Who is this?** in To check: a payment from a UPI id nobody is known by
+  asks once, and the answer is remembered.
+- **Pick contacts** with suggestions from your call log; a People tile on
+  Today; a birthday today now says today.
+
 ## v0.0.8 — 22 Oct 2026
 
 **Places** (R3), built in its own session and merged here.
