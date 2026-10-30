@@ -8,7 +8,7 @@ import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
 import { syncMail } from './email';
-import { calendarGranted, callLogGranted, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
+import { calendarGranted, callLogBridge, callLogGranted, contactsBridge, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
 
 /**
  * Data sources on the phone (M4.2): bank SMS, payment-app notifications,
@@ -110,9 +110,13 @@ const secrets: NonNullable<DeviceBridge['secrets']> = {
 };
 
 export function deviceBridge(os: LifeOSContext): DeviceBridge {
-  if (!Device) return { secrets };
+  // Contacts work wherever expo-contacts does; the call log needs the Android module.
+  const contacts = Platform.OS === 'web' ? undefined : contactsBridge;
+  if (!Device) return { secrets, contacts };
   return {
     secrets,
+    contacts,
+    callLog: callLogBridge,
     sms: {
       access: () => access('sms'),
       read: (since, limit) => Device!.readSms(since, limit).then((xs) => xs.map((m) => ({ from: m.from, body: m.body, at: m.at }))),
@@ -180,7 +184,7 @@ export async function refreshFxRates(os: LifeOSContext) {
 let running: { at: number; p: Promise<void> } | null = null;
 
 /** A step that takes longer than this is given up on (it may still finish in the background) so the rest still run. */
-const STEP_LIMIT_MS = { fx: 10_000, phone: 90_000, device: 90_000, mail: 120_000, turf: 60_000 };
+const STEP_LIMIT_MS = { fx: 10_000, phone: 90_000, device: 90_000, mail: 120_000, turf: 60_000, notion: 240_000 };
 
 function withLimit<T>(name: string, ms: number, work: () => Promise<T>): Promise<void> {
   const t0 = Date.now();
@@ -204,7 +208,9 @@ export function syncSources(os: LifeOSContext): Promise<void> {
   if (running && Date.now() - running.at < 5 * 60_000) return running.p;
   const p = (async () => {
     await withLimit('fx', STEP_LIMIT_MS.fx, () => refreshFxRates(os));
-    await withLimit('phone (contacts, calendar, calls)', STEP_LIMIT_MS.phone, () => syncPhoneSources(os));
+    await withLimit('calendar', STEP_LIMIT_MS.phone, () => syncPhoneSources(os));
+    // People's sources (crm, R2): the contacts you picked, the call log.
+    for (const id of ['contacts', 'calllog'] as const) await withLimit(id, STEP_LIMIT_MS.phone, () => syncRegistered(os, id));
     if (deviceAvailable) {
       // Message sources are declared by their modules (finance: sms, notifications) and run through the registry.
       for (const id of ['sms', 'notifications'] as const) await withLimit(id, STEP_LIMIT_MS.device, () => syncRegistered(os, id));
@@ -221,6 +227,10 @@ export function syncSources(os: LifeOSContext): Promise<void> {
     }
     // Turf web (games): only once its address and key are set.
     await withLimit('turf', STEP_LIMIT_MS.turf, () => syncRegistered(os, 'turf'));
+    // Notion (crm, R2b): your People CRM's copy, both ways — only once a token is on this phone. Its own, longer limit: ~3 calls a second.
+    await withLimit('notion', STEP_LIMIT_MS.notion, async () => {
+      if (await secrets.get('notion.token')) await syncRegistered(os, 'notion');
+    });
     // Gmail last: a receipt then matches the SMS already filed for it (and the other way round).
     await withLimit('gmail', STEP_LIMIT_MS.mail, () => syncRegistered(os, 'gmail'));
   })().finally(() => {

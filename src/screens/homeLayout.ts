@@ -1,10 +1,11 @@
 import type { LifeOSContext } from '@core/registry/context';
 
 /** Everything Today can show, in its default order (You › Home screen turns each on / off and moves it). */
-export type TileId = 'myday' | 'progress' | 'activity' | 'habits' | 'steps' | 'sleep' | 'spend' | 'done' | 'areas' | 'upcoming' | 'screen' | 'people' | 'overdue' | 'onthisday';
+export type TileId = 'myday' | 'turf' | 'progress' | 'activity' | 'habits' | 'steps' | 'sleep' | 'spend' | 'done' | 'areas' | 'upcoming' | 'screen' | 'people' | 'overdue' | 'onthisday';
 
 export const TILES: Record<TileId, { label: string; line: string; wide: boolean }> = {
   myday: { label: 'My day', line: 'Today in time order: events, tasks, things due, deliveries', wide: true },
+  turf: { label: 'Turf', line: 'The next match: who’s in and what’s still to collect', wide: true },
   progress: { label: 'Progress', line: 'Rings: steps, sleep, screen time, habits, tasks, spend vs your goals', wide: true },
   activity: { label: 'Activity', line: 'GitHub-style grids: days worked, workouts, steps, your own trackers', wide: true },
   habits: { label: 'Habits', line: 'Tick today’s habits, with their streaks', wide: true },
@@ -15,7 +16,7 @@ export const TILES: Record<TileId, { label: string; line: string; wide: boolean 
   areas: { label: 'Areas', line: 'A card per part of life with its number and trend', wide: true },
   upcoming: { label: 'Upcoming', line: 'The next two weeks', wide: true },
   screen: { label: 'Screen time', line: 'Today, top apps, 7 days', wide: true },
-  people: { label: 'People to call', line: 'Keep-in-touch and birthdays', wide: false },
+  people: { label: 'People', line: 'Who to call, who’s overdue, a birthday this week', wide: false },
   overdue: { label: 'Overdue', line: 'Upkeep that’s late', wide: false },
   onthisday: { label: 'On this day', line: 'A month, six months, years ago', wide: true },
 };

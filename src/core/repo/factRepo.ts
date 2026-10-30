@@ -4,7 +4,8 @@ import { bus } from '../events/bus';
 import type { ChangeLog } from '../sync/changeLog';
 import { normAlias } from './aliasRepo';
 
-export type FactSource = 'talk' | 'notification' | 'note' | 'correction' | 'user' | 'dump' | 'automation';
+/** 'notion': read from your Notion People CRM (crm's notion source, R2b; migration v15). */
+export type FactSource = 'talk' | 'notification' | 'note' | 'correction' | 'user' | 'dump' | 'automation' | 'notion';
 
 export interface Fact {
   id: string;

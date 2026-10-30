@@ -4,6 +4,7 @@ import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
+import { whoIs } from '@core/identity';
 import { saveCalendarEvents } from '@core/sources/phone';
 import { fileMail } from '@core/filing/messages';
 import { graphTools, newSession, upsertNode } from '@core/graph/tools';
@@ -32,6 +33,11 @@ describe('Place and Organisation', () => {
     const kor = os.records.create<PlaceData>({ object: 'place', title: 'Koramangala', data: { kind: 'area', parentId: blr.id } });
     expect(parentChain(os, kor).map((p) => p.title)).toEqual(['Bengaluru', 'India']);
     expect(os.links.forEntity(kor.id, 'located_in')[0]!.other.title).toBe('Bengaluru');
+  });
+
+  it('an Organisation is known by any of its UPI ids (core whoIs)', () => {
+    const bank = os.records.create<OrgData>({ object: 'org', title: 'HDFC Bank', data: { kind: 'bank', upi: 'hdfcbank@hdfc, hdfc.cards@hdfc' } });
+    expect(whoIs(os, { upi: 'HDFC.cards@hdfc' })).toMatchObject({ record: { id: bank.id }, by: 'upi' });
   });
 
   it("Turf's venues stay valid: kind venue, maps link out of notes", () => {

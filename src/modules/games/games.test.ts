@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -551,5 +551,166 @@ describe('teams and the generator (R9c.4)', () => {
     const apps = q<{ gameDate: string; inGoal: boolean }>('appearance').filter((a) => a.data.gameDate === '2026-10-17') as never[];
     const s = shuffleTeams(apps, (a) => (a as { inGoal: boolean }).inGoal, () => 0.3);
     expect(Object.values(s).filter((x) => x === 'A')).toHaveLength(2);
+  });
+});
+
+describe('players, venues, friends and the money texts (R9c.5)', () => {
+  const KEY = `tw_${'k'.repeat(30)}`;
+  const src = () => os.registry.sources.get('turf')!;
+  /** Turf web stand-in: a new player is p_new, a new venue v_new; the next sync brings them back. */
+  const turfWeb = () => {
+    const taken: Array<{ id: string; method: string; body: Record<string, unknown> }> = [];
+    const pending: TurfSyncPage['tables'] = {};
+    let rev = 40;
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('/api/actions')) {
+        const { actions } = JSON.parse(String(init!.body)) as { actions: typeof taken };
+        const results = actions.map((a) => {
+          taken.push(a);
+          if (a.body.action === 'player') {
+            pending.players = [{ id: 'p_new', name: a.body.name, phone: a.body.phone || null, position: a.body.position || null, kind: a.body.kind, availability_mode: 'regular', weekly_availability: 'all_week', default_availability: 'AVL' }];
+            return { id: a.id, status: 201, result: { id: 'p_new' } };
+          }
+          if (a.body.action === 'venue' && !a.body.id) {
+            pending.venues = [{ id: 'v_new', name: a.body.name, side_size: a.body.sideSize, default_cost: a.body.defaultCost, payment_terms: a.body.paymentTerms }];
+            return { id: a.id, status: 201, result: { id: 'v_new' } };
+          }
+          return { id: a.id, status: 200, result: { ok: true } };
+        });
+        return new Response(JSON.stringify({ results }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      const page = delta(rev, rev + 1, { ...pending });
+      for (const k of Object.keys(pending)) delete pending[k];
+      rev = page.rev;
+      return new Response(JSON.stringify(page), { status: 200, headers: { 'content-type': 'application/json' } });
+    }));
+    return taken;
+  };
+  beforeEach(() => {
+    applyTurfSync(os, first());
+    os.settings.set(TURF_URL, 'https://turf-web.example.dev');
+    secrets.set(TURF_KEY, KEY);
+  });
+
+  it('a new player is a Person and a profile at once, in the Football group; Turf web’s id replaces the local one', async () => {
+    const taken = turfWeb();
+    const { profileId, item } = createPlayer(os, { name: 'Dev Patel', phone: '98200 00009', position: 'RB', pace: 4 });
+    expect(item.payload).toMatchObject({ method: 'POST', body: { action: 'player', name: 'Dev Patel', phone: '98200 00009', position: 'RB', pace: 4, kind: 'regular' } });
+    expect(q('person').find((p) => p.title === 'Dev Patel')).toBeTruthy();
+    const group = q<{ memberIds: string[] }>('group')[0]!;
+    expect(group.data.memberIds).toContain(person('Dev Patel').id);
+    await runSource(os, src());
+    expect(taken.map((a) => a.body.action)).toEqual(['player']);
+    expect(os.records.get<{ sourceKey: string }>(profileId)!.data.sourceKey).toBe('turf:players:p_new');
+    expect(q('player').filter((p) => p.title === 'Dev Patel')).toHaveLength(1);
+  });
+
+  it('editing a player sends every field as Turf web’s form does; availability replaces the periods', () => {
+    const karan = q('player').find((p) => p.title === 'Karan')!;
+    const edit = editPlayer(os, karan.id, { name: 'Karan Mehta', phone: '+919820000003', position: 'Forward', speciality: 'Finishing', jersey: '9' });
+    expect(edit.payload).toMatchObject({ method: 'PUT', body: { id: 'p_karan', name: 'Karan Mehta', jerseyNumber: '9', speciality: 'Finishing', pace: null, kind: 'regular' } });
+    expect(os.records.get<{ jersey?: string; name: string }>(karan.id)!.data).toMatchObject({ name: 'Karan Mehta', jersey: '9' });
+    const av = setAvailability(os, karan.id, { mode: 'regular', weekly: 'weekends', periods: [{ status: 'OOS', startsAt: '2026-11-01', endsAt: '2026-11-08', note: 'Away' }] });
+    expect(av.payload.body).toEqual({ action: 'availability', id: 'p_karan', availabilityMode: 'regular', weeklyAvailability: 'weekends', periods: [{ status: 'OOS', startsAt: '2026-11-01', endsAt: '2026-11-08', note: 'Away' }] });
+    expect(os.records.get<{ periods: unknown[]; weekly: string }>(karan.id)!.data).toMatchObject({ weekly: 'weekends', periods: [{ status: 'OOS', startsAt: '2026-11-01' }] });
+    // Turf web's own copy of the period arrives with an id and replaces the one made here.
+    applyTurfSync(os, delta(40, 41, { player_availability_periods: [{ id: 'av_new', player_id: 'p_karan', status: 'OOS', starts_at: '2026-11-01', ends_at: '2026-11-08', note: 'Away' }] }, [{ table: 'player_availability_periods', key: 'av_karan', rev: 41 }]));
+    expect(os.records.get<{ periods: Array<{ id?: string }> }>(karan.id)!.data.periods.map((p) => p.id)).toEqual(['av_new']);
+    expect(() => setAvailability(os, karan.id, { mode: 'regular', weekly: 'all_week', periods: [{ status: 'INJ', startsAt: '2026-11-08', endsAt: '2026-11-01' }] })).toThrow(/dates/);
+  });
+
+  it('venues: a new one (and its Place) gets Turf web’s id; an edit sends the venue’s id; Turf web’s rules apply here first', async () => {
+    turfWeb();
+    const { venueId } = saveVenue(os, null, { name: 'Green Turf Arena', sideSize: 6, defaultCost: 2000, paymentTerms: 'postpaid' });
+    expect(q('place').some((p) => p.title === 'Green Turf Arena')).toBe(true);
+    await runSource(os, src());
+    expect(os.records.get<{ sourceKey: string }>(venueId)!.data.sourceKey).toBe('turf:venues:v_new');
+    expect(q<{ name: string }>('venue').filter((v) => v.data.name === 'Green Turf Arena')).toHaveLength(1);
+    const dome = q<{ name: string }>('venue').find((v) => v.data.name === 'Dome Turf')!;
+    expect(saveVenue(os, dome.id, { name: 'Dome Turf', sideSize: 5, defaultCost: 1600, paymentTerms: 'prepaid' }).item!.payload.body).toMatchObject({ action: 'venue', id: 'v_dome', defaultCost: 1600, paymentTerms: 'prepaid', advanceAmount: null });
+    expect(() => saveVenue(os, null, { name: 'X', sideSize: 10, paymentTerms: 'postpaid' })).toThrow(/ground size/);
+    expect(() => saveVenue(os, null, { name: 'X', mapsLink: 'maps.google.com/x', paymentTerms: 'postpaid' })).toThrow(/Maps link/);
+  });
+
+  it('a friend’s profile submission waits in To check until Turf web settles it; the audit log is kept', () => {
+    applyTurfSync(os, delta(40, 41, {
+      profile_submissions: [{ id: 'sub_1', player_id: 'p_karan', invite_id: 'inv_1', payload: JSON.stringify({ position: 'Striker', jerseyNumber: '9', phone: '+919820000003' }), status: 'pending', submitted_at: '2026-10-20T10:00:00Z' }],
+      change_log: [{ id: 'c2', created_at: '2026-10-20T09:00:00Z', actor: 'rutvij', device: 'iPhone', kind: 'stats', summary: 'Karan 4G · Sat 17 Oct', game_id: 'g_sat', player_id: 'p_karan', target: '{}' }],
+    }));
+    const [sub] = pendingSubmissions(os);
+    expect(sub).toMatchObject({ id: 'sub_1', name: 'Karan', status: 'pending' });
+    expect(submissionChanges(sub!, q<never>('player').find((p) => (p as { title: string }).title === 'Karan')!.data, person('Karan').data).map((c) => c.label)).toEqual(['Position', 'Shirt number']);
+    expect(os.filings.toCheck().filter((f) => f.kind === 'turf-submission').map((f) => f.label)).toEqual(['Karan submitted their profile']);
+    expect(auditLog(os).map((a) => a.summary)).toEqual(['Karan 4G · Sat 17 Oct', 'Arjun paid ₹200 · Sat 17 Oct']);
+    applyTurfSync(os, delta(41, 42, { profile_submissions: [{ id: 'sub_1', player_id: 'p_karan', invite_id: 'inv_1', payload: '{}', status: 'approved' }] }));
+    expect(pendingSubmissions(os)).toHaveLength(0);
+    expect(os.filings.toCheck().filter((f) => f.kind === 'turf-submission')).toHaveLength(0);
+  });
+
+  it('dues and the WhatsApp texts come out of Turf web’s own rules', () => {
+    const d = turfDues(os, new Date('2026-10-25T12:00:00+05:30'));
+    expect(d.owedToYou.totalCents).toBe(70_000); // Karan ₹450 + Arjun ₹250 on the game you fronted
+    expect(d.youOwe.totalCents).toBe(50_000); // your ₹500 to Priya for Wednesday
+    const texts = duesTexts(os);
+    expect(texts.all).toContain('Karan');
+    expect(texts.reminder(person('Arjun').id)).toContain('250');
+    const m = matchTexts(os, q<{ date: string }>('game').find((g) => g.data.date === '2026-10-17')!.id)!;
+    expect(m.summary).toContain('Playground Arena');
+    expect(m.pending).toContain('Karan');
+  });
+
+  it('leaders rank like Turf web: goals with Golden Boot tie-breaks', () => {
+    const { rows } = leaderTables(os);
+    const r = rankLeaders(rows, 'goals');
+    expect(r.sorted.slice(0, 2).map((x) => [x.player.name, x.goals])).toEqual([['Karan', 6], ['Priya', 3]]);
+    expect(r.places.slice(0, 2)).toEqual([1, 2]);
+  });
+});
+
+describe('shares paid by SMS (R9c.6)', () => {
+  beforeEach(() => applyTurfSync(os, first()));
+  const sms = (amount: number, date: string, merchant: string, raw: string) => os.records.create({ object: 'transaction', data: { amount, kind: 'income', category: 'other', date, merchant, rawText: raw } });
+  const asks = () => os.filings.toCheck().filter((f) => f.kind === SMS_ASK);
+  const paid = () => os.filings.toCheck().filter((f) => f.kind === SMS_PAID);
+
+  it('a new sender is asked about once; Yes records the share and learns them; next time it is recorded on its own, with Undo', () => {
+    // Karan owes ₹500 (Wed 14) and ₹450 (Sat 17). A first SMS from an unknown UPI id: asked.
+    sms(450, '2026-10-18', 'KARAN MEHTA', 'Rs.450.00 credited to HDFC Bank A/c XX1234 on 18-10-26 from VPA karan.m@okhdfc (UPI 426912345679)');
+    expect(asks().map((f) => f.label)).toEqual(['Karan paid ₹450 for Sat, 17 Oct?']);
+    expect(asks()[0]!.flag).toMatch(/₹450 in from KARAN MEHTA · SMS/);
+    const askId = asks()[0]!.id;
+    confirmSmsAsk(os, askId);
+    confirmSmsAsk(os, askId); // a second Yes pays nothing more
+    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ amountPaid: 450 });
+    // The answered question stays until the payment has gone, then leaves To check.
+    expect(asks().map((f) => f.id)).toEqual([askId]);
+    settleSmsAsk(os, askId);
+    expect(asks()).toHaveLength(0);
+    expect(os.aliases.lookup('karan.m@okhdfc').map((a) => a.entityId)).toEqual([person('Karan').id]);
+    expect(turfChanges(os).sending.map((i) => i.payload.body)).toEqual([expect.objectContaining({ action: 'payment', playerId: 'p_karan', amount: 450, via: 'sms' })]);
+
+    // The same sender pays the Wednesday share: known, exact, in the window — recorded without asking.
+    sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited to HDFC Bank A/c XX1234 on 19-10-26 from VPA karan.m@okhdfc');
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹500 · Wed, 14 Oct/)]);
+    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(500);
+    undoSmsPayment(os, paid()[0]!.id);
+    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(0);
+    expect(paid()).toHaveLength(0);
+  });
+
+  it('a smaller amount is asked as a part payment; money from outside the squad or with nothing open is left alone', () => {
+    sms(200, '2026-10-18', 'KARAN MEHTA', 'Rs.200.00 credited from VPA karan.m@okhdfc');
+    expect(asks().map((f) => f.label)).toEqual(['Karan paid ₹200 of ₹500 for Wed, 14 Oct?']);
+    sms(450, '2026-10-18', 'SWIGGY REFUND', 'Rs.450 credited from VPA swiggy@icici');
+    sms(999, '2026-12-30', 'KARAN MEHTA', 'Rs.999 credited from VPA karan.m@okhdfc');
+    expect(asks()).toHaveLength(1);
+  });
+
+  it('one of several UPI ids on their Person is known at once (core identity)', () => {
+    os.records.update(person('Karan').id, { data: { upi: 'karan@ybl, karan.m@okhdfc' } });
+    sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited from VPA karan.m@okhdfc');
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹500 · Wed, 14 Oct/)]);
   });
 });

@@ -66,6 +66,28 @@ export interface Formatters {
 
 export type Access = 'granted' | 'needed' | 'unavailable';
 
+/** One phone contact, as the device bridge hands it over. */
+export interface DeviceContact {
+  id: string;
+  name: string;
+  phones: string[];
+  emails: string[];
+  birthday?: { day: number; month: number; year?: number } | null;
+  company?: string | null;
+  jobTitle?: string | null;
+  /** The contact's photo (a content:// or file:// uri). */
+  photo?: string | null;
+}
+
+/** One call from the call log. */
+export interface CallEntry {
+  number: string;
+  name?: string | null;
+  at: number;
+  seconds: number;
+  type: 'incoming' | 'outgoing' | 'missed' | 'other';
+}
+
 export interface DeviceBridge {
   sms?: {
     access(): Promise<Access>;
@@ -82,6 +104,18 @@ export interface DeviceBridge {
   mail?: {
     /** Runs the mailbox sync (IMAP, cursors, passwords live in platform); files through core; returns how many it filed. */
     sync(): Promise<number>;
+  };
+  /** The phone's contacts (R2: crm's contacts source and the picker). Only the contacts you pick become People. */
+  contacts?: {
+    access(): Promise<Access>;
+    /** Every contact with a name, sorted by name (asks for access when it has none). */
+    read(): Promise<DeviceContact[]>;
+  };
+  /** The call log (R2: crm's call log source moves "last spoke"). */
+  callLog?: {
+    access(): Promise<Access>;
+    /** Calls since `since`, newest first. */
+    read(since: number, limit: number): Promise<CallEntry[]>;
   };
   /** The phone's secure store (keys a source needs, e.g. Turf web's): never in settings, never in a backup. */
   secrets?: {

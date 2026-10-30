@@ -52,6 +52,10 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
   const tint = tintForModule(def.module);
   const statusDef = def.statuses?.find((s) => s.value === entity.status);
   const sections = os.registry.detailSections.filter((s) => s.entityType === '*' || s.entityType === entity.object);
+  // A board may draw the whole header (Person · Profile); the first one wins.
+  const hero = sections.find((s) => s.placement === 'hero');
+  const page = sections.find((s) => s.placement === 'page');
+  const controls = { back, edit: () => router.push(`/entity/${entity.object}/${entity.id}/edit`), more: () => setPanel('menu'), cover: () => setPanel('cover'), link: () => setPanel('link'), tags: () => setPanel('tags'), attach: () => setPanel('attach') };
   const close = () => setPanel(null);
 
   const remove = () => {
@@ -63,26 +67,33 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
   return (
     <View style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
-        <RecordHeader
-          tint={tint}
-          icon={def.icon}
-          cover={cover?.uri}
-          onCoverPress={() => setPanel('cover')}
-          title={entity.title}
-          subtitle={[def.label, entity.subtitle].filter(Boolean).join(' · ')}
-          status={def.statuses?.length ? { label: statusDef?.label ?? 'No status', onPress: () => setPanel('status') } : undefined}
-          stats={headerStats(os, entity, def.fields)}
-          onBack={back}
-          actions={
-            <>
-              <IconButton icon="star" accessibilityLabel={entity.starred ? 'Unstar' : 'Star'} filled={entity.starred ? t.c.accent.mustard : 'overlay'} onPress={() => os.records.update(entity.id, { starred: !entity.starred })} />
-              <IconButton icon="edit" accessibilityLabel="Edit record" filled="overlay" onPress={() => router.push(`/entity/${entity.object}/${entity.id}/edit`)} />
-              <IconButton icon="more" accessibilityLabel="More" filled="overlay" onPress={() => setPanel('menu')} />
-            </>
-          }
-        />
+        {page ? (
+          <page.component entity={entity} ctx={os} controls={controls} say={say ? say(entity) : null} />
+        ) : null}
+        {page ? null : hero ? (
+          <hero.component entity={entity} ctx={os} controls={controls} />
+        ) : (
+          <RecordHeader
+            tint={tint}
+            icon={def.icon}
+            cover={cover?.uri}
+            onCoverPress={() => setPanel('cover')}
+            title={entity.title}
+            subtitle={[def.label, entity.subtitle].filter(Boolean).join(' · ')}
+            status={def.statuses?.length ? { label: statusDef?.label ?? 'No status', onPress: () => setPanel('status') } : undefined}
+            stats={headerStats(os, entity, def.fields)}
+            onBack={back}
+            actions={
+              <>
+                <IconButton icon="star" accessibilityLabel={entity.starred ? 'Unstar' : 'Star'} filled={entity.starred ? t.c.accent.mustard : 'overlay'} onPress={() => os.records.update(entity.id, { starred: !entity.starred })} />
+                <IconButton icon="edit" accessibilityLabel="Edit record" filled="overlay" onPress={() => router.push(`/entity/${entity.object}/${entity.id}/edit`)} />
+                <IconButton icon="more" accessibilityLabel="More" filled="overlay" onPress={() => setPanel('menu')} />
+              </>
+            }
+          />
+        )}
 
-        <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 20, gap: 20 }}>
+        {page ? null : <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 20, gap: 20 }}>
           {entity.archived ? <Chip label="Archived" icon="archive" tone="muted" /> : null}
           {say ? say(entity) : null}
 
@@ -96,7 +107,7 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
           })}
 
           <DetailsCard entity={entity} fields={def.fields} />
-          {sections.filter((s) => s.placement !== 'top').map((s) => {
+          {sections.filter((s) => s.placement !== 'top' && s.placement !== 'hero').map((s) => {
             const C = s.component;
             return (
               <View key={s.key}>
@@ -121,7 +132,7 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
           <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>
             Created {os.format.dateTime(entity.createdAt)} · updated {os.format.dateTime(entity.updatedAt)}
           </Text>
-        </View>
+        </View>}
       </ScrollView>
 
       <ActionSheet
@@ -572,7 +583,7 @@ function FactsCard({ entity }: { entity: ObjectRecord }) {
     os.facts.add({ text: text.trim(), subjectId: entity.id, source: 'user' });
     setText('');
   };
-  const who = (s: string) => (s === 'user' ? 'You' : s === 'talk' || s === 'dump' ? 'Agent' : s === 'automation' ? 'Automation' : s === 'notification' ? 'A message' : s === 'correction' ? 'A correction' : 'A note');
+  const who = (s: string) => (s === 'user' ? 'You' : s === 'talk' || s === 'dump' ? 'Agent' : s === 'automation' ? 'Automation' : s === 'notification' ? 'A message' : s === 'correction' ? 'A correction' : s === 'notion' ? 'Notion' : 'A note');
   return (
     <Card icon="sparkle" tint="memory" title="Facts" meta={facts.length ? `${facts.length}` : undefined}>
       <View style={{ gap: 12 }}>

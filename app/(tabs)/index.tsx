@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { upkeep, type Upkeep } from '@core/cycles/upkeep';
 import { onThisDay } from '@core/almanac/almanac';
-import { METRICS, formatMetric, metricSeries, peopleToCall, screenTopApps, spendPace, upcoming, type MetricId } from '@core/dashboard/metrics';
+import { METRICS, formatMetric, metricSeries, screenTopApps, spendPace, upcoming, type MetricId } from '@core/dashboard/metrics';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import type { IconName } from '@ui/icons';
@@ -18,6 +18,8 @@ import { activeHabits } from '@core/habits/habits';
 import { trackerSummary, trackers } from '@core/activity/trackers';
 import { ActivityRow } from '../../src/screens/ActivityGrid';
 import { HabitChecklist, HabitWeek } from '@boards/habits';
+import { TurfTodayTile } from '@boards/turf/today';
+import { PeopleTodayTile } from '@boards/crm/tile';
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -76,7 +78,7 @@ export default function TodayTab() {
         </View>
       }
     >
-      {(rest ? rows : rows.slice(0, 3)).map((r) => (r.length === 2 ? <BentoGrid key={r.join()}>{r.map((id) => <TodayTile key={id} id={id} u={u} />)}</BentoGrid> : <TodayTile key={r[0]} id={r[0]!} u={u} />))}
+      {(rest ? rows : rows.slice(0, 3)).map((r) => (r.length === 2 ? <BentoGrid key={r.join()}>{r.map((id) => <TodayTile key={id} id={id} u={u} />)}</BentoGrid> : <TodayTile key={r[0]} id={r[0]!} u={u} alone />))}
       <Pressable accessibilityRole="button" onPress={() => router.push('/settings/home' as never)} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10 }}>
         <Icon name="edit" size={14} />
         <Text variant="caption" color="secondary">Choose what’s on Today</Text>
@@ -85,7 +87,8 @@ export default function TodayTab() {
   );
 }
 
-function TodayTile({ id, u }: { id: TileId; u: Upkeep }) {
+/** `alone`: the tile has the row to itself (a 1×1 whose neighbour is wide), so People draws its wide 4 × 2. */
+function TodayTile({ id, u, alone }: { id: TileId; u: Upkeep; alone?: boolean }) {
   switch (id) {
     case 'steps':
     case 'sleep':
@@ -97,13 +100,15 @@ function TodayTile({ id, u }: { id: TileId; u: Upkeep }) {
     case 'upcoming':
       return <UpcomingTile u={u} />;
     case 'people':
-      return <PeopleTile u={u} />;
+      return <PeopleTodayTile wide={alone} />;
     case 'overdue':
       return <OverdueTile u={u} />;
     case 'onthisday':
       return <OnThisDayTile />;
     case 'myday':
       return <MyDayTile u={u} />;
+    case 'turf':
+      return <TurfTodayTile />;
     case 'done':
       return <DoneTile />;
     case 'progress':
@@ -227,27 +232,6 @@ function UpcomingTile({ u }: { u: Upkeep }) {
         </RowList>
       ) : (
         <Text variant="caption" color="secondary">Nothing due or planned in the next two weeks.</Text>
-      )}
-    </Tile>
-  );
-}
-
-function PeopleTile({ u }: { u: Upkeep }) {
-  const router = useRouter();
-  const people = useLive((o) => peopleToCall(o, 3, Date.now(), u), [u]);
-  return (
-    <Tile tint="people" icon="people" label="People" meta="to call">
-      {people.length ? (
-        <View style={{ gap: 6 }}>
-          {people.map((p) => (
-            <Pressable key={p.entityId} accessibilityRole="button" onPress={() => router.push(`/entity/person/${p.entityId}` as never)}>
-              <Text variant="label" numberOfLines={1}>{p.title}</Text>
-              <Text variant="caption" color={p.late ? 'alert' : 'secondary'} numberOfLines={1}>{p.why}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : (
-        <Text variant="caption" color="secondary">No one due. Set “keep in touch” on a person to see them here.</Text>
       )}
     </Tile>
   );

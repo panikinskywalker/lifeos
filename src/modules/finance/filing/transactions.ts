@@ -2,7 +2,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { findTwin, sourceLabel, type RawMessage } from '@core/filing/queue';
 import type { FileContext, FileOutcome } from '@core/filing/contract';
 import { toInr } from './fx';
-import { linkPayee, payeeFor } from './payee';
+import { askWhoIs, linkPayee, payeeFor } from './payee';
 import { categoryFor, learnedCategory, payeeOf, rangeRule, ruleCategory } from './rules';
 import { accountFor } from './accounts';
 import type { ParsedTxn } from './bankSms';
@@ -113,7 +113,9 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
     if (pm) {
       linkPayee(os, e.id, pm, t.counterparty, t.vpa, item.source);
       if (pm.guess) flag = pm.guess;
-      if (pm.created) created.push(pm.id);
+      // A UPI ID no one has, under a person's name: To check asks who it is (in place of "Payee: …").
+      const asked = askWhoIs(os, e.id, pm, t.counterparty, t.vpa, item.source, id);
+      if (pm.created && !asked) created.push(pm.id);
     }
   }
   // What you taught it for this payee (any name the bank uses for them) beats the name match and the built-in list.

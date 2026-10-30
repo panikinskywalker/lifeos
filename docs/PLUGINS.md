@@ -47,6 +47,9 @@ interface Field {
   linkTo?: string | string[] | 'any';  // link: Object id(s)
   linkWord?: string;                   // link: the Link's word ("works at", "paid")
   contactKind?: 'phone' | 'email' | 'url';
+  list?: boolean;                      // text: comma-separated, shown and typed as chips (R2: UPI IDs, Likes)
+  pattern?: RegExp; patternHint?: string; // text list: what each item must look like ("{item}" in the hint)
+  onCreateOption?: (label) => FieldOption | null; // select: options you add ("New…"; finance categories, crm relationships)
 }
 ```
 
@@ -160,8 +163,27 @@ A module's `sync` reads the phone through `os.device` (the `DeviceBridge` in
 boot) and never imports platform code. `runSource` in `src/core/filing/sources.ts`
 files messages through the parsers in batches, upserts readings by `sourceKey`
 (the Object's schema must keep that field) and records the source's state.
-Finance declares sms, notifications and gmail; usage, health and the phone
-sources stay in platform until R2 / R6.
+Finance declares sms, notifications and gmail; crm declares contacts and
+calllog (R2: `os.device.contacts` reads the phone's contacts, `os.device.callLog`
+the calls; both are `readings` sources that file their own records and report
+`filed`); usage, health and the calendar stay in platform until R6 / R4.
+
+crm also declares `notion` (R2b): a `readings` source that also writes, to a
+copy of your Notion People CRM only (`src/modules/crm/notion/client.ts`:
+`assertWritable` and a request-level guard refuse the original). Token in
+`os.device.secrets` (`notion.token`); target, cursor and the per-Person last
+agreed values in settings (`crm.notion.*`); changes wait in `os.outbox`, one
+item per Person. Migration **v15** `facts-from-notion` lets a Fact's source be
+`notion`.
+
+**Who a sender is** (R2). `ObjectDef.identity?(data) → { upi?, phone?, email? }`
+says how a record is known from outside (crm's Person: its UPI IDs, phone and
+email). Core's `whoIs(os, { upi, phone, email }, objects?)`
+(`src/core/identity.ts`) returns the one record it is, and by what: a UPI id on
+the record, a UPI id learned as an alias in `os.aliases` (shared with Turf's
+"learn a sender once"), the mobile number inside a UPI id, the email; an
+ambiguous phone or email is no match. Finance's `payeeFor` asks it first; a
+module that matches payments never imports crm.
 
 `os.device.secrets` (get / set) is the phone's secure store for tokens a
 source needs; never settings, never a backup. Games declares `turf` (R9c.1):
@@ -221,11 +243,24 @@ interface BoardManifest {
   overview?: OverviewFn;               // the module's Overview (Browse › module, Today's area card); pure
   tiles?: TileDef[];                   // { type, name, sizes, component } — for Today and grid boards (R8)
   screens?: BoardScreen[];             // 'index' is the home; others at /module/<m>/<key> or /board/<b>/<key>
-  overrides?: ObjectOverride[];        // per Object: { object, record?: sections on the Record screen (hero at the top or cards) }
+  overrides?: ObjectOverride[];        // per Object: { object, form?: the Object's form (new and edit; R2), record?: sections on the Record screen — placement 'page' draws the whole page, 'hero' replaces the header (both get RecordControls: back, edit, more, cover, link, tags, attach; 'page' also gets `say`), 'top' above the details, else cards }
+  checkCards?: Record<string, ComponentType<{ filing }>>; // To check cards for filing kinds (Turf's SMS questions; crm's 'payee-who')
   quickActions?: QuickAction[];        // the global "+" menu
   buttons?: ManualRun[];               // manual-run automations shown on this board (R10)
+  checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds
 }
 ```
+
+A board can put its own questions in **To check**: a module adds a filing of
+its own `kind` (`os.filings.add`), and the board's `checkCards[kind]` is drawn
+for it in place of the usual tick / edit / cancel row (`app/check.tsx`). Turf:
+`turf-payment-ask` (an SMS that may pay a share — Yes / Not this),
+`turf-payment` (a share recorded from an SMS — Undo), `turf-submission` (a
+friend's profile — Review / Later).
+
+A board screen's query parameters must not be called `id`: the route
+`/board/[id]/[page]` already uses `id` for the board, so `?id=` never reaches
+the screen (Turf uses `?game=`, `?player=`, `?venue=`, `?sub=`).
 
 Every module has a companion board of the same id in `src/boards/<module>`
 holding its overview, screens, quick actions and record sections (the Vehicle

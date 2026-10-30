@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { Platform, Pressable, TextInput, View, type TextInputProps, type TextStyle } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, TextInput, View, type TextInputProps, type TextStyle } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 import { Icon, type IconName } from '../icons';
 import { useTheme } from '../theme/ThemeProvider';
+import { fontForWeight, monoFonts } from '../theme/tokens';
 import { Chip, FilterChip } from './Chip';
 import type { IconBoxTone } from './IconBox';
 import { RowItem, RowList } from './RowItem';
@@ -440,3 +441,252 @@ export function DayChips({ label, value, onChange }: { label?: string; value: nu
   );
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Chip input (NR-People-Parts G5) and option pills with New… (R2).    */
+/* ------------------------------------------------------------------ */
+
+/** Split a comma-separated list value into its items. */
+export const splitList = (s: string | undefined | null) => (s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+
+const CHIP_DOT = '#9FB8F7';
+const CORAL_FILL = 'rgba(255,92,71,0.18)';
+
+/**
+ * A list typed as chips (G5: UPI IDs, Likes). The value stays a
+ * comma-separated string. Enter or a comma adds what was typed; Backspace on
+ * an empty input selects the last chip, again removes it; × removes one. An
+ * item `validate` refuses stays in the input with its line under the box.
+ * `inline` (G5): chips and the input share the box, mono with a dot.
+ * `below` (NR-People-Form · Likes): an input with a +, the chips under it.
+ */
+export function ChipsField({ label, required, hint, error, value, onChange, placeholder, validate, layout = 'inline', mono, leading, autoFocus }: { label?: string; required?: boolean; hint?: string; error?: string; value: string | undefined | null; onChange: (v: string) => void; placeholder?: string; /** The line for an item that isn't right, or null when it is. */ validate?: (item: string) => string | null; layout?: 'inline' | 'below'; /** JetBrains Mono chips with a dot (ids: UPI). Default: on for inline. */ mono?: boolean; leading?: IconName; autoFocus?: boolean }) {
+  const t = useTheme();
+  const items = splitList(value);
+  const [text, setText] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [itemError, setItemError] = useState<string | null>(null);
+  const input = useRef<TextInput>(null);
+  const isMono = mono ?? layout === 'inline';
+
+  const commit = (raw: string): boolean => {
+    const parts = raw.split(',').map((x) => x.trim()).filter(Boolean);
+    if (!parts.length) return true;
+    const next = [...items];
+    for (const p of parts) {
+      const bad = validate?.(p) ?? null;
+      if (bad) {
+        if (next.length !== items.length) onChange(next.join(', '));
+        setText(p);
+        setItemError(bad);
+        return false;
+      }
+      if (!next.some((x) => x.toLowerCase() === p.toLowerCase())) next.push(p);
+    }
+    onChange(next.join(', '));
+    setText('');
+    setItemError(null);
+    return true;
+  };
+  const remove = (i: number) => {
+    onChange(items.filter((_, j) => j !== i).join(', '));
+    setSelected(null);
+  };
+  const onText = (s: string) => {
+    setSelected(null);
+    if (itemError) setItemError(null);
+    if (s.includes(',')) {
+      const cut = s.lastIndexOf(',');
+      if (commit(s.slice(0, cut))) setText(s.slice(cut + 1).trimStart());
+      return;
+    }
+    setText(s);
+  };
+  const onKey = (key: string) => {
+    if (key !== 'Backspace' || text || !items.length) return;
+    if (selected == null) setSelected(items.length - 1);
+    else remove(selected);
+  };
+
+  const shownError = itemError ?? error;
+  const line = shownError ? (
+    <Text variant="caption" color={t.c.alert.coral} accessibilityLiveRegion="polite" style={{ paddingHorizontal: 4 }}>
+      {shownError}
+    </Text>
+  ) : selected != null && items[selected] ? (
+    <Text variant="caption" color="tertiary" style={{ paddingHorizontal: 4 }}>
+      ⌫ again removes {items[selected]}
+    </Text>
+  ) : hint ? (
+    <Text variant="caption" color="secondary" style={{ paddingHorizontal: 4 }}>
+      {hint}
+    </Text>
+  ) : null;
+  const border = { borderWidth: shownError || focused ? 1.5 : 1, borderColor: shownError ? t.c.alert.coral : focused ? t.c.fg.primary : t.c.line };
+  const textInput = (style: TextStyle) => (
+    <TextInput
+      ref={input}
+      accessibilityLabel={label ? `Add to ${label}` : placeholder}
+      value={text}
+      onChangeText={onText}
+      onKeyPress={(e) => onKey(e.nativeEvent.key)}
+      onSubmitEditing={() => commit(text)}
+      submitBehavior="submit"
+      returnKeyType="done"
+      autoCapitalize={isMono ? 'none' : 'sentences'}
+      autoCorrect={!isMono}
+      autoFocus={autoFocus}
+      keyboardType={isMono ? 'email-address' : 'default'}
+      placeholder={items.length && layout === 'inline' ? undefined : placeholder}
+      placeholderTextColor={t.c.fg.tertiary}
+      selectionColor={t.c.accent.mustard}
+      cursorColor={t.c.accent.mustard}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        setSelected(null);
+        if (text.trim()) commit(text);
+      }}
+      style={[{ color: t.c.fg.primary, paddingVertical: 0 }, style]}
+    />
+  );
+
+  const chip = (item: string, i: number) => {
+    const bad = validate?.(item) ?? null;
+    const sel = selected === i;
+    const fg = bad ? t.c.alert.coralText : t.c.fg.primary;
+    return (
+      <View key={`${item}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingLeft: 12, paddingRight: 4, borderRadius: 999, backgroundColor: bad ? CORAL_FILL : layout === 'inline' ? t.c.bg.tileRaised : 'rgba(255,255,255,0.08)', borderWidth: sel ? 1.5 : 0, borderColor: t.c.fg.primary, marginLeft: sel ? -1.5 : 0, marginRight: sel ? -1.5 : 0 }}>
+        {isMono ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: bad ? t.c.alert.coralText : CHIP_DOT }} /> : null}
+        <Text numberOfLines={1} style={[{ fontSize: 13, lineHeight: 17, color: fg }, isMono ? { fontFamily: monoFonts[700] } : { fontWeight: '600' }]}>
+          {item}
+        </Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${item}`} hitSlop={6} onPress={() => remove(i)} style={({ pressed }) => ({ width: layout === 'inline' ? 26 : 24, height: layout === 'inline' ? 26 : 24, borderRadius: 13, backgroundColor: pressed ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center' })}>
+          <Icon name="x" size={14} color={fg} />
+        </Pressable>
+      </View>
+    );
+  };
+
+  if (layout === 'below') {
+    return (
+      <View style={{ gap: 8 }}>
+        {label ? (
+          <Text variant="label" color="secondary" style={{ fontSize: 13, lineHeight: 17, paddingHorizontal: 4 }}>
+            {label}
+            {required ? <Text variant="label" color={t.c.alert.coralText}> *</Text> : null}
+          </Text>
+        ) : null}
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, paddingLeft: 18, paddingRight: 8, borderRadius: t.radius.input, backgroundColor: t.c.bg.tile }, border]}>
+          {leading ? <Icon name={leading} size={18} color={t.c.fg.secondary} style={{ flexShrink: 0 }} /> : null}
+          {textInput({ ...(t.type.body as TextStyle), fontSize: 16, lineHeight: 21, fontFamily: fontForWeight(500), flex: 1, minWidth: 0, minHeight: 44 })}
+          <Pressable accessibilityRole="button" accessibilityLabel={label ? `Add to ${label}` : 'Add'} disabled={!text.trim()} onPress={() => commit(text)} style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+            <Icon name="plus" size={20} color={text.trim() ? t.c.fg.primary : t.c.fg.tertiary} />
+          </Pressable>
+        </View>
+        {items.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginHorizontal: -t.layout.gutter, flexGrow: 0 }} contentContainerStyle={{ gap: 6, paddingHorizontal: t.layout.gutter }}>
+            {items.map(chip)}
+          </ScrollView>
+        ) : null}
+        {line}
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 8 }}>
+      {label ? (
+        <Text variant="label" color="secondary" style={{ fontSize: 13, lineHeight: 17, paddingHorizontal: 4 }}>
+          {label}
+          {required ? <Text variant="label" color={t.c.alert.coralText}> *</Text> : null}
+        </Text>
+      ) : null}
+      <View style={{ gap: 6 }}>
+        <Pressable accessible={false} onPress={() => input.current?.focus()} style={[{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, minHeight: 56, paddingVertical: 10, paddingHorizontal: 12, borderRadius: t.radius.input, backgroundColor: t.c.bg.tile }, border]}>
+          {leading && !items.length ? <Icon name={leading} size={18} color={t.c.fg.secondary} style={{ marginLeft: 6 }} /> : null}
+          {items.map(chip)}
+          {textInput(isMono && (text || items.length) ? { fontFamily: monoFonts[500], fontSize: 14, lineHeight: 18, minHeight: 34, width: 80, flexGrow: 1, paddingHorizontal: 4 } : { ...(t.type.body as TextStyle), fontSize: 16, lineHeight: 21, minHeight: 34, width: items.length ? 80 : undefined, flexGrow: 1, paddingHorizontal: 6 })}
+        </Pressable>
+        {line}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * A short list of options as pills, plus "New…" that opens an inline input
+ * and Add (NR-People-Form · Relationship). `onCreate` makes the option and
+ * returns its value (then picked). Tapping the picked pill clears it.
+ */
+export function OptionPills({ label, required, hint, error, options, value, onChange, onCreate, createHint, createPlaceholder = 'Name it' }: { label?: string; required?: boolean; hint?: string; error?: string; options: Option[]; value: string | undefined; onChange: (v: string | undefined) => void; onCreate?: (label: string) => string | null; /** The line under the New… input. */ createHint?: string; createPlaceholder?: string }) {
+  const t = useTheme();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const add = () => {
+    const v = name.trim() ? onCreate?.(name.trim()) : null;
+    if (v) onChange(v);
+    setName('');
+    setAdding(false);
+  };
+  return (
+    <View style={{ gap: 8 }}>
+      {label ? (
+        <Text variant="label" color="secondary" style={{ fontSize: 13, lineHeight: 17, paddingHorizontal: 4 }}>
+          {label}
+          {required ? <Text variant="label" color={t.c.alert.coralText}> *</Text> : null}
+        </Text>
+      ) : null}
+      <View style={{ gap: 10 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ marginHorizontal: -t.layout.gutter, flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: t.layout.gutter }}>
+          {options.map((o) => (
+            <FilterChip key={o.value} label={o.label} icon={o.icon} selected={value === o.value} onPress={() => onChange(value === o.value ? undefined : o.value)} />
+          ))}
+          {onCreate ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={label ? `New ${label.toLowerCase()}` : 'New'} accessibilityState={{ expanded: adding }} onPress={() => setAdding((a) => !a)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(245,245,247,0.32)', opacity: pressed ? 0.7 : 1 })}>
+              <Icon name="plus" size={14} color={t.c.fg.primary} />
+              <Text variant="label">New…</Text>
+            </Pressable>
+          ) : null}
+        </ScrollView>
+        {adding ? (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, paddingLeft: 18, paddingRight: 10, borderRadius: t.radius.input, backgroundColor: t.c.bg.tile, borderWidth: 1.5, borderColor: t.c.fg.primary }}>
+              <TextInput
+                accessibilityLabel={label ? `New ${label.toLowerCase()}` : 'New'}
+                autoFocus
+                value={name}
+                onChangeText={setName}
+                onSubmitEditing={add}
+                returnKeyType="done"
+                placeholder={createPlaceholder}
+                placeholderTextColor={t.c.fg.tertiary}
+                selectionColor={t.c.accent.mustard}
+                cursorColor={t.c.accent.mustard}
+                style={[t.type.body as TextStyle, { flex: 1, fontSize: 16, lineHeight: 21, color: t.c.fg.primary, paddingVertical: 12 }]}
+              />
+              <Pressable accessibilityRole="button" accessibilityLabel="Add" disabled={!name.trim()} onPress={add} style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center', opacity: !name.trim() ? 0.5 : pressed ? 0.8 : 1 })}>
+                <Text style={{ fontSize: 13, lineHeight: 20, fontWeight: '700', color: t.c.accent.mustardInk }}>Add</Text>
+              </Pressable>
+            </View>
+            {createHint ? (
+              <Text variant="caption" color="secondary" numberOfLines={2}>
+                {createHint}
+              </Text>
+            ) : null}
+          </>
+        ) : null}
+        {error ? (
+          <Text variant="caption" color={t.c.alert.coral} accessibilityLiveRegion="polite" style={{ paddingHorizontal: 4 }}>
+            {error}
+          </Text>
+        ) : hint ? (
+          <Text variant="caption" color="tertiary" style={{ paddingHorizontal: 4 }}>
+            {hint}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}

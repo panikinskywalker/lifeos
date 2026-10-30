@@ -118,5 +118,7 @@ export const orgType: ObjectDef<OrgData> = {
   ],
   indexed: ['kind'],
   searchText: (d) => [d.website, d.upi, d.phone, d.notes].filter(Boolean).join(' '),
+  /** How core `whoIs` knows it: its UPI ids and phone (R2). */
+  identity: (d) => ({ upi: (d.upi ?? '').split(/[,\s]+/).filter(Boolean), phone: d.phone ? [d.phone] : [] }),
   enrich: (_os, data, { text }) => (data.kind && data.kind !== 'other' ? data : { ...data, kind: orgKindFor(text ?? '') ?? data.kind ?? 'other' }),
 };

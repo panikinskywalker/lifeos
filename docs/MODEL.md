@@ -54,13 +54,61 @@ also listed under Mind and Agenda below because that is where you browse them).
 Every record of any Object has: title, created / updated, archived, tags,
 attachments, and can carry links, facts, events, cycles and notes.
 
-### People
+### People (module `crm`; Person agreed 22 Oct in R2)
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
-| **Person** | Someone in your life | relationship, phone, email, birthday (yearly cycle), company → Organisation link, keep-in-touch cycle | you, dumps, contacts, SMS/UPI payer match |
+| **Person** | Someone in your life | see below | you, dumps, contacts, call log, calendar, SMS/UPI payer match, Turf web |
 | **Group** | A set of people (Goa gang, flat, family) | members, kind | you, dumps, splits |
 
 Organisation is in the `places` module (decided 22 Oct, R3); see Places below.
+
+**Person's Fields** (agreed 22 Oct). The keys stay as they were (`phone`,
+`email`, `upi`, `relationship`…) so Turf web's sync and old backups keep working.
+| Field | Type | Notes |
+|---|---|---|
+| Relationship | select, **you can add options** (30 Oct) | family · friend · partner · colleague · client · vendor / service · acquaintance are the defaults; "New…" in the form adds one you can reuse (Mentor, Neighbour), with its own colour |
+| Phone | contact (phone) | tap to call; matched on its last 10 digits (contacts, call log, SMS) |
+| Email | contact (email) | tap to mail; matched on calendar attendees |
+| UPI IDs | text, comma-separated | the UPI ids you know (typed, from contacts, from Turf web); a payment from one is theirs for sure |
+| Birthday | date, year optional | drives a yearly **Birthday** Cycle, 7 days' notice |
+| Works at | link → Organisation, word "works at", **and** the typed text | the link when a record is picked; the text stays as the fallback (`company`) |
+| Role | text | |
+| Lives in | link → Place, word "lives in", **and** the typed text | as Works at (`city`) |
+| Keep in touch | select cadence | off · every week · 2 weeks · month · 3 months · 6 months · year; drives the **Keep in touch** Cycle (old day counts snap to the nearest) |
+| Last spoke | date | filled on its own by a call in the call log, an Event with them (met, call, a calendar meeting they are in, a dump), and a payment to or from them; it is the cycle's last done |
+| Photo | file | the profile hero; from the phone contact |
+| Likes | text list (chips, like UPI IDs; 30 Oct) | filter coffee, pottery, RCB; kept in step with the Likes section of your Notion pages (R2b); what gift ideas are drawn from |
+| About | long text | was Notes; one-liners stay Facts |
+| *(hidden)* contact id | source key | the phone contact it came from, so re-syncs fill gaps |
+
+**Birthdays, decided 30 Oct with the NR-People designs; both come from the
+brain (layer 8), so the People screens show their slot until it is built.**
+- **Gift ideas**: a *coming up* nudge before a birthday; Claude suggests gift
+  ideas from their Likes (with prices).
+- **The wish**: on the day Claude drafts a wish; you pick a mood (Simple ·
+  Funny · Warm), edit it and *Send on WhatsApp* opens WhatsApp with the text
+  ready. LifeOS never sends by itself.
+
+**Senders are aliases** (shared with Turf, decided 22 Oct): a payment sender
+learned once ("Who is priya.s@okicici?") is kept in core's `aliases` table on
+the Person, beside the UPI IDs Field. Matching a payment checks the UPI IDs,
+then the aliases, then the name.
+
+**Group's Fields** (agreed 22 Oct).
+| Field | Type | Notes |
+|---|---|---|
+| Name | text | the title |
+| Kind | select | home · trip · friends · family · work · sport (new; the Football group moves to sport once, Turf's sync still finds it by name) |
+| Members | link → Person, many, word "member" | each member's default share and joined / left stay in core's `group_members` |
+| Default split | select | equally · by shares; how a bill in this group splits unless you say otherwise |
+| Place | link → Place, word "at" | where the group is (Flat 4B) |
+| Photo | file | the group's cover |
+| About | long text | was Notes |
+
+**Organisation** is settled in **R3 places** (decided 22 Oct): it stays in the
+`places` module and R3 decides its Fields. People only links to it (a Person
+works at one, a Transaction's payee is one) and payee matching reads its UPI
+ids as R3 leaves them.
 
 ### Things
 | Object | Meaning | Key fields | Filed by |
@@ -246,7 +294,7 @@ large OTP on Delivery).
 | money | Transaction amount | amount + currency | sum by period / category | INR value stored alongside |
 | date / datetime | birthday, when | relative + absolute | day / week / month / year buckets | |
 | duration | workout length, Habit minutes | h m | sum | |
-| select / multi-select | direction, Event kind | chip | group by | options fixed per Object |
+| select / multi-select | direction, Event kind | chip | group by | options fixed per Object, unless the Field lets you add options (each with its own colour, stored as a setting like Categories; R2, 30 Oct) |
 | boolean | Task done | tick | count | |
 | link | company → Organisation | chip, opens record | related to | to one Object, or to any; stored as a Link record |
 | contact | phone, email, URL | tap to call / mail / open | equals | |
@@ -413,6 +461,59 @@ Each source declares: id, the modules it feeds, the permission it needs,
 sync, count today, last error). You › Data sources lists them with one
 "Sync all". Sources: you (typed / voice / share), SMS, payment notifications,
 Health Connect, Usage access, contacts, calendar, call log, Gmail (IMAP).
+
+### Notion: your People CRM, kept in step (agreed 24 Oct)
+Your People CRM in Notion and People in LifeOS keep each other up to date: a
+change in either is stored in the other. It is crm's **notion** source, one
+that also writes (the Turf web pattern: changes wait in `os.outbox` and send
+when online). Decided 24 Oct:
+- **Everyone, both ways.** Every Person in LifeOS has a page in the Notion
+  database and every page there is a Person (payees and Turf players
+  included). A page is matched to a Person by its Notion id once known, before
+  that by phone, email or a unique name (as contacts and Turf do), never
+  making a second Person.
+- **Newest edit wins, per Field.** When both sides changed the same Field
+  between syncs, the later change is kept and the other is shown once in
+  To check, so nothing is lost silently.
+- **Beyond the Fields**, LifeOS also writes last spoke and keep in touch, the
+  balance (owes you / you owe), Facts as notes on the page and the timeline
+  (calls, meetings, payments) as a log, *placed to fit your database's
+  layout*, decided once it has been read.
+- **Never the original** (decided 30 Oct): LifeOS never writes to your
+  existing Contacts database or its pages. All of R2b, the Likes sync
+  included, targets a duplicate: **📇 Personal CRM (1)**
+  (https://app.notion.com/p/40991ce13f8281bba4dff0ff4d0d830d, under Pipeline ›
+  Beta; its Contacts database is `collection://d5691ce1-3f82-8389-945f-87d26161f264`),
+  made 30 Oct with all 83 people. LifeOS is pointed at that one; the original
+  (`collection://90150d9b-31a4-46dc-84ad-280e5388783b`) is only ever read.
+- **The phone talks to Notion** with an internal-integration token you paste
+  once (You › Data sources › Notion; kept in the secure store, like Turf
+  web's key) and the database shared with it.
+- **The database** (read 24 Oct): *Pipeline › Beta › Personal CRM ›
+  🫂 Contacts*, 83 people; properties Name, Associations (multi-select),
+  Birthday, Last Contacted, Last Update? (one line), Status (a formula); every
+  page from one template (How do I know them, Address, Family members, Likes,
+  Gift ideas, About them / Miscellaneous notes, Life Updates, Lore). No phone,
+  email or UPI on any page, so the first match is by name.
+- **The mapping** (agreed 24 Oct):
+
+  | Notion | LifeOS | How |
+  |---|---|---|
+  | Name | the Person's title | exact name; an unsure match is asked once in To check |
+  | Last Contacted | Last spoke | the later date wins both ways |
+  | Birthday | Birthday | month and day only: Notion's year is a placeholder (2024 / 2025), so it is ignored; LifeOS writes back the next birthday's date, as you keep it now |
+  | Last Update? | the newest Fact | a new Last Update? becomes a Fact; a Fact said in LifeOS becomes Last Update? |
+  | Associations | **tags**, one per association, both ways | relationship is filled once where it is plain (Family / Extended Family → family, Girlfriend → partner, Colleague → colleague, Friend / Inner Circle → friend) |
+  | page bullets | **Facts**, each remembering its section | Talk can answer "what does Kunal like?"; a Fact said in LifeOS goes under Life Updates, dated |
+  | *(new)* LifeOS log | the timeline | calls, meetings and payments appended to a section at the end of the page, written by LifeOS only |
+  | Status | — | Notion's formula; LifeOS only reads it |
+  | *(new properties)* Phone, Email, UPI IDs, Relationship, Works at, Role, City, Keep in touch, Balance, LifeOS id | the Fields of the same name; Balance is ₹, + they owe you; LifeOS id is the Person's id | added to the database once by LifeOS (your columns and views stay) |
+
+  Groups are not in Notion. Address and Family members stay page text (read
+  as Facts) until Person has Fields for them. **Likes** is kept in step with
+  the page's Likes section (each bullet a like; 30 Oct), not read as Facts.
+- *Found on the way:* a birthday with no year (Notion, phone contacts) must be
+  stored as no year, not this year, or People says "turns 0"; fixed with R2b.
 
 ### Turf web: the hosted home of Turf (added 17 Oct, revised 20 Oct)
 LifeOS keeps its data on the S22, and you also run games from your iPhone,
@@ -590,11 +691,61 @@ screens checked on the phone → overrides only where the default is wrong)
   screen, Investment hero, Investments on the Finance home. **Dataset**: all three inboxes, every
   parser's read, what was filed, your corrections. 319 tests green; the web export builds.
   *Deferred inside R1:* You › Data sources still lists sources from a platform table until every
-  source is declared by a module (R2 contacts / calendar / call log, R6 health / usage); the
+  source is declared by a module (R2 contacts / call log — done; calendar with R4; R6 health / usage); the
   SubscriptionHero does not yet draw the price history; a price feed for current value is R12+.
   **Phone check pending**: migrations v11–v14 and the budget / institution folds run on first open.
-- [ ] **R2 crm** — Person; contacts source; payee and UPI matching; keep-in-touch
-  and birthday cycles; tools: people to call, last met, balances per person.
+- [x] **R2 crm** — built 22 Oct 2026 (branch `claude/r2-people-058675`; no migration). Person and
+  Group as agreed (layer 2, *People*): phone and email are contact Fields, keep in touch a cadence
+  select (old day counts snap to the nearest), Works at → Organisation and Lives in → Place with
+  the typed text kept (folded once on start, then whenever the text is typed), a photo, About;
+  Group gains sport (Football moved once), default split, place, photo. **Sources declared by
+  the module**: contacts (the people you picked, re-filled) and call log, through `os.device`
+  (`contacts`, `callLog`), run by core like finance's; the contacts picker reads the bridge.
+  **Payee and UPI matching**: core's `whoIs` (`src/core/identity.ts`) matches a UPI id, a phone
+  or an email against `ObjectDef.identity` (Person gives its UPI IDs, phone, email), then against
+  a sender learned as an alias in core's `aliases` (the same table Turf's "Who is
+  priya.s@okicici?" writes), then the mobile number inside a UPI id; finance's `payeeFor` asks it
+  first. **Last spoke** moves on its own: a call (call log), an Event with them, a payment linked
+  to them (not an unconfirmed guess); it rolls the Keep in touch cycle. **Cycles**: Keep in touch
+  (interval) and Birthday (yearly, 7 days' notice). **Tools**: `people_to_call`, `last_met`,
+  `who_is`; *balances per person* stay finance's `balances` (one home for money; the Person
+  profile shows it and Settle). **Board** (v3 Noir, NR-KitRecords): Person · Profile as the
+  record's hero (a new `placement: 'hero'` on record sections), the People home with the People
+  strip (a lime ring = due), Call or message, Birthdays, Groups; the keep-in-touch nudge.
+  355 tests green; the web export builds. *Left for later:* the calendar source moves with **R4**
+  (it files Events); Organisation's Fields are **R3**'s. **Phone check pending.**
+  **Designed 30 Oct** (`NR-People-*` on the canvas: Home, Profile, ProfileStates, Parts, Form,
+  Group, List, ListAZ, Contacts, WhoIs, Tile, Loading); Likes, gift ideas, the drafted wish and
+  relationships you add were decided with it (layer 2); gift ideas and the wish wait for layer 8.
+  **Rebuilt to it 30 Oct**: the People home (search, quick filters, the Due strip, Call or message,
+  Birthdays, Not spoken in a while, Groups), the Person page and its states (no photo, no phone,
+  overdue, birthday today, just added, vendor, owes / owe with Settle and Pay · UPI, plays football,
+  long and one-word names), the Group page (shares, balances per member with Settle), the person form
+  (relationship pills + New…, UPI IDs and Likes as chip inputs, Works at / Lives in with *Keep as
+  typed* or *New organisation…*, a birthday with "I know the year"), the People and Groups list (by
+  relationship or A–Z with the rail), Pick contacts (suggested from the call log), **Who is this?**
+  in To check (finance files a `payee-who` item for a new UPI sender; *This* moves the payments to
+  the person and learns the sender as an alias), the People tile on Today, loading skeletons. Gift
+  ideas and the wish are slots until layer 8. Since then a typed company or city links only to an
+  Organisation or Place you already have (the form's *Keep as typed*); one is made only by *New
+  organisation…*. A birthday with no year is kept without one (no "turns 0"). Phone check pending.
+- [x] **R2b Notion** — built 30 Oct 2026: your Notion People CRM kept in step with People, both
+  ways (layer 4, *Notion*), as crm's `notion` source (`src/modules/crm/notion/`: client, mapping,
+  sync), writing **only to the copy** 📇 Personal CRM (1). The original is refused twice in code:
+  every write method checks the id and the page's parent (`assertWritable`), and the request layer
+  refuses any write naming an original id; the settings screen refuses a pasted link to it; tests
+  prove each write path. First sync adds the ten columns to the copy and pulls every page (matched by
+  Notion id, LifeOS id, phone, email or a unique name; an unsure one asked once in To check,
+  `notion-match`), then every Person gets a page. Per Field the newest edit wins against the last
+  agreed value, the other shown once in To check (`notion-conflict`); on first pairing tags, likes and
+  UPI ids are merged. Likes ↔ the Likes section; other bullets → Facts (source `notion`, once);
+  Last Update? ↔ the newest Fact; Associations ↔ tags; LifeOS writes Facts under Life Updates, a
+  LifeOS log of calls, meetings and payments, Balance (finance's `balances` tool through the
+  registry) and LifeOS id. Changes wait in the outbox and send when online; nothing echoes back.
+  You › Data sources › Notion: token (secure store), the target, Sync now. **Migration v15**
+  `facts-from-notion` (facts may have the source `notion`). 395 tests green; the web export builds.
+  *Not in R2b*: deletes either way, Groups. **Not yet run against Notion** (needs your token and the
+  copy shared with the integration); phone check pending.
 - [x] **R3 places** — done 22 Oct 2026. Objects as agreed (layer 2, *Places*):
   Place (kind with the twelve options, `venue` kept for Turf; address; map pin;
   parent → Place, word *in*; maps link; notes) and Organisation (ten kinds;
@@ -740,9 +891,29 @@ screens checked on the phone → overrides only where the default is wrong)
       with" picks, side wishes or kit votes, so the generator here balances
       on ratings, positions and chemistry; the Captains suggestion stays on
       Turf web. *Phone check pending.*
-    - [ ] **R9c.5** Players, profiles, availability, venues; all of Leaders.
-    - [ ] **R9c.6** WhatsApp texts, the SMS share match (learned senders),
-      friends' submissions in To check.
+    - [x] **R9c.5 Players, venues, Leaders** (LifeOS v0.0.6, 22 Oct): new and
+      edited players (a Person and a Player profile, the Football group;
+      Turf web's id replaces the local one), availability (mode, days,
+      periods), new and edited venues (with their Place), Turf web's
+      Leaders copied in (`games/leaders.ts`: thirteen tables, ranking rules,
+      places before the last match day), dues and every WhatsApp text from
+      Turf web's own `dues.ts` / `messages.ts` (copied; `games/money.ts`).
+      Board: Home, Dues, Audit log, Games (centre and history), the match's
+      Payment checklist and pay sheet, New match, Log stats, Formations,
+      Squad, Leaders, Player, Stats card, Edit player, Venues, Edit venue,
+      Turf settings, the section switcher and the sync states, per the
+      *Turf · Noir* artboards. *Phone check pending.*
+    - [x] **R9c.6 To check, SMS, texts** (v0.0.6, 22 Oct): friends' profile
+      submissions sync into To check and are approved or turned down on the
+      Submission screen (a direct call to Turf web's `/api/invites`, so it
+      needs a connection); the audit log syncs; the SMS share match as
+      decided in layer 2 *Money* (`games/smsMatch.ts`: sender = UPI id or the
+      bank's name; known = a learned alias in core `aliases`, a player's UPI,
+      or finance's Person; sure → recorded with Undo; else a question, and a
+      Yes learns the sender); boards can now give To check their own cards
+      (`BoardManifest.checkCards`). Gaps: squad-invite requests (new players
+      asking to join) and photos aren't in the sync yet; undoing a change
+      from the audit log stays on Turf web.
   - [x] **R9d Turf web, the screens** (v0.0.5–v0.0.6, 20 Oct 2026): every
     organiser screen and every friends' page of the *Turf web · Noir* canvas,
     built in `turf-web/app/ui/` from the artboards' own measurements
@@ -807,3 +978,162 @@ providers as fallback only.
 - **Not wanted**: Odysseus's chat / email / calendar screens. LifeOS already has
   the records; the model serves them.
 
+*24 Oct: layer 8 proposes widening this job — Claude as the brain that
+notices, with what it learns kept here so a local model can take over. Not
+decided; until it is, this layer stands.*
+
+## 8. The brain: LifeOS comes to you first — proposed 24 Oct
+
+From a brainstorm on 24 Oct, after Anthropic's Claude Duet (an agent that
+comes to you with what needs you, keeps working, and asks before it acts).
+Duet is built for work; personal life is its weak side, and that is LifeOS's
+side. Nothing here is built. It widens layer 7 and touches R5, R7e, R8, R10
+and R12; those are settled when this layer is agreed.
+
+**The idea.** Anything you are missing, LifeOS already suggests: the butter
+running out, the paneer to use before it turns, the filter that is due, what
+to pack for Friday's flight, what you can cook tonight from what is left. It
+uses the Claude API (you have it now) as the brain, and keeps everything it
+learns on the phone.
+
+### How it works: code notices, Claude judges
+- **Candidates, in code.** Each module offers what might need you, cheaply,
+  from its own records: Turf (Thursday has 3 in of 10), People (9 days since
+  Dad), Stock (butter bought 18 days ago, rebought every 21), Upkeep (filter
+  five months old), travel (you fly Friday). No model call to find them.
+- **Claude gets the short list**, not the database, and does what code
+  cannot: judges what matters today, joins things up ("you fly Friday: use the
+  paneer and spinach first, skip Sunday's order"), and turns a notice into
+  something you can act on ("eggs, spinach, paneer, half a cream: palak paneer
+  tonight?"). It brings world knowledge your data lacks: shelf lives,
+  seasons, packing, recipes.
+- **What comes to you is one To check**, in three shapes, with the same
+  verbs everywhere: *done, undo?* (filed on its own) · *is this right?*
+  (unsure) · *shall I?* (something outward: a text written and ready to send,
+  a payment to mark, a list to order). LifeOS never sends, pays or orders by
+  itself; the last step is yours (Send in WhatsApp, open Zepto). Money is
+  never moved.
+
+### Four kinds of nudge (every module offers its own)
+| Kind | Examples |
+|---|---|
+| **Running out** | butter, detergent, medicines, the gas cylinder, water cans |
+| **Going off** | paneer, milk, a medicine's expiry, a passport or policy expiring |
+| **Due** | Upkeep's Cycles: the filter, the AC, the car by km; keep in touch; a Turf share owed |
+| **Coming up** | a trip, a match, guests, a birthday — and what each needs from you |
+
+### How many (agreed 24 Oct)
+What waits for you and what interrupts you are limited apart:
+- **In To check and the morning brief**: no overall limit, at most **two
+  nudges per module a day**, so no one module crowds out the rest.
+- **As a phone notification**: at most **three a day across all of
+  LifeOS**.
+- **Urgent ones always notify** (going off today, a match short tomorrow, a
+  share due today); they count toward the three, and take the slots first.
+- **It adjusts from what you do**: a module whose nudges you keep turning
+  down with Not this gets fewer, one whose nudges you act on keeps its two.
+  The limits are where it starts; what it learns is stored like the rest.
+
+### It learns, and keeps what it learned here
+- **Claude teaches the code.** Every answer worth keeping is stored: Amul
+  butter keeps about 30 days (on the product, so the next butter costs no
+  call); the packing list for a four-day beach trip; "Not this" on a nudge
+  (it does not come back); how fast you get through milk. The API is asked
+  only about what is new, so the cost falls as LifeOS learns.
+- **Stored as data in LifeOS**, never in Claude's memory: learned answers as
+  records, and **skills** (the instructions and rules it has built up) as
+  files you can read and export. If the subscription goes, the local model
+  (R12) runs on the same skills and memory, and they are the training set for
+  your own fine-tune (R14).
+
+### Privacy and cost
+- **What leaves the phone is records, never raw input**: "Butter, Amul 100 g,
+  bought 4 Oct" goes; a bank SMS, a mail, a photo do not — unless you pressed
+  the button that sends that one (a fridge photo, an invoice to read).
+- **Scheduled sends**: a morning and an evening pass, plus a few on events;
+  only what changed since the last pass; the unchanging part of each request
+  (skills, preferences) cached by the API.
+- **A Sent to Claude log** in You: what left, when, and why. Seeing it is
+  what makes the privacy believable.
+- **Code before Claude**: order mails and invoices are read by parsers, not
+  the model; a small model for small questions ("what kind of thing is
+  this?"), the large one only for the passes. A daily budget, as in You ›
+  Agent.
+
+### Groceries come in on their own (about 90% are online)
+- **Order mails** (Zepto, Instamart, BigBasket — to check which send them),
+  through the mail source finance already reads; a parser per shop.
+- **Blinkit sends no mail.** Its delivery notification and the bank / UPI SMS
+  say an order arrived and what it cost; a card follows — "Blinkit, ₹437,
+  just delivered. Share the invoice and I'll stock the fridge" — and the
+  shared invoice PDF is read by code (if the PDF is only a picture, Claude
+  reads it). Skipped, the order is still logged. *To check*: one real Blinkit
+  invoice, text or picture.
+- **Offline (the rest)**: a photo of the receipt, or a dump.
+
+### The Home board (named 24 Oct)
+A board over a revived inventory module (R7e), as Turf sits over games:
+everything kept at home, in **spaces**.
+- **Spaces**: Fridge · Kitchen · Cabinets · Clothes · Bathroom · Cleaning, and
+  any you add, rename or reorder. Each space opens to its own page of pills.
+- **Every thing in a space is a pill**, coloured by state, moving on its own.
+  Food and supplies: lime = fresh · mustard = use soon · faded = probably
+  gone (its estimated life has passed; waiting for you); tap = used up (and
+  LifeOS learns your rate), long-press = half left, or still good.
+- **Clothes are Assets** (agreed 24 Oct; layer 2, Things), not Stock: they
+  don't run out. Asset gains the category *clothing* and a **space**, so
+  Home shows them in Clothes; their pills say clean · in the wash · packed,
+  and packing for a trip picks from them. Settled in R7a.
+- **Use soon** strip on top, then **Cook tonight** (a dish from what is lime
+  and mustard).
+- **Running low → the shopping list**, pills again; the last step is Copy
+  list · open the app.
+- **The fridge photo**: snap the fridge, Claude compares it with the pills,
+  the differences light up ("no butter · found coriander"), you tap to
+  accept or fix.
+
+### Travel through the same brain
+A trip filed from booking mail already knows the days, the place and why.
+- **Packing as pills** from Home's Clothes and Bathroom, scaled to the days, tuned to the weather there (a
+  free weather service, to choose), remembering what you forgot last time.
+- **Before you go**: use the fridge up, skip the Sunday order, water the
+  plants, tell the squad you're out on Thursday.
+- **Back**: "the fridge is probably empty — here's a list."
+
+### The morning brief on Today (agreed 24 Oct)
+Today keeps its tiles and gains a **Morning brief** section on top: the
+morning pass's nudges in a few lines (what's going off, what's due, what's
+coming up, the one dish to cook), each line opening its record or its To
+check card. The evening pass updates it. The tiles stay below, as R8 has
+them.
+
+### Words (to add to layer 1)
+- **Stock** (agreed 24 Oct) — the Object for something kept at home that
+  runs out or goes off (butter, detergent, a medicine): product, space,
+  bought, quantity, life, rate, state. Not "item", which layer 1 retires for
+  a record. Clothes are Assets.
+- **Space** (agreed 24 Oct) — a part of Home that holds Stock and Assets
+  (Fridge, Clothes); not a Place, which is somewhere on a map.
+- **Nudge** (agreed 24 Oct) — what the brain brings you (one of the four kinds); it lives in
+  To check.
+- **Skill** (agreed 24 Oct) — instructions and rules the brain has learned, kept as data.
+
+### Open questions
+- **Where it runs when the phone is idle.** Android limits background work:
+  scheduled passes from the phone, or the Mac (R12, always on over Tailscale)
+  as the runner with the phone showing the cards?
+- **Layer 7's job** widens from filing and answering to noticing and
+  proposing; the chain becomes Claude first for the brain, local models for
+  filing, until R12–R14 can take the brain too.
+
+### First slices, when this is agreed
+1. **Stock and the Home board** — the Object, spaces and pills by hand
+   and from dumps; Use soon from shelf life.
+2. **Groceries in on their own** — one shop's mail parser, the Blinkit
+   invoice share, the receipt photo.
+3. **The brain's first pass** — candidates from Stock and Upkeep, one
+   morning nudge pass through Claude, the learned store, the Sent to Claude
+   log.
+4. **Cook tonight and the fridge photo.**
+5. **Travel** — packing and before you go.
+6. **Every module offers candidates** — Turf, People, Money, Documents.

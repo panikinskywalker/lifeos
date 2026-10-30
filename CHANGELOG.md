@@ -7,6 +7,125 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.10 — 30 Oct 2026
+
+**People and your Notion CRM, kept in step both ways** (R2b).
+- LifeOS writes **only to the copy, Personal CRM (1)**. The original
+  Contacts database is never written: every write checks, and the settings
+  screen refuses a link to the original.
+- Notion pages match People by their ids, phone, email or a unique name;
+  when it isn't sure, it asks in To check.
+- Likes ↔ the Likes section, bullets become Facts once, Last Contacted ↔
+  Last spoke, tags, birthdays without a year; a few new columns are added
+  to the copy once.
+- When both sides changed a Field, the newest edit wins and the other value
+  shows once in To check.
+- **You › Data sources › Notion**: the token (kept in the phone's secure
+  store), the copy, Sync now.
+- Database upgrade v15. Not yet run against your real Notion: it needs the
+  token and the copy shared with the integration.
+
+## v0.0.9 — 30 Oct 2026
+
+**People, redrawn** from the *NR-People* artboards, built in its own session
+and merged here.
+- **People home**: search, quick filters, the strip with a lime ring when
+  something is due, Call or message, Birthdays, Not spoken in a while,
+  Groups; the People and Groups list by relationship or A–Z with the rail.
+- **A Person's page** and its states (no photo, no phone, overdue, birthday
+  today, just added, a vendor, owes you / you owe, plays football); the
+  **Group** page with shares, a balance per member and Settle.
+- **The form**: relationships you add yourself (Mentor, Neighbour) with
+  their own colour, **Likes**, several UPI ids as chips, Works at / Lives
+  in with Keep as typed, a birthday with or without the year.
+- **Gift ideas and a drafted birthday wish** have their place on the page;
+  they fill in when the brain (MODEL.md layer 8) is built.
+- **Who is this?** in To check: a payment from a UPI id nobody is known by
+  asks once, and the answer is remembered.
+- **Pick contacts** with suggestions from your call log; a People tile on
+  Today; a birthday today now says today.
+
+## v0.0.8 — 22 Oct 2026
+
+**Places** (R3), built in its own session and merged here.
+- **Place**: twelve kinds (Turf's venues stay venues), address, map pin, what
+  it is *in* (Koramangala in Bengaluru in India), a maps link. A Place's city
+  and country become Places of their own, once; a maps link sitting in notes
+  moves to its Field.
+- **Organisation**: ten kinds, UPI ids, website, phone, the branch it is
+  *at*. Known by any of its UPI ids, like a Person.
+- **Filed on their own**: an Event with a location is linked *at* its Place
+  (one you have, or a new one shown in To check with Undo); a hotel stay is
+  at the hotel, in its city. A table booking by mail becomes a reservation at
+  the restaurant; mail from an Organisation's website lands on its timeline.
+  From a dump, "Toit is a brewpub in Indiranagar" files Toit, a restaurant,
+  in Indiranagar, Bengaluru.
+- **Tools**: places been, place info (visits, last here, spent there, km from
+  home), places near, organisations.
+- **The Places board** in v3 Noir: Places by city, the Place card and its
+  drawn map, visits, what is here and inside; an Organisation's payments and
+  branch. The map is drawn, not a real map, until a provider is chosen.
+
+## v0.0.7 — 22 Oct 2026
+
+**People** (R2), built in its own session and merged here.
+- **Person**: phone and email you can call or write to, a photo, About,
+  *Works at* an Organisation and *Lives in* a Place (what you typed is kept
+  when nothing is picked), and **Keep in touch** as a cadence — every week to
+  every year.
+- **Group**: a Sport kind (the Football group moves to it once), a default
+  split, a place and a photo.
+- **Contacts and the call log** are crm's own sources now: pick the contacts
+  that become People; a call moves *Last spoke*.
+- **Last spoke** also moves with an Event with them or a payment, and rolls
+  the Keep in touch nudge.
+- **Who is this?** One lookup for a UPI id, a learned sender, the mobile
+  number inside a UPI id, or an email. Finance's payee matching and Turf's
+  SMS payments both ask it, so a player with two UPI ids is known by either.
+- **Tools**: people to call, last met, who is.
+- **The People board** in v3 Noir: the Profile at the top of a Person, People
+  home with the strip, Call or message, Birthdays and Groups.
+
+## v0.0.6 — 22 Oct 2026
+
+The rest of the Turf board (R9c.5 and R9c.6), every screen drawn from the
+*Turf · Noir* artboards.
+- **Home**: money at a glance, the next match as the lime card with its RSVP
+  link, the recent games as a wallet of match cards, Turf's To check items,
+  who still owes with Copy all, and what's sending.
+- **The section switcher** on every screen: Home · Games · + · Players ·
+  Venues.
+- **Dues** (owed to you, you owe, settled, credit held; tick to mark paid,
+  open a row for one game at a time, reminders to copy or share) and the
+  **Audit log** from Turf web.
+- **Games**: the Match centre (season so far, what's booked as a stack of
+  cards, 13 weeks of activity, a month calendar, when you play) and Match
+  history (search, paid / partial / unpaid).
+- **Match**: the Payment checklist and the pay sheet redrawn, every WhatsApp
+  text (payment status, short, who's still to pay, details, result), **Log
+  stats** for the whole match at once, and the formation picker with mini
+  pitches.
+- **New match** redrawn: venue defaults, a suggested day, kick-off chips,
+  steppers, who fronted, the squad picker with availability, the shares.
+- **Players**: the Squad (search, unpaid / clear, availability), **Leaders**
+  (Turf web's thirteen tables: podium, places with ▲▼, not ranked yet,
+  share), the **Player** profile (attributes, overall and form, stats, kits,
+  availability, their dues), the **Stats card**, and **Edit player** with
+  availability. New players are made here too.
+- **Venues** and **Edit venue**, new venues included.
+- **Turf settings** redrawn, with the squad name and your UPI from Turf web.
+- **States**: not connected, loading, offline with what's waiting, couldn't
+  reach Turf web; the sync pill says which.
+- **SMS**: money in that pays a share is recorded on its own when the sender
+  is known and the amount exact (with Undo in To check); otherwise To check
+  asks, and a Yes teaches LifeOS that sender.
+- **Friends' profile submissions** arrive in To check; review and approve or
+  turn down (needs Turf web online).
+- **Today** gets a Turf tile: the next match, who's in, what's still to
+  collect.
+- Not yet: photos, squad-join requests, and undo from the audit log (all on
+  Turf web); the stats card shares as text, not an image.
+
 ## v0.0.5 — 22 Oct 2026
 
 Teams and the generator, on the new kit (R9c.4), drawn from the *Turf · Noir*
