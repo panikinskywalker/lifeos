@@ -111,7 +111,7 @@ export const personType: ObjectDef<PersonData> = {
     { key: 'photo', label: 'Photo', type: 'file' },
     { key: 'phone', label: 'Phone', type: 'contact', contactKind: 'phone', section: 'Contact' },
     { key: 'email', label: 'Email', type: 'contact', contactKind: 'email', section: 'Contact' },
-    { key: 'upi', label: 'UPI IDs', type: 'text', list: true, section: 'Contact', description: 'A payment from one of these is theirs', placeholder: 'priya.s@okicici' },
+    { key: 'upi', label: 'UPI IDs', type: 'text', list: true, pattern: /^[a-z0-9._-]{2,}@[a-z][a-z0-9]+$/i, patternHint: '“{item}” needs an @ and a bank handle, like priya@okhdfc', section: 'Contact', description: 'A payment from one of these is theirs', placeholder: 'priya.s@okicici' },
     { key: 'worksAtId', label: 'Works at', type: 'link', linkTo: 'org', linkWord: 'works at', section: 'Work' },
     { key: 'company', label: 'Company', type: 'text', section: 'Work', description: 'As typed; kept when no Organisation is picked' },
     { key: 'role', label: 'Role', type: 'text', section: 'Work' },

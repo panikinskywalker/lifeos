@@ -708,6 +708,18 @@ screens checked on the phone → overrides only where the default is wrong)
   **Designed 30 Oct** (`NR-People-*` on the canvas: Home, Profile, ProfileStates, Parts, Form,
   Group, List, ListAZ, Contacts, WhoIs, Tile, Loading); Likes, gift ideas, the drafted wish and
   relationships you add were decided with it (layer 2); gift ideas and the wish wait for layer 8.
+  **Rebuilt to it 30 Oct**: the People home (search, quick filters, the Due strip, Call or message,
+  Birthdays, Not spoken in a while, Groups), the Person page and its states (no photo, no phone,
+  overdue, birthday today, just added, vendor, owes / owe with Settle and Pay · UPI, plays football,
+  long and one-word names), the Group page (shares, balances per member with Settle), the person form
+  (relationship pills + New…, UPI IDs and Likes as chip inputs, Works at / Lives in with *Keep as
+  typed* or *New organisation…*, a birthday with "I know the year"), the People and Groups list (by
+  relationship or A–Z with the rail), Pick contacts (suggested from the call log), **Who is this?**
+  in To check (finance files a `payee-who` item for a new UPI sender; *This* moves the payments to
+  the person and learns the sender as an alias), the People tile on Today, loading skeletons. Gift
+  ideas and the wish are slots until layer 8. Since then a typed company or city links only to an
+  Organisation or Place you already have (the form's *Keep as typed*); one is made only by *New
+  organisation…*. A birthday with no year is kept without one (no "turns 0"). Phone check pending.
 - [ ] **R2b Notion** — your Notion People CRM kept in step with People, both ways (layer 4,
   *Notion*; agreed 24 Oct, mapping agreed the same day). Next: build it.
 - [x] **R3 places** — done 22 Oct 2026. Objects as agreed (layer 2, *Places*):

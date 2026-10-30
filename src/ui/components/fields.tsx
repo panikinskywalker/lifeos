@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 import type { Field, FieldOption } from '@core/domain/types';
+import { patternError } from '@core/domain/fields';
 import { tintForModule } from '../theme/moduleTint';
-import { Chip, DateField as KitDateField, FormField, FilterChip, MoneyField, NumberField, PickerSheet, RelationField as KitRelationField, SelectField as KitSelectField, SwitchField, TagsField, TextField } from '../kit';
+import { Chip, ChipsField, DateField as KitDateField, FormField, FilterChip, MoneyField, NumberField, OptionPills, PickerSheet, RelationField as KitRelationField, SelectField as KitSelectField, SwitchField, TagsField, TextField } from '../kit';
 import { useLive, useOS, useSettings } from '../hooks';
 
 /*
@@ -34,6 +35,9 @@ export function FieldInput(props: FieldInputProps) {
     case 'datetime':
       return <DateField {...props} />;
     case 'select':
+      // A short list you can add to (Relationship): pills plus New… (NR-People-Form); a long one keeps the picker.
+      if (field.onCreateOption && (field.options?.length ?? 0) <= 12)
+        return <OptionPills {...common} hint={field.description} options={toOptions(field.options)} value={value == null ? undefined : String(value)} onChange={onChange} onCreate={(label) => field.onCreateOption!(label)?.value ?? null} createHint={`Becomes a ${field.label.toLowerCase()} you can pick again.`} />;
       return <KitSelectField {...common} options={toOptions(field.options)} value={value == null ? undefined : String(value)} onChange={onChange} onCreate={field.onCreateOption ? (label) => field.onCreateOption!(label)?.value ?? null : undefined} />;
     case 'multiselect':
       return <MultiSelectField {...props} />;
@@ -46,6 +50,10 @@ export function FieldInput(props: FieldInputProps) {
       return <TextField {...common} value={value == null ? '' : String(value)} onChange={onChange} placeholder={field.placeholder} autoFocus={autoFocus} keyboardType={field.contactKind === 'phone' ? 'phone-pad' : field.contactKind === 'email' ? 'email-address' : field.contactKind === 'url' ? 'url' : 'default'} />;
     case 'longtext':
       return <TextField {...common} multiline value={value == null ? '' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)} onChange={onChange} placeholder={field.placeholder} autoFocus={autoFocus} />;
+    case 'text':
+      // A list (UPI IDs, Likes): typed as chips (G5); the value stays comma-separated.
+      if (field.list) return <ChipsField {...common} hint={field.description} value={value == null ? '' : String(value)} onChange={onChange} placeholder={field.placeholder} validate={field.pattern ? (item) => patternError(field, item) : undefined} mono={!!field.pattern} autoFocus={autoFocus} />;
+      return <TextField {...common} value={value == null ? '' : String(value)} onChange={onChange} placeholder={field.placeholder} autoFocus={autoFocus} error={error ?? (field.pattern && value ? patternError(field, String(value)) ?? undefined : undefined)} />;
     default:
       return <TextField {...common} value={value == null ? '' : String(value)} onChange={onChange} placeholder={field.placeholder} autoFocus={autoFocus} />;
   }

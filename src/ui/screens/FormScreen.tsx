@@ -8,11 +8,21 @@ import { Button, FormField, FilterChip, Screen, Section, Text, TextField } from 
 import { FieldInput, TagEditor } from '../components/fields';
 import { useLive, useOS } from '../hooks';
 
+type FormProps = { type: string; id?: string; initial?: Record<string, unknown>; onSaved?: (e: ObjectRecord) => void; linkTo?: { id: string; kind: string } };
+
 /**
- * One form for every entity type. Fields come from the type definition plus
- * the user's custom fields; validation from the zod schema.
+ * One form for every Object. Fields come from the Object plus the user's
+ * custom fields; validation from the zod schema. An Object whose board has
+ * its own form (`overrides[].form`: Person) gets that one instead.
  */
-export function FormScreen({ type, id, initial, onSaved, linkTo }: { type: string; id?: string; initial?: Record<string, unknown>; onSaved?: (e: ObjectRecord) => void; linkTo?: { id: string; kind: string } }) {
+export function FormScreen(props: FormProps) {
+  const os = useOS();
+  const Override = os.registry.forms.get(props.type);
+  if (Override) return <Override id={props.id} initial={props.initial} onSaved={props.onSaved} linkTo={props.linkTo} />;
+  return <GenericForm {...props} />;
+}
+
+function GenericForm({ type, id, initial, onSaved, linkTo }: FormProps) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();

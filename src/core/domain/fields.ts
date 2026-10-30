@@ -70,6 +70,16 @@ export interface Field {
   contactKind?: 'phone' | 'email' | 'url';
   /** text: a comma-separated list, shown as chips and typed with a chip input (UPI IDs, Likes; R2). */
   list?: boolean;
+  /** text (each item, for a list): what it must look like; the chip input refuses others. */
+  pattern?: RegExp;
+  /** The line for a value that doesn't match `pattern`; `{item}` is what was typed (“{item}” needs an @ and a bank handle). */
+  patternHint?: string;
+}
+
+/** The line for a text value (or one list item) that doesn't match its Field's `pattern`, or null. */
+export function patternError(field: Pick<Field, 'pattern' | 'patternHint' | 'label'>, item: string): string | null {
+  if (!field.pattern || field.pattern.test(item)) return null;
+  return (field.patternHint ?? `“{item}” doesn’t look like ${field.label.toLowerCase().replace(/s$/, '')}`).split('{item}').join(item);
 }
 
 export type MoneyValue = { amount: number; currency?: string };

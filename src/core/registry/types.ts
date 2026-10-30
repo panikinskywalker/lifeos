@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'; // type-only: core has no runtime dependency on React (deps.test allows `import type`)
+import type { ComponentType, ReactNode } from 'react'; // type-only: core has no runtime dependency on React (deps.test allows `import type`)
 import type { ZodTypeAny } from 'zod';
 import type { ObjectRecord, ObjectDef, WidgetSize } from '../domain/types';
 import type { CoreEvents, EventName } from '../events/bus';
@@ -80,7 +80,7 @@ export interface EntityDetailSection {
   key: string;
   title: string;
   /** `say`: the app shell's "Tell me about …" bar, for a 'page' section to place. */
-  component: ComponentType<{ entity: ObjectRecord<any>; ctx: LifeOSContext; controls?: RecordControls; say?: import('react').ReactNode }>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  component: ComponentType<{ entity: ObjectRecord<any>; ctx: LifeOSContext; controls?: RecordControls; say?: ReactNode }>; // eslint-disable-line @typescript-eslint/no-explicit-any
   order?: number;
   /**
    * 'page': the board draws the whole record page (R2: Person and Group, from NR-People-*), with the page's controls.
@@ -137,6 +137,17 @@ export interface ObjectOverride {
   object: string | '*';
   /** Extra sections on the Record screen (hero at the top, cards in the body). */
   record?: EntityDetailSection[];
+  /** The Object's own form in place of the generic one (R2: Person, from NR-People-Form); used by New and Edit. */
+  form?: ComponentType<RecordFormProps>;
+}
+
+/** What a form override gets: the record to edit (none = new), prefilled values, and what to do once saved (default: open the record). */
+export interface RecordFormProps {
+  id?: string;
+  initial?: Record<string, unknown>;
+  onSaved?: (e: ObjectRecord) => void;
+  /** Link the new record to this one once saved (/entity/<type>/new?linkId=…&linkKind=…). */
+  linkTo?: { id: string; kind: string };
 }
 
 /** The Overview screen's content for a module: numbers, charts, what needs you. Pure. */

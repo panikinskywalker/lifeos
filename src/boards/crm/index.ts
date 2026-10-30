@@ -1,10 +1,18 @@
 import type { BoardManifest } from '@core/registry/types';
 import { peopleOverview } from './overview';
-import { PersonProfile } from './profile';
+import { PersonPage } from './profile';
+import { GroupPage } from './group';
 import { PeopleHome } from './screens';
-import { PersonSection } from './sections';
+import { PeopleList } from './lists';
+import { PersonForm } from './form';
+import { WhoIsCard } from './whois';
 
-/** Companion board of the crm module (People): the People home and Overview, quick actions, Person · Profile (v3 Noir). */
+/**
+ * Companion board of the crm module (People), drawn to the NR-People-*
+ * artboards (v3 Noir): the People home, the People and Groups list, the
+ * Person and Group pages (each the whole record page), the person form, the
+ * "Who is this?" card in To check, the Overview, quick actions.
+ */
 export const crmBoard: BoardManifest = {
   id: 'crm',
   module: 'crm',
@@ -13,15 +21,14 @@ export const crmBoard: BoardManifest = {
   color: 'pink',
   placement: 'module',
   overview: peopleOverview,
-  screens: [{ key: 'index', title: 'People', component: PeopleHome }],
+  screens: [
+    { key: 'index', title: 'People', component: PeopleHome },
+    { key: 'list', title: 'Everyone', component: PeopleList },
+  ],
   quickActions: [{ id: 'crm.addPerson', label: 'Person', icon: 'person', route: '/entity/person/new' }],
   overrides: [
-    {
-      object: 'person',
-      record: [
-        { entityType: 'person', key: 'crm.profile', title: 'Profile', component: PersonProfile, order: 0, placement: 'hero' },
-        { entityType: 'person', key: 'crm.person', title: 'Keep in touch', component: PersonSection, order: 10, placement: 'top' },
-      ],
-    },
+    { object: 'person', form: PersonForm, record: [{ entityType: 'person', key: 'crm.person', title: 'Person', component: PersonPage, order: 0, placement: 'page' }] },
+    { object: 'group', record: [{ entityType: 'group', key: 'crm.group', title: 'Group', component: GroupPage, order: 0, placement: 'page' }] },
   ],
+  checkCards: { 'payee-who': WhoIsCard },
 };

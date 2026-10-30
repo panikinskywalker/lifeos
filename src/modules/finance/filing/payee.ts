@@ -128,3 +128,105 @@ export function linkMissingPayees(os: LifeOSContext): number {
   }
   return n;
 }
+
+/* ------------------------------------------------------------------ */
+/* Who is this? (R2, NR-People-WhoIs)                                   */
+/* ------------------------------------------------------------------ */
+
+/** To check kind: a payment from (or to) a UPI ID nobody is known by, under a name that isn't a business. */
+export const PAYEE_WHO = 'payee-who';
+
+/** What a "Who is …?" filing keeps (in its `before`): the UPI ID, the name the message used, the stand-in payee. */
+export interface WhoAsk {
+  vpa: string;
+  said: string | null;
+  /** The payee record made for it meanwhile (an Organisation of kind 'payee'). */
+  payeeId: string | null;
+}
+
+export const whoAskOf = (f: { kind: string; before: Record<string, unknown> | null }): WhoAsk | null => (f.kind === PAYEE_WHO && f.before && typeof f.before.vpa === 'string' ? (f.before as unknown as WhoAsk) : null);
+
+/**
+ * A new sender: the payment was linked to a new stand-in payee because no one
+ * has this UPI ID and the name isn't a shop's. Ask once in To check who it is
+ * ("Who is priya.s@okicici?"); the answer is remembered for every payment
+ * after. Returns whether it asked (the stand-in then needs no filing of its own).
+ */
+export function askWhoIs(os: LifeOSContext, txId: string, m: PayeeMatch, said: string | null, vpa: string | null, source: string, sourceRef: string | null): boolean {
+  if (!vpa || m.type !== 'org' || !m.created || !os.registry.objects.has('person')) return false;
+  if (os.records.get<{ kind?: string }>(m.id)?.data.kind !== 'payee') return false;
+  const tx = os.records.get<{ amount?: number; kind?: string }>(txId);
+  const money = tx?.data.amount != null ? `${os.format.currency(tx.data.amount)} ${tx.data.kind === 'income' ? 'in' : 'out'}` : null;
+  const ask: WhoAsk = { vpa: vpa.toLowerCase(), said: said?.trim() || null, payeeId: m.id };
+  os.filings.add({ source, sourceRef, kind: PAYEE_WHO, action: 'logged', entityId: txId, label: `Who is ${ask.vpa}?`, flag: [money, 'answer once and every payment after is theirs'].filter(Boolean).join(' · '), before: ask as unknown as Record<string, unknown> });
+  return true;
+}
+
+/** The payments linked to the stand-in payee from this UPI ID (the asked one first). */
+function askedPayments(os: LifeOSContext, txId: string | null, ask: WhoAsk): Array<{ txId: string; linkId: string | null; as: string | null }> {
+  const out: Array<{ txId: string; linkId: string | null; as: string | null }> = [];
+  if (txId) {
+    const r = os.links.forEntity(txId).find((x) => x.direction === 'out' && (x.relation.kind === 'payee' || x.relation.kind === 'person'));
+    out.push({ txId, linkId: r?.relation.id ?? null, as: (r?.relation.meta.as as string | undefined) ?? ask.said });
+  }
+  if (ask.payeeId) {
+    for (const r of os.links.forEntity(ask.payeeId, 'payee')) {
+      if (r.direction !== 'in' || r.other.id === txId || r.other.object !== 'transaction') continue;
+      out.push({ txId: r.other.id, linkId: r.relation.id, as: (r.relation.meta.as as string | undefined) ?? ask.said });
+    }
+  }
+  return out;
+}
+
+/**
+ * "This": the payment (and any since from the same UPI ID) is theirs. The
+ * links move to the person, certain; the UPI ID is learned (an alias, shared
+ * with Turf) and joins their UPI IDs; the stand-in payee goes if nothing else
+ * uses it. The question leaves To check.
+ */
+export function answerWhoIs(os: LifeOSContext, filingId: string, personId: string): void {
+  const f = os.filings.get(filingId);
+  const ask = f ? whoAskOf(f) : null;
+  if (!f || !ask || !os.records.get(personId)) return;
+  os.db.transaction(() => {
+    for (const p of askedPayments(os, f.entityId, ask)) {
+      if (p.linkId) os.links.remove(p.linkId, 'user');
+      os.links.link(p.txId, personId, 'person', { as: p.as, vpa: ask.vpa }, 'user', { source: 'manual', confidence: 1 });
+    }
+    os.aliases.learn(ask.vpa, personId);
+    if (ask.said) os.aliases.learn(norm(ask.said), personId);
+    const e = os.records.get<{ upi?: string }>(personId);
+    if (e && !(e.data.upi ?? '').toLowerCase().split(/[,\s]+/).includes(ask.vpa)) os.records.update(personId, { data: { upi: [e.data.upi, ask.vpa].filter(Boolean).join(', ') } }, 'user');
+    const stand = ask.payeeId ? os.records.get<{ kind?: string }>(ask.payeeId) : null;
+    if (stand && stand.data.kind === 'payee' && !os.links.forEntity(stand.id).length) os.records.delete(stand.id, 'user');
+    os.filings.setChecked(filingId);
+  });
+  bus.emit('data.changed', { table: 'relations', id: filingId });
+}
+
+/** "It's a shop or company": the stand-in payee stays, as an Organisation (a shop), and the UPI ID means it from now on. */
+export function keepWhoAsOrg(os: LifeOSContext, filingId: string): string | null {
+  const f = os.filings.get(filingId);
+  const ask = f ? whoAskOf(f) : null;
+  if (!f || !ask) return null;
+  let orgId = ask.payeeId && os.records.get(ask.payeeId) ? ask.payeeId : null;
+  os.db.transaction(() => {
+    if (!orgId) {
+      const e = os.records.create({ object: 'org', title: titleCase(ask.said ?? ask.vpa.split('@')[0]!.replace(/[._-]+/g, ' ')), data: { kind: 'shop', upi: ask.vpa } }, 'user');
+      orgId = e.id;
+      for (const p of askedPayments(os, f.entityId, ask)) {
+        if (p.linkId) os.links.remove(p.linkId, 'user');
+        os.links.link(p.txId, e.id, 'payee', { as: p.as, vpa: ask.vpa }, 'user', { source: 'manual', confidence: 1 });
+      }
+    } else {
+      const org = os.records.get<{ kind?: string; upi?: string }>(orgId)!;
+      const patch: Record<string, unknown> = {};
+      if (org.data.kind === 'payee') patch.kind = 'shop';
+      if (!(org.data.upi ?? '').toLowerCase().includes(ask.vpa)) patch.upi = [org.data.upi, ask.vpa].filter(Boolean).join(', ');
+      if (Object.keys(patch).length) os.records.update(orgId, { data: patch }, 'user');
+    }
+    os.aliases.learn(ask.vpa, orgId!);
+    os.filings.setChecked(filingId);
+  });
+  return orgId;
+}
