@@ -168,6 +168,14 @@ calllog (R2: `os.device.contacts` reads the phone's contacts, `os.device.callLog
 the calls; both are `readings` sources that file their own records and report
 `filed`); usage, health and the calendar stay in platform until R6 / R4.
 
+crm also declares `notion` (R2b): a `readings` source that also writes, to a
+copy of your Notion People CRM only (`src/modules/crm/notion/client.ts`:
+`assertWritable` and a request-level guard refuse the original). Token in
+`os.device.secrets` (`notion.token`); target, cursor and the per-Person last
+agreed values in settings (`crm.notion.*`); changes wait in `os.outbox`, one
+item per Person. Migration **v15** `facts-from-notion` lets a Fact's source be
+`notion`.
+
 **Who a sender is** (R2). `ObjectDef.identity?(data) → { upi?, phone?, email? }`
 says how a record is known from outside (crm's Person: its UPI IDs, phone and
 email). Core's `whoIs(os, { upi, phone, email }, objects?)`

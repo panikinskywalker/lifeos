@@ -7,6 +7,24 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.10 — 30 Oct 2026
+
+**People and your Notion CRM, kept in step both ways** (R2b).
+- LifeOS writes **only to the copy, Personal CRM (1)**. The original
+  Contacts database is never written: every write checks, and the settings
+  screen refuses a link to the original.
+- Notion pages match People by their ids, phone, email or a unique name;
+  when it isn't sure, it asks in To check.
+- Likes ↔ the Likes section, bullets become Facts once, Last Contacted ↔
+  Last spoke, tags, birthdays without a year; a few new columns are added
+  to the copy once.
+- When both sides changed a Field, the newest edit wins and the other value
+  shows once in To check.
+- **You › Data sources › Notion**: the token (kept in the phone's secure
+  store), the copy, Sync now.
+- Database upgrade v15. Not yet run against your real Notion: it needs the
+  token and the copy shared with the integration.
+
 ## v0.0.9 — 30 Oct 2026
 
 **People, redrawn** from the *NR-People* artboards, built in its own session

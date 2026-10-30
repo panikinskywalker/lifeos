@@ -37,18 +37,18 @@ export function paymentLine(os: LifeOSContext, txId: string | null, sourceRef?: 
 }
 
 /** The card (p18, r28, gap 14) on the To check list's raised slab. */
-function Card({ children, gap = 14 }: { children: React.ReactNode; gap?: number }) {
+export function Card({ children, gap = 14 }: { children: React.ReactNode; gap?: number }) {
   const t = useTheme();
   return <View style={{ padding: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, gap }}>{children}</View>;
 }
 
-function Hairline() {
+export function Hairline() {
   const t = useTheme();
   return <View style={{ height: 1, backgroundColor: t.c.line }} />;
 }
 
 /** A 32-high "This" pill: lime for the best match, raised for the rest. */
-function SmallPill({ title, lime, onPress, label }: { title: string; lime?: boolean; onPress: () => void; label: string }) {
+export function SmallPill({ title, lime, onPress, label }: { title: string; lime?: boolean; onPress: () => void; label: string }) {
   const t = useTheme();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} hitSlop={8} onPress={onPress} style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, borderRadius: 999, backgroundColor: lime ? t.c.accent.mustard : t.c.bg.tileRaised, justifyContent: 'center', opacity: pressed ? 0.8 : 1 })}>
@@ -58,7 +58,7 @@ function SmallPill({ title, lime, onPress, label }: { title: string; lime?: bool
 }
 
 /** A 44-high full-width pill (Yes, John · Not them). */
-function WidePill({ title, icon, lime, onPress }: { title: string; icon: string; lime?: boolean; onPress: () => void }) {
+export function WidePill({ title, icon, lime, onPress }: { title: string; icon: string; lime?: boolean; onPress: () => void }) {
   const t = useTheme();
   const fg = lime ? t.c.accent.mustardInk : t.c.fg.primary;
   return (

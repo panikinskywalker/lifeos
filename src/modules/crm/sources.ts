@@ -1,6 +1,7 @@
 import type { SourceDef } from '@core/registry/types';
 import { sourceState } from '@core/sources/deviceData';
 import { applyCallLog, resyncContacts } from './contacts';
+import { notionSource } from './notion';
 
 /**
  * The sources that feed People (docs/MODEL.md §4; R2). Each reads the phone
@@ -46,4 +47,5 @@ export const callLogSource: SourceDef = {
   },
 };
 
-export const crmSources: SourceDef[] = [contactsSource, callLogSource];
+/** Notion (R2b): your People CRM's copy, kept in step both ways. */
+export const crmSources: SourceDef[] = [contactsSource, callLogSource, notionSource];

@@ -12,6 +12,7 @@ import { foldPeople, linkWorkAndHome } from './folds';
 import { onLinkAdded, refreshLastSpoke } from './lastSpoke';
 import { lastMet, peopleToCall } from './people';
 import { applyRelationships } from './relationships';
+import { listenForNotion } from './notion';
 
 export * from './types';
 export { nextBirthday };
@@ -20,6 +21,7 @@ export { touchLastSpoke, refreshLastSpoke } from './lastSpoke';
 export { peopleToCall, lastMet, daysSince, type ToCall, type LastMet } from './people';
 export { linkWorkAndHome, foldPeople } from './folds';
 export { contactsSource, callLogSource } from './sources';
+export * from './notion';
 export { addRelationship, updateRelationship, customRelationships, BUILTIN_RELATIONSHIPS, RELATIONSHIP_COLORS } from './relationships';
 
 /** A person by id, or by a name said in Talk. */
@@ -55,6 +57,8 @@ export const crmModule: ModuleManifest = {
     });
     // A payment or an Event with someone moves their last spoke.
     bus.on('relation.added', ({ relation }) => onLinkAdded(os, relation));
+    // Notion (R2b): a change here about a Person waits to go to your People CRM's copy.
+    listenForNotion(os);
     if (!os.settings.get<boolean>('crm.r2.folded', false)) {
       foldPeople(os);
       refreshLastSpoke(os);
