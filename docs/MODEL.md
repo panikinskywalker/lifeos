@@ -117,6 +117,15 @@ Derived, not Fields: visits (Events linked *at* the Place), last been, what was
 spent there (Transactions whose payee is an Organisation *at* the Place), the
 Places inside it.
 
+**Places and travel stay apart** (decided 30 Oct). A Place is *where*
+something is and has no dates (Toit, the gym, Goa); a Trip is *going
+somewhere for a while* (Goa, 20–24 Dec: dates, companions, budget, spend) and
+stays in `travel` (R7d); a planned tour is a Trip with status planning. They
+meet through Links only: a Trip's destination → Place (R7d turns today's text
+into the link), its stays and flights *at* their Places. Once that link
+exists, a Place's page shows **Trips here**. A Trip planner stays a candidate
+board (layer 3).
+
 **Organisation** (Object id `org`), agreed 22 Oct:
 | Field | Type | Notes |
 |---|---|---|
