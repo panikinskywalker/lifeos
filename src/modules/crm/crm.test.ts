@@ -141,7 +141,7 @@ describe('AI tools', () => {
 describe('People design decisions (30 Oct)', () => {
   it('a relationship you add is kept, with its own colour, and can be picked for anyone', async () => {
     const { addRelationship } = await import('./relationships');
-    const field = crmModule.objects[0]!.fields.find((f) => f.key === 'relationship')!;
+    const field = crmModule.objects![0]!.fields.find((f) => f.key === 'relationship')!;
     const mentor = field.onCreateOption!('mentor')!;
     expect(mentor).toMatchObject({ value: 'mentor', label: 'Mentor', color: 'purple' });
     expect(field.options!.map((o) => o.value)).toContain('mentor');
