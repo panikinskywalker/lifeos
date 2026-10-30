@@ -68,6 +68,8 @@ export interface Field {
   linkWord?: string;
   /** contact. */
   contactKind?: 'phone' | 'email' | 'url';
+  /** text: a comma-separated list, shown as chips and typed with a chip input (UPI IDs, Likes; R2). */
+  list?: boolean;
 }
 
 export type MoneyValue = { amount: number; currency?: string };

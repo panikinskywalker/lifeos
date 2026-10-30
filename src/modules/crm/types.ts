@@ -23,6 +23,23 @@ export function snapCadence(v: unknown): string | undefined {
 
 export const cadenceLabel = (v: string | undefined) => CADENCES.find((c) => c.value === v)?.label ?? null;
 
+/** A birthday without a year is kept with this year (Notion's placeholders, phone contacts); never shown, no age. */
+export const NO_YEAR = 1900;
+
+/** Month, day and year (null when not known) of an ISO birthday. */
+export function birthdayParts(iso: string | undefined): { month: number; day: number; year: number | null } | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+  if (!m) return null;
+  const year = Number(m[1]);
+  return { month: Number(m[2]), day: Number(m[3]), year: year > NO_YEAR ? year : null };
+}
+
+/** An ISO birthday from month (1–12), day and an optional year. */
+export const birthdayIso = (month: number, day: number, year?: number | null) => `${year && year > NO_YEAR ? year : NO_YEAR}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+/** Split a list Field ("a, b") into its items. */
+export const listItems = (s: string | undefined) => (s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+
 export interface FileValue {
   uri: string;
   name?: string;
@@ -48,6 +65,8 @@ export interface PersonData {
   /** Last spoke (ISO day): a call, an Event with them, a payment; the keep-in-touch cycle's last done. */
   lastContactAt?: string;
   photo?: FileValue;
+  /** Likes, comma-separated (filter coffee, pottery, RCB): what gift ideas are drawn from; kept in step with Notion's Likes section (R2b). */
+  likes?: string;
   /** About (long text). */
   notes?: string;
   /** The phone contact this person was imported from (re-syncs fill gaps). */
@@ -55,6 +74,7 @@ export interface PersonData {
 }
 
 const split = (s: string | undefined) => (s ?? '').split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+
 const file = z.object({ uri: z.string(), name: z.string().optional(), mime: z.string().optional() });
 
 export const personType: ObjectDef<PersonData> = {
@@ -77,6 +97,7 @@ export const personType: ObjectDef<PersonData> = {
     contactEvery: z.preprocess(snapCadence, z.string().optional()),
     lastContactAt: z.string().optional(),
     photo: file.optional(),
+    likes: z.string().optional(),
     notes: z.string().optional(),
     contactId: z.string().optional(),
   }),
@@ -90,19 +111,20 @@ export const personType: ObjectDef<PersonData> = {
     { key: 'photo', label: 'Photo', type: 'file' },
     { key: 'phone', label: 'Phone', type: 'contact', contactKind: 'phone', section: 'Contact' },
     { key: 'email', label: 'Email', type: 'contact', contactKind: 'email', section: 'Contact' },
-    { key: 'upi', label: 'UPI IDs', type: 'text', section: 'Contact', description: 'Comma-separated; a payment from one of these is theirs', placeholder: 'priya.s@okicici' },
+    { key: 'upi', label: 'UPI IDs', type: 'text', list: true, section: 'Contact', description: 'A payment from one of these is theirs', placeholder: 'priya.s@okicici' },
     { key: 'worksAtId', label: 'Works at', type: 'link', linkTo: 'org', linkWord: 'works at', section: 'Work' },
     { key: 'company', label: 'Company', type: 'text', section: 'Work', description: 'As typed; kept when no Organisation is picked' },
     { key: 'role', label: 'Role', type: 'text', section: 'Work' },
     { key: 'livesInId', label: 'Lives in', type: 'link', linkTo: 'place', linkWord: 'lives in', section: 'Details' },
     { key: 'city', label: 'City', type: 'text', section: 'Details', summary: true, description: 'As typed; kept when no Place is picked' },
     { key: 'birthday', label: 'Birthday', type: 'date', section: 'Details', description: 'The year is optional' },
+    { key: 'likes', label: 'Likes', type: 'text', list: true, section: 'Details', placeholder: 'Add a like: food, hobby, team, brand', description: 'Gift ideas before their birthday come from these' },
     { key: 'contactEvery', label: 'Keep in touch', type: 'select', section: 'Details', options: CADENCES.map((c) => ({ value: c.value, label: c.label })), description: 'A nudge when you have not spoken for this long' },
     { key: 'lastContactAt', label: 'Last spoke', type: 'date', section: 'Details', description: 'Moves on its own with calls, meetings and payments' },
     { key: 'notes', label: 'About', type: 'longtext', section: 'Details' },
   ],
   indexed: ['relationship'],
-  searchText: (d) => [d.company, d.role, d.city, d.notes, d.email, d.phone, d.upi].filter(Boolean).join(' '),
+  searchText: (d) => [d.company, d.role, d.city, d.notes, d.email, d.phone, d.upi, d.likes].filter(Boolean).join(' '),
   identity: (d) => ({ upi: split(d.upi), phone: d.phone ? [d.phone] : [], email: d.email ? [d.email] : [] }),
   links: [
     { kind: 'person', label: 'Mentioned in', to: ['transaction', 'trip', 'task', 'event', 'note'], cardinality: 'many' },

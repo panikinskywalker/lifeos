@@ -11,6 +11,7 @@ import { crmSources } from './sources';
 import { foldPeople, linkWorkAndHome } from './folds';
 import { onLinkAdded, refreshLastSpoke } from './lastSpoke';
 import { lastMet, peopleToCall } from './people';
+import { applyRelationships } from './relationships';
 
 export * from './types';
 export { nextBirthday };
@@ -19,6 +20,7 @@ export { touchLastSpoke, refreshLastSpoke } from './lastSpoke';
 export { peopleToCall, lastMet, daysSince, type ToCall, type LastMet } from './people';
 export { linkWorkAndHome, foldPeople } from './folds';
 export { contactsSource, callLogSource } from './sources';
+export { addRelationship, updateRelationship, customRelationships, BUILTIN_RELATIONSHIPS, RELATIONSHIP_COLORS } from './relationships';
 
 /** A person by id, or by a name said in Talk. */
 function personFor(os: Parameters<NonNullable<ModuleManifest['onStart']>>[0], who: string) {
@@ -38,6 +40,7 @@ export const crmModule: ModuleManifest = {
   objects: [personType, groupType],
   sources: crmSources,
   onStart: (os) => {
+    applyRelationships(os);
     // A group's member field is mirrored into group_members (default shares for splits, "groups Priya is in").
     const sync = (e: ObjectRecord) => {
       if (e.object === 'group') os.groups.setMembers(e.id, ((e.data as { memberIds?: string[] }).memberIds ?? []).filter(Boolean));

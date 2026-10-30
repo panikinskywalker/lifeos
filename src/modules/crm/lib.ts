@@ -6,6 +6,7 @@ export function nextBirthday(iso: string): { days: number; age: number | null } 
   const next = new Date(now.getFullYear(), d.getMonth(), d.getDate());
   if (next < now) next.setFullYear(now.getFullYear() + 1);
   const days = Math.ceil((next.getTime() - now.getTime()) / 86400000);
+  // Year 1900 means "no year" (NO_YEAR in types.ts): no age.
   return { days, age: d.getFullYear() > 1900 ? next.getFullYear() - d.getFullYear() : null };
 }
 

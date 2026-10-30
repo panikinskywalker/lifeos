@@ -137,3 +137,25 @@ describe('AI tools', () => {
     expect(await tool('who_is').run({ upi: 'nobody@ybl' }, os)).toEqual({ id: null });
   });
 });
+
+describe('People design decisions (30 Oct)', () => {
+  it('a relationship you add is kept, with its own colour, and can be picked for anyone', async () => {
+    const { addRelationship } = await import('./relationships');
+    const field = crmModule.objects[0]!.fields.find((f) => f.key === 'relationship')!;
+    const mentor = field.onCreateOption!('mentor')!;
+    expect(mentor).toMatchObject({ value: 'mentor', label: 'Mentor', color: 'purple' });
+    expect(field.options!.map((o) => o.value)).toContain('mentor');
+    expect(addRelationship(os, 'Mentor')).toEqual(mentor);
+    const p = person('Asha', { relationship: 'mentor' });
+    expect(p.data.relationship).toBe('mentor');
+  });
+
+  it('a contact without a birth year is kept without one: no age, the birthday cycle still yearly', async () => {
+    const { importContacts, birthdayParts, nextBirthday } = await import('.');
+    importContacts(os, [{ id: 'c7', name: 'Nani', phones: [], emails: [], birthday: { day: 23, month: 9 } }]);
+    const n = os.records.query<PersonData>('person').find((p) => p.title === 'Nani')!;
+    expect(birthdayParts(n.data.birthday)).toEqual({ month: 10, day: 23, year: null });
+    expect(nextBirthday(n.data.birthday!)!.age).toBeNull();
+    expect(os.cycles.forEntity(n.id).find((c) => c.template === 'person.birthday')!.nextDueAt).toBeGreaterThan(Date.now() - DAY);
+  });
+});

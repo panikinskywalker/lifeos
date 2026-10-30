@@ -1,7 +1,7 @@
 import type { CallEntry, DeviceContact, LifeOSContext } from '@core/registry/context';
 import { resolveCandidates } from '@core/ai/lifeTools';
 import { phoneKey } from '@core/identity';
-import type { PersonData } from './types';
+import { birthdayIso, type PersonData } from './types';
 import { touchLastSpoke } from './lastSpoke';
 
 /**
@@ -31,7 +31,8 @@ export function personForContact(os: LifeOSContext, c: DeviceContact): string | 
 
 function contactData(c: DeviceContact): Partial<PersonData> {
   const b = c.birthday;
-  const birthday = b && b.month >= 0 && b.day ? `${b.year ?? new Date().getFullYear()}-${String(b.month + 1).padStart(2, '0')}-${String(b.day).padStart(2, '0')}` : undefined;
+  // No year on the contact: kept as no year (NO_YEAR), so People never says "turns 0".
+  const birthday = b && b.month >= 0 && b.day ? birthdayIso(b.month + 1, b.day, b.year) : undefined;
   return { phone: c.phones[0], email: c.emails[0], birthday, company: c.company ?? undefined, role: c.jobTitle ?? undefined, photo: c.photo ? { uri: c.photo, name: 'Contact photo' } : undefined, contactId: c.id };
 }
 
