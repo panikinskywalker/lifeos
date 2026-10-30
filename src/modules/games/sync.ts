@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import type { AppearanceData, AvailabilityPeriod, GameData, PlayerProfileData, VenueData } from './types';
+import { applyInbox } from './inbox';
 
 /**
  * Turf web → LifeOS (docs/MODEL.md layer 4, *Turf web*; R9c). Turf web holds
@@ -135,7 +136,12 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
     const apps = bySourceKey<AppearanceData>(os, 'appearance');
 
     /* ---------- settings: which player is you ---------- */
-    for (const r of rows('settings')) if (r.key === 'ownerPlayerId') os.settings.set(SETTING_ME, json<string | null>(r.value) ?? null);
+    for (const r of rows('settings')) {
+      if (r.key === 'ownerPlayerId') os.settings.set(SETTING_ME, json<string | null>(r.value) ?? null);
+      if (r.key === 'ownerUpi') os.settings.set('turf.ownerUpi', json<string | null>(r.value) ?? null);
+      if (r.key === 'squadName') os.settings.set('turf.squadName', json<string | null>(r.value) ?? 'Football');
+      if (r.key === 'siteAddress') os.settings.set('turf.siteAddress', json<string | null>(r.value) ?? null);
+    }
 
     /* ---------- players → People + Player profiles ---------- */
     const people = has('person') ? os.records.query<{ phone?: string; email?: string; upi?: string }>('person', {}, { limit: 100_000 }) : [];
@@ -202,6 +208,7 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
         weekly: weekly === 'weekdays' || weekly === 'weekends' ? weekly : 'all_week',
         availability: avail(str(tp, 'default_availability')),
         photoPath: str(tp, 'photo_key'),
+        guest: tp.kind === 'guest' || undefined,
         shareSlug: str(tp, 'public_slug'),
         notes: str(tp, 'notes'),
         sourceKey: key,
@@ -214,7 +221,7 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
       let gid = os.settings.get<string | null>(SETTING_GROUP, null);
       let group = gid ? os.records.get<{ name: string; memberIds: string[] }>(gid) : undefined;
       if (!group) group = os.records.query<{ name: string; memberIds: string[] }>('group', {}, { limit: 1000 }).find((g) => g.data.name.trim().toLowerCase() === 'football');
-      if (!group) group = os.records.create({ object: 'group', data: { name: 'Football', kind: 'friends', memberIds: [] } }, ACTOR);
+      if (!group) group = os.records.create({ object: 'group', data: { name: 'Football', kind: 'sport', memberIds: [] } }, ACTOR);
       gid = group.id;
       os.settings.set(SETTING_GROUP, gid);
       const members = [...new Set([...(group.data.memberIds ?? []), ...regulars])];
@@ -234,7 +241,8 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
       const profile = profiles.get(turfKey('players', String(r.player_id)));
       if (!profile) continue;
       const period: AvailabilityPeriod = { id: String(r.id), status: avail(str(r, 'status')), startsAt: str(r, 'starts_at') ?? '', endsAt: str(r, 'ends_at') ?? null, note: str(r, 'note') ?? null };
-      setPeriods(profile, [...(profile.data.periods ?? []).filter((p) => p.id !== period.id), period].sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
+      // Periods made here have no id until Turf web's own copies arrive; those replace them.
+      setPeriods(profile, [...(profile.data.periods ?? []).filter((p) => p.id && p.id !== period.id), period].sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
     }
 
     /* ---------- venues → Places + Venues ---------- */
@@ -413,6 +421,9 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
 
     /* ---------- amount paid = the sum of the entries ---------- */
     for (const id of touchedApps) recountPaid(os, id);
+
+    /* ---------- friends' submissions, the audit log ---------- */
+    applyInbox(os, page, (pid) => profiles.get(turfKey('players', pid)));
 
     /* ---------- Debts between you and someone ---------- */
     res.debtsOpen = syncDebts(os, profiles);

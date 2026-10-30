@@ -32,8 +32,9 @@ export interface TurfAction {
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body: Record<string, unknown>;
   undo?: Undo;
-  /** The local id of the match this change makes. */
+  /** The local id of the record this change makes (a match, a player, a venue), and which. */
   creates?: string;
+  createsKind?: 'games' | 'players' | 'venues';
 }
 
 export const LOCAL_IDS = 'turf.localIds';
@@ -448,6 +449,272 @@ export function matchInputOf(os: LifeOSContext, gameId: string): MatchInput | nu
     playerIds: liveApps(os, g.id).map((a) => profileOf(a.data.personId)).filter((x): x is string => !!x),
     frontedById: profileOf(g.data.frontedById),
   };
+}
+
+/* ---------- players ---------- */
+
+export interface PlayerInput {
+  name: string;
+  phone?: string;
+  email?: string;
+  /** UPI id (Turf web's payment id). */
+  upi?: string;
+  position?: string;
+  secondaryPosition?: string;
+  /** Comma-separated, as the profile keeps it. */
+  comfortable?: string;
+  preferredFoot?: string;
+  speciality?: string;
+  playingStyle?: string;
+  startingLevel?: string;
+  ability?: number;
+  pace?: number;
+  stamina?: number;
+  defending?: number;
+  passing?: number;
+  dribbling?: number;
+  shooting?: number;
+  keeperWilling?: boolean;
+  keeperRating?: number;
+  jersey?: string;
+  boots?: string;
+  favouritePlayer?: string;
+  clubs?: string;
+  countries?: string;
+  kitColors?: string;
+  notes?: string;
+  guest?: boolean;
+}
+
+/** The body Turf web's player form sends (create: action 'player'; edit: the PUT with every field). */
+function playerBody(p: PlayerInput) {
+  return {
+    name: p.name.trim(),
+    phone: p.phone ?? '',
+    email: p.email ?? '',
+    position: p.position ?? '',
+    notes: p.notes ?? '',
+    paymentId: p.upi ?? '',
+    preferredFoot: p.preferredFoot ?? '',
+    speciality: p.speciality ?? '',
+    shoes: p.boots ?? '',
+    jerseyNumber: p.jersey ?? '',
+    favouritePlayer: p.favouritePlayer ?? '',
+    supportedClubs: p.clubs ?? '',
+    supportedCountries: p.countries ?? '',
+    kitColors: p.kitColors ?? '',
+    secondaryPosition: p.secondaryPosition ?? '',
+    comfortablePositions: p.comfortable ? p.comfortable.split(',').map((x) => x.trim()).filter(Boolean) : [],
+    goalkeeperWilling: p.keeperWilling ?? null,
+    goalkeeperRating: p.keeperWilling ? p.keeperRating ?? null : null,
+    playingStyle: p.playingStyle ?? '',
+    startingLevel: p.startingLevel ?? null,
+    initialAbility: p.ability ?? null,
+    pace: p.pace ?? null,
+    stamina: p.stamina ?? null,
+    defending: p.defending ?? null,
+    passing: p.passing ?? null,
+    dribbling: p.dribbling ?? null,
+    shooting: p.shooting ?? null,
+    kind: p.guest ? 'guest' : 'regular',
+  };
+}
+
+/** The profile fields a PlayerInput sets (blank clears). */
+function profileFields(p: PlayerInput): Partial<PlayerProfileData> {
+  const s = (v?: string) => (v && v.trim() ? v.trim() : undefined);
+  return {
+    name: p.name.trim(),
+    position: s(p.position),
+    secondaryPosition: s(p.secondaryPosition),
+    comfortable: s(p.comfortable),
+    preferredFoot: s(p.preferredFoot),
+    speciality: s(p.speciality),
+    playingStyle: s(p.playingStyle),
+    startingLevel: s(p.startingLevel),
+    ability: p.ability,
+    pace: p.pace,
+    stamina: p.stamina,
+    defending: p.defending,
+    passing: p.passing,
+    dribbling: p.dribbling,
+    shooting: p.shooting,
+    keeperWilling: p.keeperWilling,
+    keeperRating: p.keeperWilling ? p.keeperRating : undefined,
+    jersey: s(p.jersey),
+    boots: s(p.boots),
+    favouritePlayer: s(p.favouritePlayer),
+    clubs: s(p.clubs),
+    countries: s(p.countries),
+    kitColors: s(p.kitColors),
+    notes: s(p.notes),
+    guest: p.guest || undefined,
+  };
+}
+
+/** A player's form, filled from the profile and their Person. */
+export function playerInputOf(os: LifeOSContext, profileId: string): PlayerInput | null {
+  const p = os.records.get<PlayerProfileData>(profileId);
+  if (!p) return null;
+  const person = os.records.get<{ phone?: string; email?: string; upi?: string }>(p.data.personId);
+  const d = p.data;
+  return { name: d.name, phone: person?.data.phone, email: person?.data.email, upi: person?.data.upi, position: d.position, secondaryPosition: d.secondaryPosition, comfortable: d.comfortable, preferredFoot: d.preferredFoot, speciality: d.speciality, playingStyle: d.playingStyle, startingLevel: d.startingLevel, ability: d.ability, pace: d.pace, stamina: d.stamina, defending: d.defending, passing: d.passing, dribbling: d.dribbling, shooting: d.shooting, keeperWilling: d.keeperWilling, keeperRating: d.keeperRating, jersey: d.jersey, boots: d.boots, favouritePlayer: d.favouritePlayer, clubs: d.clubs, countries: d.countries, kitColors: d.kitColors, notes: d.notes, guest: d.guest };
+}
+
+/** A new player: a Person (unless one is given) and a Player profile, sent to Turf web. Returns the profile. */
+export function createPlayer(os: LifeOSContext, input: PlayerInput, personId?: string): { profileId: string; item: OutboxItem<TurfAction> } {
+  if (!input.name.trim()) throw new Error('Give them a name');
+  const changeId = newId();
+  const local = `local-${changeId}`;
+  let profileId!: string;
+  let item!: OutboxItem<TurfAction>;
+  os.db.transaction(() => {
+    const made: string[] = [];
+    const pid = personId && os.records.get(personId) ? personId : os.records.create({ object: 'person', title: input.name.trim(), data: Object.fromEntries(Object.entries({ relationship: 'friend', phone: input.phone, email: input.email, upi: input.upi }).filter(([, v]) => v)) }, ACTOR).id;
+    if (pid !== personId) made.push(pid);
+    const profile = os.records.create<PlayerProfileData>({ object: 'player', data: { ...(profileFields(input) as PlayerProfileData), personId: pid, availability: 'AVL', availabilityMode: 'regular', weekly: 'all_week', sourceKey: `turf:players:${local}` } }, ACTOR);
+    profileId = profile.id;
+    made.unshift(profile.id);
+    if (!input.guest) {
+      const gid = os.settings.get<string | null>('turf.groupId', null);
+      const group = gid ? os.records.get<{ memberIds?: string[] }>(gid) : undefined;
+      if (group && !(group.data.memberIds ?? []).includes(pid)) os.records.update(gid!, { data: { ...group.data, memberIds: [...(group.data.memberIds ?? []), pid] } }, ACTOR);
+    }
+    item = queueTurf(os, { id: changeId, label: `New player · ${input.name.trim()}${input.guest ? ' (guest)' : ''}`, recordId: profile.id, action: { method: 'POST', body: { action: 'player', ...playerBody(input) }, undo: { restore: [], remove: made }, creates: local, createsKind: 'players' } });
+  });
+  return { profileId, item };
+}
+
+/** A player's details changed; Turf web gets every field, as its own form sends them. */
+export function editPlayer(os: LifeOSContext, profileId: string, input: PlayerInput) {
+  const p = os.records.get<PlayerProfileData>(profileId);
+  const id = p ? turfPlayerId(p.data) : null;
+  if (!p || !id) throw new Error('That player isn’t in Turf web');
+  if (!input.name.trim()) throw new Error('Give them a name');
+  const person = os.records.get<Record<string, unknown>>(p.data.personId);
+  return change(os, {
+    label: `${input.name.trim()} · details changed`,
+    recordId: p.id,
+    touches: [p.id, ...(person ? [person.id] : [])],
+    method: 'PUT',
+    body: { id, ...playerBody(input) },
+    apply: () => {
+      replaceData<PlayerProfileData>(os, p.id, { ...p.data, ...profileFields(input) } as PlayerProfileData);
+      if (person) os.records.update(person.id, { data: { ...person.data, phone: input.phone || undefined, email: input.email || undefined, upi: input.upi || undefined } }, ACTOR);
+    },
+  });
+}
+
+export interface AvailabilityInput {
+  mode: 'regular' | 'window_only';
+  weekly: 'all_week' | 'weekdays' | 'weekends';
+  periods: Array<{ status: 'AVL' | 'INJ' | 'OOS'; startsAt: string; endsAt?: string | null; note?: string | null }>;
+}
+
+/** When a player can play: regular or only in windows, which days, and periods (injured, away…). */
+export function setAvailability(os: LifeOSContext, profileId: string, a: AvailabilityInput) {
+  const p = os.records.get<PlayerProfileData>(profileId);
+  const id = p ? turfPlayerId(p.data) : null;
+  if (!p || !id) throw new Error('That player isn’t in Turf web');
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  if (a.periods.some((x) => !day.test(x.startsAt) || (x.endsAt && (!day.test(x.endsAt) || x.endsAt < x.startsAt)))) throw new Error('Check the availability dates');
+  return change(os, {
+    label: `${p.data.name} · availability`,
+    recordId: p.id,
+    touches: [p.id],
+    method: 'POST',
+    body: { action: 'availability', id, availabilityMode: a.mode, weeklyAvailability: a.weekly, periods: a.periods.map((x) => ({ status: x.status, startsAt: x.startsAt, endsAt: x.endsAt ?? '', note: x.note ?? '' })) },
+    apply: () => replaceData<PlayerProfileData>(os, p.id, { ...p.data, availabilityMode: a.mode, weekly: a.weekly, availability: a.mode === 'window_only' ? 'OOS' : 'AVL', periods: a.periods.length ? a.periods.map((x) => ({ status: x.status, startsAt: x.startsAt, endsAt: x.endsAt ?? null, note: x.note ?? null })) : undefined }),
+  });
+}
+
+/* ---------- venues ---------- */
+
+export interface VenueInput {
+  name: string;
+  defaultTime?: string;
+  sideSize?: number;
+  defaultCost?: number;
+  mapsLink?: string;
+  paymentTerms: VenueData['paymentTerms'];
+  advance?: number;
+  notes?: string;
+}
+
+const SIZES = [5, 6, 7, 8, 9, 11];
+
+function checkVenue(v: VenueInput) {
+  if (!v.name.trim()) throw new Error('Give the venue a name');
+  if (v.sideSize && !SIZES.includes(v.sideSize)) throw new Error('Choose a supported ground size');
+  if (v.defaultCost != null && v.defaultCost <= 0) throw new Error('The usual cost must be more than zero');
+  if (v.mapsLink && !/^https?:\/\//i.test(v.mapsLink)) throw new Error('Use a complete Google Maps link');
+}
+
+const venueBody = (v: VenueInput) => ({ action: 'venue', name: v.name.trim(), defaultTime: v.defaultTime ?? '', sideSize: v.sideSize ?? null, defaultCost: v.defaultCost ?? null, mapsLink: v.mapsLink ?? '', paymentTerms: v.paymentTerms, advanceAmount: v.paymentTerms === 'advance_paid' ? v.advance ?? 0 : null, notes: v.notes ?? '' });
+
+const venueData = (v: VenueInput, base: Partial<VenueData>): VenueData => ({ ...base, name: v.name.trim(), defaultTime: v.defaultTime || undefined, sideSize: v.sideSize || undefined, defaultCost: v.defaultCost || undefined, mapsLink: v.mapsLink || undefined, paymentTerms: v.paymentTerms, advance: v.paymentTerms === 'advance_paid' ? v.advance : undefined, notes: v.notes || undefined }) as VenueData;
+
+/** A new venue (a Place too) or an edited one, sent to Turf web. Returns the Venue record. */
+export function saveVenue(os: LifeOSContext, venueId: string | null, v: VenueInput): { venueId: string; item: OutboxItem<TurfAction> | null } {
+  checkVenue(v);
+  if (venueId) {
+    const cur = os.records.get<VenueData>(venueId);
+    const id = cur ? turfVenueId(cur.data) : null;
+    if (!cur || !id) throw new Error('That venue isn’t in Turf web');
+    const item = change(os, { label: `${v.name.trim()} · venue saved`, recordId: cur.id, touches: [cur.id], method: 'POST', body: { ...venueBody(v), id }, apply: () => replaceData<VenueData>(os, cur.id, venueData(v, cur.data)) });
+    return { venueId: cur.id, item };
+  }
+  const changeId = newId();
+  const local = `local-${changeId}`;
+  let vid!: string;
+  let item!: OutboxItem<TurfAction>;
+  os.db.transaction(() => {
+    const place = os.records.query<{ kind?: string }>('place', {}, { limit: 100_000 }).find((pl) => pl.title.trim().toLowerCase() === v.name.trim().toLowerCase());
+    const made: string[] = [];
+    const placeId = place?.id ?? os.records.create({ object: 'place', title: v.name.trim(), data: { kind: 'venue' } }, ACTOR).id;
+    if (!place) made.push(placeId);
+    const rec = os.records.create<VenueData>({ object: 'venue', data: venueData(v, { placeId, sourceKey: `turf:venues:${local}` }) }, ACTOR);
+    vid = rec.id;
+    made.unshift(rec.id);
+    item = queueTurf(os, { id: changeId, label: `New venue · ${v.name.trim()}`, recordId: rec.id, action: { method: 'POST', body: venueBody(v), undo: { restore: [], remove: made }, creates: local, createsKind: 'venues' } });
+  });
+  return { venueId: vid, item };
+}
+
+/** The venue form's starting point. */
+export function venueInputOf(os: LifeOSContext, venueId: string): VenueInput | null {
+  const v = os.records.get<VenueData>(venueId);
+  if (!v) return null;
+  return { name: v.data.name, defaultTime: v.data.defaultTime, sideSize: v.data.sideSize, defaultCost: v.data.defaultCost, mapsLink: v.data.mapsLink, paymentTerms: v.data.paymentTerms, advance: v.data.advance, notes: v.data.notes };
+}
+
+/* ---------- when Turf web answers a new match, player or venue ---------- */
+
+/** Turf web made the record: the local one takes its real id. If Turf web already had it (a venue of the same name and size), the local copy folds into that one. */
+export function remapLocal(os: LifeOSContext, kind: 'games' | 'players' | 'venues', local: string, real: string) {
+  if (kind === 'games') return remapLocalMatch(os, local, real);
+  const map = os.settings.get<Record<string, string>>(LOCAL_IDS, {});
+  map[local] = real;
+  os.settings.set(LOCAL_IDS, map);
+  const object = kind === 'players' ? 'player' : 'venue';
+  const find = (key: string) => os.records.query<{ sourceKey?: string }>(object, { includeArchived: true, filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 1 })[0];
+  os.db.transaction(() => {
+    const mine = find(`turf:${kind}:${local}`);
+    if (!mine) return;
+    const theirs = find(`turf:${kind}:${real}`);
+    if (theirs && theirs.id !== mine.id && kind === 'venues') {
+      for (const g of os.records.query<GameData>('game', { includeArchived: true, filter: { and: [{ field: 'data.venueId', op: 'eq', value: mine.id }] } }, { limit: 10_000 })) os.records.update<GameData>(g.id, { data: { ...g.data, venueId: theirs.id } }, 'system');
+      os.records.delete(mine.id, 'system');
+      return;
+    }
+    os.records.update(mine.id, { data: { ...(mine.data as object), sourceKey: `turf:${kind}:${real}` } }, 'system');
+    if (kind === 'players') {
+      for (const a of os.records.query<AppearanceData>('appearance', { includeArchived: true }, { limit: 100_000 })) {
+        const k = a.data.sourceKey ?? '';
+        if (k.endsWith(`:${local}`)) os.records.update<AppearanceData>(a.id, { data: { ...a.data, sourceKey: k.replace(`:${local}`, `:${real}`) } }, 'system');
+      }
+    }
+  });
 }
 
 /* ---------- when Turf web answers a new match ---------- */

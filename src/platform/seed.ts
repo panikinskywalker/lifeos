@@ -94,6 +94,20 @@ export function seedDemoData(os: LifeOSContext) {
     os.records.create({ object: 'note', title: 'Japan itinerary ideas', data: { body: 'Tokyo 5 nights → Hakone 1 → Kyoto 4 → Osaka 3. Book teamLab early. Try the 7-day JR pass math vs. point-to-point.', kind: 'idea' }, });
     const meeting = os.records.create({ object: 'note', title: 'Weekly sync with Arjun', data: { body: 'Discussed plugin loading strategy. Decision: manifests stay plain objects; lazy-load screens.', kind: 'meeting', projectId: lifeos.id, personIds: [arjun.id] } });
     os.links.link(meeting.id, lifeos.id, 'project');
+    // Places (R3): a city in its country, areas in the city, places in the areas; events at them.
+    const india = os.records.create({ object: 'place', title: 'India', data: { kind: 'country' } });
+    const blr = os.records.create({ object: 'place', title: 'Bengaluru', data: { kind: 'city', parentId: india.id } });
+    const indira = os.records.create({ object: 'place', title: 'Indiranagar', data: { kind: 'area', parentId: blr.id, coordinates: { lat: 12.9719, lng: 77.6412 } } });
+    const kora = os.records.create({ object: 'place', title: 'Koramangala', data: { kind: 'area', parentId: blr.id } });
+    os.records.create({ object: 'place', title: 'Home', data: { kind: 'home', parentId: kora.id, coordinates: { lat: 12.9352, lng: 77.6245 } } });
+    const toit = os.records.create({ object: 'place', title: 'Toit', data: { kind: 'restaurant', parentId: indira.id, address: '298, 100 Feet Rd, Indiranagar', coordinates: { lat: 12.9791, lng: 77.6408 } } });
+    const tokai = os.records.create({ object: 'place', title: 'Blue Tokai, Indiranagar', data: { kind: 'restaurant', parentId: indira.id, address: '12th Main, HAL 2nd Stage', coordinates: { lat: 12.9698, lng: 77.6387 } } });
+    os.records.create({ object: 'place', title: 'Dome Turf', data: { kind: 'venue', parentId: kora.id, coordinates: { lat: 12.9279, lng: 77.6271 } } });
+    os.records.create({ object: 'org', title: 'Toit Brewpub', data: { kind: 'restaurant', placeId: toit.id, website: 'https://toit.in' } });
+    for (const [d, title, at] of [[3, 'Beers with Arjun', toit], [12, 'Coffee with Priya', tokai], [19, 'Dinner at Toit', toit], [26, 'Work from Blue Tokai', tokai]] as const) {
+      const e = os.records.create({ object: 'event', title, data: { kind: 'met', startAt: Date.now() - d * 86400000 } });
+      os.links.link(e.id, at.id, 'at');
+    }
     os.records.create({ object: 'event', title: 'Dentist', data: { startAt: Date.now() + 2 * 86400000, location: 'Indiranagar' } });
     os.records.create({ object: 'event', title: 'Priya\'s birthday dinner', data: { startAt: Date.now() + 9 * 86400000, personIds: [priya.id] } });
     os.records.create({ object: 'item', title: 'Paracetamol', data: { quantity: 4, unit: 'strips', location: 'Medicine box', category: 'medicine', minQuantity: 2 } });

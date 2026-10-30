@@ -250,6 +250,8 @@ export interface PlayerProfileData {
   photoPath?: string;
   shareSlug?: string;
   notes?: string;
+  /** A guest: plays now and then, not a member of the Football group. */
+  guest?: boolean;
   sourceKey?: string;
 }
 
@@ -291,6 +293,7 @@ export const playerProfileObject: ObjectDef<PlayerProfileData> = {
     weekly: z.enum(['all_week', 'weekdays', 'weekends']).optional(),
     availability: z.enum(['AVL', 'INJ', 'OOS']).default('AVL'),
     periods: z.array(z.object({ id: z.string().optional(), status: z.enum(['AVL', 'INJ', 'OOS']), startsAt: z.string(), endsAt: z.string().nullable().optional(), note: z.string().nullable().optional() })).optional(),
+    guest: z.boolean().optional(),
     photoPath: z.string().optional(),
     shareSlug: z.string().optional(),
     notes: z.string().optional(),

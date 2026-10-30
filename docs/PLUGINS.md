@@ -130,9 +130,17 @@ Core keeps the queue (`src/core/filing/queue.ts`), sender trust and dispatch
 (`messages.ts`): every parser that read something files, in priority order;
 no parser → a dismissed leftover. A module declares `filing: { parsers }` and,
 for tools the model gets while filing a dump, `filingTools(session)` (finance:
-`log_spend`). `ObjectDef.enrich(os, data, { text })` fills defaults for a record
-made from a sentence (finance: the category), so core's generic tools never
-import a module.
+`log_spend`; places: `file_place`). `ObjectDef.enrich(os, data, { text })` fills defaults for a record
+made from a sentence (finance: the category; places: a Place's or
+Organisation's kind from its name), so core's generic tools never import a
+module; core's `upsertNode` calls it for every record it makes from a name (R3).
+
+Places (R3) files without a source of its own: it listens for Events created
+or edited with a `location` (whoever wrote them: core's calendar reading,
+travel's booking parser, a dump) and links them *at* a Place, and its mail
+parser `places.mail` runs last (priority 90) so it can mark what the other
+parsers filed from a mail as *sent by* the Organisation whose website matches
+the sender; when it is the only reader the mail stays a dismissed leftover.
 
 ### Sources (R1, as built)
 
@@ -227,8 +235,20 @@ interface BoardManifest {
   overrides?: ObjectOverride[];        // per Object: { object, record?: sections on the Record screen; placement 'hero' replaces the header (gets RecordControls: back, edit, more, cover), 'top' above the details, else cards }
   quickActions?: QuickAction[];        // the global "+" menu
   buttons?: ManualRun[];               // manual-run automations shown on this board (R10)
+  checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds
 }
 ```
+
+A board can put its own questions in **To check**: a module adds a filing of
+its own `kind` (`os.filings.add`), and the board's `checkCards[kind]` is drawn
+for it in place of the usual tick / edit / cancel row (`app/check.tsx`). Turf:
+`turf-payment-ask` (an SMS that may pay a share — Yes / Not this),
+`turf-payment` (a share recorded from an SMS — Undo), `turf-submission` (a
+friend's profile — Review / Later).
+
+A board screen's query parameters must not be called `id`: the route
+`/board/[id]/[page]` already uses `id` for the board, so `?id=` never reaches
+the screen (Turf uses `?game=`, `?player=`, `?venue=`, `?sub=`).
 
 Every module has a companion board of the same id in `src/boards/<module>`
 holding its overview, screens, quick actions and record sections (the Vehicle

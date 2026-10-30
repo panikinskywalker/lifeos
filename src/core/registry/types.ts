@@ -159,6 +159,12 @@ export interface BoardManifest {
   overrides?: ObjectOverride[];
   quickActions?: QuickAction[];
   buttons?: ManualRun[];
+  /**
+   * To check cards for filings of this board's own kinds (Turf: an SMS that
+   * may pay a share — Yes / Not this; a friend's profile — Review / Later).
+   * To check draws them in place of the usual tick / edit / cancel row.
+   */
+  checkCards?: Record<string, ComponentType<{ filing: import('../repo/filingRepo').Filing }>>;
 }
 
 /* ------------------------------------------------------------------ */

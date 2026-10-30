@@ -27,7 +27,8 @@ const FACE_COLOURS = ['#D7F55C', '#F4A8CE', '#F6E27F', '#A9C4FF', '#6FD3C8', '#C
 const INK = '#0B0B0D';
 
 const initials = (name: string) => {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  // Words with letters only ("Neel (guest)" → N, not "N(").
+  const parts = name.trim().split(/\s+/).map((w) => w.replace(/[^\p{L}]/gu, '')).filter(Boolean).filter((w, i, all) => !(all.length > 1 && i === all.length - 1 && /^guest$/i.test(w)));
   return (parts.length > 1 ? parts[0]![0]! + parts[parts.length - 1]![0]! : (parts[0] ?? '?').slice(0, 1)).toUpperCase();
 };
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
@@ -489,28 +490,126 @@ export function TurfPickTeams({ ctx, params }: Props) {
         Captains are picked in Log stats. Shown here at once and sent to Turf web; they wait on this phone while you’re offline.
       </Text>
 
-      <Sheet visible={!!shape} onClose={() => setShape(null)} title={shape ? `${kits[shape].name} formation` : ''}>
-        <ChipRow>
-          {(d.g.data.sideSize && FORMATIONS[d.g.data.sideSize] ? FORMATIONS[d.g.data.sideSize]! : Object.values(FORMATIONS).flat()).map((f) => (
-            <FilterChip
-              key={f}
-              label={f}
-              selected={shape ? formationOf(d.g.data, shape) === f : false}
-              onPress={() => {
-                if (!shape) return;
-                try {
-                  if (setFormation(os, d.g.id, shape, f)) void pull(true);
-                } catch (e) {
-                  toast.show({ message: (e as Error).message, icon: 'info' });
-                }
-                setShape(null);
-              }}
-            />
-          ))}
-        </ChipRow>
-        <Text variant="caption" color="tertiary">
-          Outfield rows from the back; the keeper isn’t counted.
-        </Text>
+      <Sheet
+        visible={!!shape}
+        onClose={() => setShape(null)}
+        title="Formation"
+        footer={shape ? <Button title={`Done · ${kits[shape].name} ${formationOf(d.g.data, shape) ?? ''}`.trim()} icon="check" block onPress={() => setShape(null)} /> : undefined}
+      >
+        {/* 4e Formation (TF-Formations): the side, its shape as mini pitches, the pitch with everyone slotted in. A tap sets the shape and sends it. */}
+        {shape
+          ? (() => {
+              const size = d.g.data.sideSize ?? null;
+              const NAMES: Record<string, [string, string]> = {
+                '2-3-1': ['Classic', 'Most common · width from the three'],
+                '3-2-1': ['Christmas tree', 'Back three · narrow and solid'],
+                '2-1-2-1': ['Diamond', 'A holder and a ten · two wide'],
+                '3-1-2': ['Front-foot', 'Two up top · one pivot'],
+                '2-2-2': ['Pairs', 'Simple · easy to hold'],
+                '1-3-2': ['Press', 'All-out · one at the back'],
+              };
+              const words = (n: number) => ['', 'one', 'two', 'three', 'four', 'five'][n] ?? String(n);
+              const describe = (f: string) => {
+                const r = formationRows(f);
+                return [`${words(r[0]!)} at the back`, r.length > 2 ? `${words(r.slice(1, -1).reduce((x, y) => x + y, 0))} in midfield` : null, `${words(r[r.length - 1]!)} up top`].filter(Boolean).join(' · ');
+              };
+              const groups = size && FORMATIONS[size] ? [[size, FORMATIONS[size]!] as const] : (Object.entries(FORMATIONS).map(([n, fs]) => [Number(n), fs] as const));
+              const tile = (f: string) => {
+                const on = formationOf(d.g.data, shape) === f;
+                const r = formationRows(f);
+                const line = on ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.14)';
+                const dot = on ? kits[shape].hex : 'rgba(245,245,247,0.62)';
+                const y = (i: number) => (r.length === 1 ? 32 : 48.8 - (i * 34) / (r.length - 1));
+                return (
+                  <Pressable
+                    key={f}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={`${f}${NAMES[f] ? `, ${NAMES[f]![0]}` : ''}`}
+                    onPress={() => {
+                      try {
+                        if (setFormation(os, d.g.id, shape, f)) void pull(true);
+                      } catch (e) {
+                        toast.show({ message: (e as Error).message, icon: 'info' });
+                      }
+                    }}
+                    style={{ width: 98, gap: 6 }}
+                  >
+                    <View style={{ borderRadius: 12, borderWidth: 2, borderColor: on ? kits[shape].hex : 'transparent', margin: -2 }}>
+                      <Svg width={98} height={74} viewBox="0 0 98 74">
+                        <Rect x={0} y={0} width={98} height={74} rx={10} fill={on ? '#23563A' : t.c.bg.tileRaised} />
+                        <Rect x={6} y={-8} width={86} height={76} rx={3} fill="none" stroke={line} strokeWidth={1} />
+                        <Rect x={27} y={54} width={44} height={14} fill="none" stroke={line} strokeWidth={1} />
+                        <Path d="M6 5.92 A43.0 5.92 0 0 0 92 5.92" fill="none" stroke={line} strokeWidth={1} />
+                        <Circle cx={49} cy={65.1} r={3.5} fill={dot} />
+                        {r.map((n, i) => Array.from({ length: n }, (_, k) => <Circle key={`${i}-${k}`} cx={49 + (k - (n - 1) / 2) * (n === 2 ? 39.2 : 82 / n)} cy={y(i)} r={3.5} fill={dot} />))}
+                      </Svg>
+                    </View>
+                    <View>
+                      <Display size={18} color={on ? kits[shape].text : undefined} style={{ lineHeight: 18 }}>
+                        {f}
+                      </Display>
+                      {NAMES[f] ? (
+                        <Text variant="labelMicro" color="secondary" style={{ fontSize: 11, lineHeight: 14, fontWeight: '700' }}>
+                          {NAMES[f]![0]}
+                        </Text>
+                      ) : null}
+                      <Text variant="caption" color="tertiary" style={{ fontSize: 10, lineHeight: 13 }}>
+                        {NAMES[f]?.[1] ?? describe(f)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              };
+              return (
+                <>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {(['A', 'B'] as const).map((side) => (
+                      <Pressable key={side} accessibilityRole="tab" accessibilityState={{ selected: shape === side }} onPress={() => setShape(side)} style={{ flex: 1, height: 40, borderRadius: 999, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: shape === side ? t.c.accent.mustard : t.c.bg.tileRaised }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: kits[side].hex, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)' }} />
+                        <Text variant="label" color={shape === side ? t.c.accent.mustardInk : 'secondary'} style={{ fontSize: 13, lineHeight: 17, fontWeight: '700' }}>
+                          {`${kits[side].name} · ${formationOf(d.g.data, side) ?? '—'}`}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <View style={{ gap: 14 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
+                      <Text variant="tileTitle" style={{ lineHeight: 20 }}>{`Shape for ${kits[shape].name}`}</Text>
+                      <Text variant="caption" color="tertiary" numberOfLines={1} style={{ marginLeft: 'auto', flexShrink: 1 }}>
+                        {[size ? `${size}-a-side` : 'Any size', d.g.data.venueName].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                    {groups.map(([n, fs]) => (
+                      <View key={n} style={{ gap: 10 }}>
+                        {groups.length > 1 ? <Mono>{`${n}s · ${n - 1} outfield`}</Mono> : null}
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 14 }}>{fs.map(tile)}</View>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={{ gap: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text variant="tileTitle">On the pitch</Text>
+                        <Text variant="caption" color="secondary" style={{ fontWeight: '500' }}>
+                          {[format(new Date(`${d.g.data.date}T12:00:00`), 'EEE d MMM'), d.g.data.scoreA != null && d.g.data.scoreB != null ? `${d.g.data.scoreA} – ${d.g.data.scoreB}` : null].filter(Boolean).join(' · ')}
+                        </Text>
+                      </View>
+                      {(['A', 'B'] as const).map((side) => (
+                        <View key={side} style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: side === shape ? t.c.accent.mustardSoft : t.c.bg.dim }}>
+                          <Text variant="labelMicro" color={side === shape ? t.c.accent.mustard : 'secondary'}>{`${kits[side].name} ${formationOf(d.g.data, side) ?? '—'}`}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <Pitch game={d.g.data} players={d.players.map((p) => ({ ...p, team: teams[p.id] ?? null }))} />
+                    <Text variant="caption" color="tertiary">
+                      Outfield rows from the back; the keeper isn’t counted. Players slot in by their preferred position.
+                    </Text>
+                  </View>
+                </>
+              );
+            })()
+          : null}
       </Sheet>
     </Screen>
   );

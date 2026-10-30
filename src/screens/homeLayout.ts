@@ -1,10 +1,11 @@
 import type { LifeOSContext } from '@core/registry/context';
 
 /** Everything Today can show, in its default order (You › Home screen turns each on / off and moves it). */
-export type TileId = 'myday' | 'progress' | 'activity' | 'habits' | 'steps' | 'sleep' | 'spend' | 'done' | 'areas' | 'upcoming' | 'screen' | 'people' | 'overdue' | 'onthisday';
+export type TileId = 'myday' | 'turf' | 'progress' | 'activity' | 'habits' | 'steps' | 'sleep' | 'spend' | 'done' | 'areas' | 'upcoming' | 'screen' | 'people' | 'overdue' | 'onthisday';
 
 export const TILES: Record<TileId, { label: string; line: string; wide: boolean }> = {
   myday: { label: 'My day', line: 'Today in time order: events, tasks, things due, deliveries', wide: true },
+  turf: { label: 'Turf', line: 'The next match: who’s in and what’s still to collect', wide: true },
   progress: { label: 'Progress', line: 'Rings: steps, sleep, screen time, habits, tasks, spend vs your goals', wide: true },
   activity: { label: 'Activity', line: 'GitHub-style grids: days worked, workouts, steps, your own trackers', wide: true },
   habits: { label: 'Habits', line: 'Tick today’s habits, with their streaks', wide: true },
