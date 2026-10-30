@@ -777,6 +777,8 @@ screens checked on the phone → overrides only where the default is wrong)
   web export builds. *Not in R3*: Person's company → Organisation is R2's;
   maps are drawn, not tiled, so there is no real map until a provider is
   chosen; no migration (Fields live in record JSON). **Phone check pending.**
+  **Design prompt 30 Oct**: `docs/design/PLACES-BRIEF.md` asks for
+  `NR-Places-*` artboards that replace this first pass.
 - [ ] **R4 projects** — Task, Project, Goal, Event; calendar source.
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
   Upkeep; Upkeep re-hung on cycles from every module.
