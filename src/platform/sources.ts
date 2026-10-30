@@ -184,7 +184,7 @@ export async function refreshFxRates(os: LifeOSContext) {
 let running: { at: number; p: Promise<void> } | null = null;
 
 /** A step that takes longer than this is given up on (it may still finish in the background) so the rest still run. */
-const STEP_LIMIT_MS = { fx: 10_000, phone: 90_000, device: 90_000, mail: 120_000, turf: 60_000 };
+const STEP_LIMIT_MS = { fx: 10_000, phone: 90_000, device: 90_000, mail: 120_000, turf: 60_000, notion: 240_000 };
 
 function withLimit<T>(name: string, ms: number, work: () => Promise<T>): Promise<void> {
   const t0 = Date.now();
@@ -227,6 +227,10 @@ export function syncSources(os: LifeOSContext): Promise<void> {
     }
     // Turf web (games): only once its address and key are set.
     await withLimit('turf', STEP_LIMIT_MS.turf, () => syncRegistered(os, 'turf'));
+    // Notion (crm, R2b): your People CRM's copy, both ways — only once a token is on this phone. Its own, longer limit: ~3 calls a second.
+    await withLimit('notion', STEP_LIMIT_MS.notion, async () => {
+      if (await secrets.get('notion.token')) await syncRegistered(os, 'notion');
+    });
     // Gmail last: a receipt then matches the SMS already filed for it (and the other way round).
     await withLimit('gmail', STEP_LIMIT_MS.mail, () => syncRegistered(os, 'gmail'));
   })().finally(() => {

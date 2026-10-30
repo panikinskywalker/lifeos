@@ -14,7 +14,7 @@ import type { PersonData } from './types';
  */
 
 /** Objects whose records count as contact, when linked to a person. */
-const CONTACT_OBJECTS = new Set(['event', 'transaction']);
+export const CONTACT_OBJECTS = new Set(['event', 'transaction']);
 
 const iso = (t: number) => {
   const d = new Date(t);
@@ -22,7 +22,7 @@ const iso = (t: number) => {
 };
 
 /** When a linked record happened: its domain time, else a start or a date in its data. */
-function happenedAt(r: ObjectRecord): number | null {
+export function happenedAt(r: ObjectRecord): number | null {
   if (r.occurredAt) return r.occurredAt;
   const d = r.data as { startAt?: number; date?: string };
   if (typeof d.startAt === 'number') return d.startAt;

@@ -759,4 +759,36 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_outbox_record ON outbox(record_id)`,
     ],
   },
+  {
+    version: 15,
+    name: 'facts-from-notion',
+    // docs/MODEL.md layer 4 (R2b): a bullet or a Last Update? read from your
+    // Notion People CRM is a Fact with the source 'notion' (a CHECK cannot be
+    // widened in place, so the table is rebuilt as in v12).
+    up: [
+      `CREATE TABLE facts_v15 (
+        id TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        subject_id TEXT,
+        subject_key TEXT,
+        source TEXT NOT NULL CHECK (source IN ('talk', 'notification', 'note', 'correction', 'user', 'dump', 'automation', 'notion')),
+        source_ref TEXT,
+        stated_at INTEGER NOT NULL,
+        confidence REAL NOT NULL DEFAULT 1,
+        active INTEGER NOT NULL DEFAULT 1,
+        superseded_by TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        deleted_at INTEGER,
+        version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `INSERT INTO facts_v15 SELECT id, text, subject_id, subject_key, source, source_ref, stated_at, confidence, active, superseded_by, created_at, updated_at, deleted_at, version FROM facts`,
+      `DROP TABLE facts`,
+      `ALTER TABLE facts_v15 RENAME TO facts`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_subject ON facts(subject_id, active)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_key ON facts(subject_key, active)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_recent ON facts(active, stated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_facts_source_ref ON facts(source_ref)`,
+    ],
+  },
 ];

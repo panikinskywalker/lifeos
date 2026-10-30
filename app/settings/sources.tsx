@@ -28,6 +28,7 @@ export default function SourcesScreen() {
   const info = useLive((o) => Object.fromEntries(SOURCES.map((s) => [s.id, sourceState(o, s.id)])), []);
   const gmail = useLive((o) => mailAccounts(o), []);
   const turf = useLive((o) => sourceState(o, 'turf'), []);
+  const notion = useLive((o) => sourceState(o, 'notion'), []);
   const proposed = useLive((o) => o.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ingest_queue WHERE status='proposed'`)?.n ?? 0, []);
 
   const refresh = useCallback(async () => {
@@ -173,6 +174,23 @@ export default function SourcesScreen() {
           </Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button title={turf.lastSync ? 'Settings' : 'Connect'} size="sm" variant={turf.lastSync ? 'secondary' : 'primary'} icon={turf.lastSync ? 'settings' : 'link'} onPress={() => router.push('/settings/turf' as never)} />
+          </View>
+        </View>
+        <View style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Icon name="notebook" size={18} color={notion.lastSync ? t.c.ok.sageText : t.c.fg.secondary} />
+            <Text variant="rowTitle" style={{ flex: 1 }}>
+              Notion
+            </Text>
+            <Text variant="labelMicro" color={notion.error ? t.c.alert.coralText : notion.lastSync ? t.c.ok.sageText : t.c.fg.secondary} style={{ textTransform: 'uppercase' }}>
+              {notion.error ? 'Needs attention' : notion.lastSync ? 'On' : 'Off'}
+            </Text>
+          </View>
+          <Text variant="caption" color="secondary">
+            Your People CRM, kept in step with People both ways. LifeOS writes only to the copy, 📇 Personal CRM (1); your original is never changed.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button title={notion.lastSync ? 'Settings' : 'Connect'} size="sm" variant={notion.lastSync ? 'secondary' : 'primary'} icon={notion.lastSync ? 'settings' : 'link'} onPress={() => router.push('/settings/notion' as never)} />
           </View>
         </View>
       </View>

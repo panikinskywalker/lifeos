@@ -720,8 +720,23 @@ screens checked on the phone → overrides only where the default is wrong)
   ideas and the wish are slots until layer 8. Since then a typed company or city links only to an
   Organisation or Place you already have (the form's *Keep as typed*); one is made only by *New
   organisation…*. A birthday with no year is kept without one (no "turns 0"). Phone check pending.
-- [ ] **R2b Notion** — your Notion People CRM kept in step with People, both ways (layer 4,
-  *Notion*; agreed 24 Oct, mapping agreed the same day). Next: build it.
+- [x] **R2b Notion** — built 30 Oct 2026: your Notion People CRM kept in step with People, both
+  ways (layer 4, *Notion*), as crm's `notion` source (`src/modules/crm/notion/`: client, mapping,
+  sync), writing **only to the copy** 📇 Personal CRM (1). The original is refused twice in code:
+  every write method checks the id and the page's parent (`assertWritable`), and the request layer
+  refuses any write naming an original id; the settings screen refuses a pasted link to it; tests
+  prove each write path. First sync adds the ten columns to the copy and pulls every page (matched by
+  Notion id, LifeOS id, phone, email or a unique name; an unsure one asked once in To check,
+  `notion-match`), then every Person gets a page. Per Field the newest edit wins against the last
+  agreed value, the other shown once in To check (`notion-conflict`); on first pairing tags, likes and
+  UPI ids are merged. Likes ↔ the Likes section; other bullets → Facts (source `notion`, once);
+  Last Update? ↔ the newest Fact; Associations ↔ tags; LifeOS writes Facts under Life Updates, a
+  LifeOS log of calls, meetings and payments, Balance (finance's `balances` tool through the
+  registry) and LifeOS id. Changes wait in the outbox and send when online; nothing echoes back.
+  You › Data sources › Notion: token (secure store), the target, Sync now. **Migration v15**
+  `facts-from-notion` (facts may have the source `notion`). 395 tests green; the web export builds.
+  *Not in R2b*: deletes either way, Groups. **Not yet run against Notion** (needs your token and the
+  copy shared with the integration); phone check pending.
 - [x] **R3 places** — done 22 Oct 2026. Objects as agreed (layer 2, *Places*):
   Place (kind with the twelve options, `venue` kept for Turf; address; map pin;
   parent → Place, word *in*; maps link; notes) and Organisation (ten kinds;

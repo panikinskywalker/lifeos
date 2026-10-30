@@ -71,6 +71,8 @@ export interface PersonData {
   notes?: string;
   /** The phone contact this person was imported from (re-syncs fill gaps). */
   contactId?: string;
+  /** Their page in your Notion People CRM (the copy; R2b), once known: hidden, how a page is matched first. */
+  notionId?: string;
 }
 
 const split = (s: string | undefined) => (s ?? '').split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
@@ -100,6 +102,7 @@ export const personType: ObjectDef<PersonData> = {
     likes: z.string().optional(),
     notes: z.string().optional(),
     contactId: z.string().optional(),
+    notionId: z.string().optional(),
   }),
   cycleFields: { 'person.contact': { lastDoneAt: 'lastContactAt' } },
   cycleTemplates: (d) => [

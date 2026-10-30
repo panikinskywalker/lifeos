@@ -6,12 +6,14 @@ import { PeopleHome } from './screens';
 import { PeopleList } from './lists';
 import { PersonForm } from './form';
 import { WhoIsCard } from './whois';
+import { NotionConflictCard, NotionMatchCard } from './notion';
 
 /**
  * Companion board of the crm module (People), drawn to the NR-People-*
  * artboards (v3 Noir): the People home, the People and Groups list, the
  * Person and Group pages (each the whole record page), the person form, the
- * "Who is this?" card in To check, the Overview, quick actions.
+ * "Who is this?" card and the two Notion cards in To check, the Overview,
+ * quick actions.
  */
 export const crmBoard: BoardManifest = {
   id: 'crm',
@@ -30,5 +32,5 @@ export const crmBoard: BoardManifest = {
     { object: 'person', form: PersonForm, record: [{ entityType: 'person', key: 'crm.person', title: 'Person', component: PersonPage, order: 0, placement: 'page' }] },
     { object: 'group', record: [{ entityType: 'group', key: 'crm.group', title: 'Group', component: GroupPage, order: 0, placement: 'page' }] },
   ],
-  checkCards: { 'payee-who': WhoIsCard },
+  checkCards: { 'payee-who': WhoIsCard, 'notion-match': NotionMatchCard, 'notion-conflict': NotionConflictCard },
 };

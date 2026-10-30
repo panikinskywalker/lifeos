@@ -583,7 +583,7 @@ function FactsCard({ entity }: { entity: ObjectRecord }) {
     os.facts.add({ text: text.trim(), subjectId: entity.id, source: 'user' });
     setText('');
   };
-  const who = (s: string) => (s === 'user' ? 'You' : s === 'talk' || s === 'dump' ? 'Agent' : s === 'automation' ? 'Automation' : s === 'notification' ? 'A message' : s === 'correction' ? 'A correction' : 'A note');
+  const who = (s: string) => (s === 'user' ? 'You' : s === 'talk' || s === 'dump' ? 'Agent' : s === 'automation' ? 'Automation' : s === 'notification' ? 'A message' : s === 'correction' ? 'A correction' : s === 'notion' ? 'Notion' : 'A note');
   return (
     <Card icon="sparkle" tint="memory" title="Facts" meta={facts.length ? `${facts.length}` : undefined}>
       <View style={{ gap: 12 }}>
