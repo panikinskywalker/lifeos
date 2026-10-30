@@ -470,6 +470,13 @@ when online). Decided 24 Oct:
   balance (owes you / you owe), Facts as notes on the page and the timeline
   (calls, meetings, payments) as a log, *placed to fit your database's
   layout*, decided once it has been read.
+- **Never the original** (decided 30 Oct): LifeOS never writes to your
+  existing Contacts database or its pages. All of R2b, the Likes sync
+  included, targets a duplicate: **📇 Personal CRM (1)**
+  (https://app.notion.com/p/40991ce13f8281bba4dff0ff4d0d830d, under Pipeline ›
+  Beta; its Contacts database is `collection://d5691ce1-3f82-8389-945f-87d26161f264`),
+  made 30 Oct with all 83 people. LifeOS is pointed at that one; the original
+  (`collection://90150d9b-31a4-46dc-84ad-280e5388783b`) is only ever read.
 - **The phone talks to Notion** with an internal-integration token you paste
   once (You › Data sources › Notion; kept in the secure store, like Turf
   web's key) and the database shared with it.
