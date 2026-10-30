@@ -2,7 +2,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { upkeep } from '@core/cycles/upkeep';
 import { daysUntil, inDays, isoOf, lastMonths, type ModuleOverview, type OverviewBlock } from '@core/dashboard/overview';
 
-const THINGS = new Set(['asset', 'vehicle', 'routine', 'item']);
+const THINGS = new Set(['asset', 'vehicle', 'routine']);
 
 /** Things and upkeep at a glance: what's due, what's late, what upkeep cost by month, warranties and papers running out. */
 export function assetsOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {

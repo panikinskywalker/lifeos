@@ -30,7 +30,7 @@ export const smsSource: SourceDef = {
 export const notificationsSource: SourceDef = {
   id: 'notifications',
   label: 'Payment notifications',
-  modules: ['finance'],
+  modules: ['finance', 'inventory'],
   permission: 'Notification access',
   kind: 'messages',
   messageSource: 'notification',
@@ -38,7 +38,9 @@ export const notificationsSource: SourceDef = {
   sync: async (os) => {
     const n = os.device?.notifications;
     if (!n) return { messages: [] };
-    n.setAllowlist(Object.keys(PAYMENT_APPS));
+    // Payment apps, and the apps other modules' parsers read (Home: Blinkit's delivery).
+    const others = [...os.registry.parsers.values()].flatMap((p) => p.packages ?? []);
+    n.setAllowlist([...new Set([...Object.keys(PAYMENT_APPS), ...others])]);
     return { messages: n.drain().map((m) => ({ from: m.package, title: m.title, text: m.text, at: m.at })) };
   },
 };

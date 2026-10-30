@@ -27,6 +27,7 @@ const MAP = {
   shoe: 'footprints', shirt: 'shirt', drop: 'droplets', wind: 'wind', leaf: 'leaf', heart: 'heart', activity: 'activity',
   flame: 'flame', bolt: 'zap', gift: 'gift', cake: 'cake', food: 'utensils', film: 'film', briefcase: 'briefcase',
   scale: 'weight', phone: 'phone', brain: 'brain', library: 'library', 'pen-line': 'pen-line', notebook: 'notebook-pen',
+  fridge: 'refrigerator', snow: 'snowflake', pot: 'cooking-pot', spray: 'spray-can', bath: 'bath',
 };
 
 const nodes = JSON.parse(readFileSync(process.argv[2], 'utf8'));

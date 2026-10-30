@@ -117,6 +117,12 @@ export interface DeviceBridge {
     /** Calls since `since`, newest first. */
     read(since: number, limit: number): Promise<CallEntry[]>;
   };
+  /**
+   * The text of a PDF shared into LifeOS (Home: a Blinkit invoice), or null
+   * when it has none (a scan). Not filled yet: the app has no PDF reader
+   * (docs/MODEL.md R7e), so shared invoices wait for it.
+   */
+  pdfText?: (uri: string) => Promise<string | null>;
   /** The phone's secure store (keys a source needs, e.g. Turf web's): never in settings, never in a backup. */
   secrets?: {
     get(key: string): Promise<string | null>;

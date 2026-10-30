@@ -31,7 +31,7 @@ const MODULE_SHORT: Record<string, string> = {
   habits: 'Habits',
   knowledge: 'Notes',
   assets: 'Things',
-  inventory: 'Inventory',
+  inventory: 'Home',
   places: 'Places',
 };
 
