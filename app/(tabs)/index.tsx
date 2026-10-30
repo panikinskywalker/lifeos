@@ -20,6 +20,7 @@ import { ActivityRow } from '../../src/screens/ActivityGrid';
 import { HabitChecklist, HabitWeek } from '@boards/habits';
 import { TurfTodayTile } from '@boards/turf/today';
 import { PeopleTodayTile } from '@boards/crm/tile';
+import { HomeTodayTile } from '@boards/inventory/tile';
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -87,7 +88,7 @@ export default function TodayTab() {
   );
 }
 
-/** `alone`: the tile has the row to itself (a 1×1 whose neighbour is wide), so People draws its wide 4 × 2. */
+/** `alone`: the tile has the row to itself (a 1×1 whose neighbour is wide), so People and Home draw their wide 4 × 2. */
 function TodayTile({ id, u, alone }: { id: TileId; u: Upkeep; alone?: boolean }) {
   switch (id) {
     case 'steps':
@@ -101,6 +102,8 @@ function TodayTile({ id, u, alone }: { id: TileId; u: Upkeep; alone?: boolean })
       return <UpcomingTile u={u} />;
     case 'people':
       return <PeopleTodayTile wide={alone} />;
+    case 'home':
+      return <HomeTodayTile wide={alone} />;
     case 'overdue':
       return <OverdueTile u={u} />;
     case 'onthisday':

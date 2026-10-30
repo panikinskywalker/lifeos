@@ -135,7 +135,7 @@ learns from.
 | Space | link → Space, word *kept in* | the pill's page |
 | Bought on | date | the latest purchase |
 | Life | number (days) + whose: **estimated** · **yours** | how long it keeps once bought. Estimated from a table of shelf lives by name in code until the brain gives better (milk 3 d, paneer 4, butter 30, atta 90…); yours when you correct it, and yours stays on the product from then on. Empty for things that don't go off (salt) |
-| Rate | number (days), **learned** | how long one lasts you: the median of the last five spans from a purchase to when it was used up or bought again; empty until there are two |
+| Rate | number (days), **learned** | how long one lasts you: the median of the last five spans from a purchase to when it was used up or bought again; empty until it has been bought twice, or bought and used up |
 | Source | select | order · receipt · you; an order also names its **shop** (Blinkit · Zepto · Instamart · BigBasket · other) |
 | Order | link → Transaction, word *bought in* | the latest order's payment, when finance has one |
 | Price | money | what the latest one cost (from the invoice) |
@@ -153,6 +153,10 @@ learns from.
 - **fresh**: otherwise, and always for things with no life.
 - *Still good* on a use-soon or probably-gone thing sets *checked on*: it
   counts as use soon for 2 more days, then probably gone again.
+
+**A rebuy** adds to what is left, unless what was left is probably gone or
+its rate is nearly up (80 %): LifeOS never sees things used up, so then it
+assumes the last one ran out.
 
 **Running low** is the rate's, apart from state: a thing with a rate, one or
 less left, and its rate nearly up ("every 3 wk · 18 d", from 3 days before),
@@ -833,7 +837,7 @@ screens checked on the phone → overrides only where the default is wrong)
 - [ ] **R7b deliveries** — Delivery; shipping parsers; OTP; tracking.
 - [ ] **R7c documents** — Document; expiry cycles; files.
 - [ ] **R7d travel** — Trip; spend vs budget; flights and stays from mail.
-- [ ] **R7e Home** — layer 8's first slice (agreed with the Fields 30 Oct): Stock and Space
+- [x] **R7e Home** — built 30 Oct 2026 (branch `claude/r7e-home-1f3592`; no migration), layer 8's first slice: Stock and Space
   (layer 2, *Things*) in `inventory`, shown as Home; the old `item` records folded in once.
   **Module**: state from bought on and life; the rate learned from purchases and used up;
   *used up* and *half left* with Undo; the *running out* and *going off* candidates as plain
@@ -848,7 +852,14 @@ screens checked on the phone → overrides only where the default is wrong)
   Running low, Spaces, Just came in), a space page of pills (tap = used up, long-press = half
   left · still good · move), the Stock page, the shopping list (Copy list · Open Blinkit /
   Zepto; LifeOS never orders), a Home tile for Today. Cook tonight and the fridge photo are
-  slots until the brain.
+  slots until the brain. Home is a board in Browse › Boards (a companion board placed there).
+  Core gains small pieces: `filings.ofKind / forSource / update`, the parser contract's
+  `packages` (the notifications source listens to Blinkit too), the device bridge's `pdfText`
+  seam, link words *kept in* and *bought in*; five Lucide icons (fridge, snow, pot, spray,
+  bath). 420 tests green; the web export builds. *Waiting*: a real Blinkit invoice (text or
+  scan) to check the parser; a PDF reader on the phone (`pdfText`: no Expo SDK 57 package reads
+  a PDF's text, so it needs a JS reader such as `pdfjs-dist` or a small native module — to
+  choose); the `NR-Home-*` artboards. **Phone check pending.**
 - [ ] **R7f knowledge** (later) — Note, Fact as the Second Brain; Memory replaced.
 
 ### Boards and automations

@@ -8,6 +8,7 @@ import { classifyFailure } from '@core/ai/limits';
 import { localAnswer } from '@core/ai/localAnswer';
 import { parseMessage } from '@core/ai/parser';
 import type { DumpSource } from '@core/repo/dumpRepo';
+import { stockFromInvoice, undoStocked } from '@modules/inventory';
 import { useLive, useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Chip, EmptyState, Icon, IconButton, ScreenHeader, Text, useBottomBarInset, useToast } from '@ui/kit';
@@ -129,10 +130,17 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
     setText('');
     setSource('typed');
     if (file) {
-      // A shared file is attached to the right record by the agent.
-      body = `${body || 'I shared this — attach it where it belongs.'}\n[Shared file: ${file.name}${file.mime ? ` (${file.mime})` : ''} — uri ${file.uri}. Use attach_file to put it on the right record.]`;
       setFile(null);
-      return void ask(body);
+      return void (async () => {
+        // An order's invoice (Blinkit) stocks Home when the phone can read the PDF's text (R7e; no reader yet).
+        if (/pdf/i.test(file.mime) || /\.pdf$/i.test(file.name)) {
+          const pdf = await os.device?.pdfText?.(file.uri).catch(() => null);
+          const stocked = pdf ? stockFromInvoice(os, pdf) : null;
+          if (stocked) return toast.show({ message: stocked.label, icon: 'check', undo: () => undoStocked(os, stocked.filingId) });
+        }
+        // Anything else is attached to the right record by the agent.
+        void ask(`${body || 'I shared this — attach it where it belongs.'}\n[Shared file: ${file.name}${file.mime ? ` (${file.mime})` : ''} — uri ${file.uri}. Use attach_file to put it on the right record.]`);
+      })();
     }
     if (classifyInput(body) === 'ask') return void ask(body);
     saveDump(os, body, src);
