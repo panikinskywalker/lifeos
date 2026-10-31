@@ -70,7 +70,7 @@ interface ObjectDef<T = Record<string, unknown>> {
   statuses?: FieldOption[];
   occurredAtField?: string;   // which Field is the record's domain time
   title?(data: T): string; subtitle?(data: T, f: Fmt): string | undefined; searchText?(data: T): string;
-  cycleTemplates?(data: T): CycleSeed[];                    // new Vehicle → service, insurance, PUC
+  cycleTemplates?(data: T): CycleSeed[];                    // a new Asset → warranty, service
   cycleFields?: Record<string, { nextDueAt?: string; lastDoneAt?: string; nextDueMeter?: string }>;
   cycleActiveStatuses?: string[];
   meters?: Array<{ meter: string; field: string; label: string; unit: string }>;
@@ -311,7 +311,7 @@ A board screen's query parameters must not be called `id`: the route
 the screen (Turf uses `?game=`, `?player=`, `?venue=`, `?sub=`).
 
 Every module has a companion board of the same id in `src/boards/<module>`
-holding its overview, screens, quick actions and record sections (the Vehicle
+holding its overview, screens, quick actions and record sections (the Asset
 hero, the Delivery OTP). Core UI generates the generic screens — List, Record,
 Form, Links, and Metric for numbers — for every Object; a board only overrides.
 Module colours are palette names (`'pink'`); the theme resolves them per scheme
