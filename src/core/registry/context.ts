@@ -12,6 +12,7 @@ import type { FilingRepo } from '../repo/filingRepo';
 import type { QuestionRepo } from '../repo/questionRepo';
 import type { OutboxRepo } from '../repo/outboxRepo';
 import type { Scheduler } from '../automation/scheduler';
+import type { BrainStore } from '../brain/store';
 
 /**
  * The "os" object handed to every module, widget, action and AI tool.
@@ -34,6 +35,8 @@ export interface LifeOSContext {
   questions: QuestionRepo;
   /** Changes waiting to be sent to a source that also writes (Turf web); shown as *sending*. */
   outbox: OutboxRepo;
+  /** The brain (docs/MODEL.md layer 8): nudges, what it learned, Skills, the Sent to Claude log. */
+  brain: BrainStore;
   reminders: ReminderRepo;
   customFields: CustomFieldRepo;
   views: ViewRepo;

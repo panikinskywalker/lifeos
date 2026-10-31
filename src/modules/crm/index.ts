@@ -14,7 +14,9 @@ import { lastMet, peopleToCall } from './people';
 import { applyRelationships } from './relationships';
 import { listenForNotion } from './notion';
 
+import { crmBrain } from './brain';
 export * from './types';
+export { crmBrain, giftIdeasKey, wishKey } from './brain';
 export { nextBirthday };
 export { importContacts, personForContact, resyncContacts, applyCallLog } from './contacts';
 export { touchLastSpoke, refreshLastSpoke } from './lastSpoke';
@@ -41,6 +43,7 @@ export const crmModule: ModuleManifest = {
   color: CRM_COLOR,
   objects: [personType, groupType],
   sources: crmSources,
+  brain: crmBrain,
   onStart: (os) => {
     applyRelationships(os);
     // A group's member field is mirrored into group_members (default shares for splits, "groups Priya is in").

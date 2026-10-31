@@ -4,10 +4,12 @@ import { ensureSpaces } from './stock';
 import { foldItems } from './fold';
 import { groceryOrderParser } from './groceries';
 import { inventoryAiTools } from './aiTools';
+import { inventoryBrain } from './brain';
 
 export * from './types';
 export * from './stock';
 export * from './nudges';
+export { inventoryBrain, dishAsk } from './brain';
 export { foldItems } from './fold';
 export { BLINKIT_APP, HOME_ORDER, HOME_STOCKED, groceryOrderParser, orderAskOf, parseBlinkitInvoice, readInvoice, stockFromInvoice, stockedNoteOf, undoStocked, type Invoice, type InvoiceLine, type OrderAsk, type StockedNote } from './groceries';
 
@@ -26,6 +28,7 @@ export const inventoryModule: ModuleManifest = {
   objects: [stockType, spaceType],
   aiTools: inventoryAiTools,
   filing: { parsers: [groceryOrderParser] },
+  brain: inventoryBrain,
   onStart: (os) => {
     // R7e, once: the seven spaces, and the old items folded into Stock.
     if (!os.settings.get<boolean>('inventory.r7e', false)) {

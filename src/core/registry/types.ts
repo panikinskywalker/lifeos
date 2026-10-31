@@ -279,6 +279,8 @@ export interface ModuleManifest {
   filing?: { parsers?: MessageParser[] };
   /** Tools the model gets while filing a dump, bound to the session (provenance, undo): finance's log_spend. */
   filingTools?: (session: import('../graph/tools').GraphSession) => AiToolDef[];
+  /** What this module can bring you (docs/MODEL.md layer 8): candidates in code, the slots Claude fills, what Yes / Undo do. */
+  brain?: import('../brain/contract').BrainDef;
   /** Runs once when installed: seed default views/dashboards/rules. */
   onInstall?: (os: LifeOSContext) => void | Promise<void>;
   /** Runs every app start after install. */
