@@ -46,6 +46,8 @@ interface Native {
   readHealth(startMs: number, endMs: number): Promise<HealthDay[]>;
   openHealthConnect(): void;
   readCallLog(sinceMs: number, limit: number): Promise<CallEntry[]>;
+  /** A shared PDF's text (content://, file:// or a path); empty for a scan. Rejects when it can't be opened (locked, broken). */
+  pdfText(uri: string): Promise<string>;
   mailCheck(email: string, password: string): Promise<'ok'>;
   mailHeaders(email: string, password: string, sinceMs: number, afterUid: number, uidValidity: number, max: number): Promise<{ uidValidity: number; total: number; headers: MailHeaderRaw[] }>;
   mailBodies(email: string, password: string, uids: number[]): Promise<Array<{ uid: number; text: string }>>;

@@ -4,6 +4,7 @@ import type { Filing } from '@core/repo/filingRepo';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Icon, Text, useToast } from '@ui/kit';
+import { useRouter } from 'expo-router';
 import { orderAskOf, stockedNoteOf, stockState, undoStocked, type StockData } from '@modules/inventory';
 import { BLINKIT, openShop } from './list';
 import { PillCloud, StockPill } from './parts';
@@ -42,6 +43,20 @@ export function OrderCard({ filing }: { filing: Filing }) {
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Button title="Open Blinkit" size="sm" style={{ flex: 1 }} onPress={() => void openShop(BLINKIT)} />
         <Button title="Skip" size="sm" variant="secondary" style={{ paddingHorizontal: 22 }} onPress={() => os.filings.setChecked(filing.id)} />
+      </View>
+    </Shell>
+  );
+}
+
+/** "Couldn't read this invoice": a scan or a locked PDF. Add by hand · OK. */
+export function UnreadCard({ filing }: { filing: Filing }) {
+  const os = useOS();
+  const router = useRouter();
+  return (
+    <Shell icon="alert" title={filing.label} line={filing.flag}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Button title="Add by hand" size="sm" style={{ flex: 1 }} onPress={() => { os.filings.setChecked(filing.id); router.push('/module/inventory/index' as never); }} />
+        <Button title="OK" size="sm" variant="secondary" style={{ paddingHorizontal: 22 }} onPress={() => os.filings.setChecked(filing.id)} />
       </View>
     </Shell>
   );

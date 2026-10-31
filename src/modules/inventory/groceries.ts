@@ -20,6 +20,7 @@ import { buy, shopLabel, undoAll, type StockUndo } from './stock';
 /** To check kinds this module files; the Home board draws their cards. */
 export const HOME_ORDER = 'home-order';
 export const HOME_STOCKED = 'home-stocked';
+export const HOME_UNREAD = 'home-unread';
 
 /** Blinkit's Android app (was Grofers). */
 export const BLINKIT_APP = 'com.grofers.customerapp';
@@ -226,6 +227,11 @@ export function stockFromInvoice(os: LifeOSContext, text: string, opts: { at?: n
   const f = os.filings.add({ source: 'share', kind: HOME_STOCKED, action: 'created', entityId: orderId ?? null, label, before: note as unknown as Record<string, unknown> });
   if (card) os.filings.setChecked(card.id);
   return { filingId: f.id, ids: undo.map((u) => u.id), label };
+}
+
+/** A shared PDF with no text LifeOS can read (a scan, a locked file): a card says so, never a silent failure. */
+export function noteUnreadInvoice(os: LifeOSContext, fileName: string): Filing {
+  return os.filings.add({ source: 'share', kind: HOME_UNREAD, action: 'logged', label: `Couldn’t read this invoice · ${fileName}`, flag: 'It has no text LifeOS can read: a scanned picture, or a locked PDF. Add what came by hand.' });
 }
 
 /** Undo a stocked order: every line back as it was, the order's card back in To check. */

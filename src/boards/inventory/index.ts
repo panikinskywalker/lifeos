@@ -1,11 +1,11 @@
 import type { BoardManifest } from '@core/registry/types';
-import { HOME_ORDER, HOME_STOCKED } from '@modules/inventory';
+import { HOME_ORDER, HOME_STOCKED, HOME_UNREAD } from '@modules/inventory';
 import { inventoryOverview } from './overview';
 import { HomeScreen } from './home';
 import { SpaceScreen } from './space';
 import { ShoppingList } from './list';
 import { StockPage } from './thing';
-import { OrderCard, StockedCard } from './cards';
+import { OrderCard, StockedCard, UnreadCard } from './cards';
 
 /**
  * Home (the inventory module's board; docs/MODEL.md layer 8, R7e): a board
@@ -28,5 +28,5 @@ export const inventoryBoard: BoardManifest = {
   ],
   quickActions: [{ id: 'inventory.add', label: 'Stock', icon: 'home', route: '/module/inventory/index' }],
   overrides: [{ object: 'stock', record: [{ entityType: 'stock', key: 'inventory.stock', title: 'Stock', component: StockPage, order: 0, placement: 'page' }] }],
-  checkCards: { [HOME_ORDER]: OrderCard, [HOME_STOCKED]: StockedCard },
+  checkCards: { [HOME_ORDER]: OrderCard, [HOME_STOCKED]: StockedCard, [HOME_UNREAD]: UnreadCard },
 };

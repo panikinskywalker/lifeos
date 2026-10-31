@@ -8,7 +8,7 @@ import { classifyFailure } from '@core/ai/limits';
 import { localAnswer } from '@core/ai/localAnswer';
 import { parseMessage } from '@core/ai/parser';
 import type { DumpSource } from '@core/repo/dumpRepo';
-import { stockFromInvoice, undoStocked } from '@modules/inventory';
+import { noteUnreadInvoice, stockFromInvoice, undoStocked } from '@modules/inventory';
 import { useLive, useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Chip, EmptyState, Icon, IconButton, ScreenHeader, Text, useBottomBarInset, useToast } from '@ui/kit';
@@ -132,10 +132,15 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
     if (file) {
       setFile(null);
       return void (async () => {
-        // An order's invoice (Blinkit) stocks Home when the phone can read the PDF's text (R7e; no reader yet).
-        if (/pdf/i.test(file.mime) || /\.pdf$/i.test(file.name)) {
-          const pdf = await os.device?.pdfText?.(file.uri).catch(() => null);
-          const stocked = pdf ? stockFromInvoice(os, pdf) : null;
+        // An order's invoice (Blinkit) stocks Home; a PDF with no readable text says so in To check.
+        const readPdf = os.device?.pdfText;
+        if (readPdf && (/pdf/i.test(file.mime) || /\.pdf$/i.test(file.name))) {
+          const pdf = await readPdf(file.uri).catch(() => null);
+          if (!pdf) {
+            noteUnreadInvoice(os, file.name);
+            return toast.show({ message: 'Couldn’t read this invoice: see To check', icon: 'alert' });
+          }
+          const stocked = stockFromInvoice(os, pdf);
           if (stocked) return toast.show({ message: stocked.label, icon: 'check', undo: () => undoStocked(os, stocked.filingId) });
         }
         // Anything else is attached to the right record by the agent.

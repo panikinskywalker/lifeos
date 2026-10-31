@@ -867,10 +867,11 @@ screens checked on the phone → overrides only where the default is wrong)
   Core gains small pieces: `filings.ofKind / forSource / update`, the parser contract's
   `packages` (the notifications source listens to Blinkit too), the device bridge's `pdfText`
   seam, link words *kept in* and *bought in*; five Lucide icons (fridge, snow, pot, spray,
-  bath). 420 tests green; the web export builds. *Waiting*: a real Blinkit invoice (text or
-  scan) to check the parser; a PDF reader on the phone (`pdfText`: no Expo SDK 57 package reads
-  a PDF's text, so it needs a JS reader such as `pdfjs-dist` or a small native module — to
-  choose); the `NR-Home-*` artboards. **Phone check pending.**
+  bath). 420 tests green; the web export builds. **Reading the PDF** (31 Oct): the device
+  module reads a shared PDF's text with PdfBox-Android (Apache 2.0), rows in reading order; a
+  PDF with no text (a scan, a locked file) gives a *Couldn't read this invoice* card in To
+  check. *Waiting*: a real Blinkit invoice (text or scan) to check the parser; the
+  `NR-Home-*` artboards. **Phone check pending** (needs a new dev build).
 - [ ] **R7f knowledge** (later) — Note, Fact as the Second Brain; Memory replaced.
 
 ### Boards and automations

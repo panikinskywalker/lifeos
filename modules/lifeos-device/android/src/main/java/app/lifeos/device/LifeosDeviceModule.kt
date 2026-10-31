@@ -102,6 +102,10 @@ class LifeosDeviceModule : Module() {
       try { open(i) } catch (e: Exception) { open(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.healthdata"))) }
     }
 
+    /* ---------------- Shared PDFs ---------------- */
+
+    AsyncFunction("pdfText") Coroutine { uri: String -> withContext(Dispatchers.IO) { PdfText.read(context, uri) } }
+
     /* ---------------- Call log ---------------- */
 
     // Gmail over IMAP (app password) — read-only; see MailReader.
