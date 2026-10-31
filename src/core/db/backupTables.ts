@@ -30,6 +30,10 @@ export const BACKUP_TABLES = [
   'usage_daily',
   'usage_app_daily',
   'outbox',
+  'nudges',
+  'brain_learned',
+  'brain_skills',
+  'brain_sent',
 ] as const;
 
 /** Rebuilt or re-derived on this device, so not worth carrying in a backup. */

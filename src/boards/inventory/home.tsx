@@ -10,7 +10,7 @@ import { goingOffCandidates, justCameIn, runningLow, useByWords, runningOutCandi
 import { clothesByState } from '@modules/assets';
 import { ToCheckBell } from '../../screens/ToCheckBell';
 import { AddSheet, usePillActions } from './actions';
-import { BrainSlot, Card, HomeEmpty, PillCloud, SectionHead, SpaceTile, StockPill, Why } from './parts';
+import { Card, CookTonight, HomeEmpty, PillCloud, SectionHead, SpaceTile, StockPill, Why } from './parts';
 
 /**
  * Home (the inventory board's index; a first pass from the kit until the
@@ -95,7 +95,7 @@ export function HomeScreen({ ctx }: { ctx: LifeOSContext; params: Record<string,
         </>
       ) : null}
 
-      <BrainSlot title="Cook tonight" line="A dish from what's fresh and what to use soon. Comes with the brain (layer 8)." icon="food" />
+      <CookTonight />
 
       <SectionHead title="Running low" sub={d.low.length ? 'From how often you rebuy' : 'Nothing running low'} action={d.onList ? `List · ${d.onList}` : 'Shopping list'} onAction={() => router.push('/module/inventory/list' as never)} />
       {d.low.length ? (

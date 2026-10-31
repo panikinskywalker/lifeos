@@ -14,6 +14,7 @@ import { DumpRepo } from './repo/dumpRepo';
 import { FilingRepo } from './repo/filingRepo';
 import { QuestionRepo } from './repo/questionRepo';
 import { OutboxRepo } from './repo/outboxRepo';
+import { BrainStore } from './brain/store';
 import { AutomationEngine } from './automation/engine';
 import { Scheduler } from './automation/scheduler';
 import { createFormatters, DEFAULT_LOCALE, type LocaleSettings } from './format';
@@ -68,6 +69,7 @@ export async function createLifeOS(opts: LifeOSOptions): Promise<LifeOSContext> 
     filings: new FilingRepo(db),
     questions: new QuestionRepo(db),
     outbox: new OutboxRepo(db),
+    brain: new BrainStore(db),
     reminders: new ReminderRepo(db, timeline, changes),
     customFields: new CustomFieldRepo(db),
     views: new ViewRepo(db),

@@ -21,6 +21,7 @@ import { HabitChecklist, HabitWeek } from '@boards/habits';
 import { TurfTodayTile } from '@boards/turf/today';
 import { PeopleTodayTile } from '@boards/crm/tile';
 import { HomeTodayTile } from '@boards/inventory/tile';
+import { MorningBrief } from '../../src/screens/MorningBrief';
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -79,6 +80,7 @@ export default function TodayTab() {
         </View>
       }
     >
+      <MorningBrief />
       {(rest ? rows : rows.slice(0, 3)).map((r) => (r.length === 2 ? <BentoGrid key={r.join()}>{r.map((id) => <TodayTile key={id} id={id} u={u} />)}</BentoGrid> : <TodayTile key={r[0]} id={r[0]!} u={u} alone />))}
       <Pressable accessibilityRole="button" onPress={() => router.push('/settings/home' as never)} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10 }}>
         <Icon name="edit" size={14} />

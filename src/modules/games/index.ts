@@ -1,11 +1,13 @@
 import type { ModuleManifest } from '@core/registry/types';
 import { GAMES_COLOR, gamesObjects } from './types';
 import { gamesAiTools } from './aiTools';
+import { gamesBrain } from './brain';
 import { turfWebSource } from './sources';
 import { bus } from '@core/events/bus';
 import { matchTransaction } from './smsMatch';
 
 export * from './types';
+export { gamesBrain } from './brain';
 export * from './sync';
 export * from './lib';
 export * from './sources';
@@ -34,6 +36,7 @@ export const gamesModule: ModuleManifest = {
   dependencies: ['crm', 'places', 'finance'],
   objects: gamesObjects,
   aiTools: gamesAiTools,
+  brain: gamesBrain,
   sources: [turfWebSource],
   // A share paid by SMS (R9c.6): every money-in Transaction finance files is checked against the open shares.
   onStart: (os) => {

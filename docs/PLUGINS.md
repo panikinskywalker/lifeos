@@ -234,6 +234,52 @@ may call a module's read tools directly as functions. Core keeps its generic
 tools (`create_record`, `set_fields`, `link`, `record_event`, `search`…),
 driven by Object schemas.
 
+## The brain (MODEL.md layer 8, slice 3; built 31 Oct)
+
+```ts
+// src/core/brain/contract.ts
+type NudgeKind = 'running out' | 'going off' | 'due' | 'coming up';
+type NudgeShape = 'done' | 'check' | 'ask';            // filing kinds nudge-done · nudge-check · nudge-ask
+type Plain = string | number | boolean | null | string[];
+
+interface Ask { key: string; slot: string; prompt: string; record?: Record<string, Plain> }
+interface Candidate {
+  key: string;                    // stable while it is the same notice; filed once ('crm:bday:<id>:2026')
+  kind: NudgeKind; shape: NudgeShape;
+  subjectId?: string | null;      // the record the card and the brief line open
+  route?: string;                 // or a screen ('/board/turf/dues')
+  title: string;
+  line: string;                   // code's own words: used when Claude is not asked
+  record: Record<string, Plain>;  // the only thing that leaves the phone
+  urgent?: boolean; rank?: number;   // urgent first, then lower rank
+  yes?: string;                   // the main verb (ask: 'Send in WhatsApp'; check: 'Right')
+  asks?: Ask[];                   // slots Claude fills with it (gift ideas, the wish)
+  payload?: unknown;              // read only by the module's act
+}
+interface BrainDef {
+  candidates(os, now): Candidate[];
+  asks?(os, now): Ask[];          // fills that are not nudges (Home's Cook tonight)
+  /** apply (done shape, at filing; returns what undo needs) · yes · no (Not this) · undo. May return { open: url }. */
+  act?(os, verb: 'apply' | 'yes' | 'no' | 'undo', nudge: Nudge): unknown;
+  skills?: Array<{ name: string; body: string }>;   // the module's starting rules
+}
+ModuleManifest.brain?: BrainDef
+```
+
+Core (`src/core/brain/`): `runPass(os, { pass, model, now })` gathers every
+module's candidates plus core's Upkeep ones (due Cycles of modules without a
+`brain`), drops keys already filed or turned down, keeps the per-module limit,
+asks Claude once (the learned store answers what it can; nothing new, no call),
+files a `nudges` row and a filing per nudge (`source: 'brain'`,
+`sourceRef: <pass id>`, `kind: nudge-<shape>`), stores the fills, logs the send
+and notifies up to three a day. Claude is reached through `BrainModel`
+(`src/core/ai/brainModel.ts`: the Messages API over fetch, the system prompt
+cached with `cache_control`); tests pass a mock. Stores: `os.brain.learned`,
+`os.brain.skills`, `os.brain.nudges`, `os.brain.sent` (migration v16, all in
+backups). A board reads a fill with `os.brain.learned.get(key)`, the key made
+by the module's exported helper (crm `giftIdeasKey`, `wishKey`; inventory
+`dishAsk`).
+
 ## Board
 
 ```ts

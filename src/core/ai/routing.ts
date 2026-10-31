@@ -23,7 +23,7 @@ export function routeMessage(text: string): { tier: Tier; reason: string } {
   return { tier: 'fast', reason: 'single request' };
 }
 
-export type UsagePurpose = 'chat' | 'facts';
+export type UsagePurpose = 'chat' | 'facts' | 'brain';
 
 export function recordUsage(os: LifeOSContext, u: { model: string; provider?: string; purpose: UsagePurpose; input: number; output: number; conversationId?: string | null; at?: number }): void {
   os.db.run(`INSERT INTO ai_usage(id,at,model,purpose,input_tokens,output_tokens,conversation_id,provider) VALUES (?,?,?,?,?,?,?,?)`, [newId(), u.at ?? Date.now(), u.model, u.purpose, Math.round(u.input), Math.round(u.output), u.conversationId ?? null, u.provider ?? null]);

@@ -7,6 +7,34 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.14 · 31 Oct 2026
+
+**The brain, a first pass** (MODEL.md layer 8), built in its own session and
+merged here. LifeOS now comes to you first. The screens are a first pass
+from the kit until the *NR-Brain* artboards are drawn.
+- **Morning and evening passes**: twice a day LifeOS looks through Home,
+  Upkeep, People and Turf for what needs you and asks Claude to judge and
+  word it. At most two nudges per module a day; at most three notifications
+  a day, urgent first, never in quiet hours.
+- **A Morning brief on Today**, above the tiles: today's nudges and what to
+  cook tonight, each opening its record. "Updated 7 pm" after the evening
+  pass.
+- **Nudges in To check**, in three shapes: done, undo? (butter put on the
+  shopping list) · is this right? (milk probably gone) · shall I? (call Dad,
+  send Karan's wish, remind Arjun, open Thursday's match). Not this means
+  never again.
+- **Cook tonight** on Home, **gift ideas** on People's birthday cards and
+  profile, and **a drafted wish** in the wish card, from Claude.
+- **You › Agent › Brain**: the Claude key, the model (Opus 5.5 on the first
+  day, Haiku 5.5 after; Opus for today when you want it), a daily budget,
+  the **Sent to Claude** log (exactly what left the phone: records only),
+  what it has learned and its Skills, Copy as Markdown, Run a pass now.
+- It learns: an answer it already has never costs a call again, and what it
+  learns stays on the phone (in backups), never in Claude.
+- Without a key, or over the budget, nudges still come in LifeOS's own
+  words.
+- Database upgrade v16. Not yet run on the phone.
+
 ## v0.0.13 · 31 Oct 2026
 
 **Projects, rebuilt** (R4), built in its own session and merged here. The

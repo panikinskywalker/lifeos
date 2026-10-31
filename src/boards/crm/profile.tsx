@@ -14,7 +14,7 @@ import { blocks, monoFonts } from '@ui/theme/tokens';
 import { birthdayParts, cadenceLabel, daysSince, listItems, type GroupData, type PersonData } from '@modules/crm';
 import { balanceWith, settleUp, undoSettle, type DebtData } from '@modules/finance/split';
 import { Face, FaceStack, faceColor, initials, KeepInTouchNudge, shortSpan } from './parts';
-import { birthdayIn, GiftIdeasSlot, weekdayDay, WishCard } from './birthday';
+import { birthdayIn, GiftIdeasSlot, useGiftIdeas, weekdayDay, WishCard } from './birthday';
 
 /**
  * Person · Profile (NR-People-Profile, its states in NR-People-ProfileStates):
@@ -645,6 +645,7 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
   const tel = p.data.phone?.replace(/[^+\d]/g, '') || null;
   const upi = listItems(p.data.upi)[0] ?? null;
   const likes = listItems(p.data.likes);
+  const ideas = useGiftIdeas(p);
   const bday = birthdayIn(p.data.birthday);
   const bdayToday = bday?.days === 0;
   const overdueBy = view.contactStatus?.state === 'overdue' && view.contactStatus.daysLeft != null ? -view.contactStatus.daysLeft : null;
@@ -848,7 +849,7 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
             <Disc icon="gift" bg="rgba(215,245,92,0.14)" color={LIME} />
             <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
               <Text numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, fontWeight: '600', color: INK }}>{bday ? `Gift ideas for ${bday.date.getDate()} ${MONTHS[bday.date.getMonth()]}` : 'Gift ideas'}</Text>
-              <Text numberOfLines={2} style={{ fontSize: 13, lineHeight: 17, color: INK2 }}>{likes.length ? `Gift ideas from ${first}’s likes arrive with the brain` : 'No likes saved, so no gift ideas'}</Text>
+              <Text numberOfLines={2} style={{ fontSize: 13, lineHeight: 17, color: INK2 }}>{ideas ? ideas.join(' · ') : likes.length ? `Gift ideas from ${first}’s likes come with the brain’s pass` : 'No likes saved, so no gift ideas'}</Text>
             </View>
           </View>
         </SheetCard>

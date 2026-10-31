@@ -5,6 +5,7 @@ import { PROVIDER_PRESETS, type ProviderConfig, type ProviderKind } from '@core/
 import { listModels, pickModel } from '@core/ai/openaiCompat';
 import { providerTokensThisMonth, providerTokensToday, usageSummary } from '@core/ai/routing';
 import { providerLimits } from '@core/ai/limits';
+import { brainSettings } from '@core/brain';
 import { format } from 'date-fns';
 import { useOS, useLive, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -29,6 +30,7 @@ export default function AiSettingsRoute() {
   const t = useTheme();
   const s = useSettings();
   const usage = useLive((o) => usageSummary(o), []);
+  const brainOn = useLive((o) => brainSettings(o).on, []);
   // Every known provider appears once: the chain first (in its order), then the rest switched off.
   const chain: ProviderConfig[] = [...s.aiChain, ...ALL.filter((kind) => !s.aiChain.some((c) => c.kind === kind)).map((kind) => ({ kind, enabled: false }))];
   const save = (next: ProviderConfig[]) => s.set('aiChain', next);
@@ -54,6 +56,13 @@ export default function AiSettingsRoute() {
             <Chip key={c.kind} label={label(c.kind)} small />
           ))}
         </View>
+      </Card>
+
+      <Card icon="brain" tint="memory" title="Brain" meta={brainOn ? 'Morning and evening' : 'Off'}>
+        <Text variant="body" color="secondary">
+          What LifeOS brings you on its own: Claude judges what the code noticed, twice a day. The key, the daily budget, what was sent and what it has learned.
+        </Text>
+        <Button title="Open Brain" icon="chevron-right" size="sm" variant="secondary" onPress={() => router.push('/settings/brain' as never)} />
       </Card>
 
       <Section title="Providers" meta="in order">

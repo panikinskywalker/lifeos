@@ -10,7 +10,7 @@ import { goals, myDay } from '../dashboard/day';
  * hours (it waits until they end). Pure: the platform schedules the plan.
  */
 
-export type NotifyKind = 'reminder' | 'upkeep' | 'brief';
+export type NotifyKind = 'reminder' | 'upkeep' | 'brief' | 'nudge';
 
 export interface NotifyPrefs {
   brief: { on: boolean; time: string };
@@ -115,6 +115,10 @@ export function notificationPlan(os: LifeOSContext, now = Date.now(), limit = 60
       if (n.at <= now) continue;
       out.push({ kind: 'upkeep', at: n.at, title: n.title, body: n.body, data: { cycleId: n.cycleId, entityId: n.entityId, entityType: os.records.get(n.entityId)?.object } });
     }
+  }
+  // The brain's nudges waiting for quiet hours to end (layer 8): already counted in the three a day.
+  for (const n of os.brain.nudges.waitingToNotify(now)) {
+    out.push({ kind: 'nudge', at: n.notifiedAt!, title: os.registry.modules.get(n.module)?.name ?? 'Upkeep', body: n.line, data: { route: '/check' } });
   }
   if (prefs.brief.on) {
     // Today's if it's still ahead, and tomorrow's (rescheduled with fresher data on every sync).

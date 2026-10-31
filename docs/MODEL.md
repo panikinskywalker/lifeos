@@ -1338,9 +1338,8 @@ them.
 - **Skill** (agreed 24 Oct) — instructions and rules the brain has learned, kept as data.
 
 ### Open questions
-- **Where it runs when the phone is idle.** Android limits background work:
-  scheduled passes from the phone, or the Mac (R12, always on over Tailscale)
-  as the runner with the phone showing the cards?
+- ~~**Where it runs when the phone is idle.**~~ *Decided 31 Oct: the phone*
+  runs the passes and calls Claude's API directly (see *The contract* below).
 - **Layer 7's job** widens from filing and answering to noticing and
   proposing; the chain becomes Claude first for the brain, local models for
   filing, until R12–R14 can take the brain too.
@@ -1353,6 +1352,52 @@ them.
 3. **The brain's first pass** — candidates from Stock and Upkeep, one
    morning nudge pass through Claude, the learned store, the Sent to Claude
    log.
+   *Built 31 Oct (branch `claude/brain-v1`), wider than first planned:
+   candidates from Home, Upkeep, People and Turf, morning and evening passes,
+   the Morning brief on Today, Cook tonight, gift ideas and the wish; see
+   *The contract* below and `docs/handover/brain-v1.md`. Not yet checked on
+   the phone.*
 4. **Cook tonight and the fridge photo.**
 5. **Travel** — packing and before you go.
 6. **Every module offers candidates** — Turf, People, Money, Documents.
+
+### The contract (slice 3, agreed 31 Oct; code contracts in `docs/PLUGINS.md`)
+- **Candidates are a pure function on the module manifest**: `brain.candidates(os,
+  now)` returns plain `Candidate`s (key, kind, shape, the record it opens, code's
+  own line, the record's fields as plain values, urgent, rank, asks). Typed in
+  core (`src/core/brain/contract.ts`); no module imports another. Upkeep is core,
+  so core offers every due Cycle whose module offers no candidates of its own
+  (crm's keep in touch and birthdays are crm's). A module may also offer
+  **asks** that are not nudges: a slot Claude fills (Home's Cook tonight).
+- **Three filing kinds in To check**, one per shape, with the same verbs everywhere:
+  `nudge-done` (*done, undo?*: LifeOS did it on its own, e.g. butter put on the
+  shopping list; Undo) · `nudge-check` (*is this right?*: Right / Not this) ·
+  `nudge-ask` (*shall I?*: the module's verb, e.g. Send in WhatsApp, Call; the
+  last step is yours). Every card also has Later (tick). A pass's nudges are
+  one group in To check, and each opens its record.
+- **The limits** (*How many*): at most two nudges per module a day (one, once a
+  module's nudges are turned down with Not this three times in 14 days and more
+  often than acted on); at most three phone notifications a day, urgent ones
+  first, moved out of quiet hours. A nudge's key is filed once; Not this keeps
+  it from coming back.
+- **The learned store** (`brain_learned`): every answer Claude gives is kept by
+  the key the module made for the question (gift ideas for Karan with these
+  Likes; the wish for this birthday; a dish from these things), with Not this
+  and what Claude says is worth remembering. A pass asks Claude only about keys
+  it does not hold, and calls no one when there is nothing new. **Skills**
+  (`brain_skills`): the rules the brain works by, as text you can read; core's
+  house rules and each module's start them, Claude may add one. Both are in
+  backups and exported as one Markdown file from You › Agent › Brain.
+- **What a pass sends** is records only: each candidate's fields as plain values
+  (a name, a date, a count, Likes), never a phone number, a message, a mail or a
+  photo. The unchanging part (house rules and Skills) is the cached system
+  prompt. Every send is written to the **Sent to Claude** log (`brain_sent`):
+  when, which pass, why, the lines that left, tokens, cache use. A **daily
+  budget** (tokens, You › Agent › Brain) is checked before each call; over it,
+  or with no key, the nudges are filed in code's own words.
+- **When**: a morning pass (from 7:00) and an evening pass (from 19:00), run by the
+  existing background task (`expo-background-task`, every 15 min or more as
+  Android allows) and when the app opens; a pass can be run by hand. The
+  **Morning brief** on Today shows today's nudges and the dish, "Updated 7 pm"
+  once the evening pass has run.
+

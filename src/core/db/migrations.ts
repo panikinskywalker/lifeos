@@ -791,4 +791,73 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_facts_source_ref ON facts(source_ref)`,
     ],
   },
+  {
+    version: 16,
+    name: 'brain',
+    // docs/MODEL.md layer 8, slice 3: the nudges a pass filed, what the brain
+    // has learned (answers by key, Not this), its Skills, and the Sent to
+    // Claude log.
+    up: [
+      `CREATE TABLE IF NOT EXISTS nudges (
+        id TEXT PRIMARY KEY,
+        key TEXT NOT NULL,
+        module TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        shape TEXT NOT NULL CHECK (shape IN ('done', 'check', 'ask')),
+        pass_id TEXT NOT NULL,
+        filing_id TEXT,
+        record_id TEXT,
+        route TEXT,
+        title TEXT NOT NULL,
+        line TEXT NOT NULL,
+        yes TEXT,
+        urgent INTEGER NOT NULL DEFAULT 0,
+        payload TEXT,
+        undo TEXT,
+        state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'yes', 'no', 'later', 'undone')),
+        notified_at INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_nudges_key ON nudges(key)`,
+      `CREATE INDEX IF NOT EXISTS idx_nudges_day ON nudges(module, created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_nudges_filing ON nudges(filing_id)`,
+      `CREATE TABLE IF NOT EXISTS brain_learned (
+        key TEXT PRIMARY KEY,
+        module TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('answer', 'fact', 'not-this', 'held')),
+        value TEXT NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('claude', 'you', 'code')),
+        uses INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_brain_learned_module ON brain_learned(module, kind)`,
+      `CREATE TABLE IF NOT EXISTS brain_skills (
+        id TEXT PRIMARY KEY,
+        module TEXT NOT NULL,
+        name TEXT NOT NULL,
+        body TEXT NOT NULL,
+        source TEXT NOT NULL CHECK (source IN ('claude', 'you', 'code')),
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS brain_sent (
+        id TEXT PRIMARY KEY,
+        at INTEGER NOT NULL,
+        pass TEXT NOT NULL,
+        why TEXT NOT NULL,
+        model TEXT NOT NULL,
+        lines TEXT NOT NULL,
+        records INTEGER NOT NULL DEFAULT 0,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_read INTEGER NOT NULL DEFAULT 0,
+        cache_write INTEGER NOT NULL DEFAULT 0,
+        outcome TEXT NOT NULL,
+        error TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_brain_sent_at ON brain_sent(at)`,
+    ],
+  },
 ];
