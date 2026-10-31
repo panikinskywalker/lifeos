@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
@@ -8,7 +8,7 @@ import { useLive } from '@ui/hooks';
 import { Icon, Text } from '@ui/kit';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
-import { birthdayParts, listItems, type PersonData } from '@modules/crm';
+import { birthdayParts, giftIdeasKey, listItems, wishKey, type PersonData } from '@modules/crm';
 import { Face, faceColor, initials } from './parts';
 
 /**
@@ -95,6 +95,15 @@ function BigButton({ label, icon, onPress, lime, style }: { label: string; icon:
   );
 }
 
+/** Gift ideas Claude gave for these Likes (the learned store, MODEL layer 8), or undefined. */
+export function useGiftIdeas(person: ObjectRecord<PersonData>): string[] | undefined {
+  return useLive((os) => {
+    const key = giftIdeasKey(person);
+    const v = key ? os.brain.learned.get<string[]>(key) : undefined;
+    return Array.isArray(v) && v.length ? v : undefined;
+  }, [person.id, person.data.likes]);
+}
+
 /**
  * Gift ideas · from their likes (layer 8 slot): one card per Like, then the
  * quiet line saying ideas arrive with the brain. `card` is the colour the
@@ -104,6 +113,7 @@ export function GiftIdeasSlot({ person, card, onEditLikes }: { person: ObjectRec
   const t = useTheme();
   const likes = listItems(person.data.likes);
   const first = firstName(person.title);
+  const ideas = useGiftIdeas(person);
   return (
     <View style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -115,17 +125,17 @@ export function GiftIdeasSlot({ person, card, onEditLikes }: { person: ObjectRec
       {likes.length ? (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-            {likes.map((like) => (
-              <View key={like} style={{ width: 150, padding: 12, borderRadius: 16, backgroundColor: card ?? t.c.bg.tileRaised, gap: 6 }}>
+            {(ideas ?? likes).map((x) => (
+              <View key={x} style={{ width: 150, padding: 12, borderRadius: 16, backgroundColor: card ?? t.c.bg.tileRaised, gap: 6 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <Icon name="heart" size={12} color={t.c.fg.secondary} />
-                  <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '600', color: t.c.fg.secondary }}>Likes</Text>
+                  <Icon name={ideas ? 'gift' : 'heart'} size={12} color={t.c.fg.secondary} />
+                  <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '600', color: t.c.fg.secondary }}>{ideas ? 'Idea' : 'Likes'}</Text>
                 </View>
-                <Text numberOfLines={1} style={{ fontSize: 14, lineHeight: 18, fontWeight: '600', color: t.c.fg.primary }}>{like}</Text>
+                <Text numberOfLines={2} style={{ fontSize: 14, lineHeight: 18, fontWeight: '600', color: t.c.fg.primary }}>{x}</Text>
               </View>
             ))}
           </ScrollView>
-          <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '500', color: t.c.fg.tertiary }}>{`Gift ideas from ${first}’s likes arrive with the brain`}</Text>
+          <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '500', color: t.c.fg.tertiary }}>{ideas ? `From ${likes.join(', ')}, by Claude` : `Gift ideas from ${first}’s likes come with the brain’s pass in the two weeks before`}</Text>
         </>
       ) : (
         <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '500', color: t.c.fg.tertiary }}>No likes saved, so no gift ideas</Text>
@@ -216,8 +226,8 @@ export function BirthdayRow({ person, days, ctx }: { person: ObjectRecord<Person
 const MOODS = ['Simple', 'Funny', 'Warm'] as const;
 
 /**
- * BIRTHDAY · C · the wish (layer 8 slot): mood pills, a text box Claude will
- * draft into on the day (empty for now, yours to write), Send on WhatsApp ·
+ * BIRTHDAY · C · the wish (layer 8 slot): mood pills, the wish Claude drafted
+ * at the pass on the day or the day before (yours to edit), Send on WhatsApp ·
  * Call instead, what happened last year, and gift ideas from their likes.
  */
 export function WishCard({ person, ctx }: { person: ObjectRecord<PersonData>; ctx: LifeOSContext }) {
@@ -227,6 +237,15 @@ export function WishCard({ person, ctx }: { person: ObjectRecord<PersonData>; ct
   const [text, setText] = useState('');
   const first = firstName(person.title);
   const likes = listItems(person.data.likes);
+  const ideas = useGiftIdeas(person);
+  // The wish Claude drafted at the pass on the day or the day before (the learned store); yours to edit.
+  const drafted = useLive((os) => {
+    const key = wishKey(person);
+    return key ? os.brain.learned.get<string>(key) : undefined;
+  }, [person.id, person.data.birthday]);
+  useEffect(() => {
+    if (drafted) setText((cur) => cur || drafted);
+  }, [drafted]);
   const phone = digits(person.data.phone);
   const edit = () => router.push(`/entity/person/${person.id}/edit`);
   const lastYear = useLive(
@@ -294,8 +313,8 @@ export function WishCard({ person, ctx }: { person: ObjectRecord<PersonData>; ct
           <Icon name="gift" size={18} color={t.c.fg.primary} />
         </View>
         <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
-          <Text numberOfLines={1} style={{ fontSize: 16, lineHeight: 21, fontWeight: '600', color: t.c.fg.primary }}>{`Gift ideas from ${first}’s likes`}</Text>
-          <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, color: t.c.fg.secondary }}>{likes.length ? likes.join(' · ') : 'No likes saved yet · Add likes'}</Text>
+          <Text numberOfLines={1} style={{ fontSize: 16, lineHeight: 21, fontWeight: '600', color: t.c.fg.primary }}>{ideas ? `Gift ideas for ${first}` : `Gift ideas from ${first}’s likes`}</Text>
+          <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, color: t.c.fg.secondary }}>{ideas ? ideas.join(' · ') : likes.length ? likes.join(' · ') : 'No likes saved yet · Add likes'}</Text>
         </View>
         <Icon name="chevron-right" size={18} color={t.c.fg.secondary} />
       </Pressable>

@@ -8,6 +8,7 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, EmptyState, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
 import { dumpWhen, kindIcon } from '../src/screens/DumpPane';
+import { NUDGE_CARDS } from '../src/screens/NudgeCard';
 
 /**
  * To check (docs/GRAPH.md §3.5): everything the agent filed from what you
@@ -21,7 +22,8 @@ export default function ToCheckScreen() {
   const toast = useToast();
   const items = useLive((o) => o.filings.toCheck(), []);
   // A board's own To check cards (Turf's SMS questions and submissions), by filing kind.
-  const cards = Object.assign({}, ...[...os.registry.boards.values()].map((b) => b.checkCards ?? {})) as Record<string, React.ComponentType<{ filing: Filing }>>;
+  // The brain's nudges (MODEL layer 8) are core's own cards, one per shape.
+  const cards = Object.assign({}, NUDGE_CARDS, ...[...os.registry.boards.values()].map((b) => b.checkCards ?? {})) as Record<string, React.ComponentType<{ filing: Filing }>>;
   // Group by what was said, keeping the list order (flagged first, newest first).
   // By what it came from: a dump, or one SMS / notification / other source item.
   const groups: Array<{ key: string; dumpId: string | null; source: string; sourceRef: string | null; items: Filing[] }> = [];
@@ -53,7 +55,7 @@ export default function ToCheckScreen() {
             const dump = g.dumpId ? os.dumps.get(g.dumpId) : null;
             const msg = !g.dumpId && g.sourceRef ? messageItem(os, g.sourceRef) : null;
             const when = dump?.createdAt ?? msg?.receivedAt ?? g.items[0]!.createdAt;
-            const head = dump ? `${dumpWhen(when)}${dump.subjectId ? ` · on ${os.records.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : `${dumpWhen(when)} · ${msg ? sourceLabel(os, msg) : g.source}`;
+            const head = dump ? `${dumpWhen(when)}${dump.subjectId ? ` · on ${os.records.get(dump.subjectId)?.title ?? 'a record'}` : ''}` : `${dumpWhen(when)} · ${msg ? sourceLabel(os, msg) : g.source === 'brain' ? 'From the brain' : g.source}`;
             const quote = dump?.body ?? msg?.text ?? null;
             return (
               <View key={g.key} style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>

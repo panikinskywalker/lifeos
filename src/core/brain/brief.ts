@@ -15,8 +15,8 @@ export interface BriefLine {
   urgent: boolean;
   /** Where the line goes: the record, a screen, or To check. */
   route: string;
-  /** Still waiting for you in To check. */
-  open: boolean;
+  /** You already answered its card (shown quieter). */
+  answered: boolean;
 }
 
 export interface Brief {
@@ -32,9 +32,9 @@ export function brief(os: LifeOSContext, now = Date.now(), max = 6): Brief {
   for (const n of os.brain.nudges.since(startOfDay(now))) {
     if (n.state === 'no' || n.state === 'undone') continue;
     const rec = n.recordId ? os.records.get(n.recordId) : undefined;
-    lines.push({ id: n.id, text: n.line, module: n.module, urgent: n.urgent, route: n.route ?? (rec ? `/entity/${rec.object}/${rec.id}` : '/check'), open: n.state === 'open' });
+    lines.push({ id: n.id, text: n.line, module: n.module, urgent: n.urgent, route: n.route ?? (rec ? `/entity/${rec.object}/${rec.id}` : '/check'), answered: n.state !== 'open' });
   }
-  lines.sort((a, b) => Number(b.urgent) - Number(a.urgent) || Number(b.open) - Number(a.open));
+  lines.sort((a, b) => Number(b.urgent) - Number(a.urgent) || Number(a.answered) - Number(b.answered));
   const out = lines.slice(0, max);
   for (const b of brains(os)) {
     let asks: ReturnType<NonNullable<typeof b.def.asks>> = [];
@@ -47,7 +47,7 @@ export function brief(os: LifeOSContext, now = Date.now(), max = 6): Brief {
       if (!a.brief) continue;
       const v = os.brain.learned.get<string | string[]>(a.key);
       if (!v) continue;
-      out.push({ id: a.key, text: `${cap(a.slot)}: ${Array.isArray(v) ? v.join(', ') : v}`, module: b.module, urgent: false, route: a.route ?? '/check', open: false });
+      out.push({ id: a.key, text: `${cap(a.slot)}: ${Array.isArray(v) ? v.join(', ') : v}`, module: b.module, urgent: false, route: a.route ?? '/check', answered: false });
     }
   }
   return { lines: out, pass: lastPassToday(os, now) };

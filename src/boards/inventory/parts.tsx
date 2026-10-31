@@ -1,9 +1,10 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
-import { Icon, Text } from '@ui/kit';
+import { Button, Icon, Text, useToast } from '@ui/kit';
+import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
-import { quantityWords, shopLabel, type StockState } from '@modules/inventory';
+import { dishAsk, quantityWords, shopLabel, type StockState } from '@modules/inventory';
 
 /**
  * Home's parts, a first pass from the kit (NR-KitRecords, NR-People-Parts'
@@ -176,3 +177,44 @@ export function HomeEmpty({ icon = 'home', title, line, children }: { icon?: str
 }
 
 export { INK };
+
+/**
+ * Cook tonight (layer 8): the dish Claude suggested at the last pass from what
+ * is fresh and what to use soon, kept in the learned store under the key made
+ * from those things (so the same fridge never costs a second call). Another
+ * idea forgets it; the next pass asks again. The slot until there is one.
+ */
+export function CookTonight() {
+  const t = useTheme();
+  const os = useOS();
+  const toast = useToast();
+  const d = useLive((o) => {
+    const ask = dishAsk(o);
+    return { ask, dish: ask ? o.brain.learned.get<string>(ask.key) : undefined };
+  }, []);
+  if (!d.ask) return <BrainSlot title="Cook tonight" line="Fewer than three things in the Fridge and Kitchen to cook from." icon="food" />;
+  if (!d.dish) return <BrainSlot title="Cook tonight" line="A dish from what's fresh and what to use soon, at the brain's next pass." icon="food" />;
+  const [name, uses] = d.dish.split(/:\s*/, 2);
+  return (
+    <View style={{ padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Icon name="food" size={18} color={t.c.accent.mustard} />
+        <Text style={{ flex: 1, fontSize: 11, lineHeight: 14, fontWeight: '600', letterSpacing: 0.9, color: t.c.fg.tertiary }}>COOK TONIGHT</Text>
+      </View>
+      <Text style={{ fontSize: 20, lineHeight: 25, fontWeight: '700', color: t.c.fg.primary }}>{name}</Text>
+      {uses ? <Text style={{ fontSize: 13, lineHeight: 17, color: t.c.fg.secondary }}>{uses}</Text> : null}
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Button
+          title="Another idea"
+          icon="refresh"
+          size="sm"
+          variant="secondary"
+          onPress={() => {
+            os.brain.learned.forget(d.ask!.key);
+            toast.show({ message: 'A new idea comes with the next pass', icon: 'refresh' });
+          }}
+        />
+      </View>
+    </View>
+  );
+}
