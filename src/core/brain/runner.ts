@@ -223,7 +223,8 @@ function notifyFiled(os: LifeOSContext, filed: Nudge[], all: Brains[], now: numb
   for (const x of [...filed].sort((a, b) => Number(b.urgent) - Number(a.urgent))) {
     if (slots-- <= 0) break;
     void os.notify({ title: all.find((b) => b.module === x.module)?.name ?? 'LifeOS', body: x.line, at: at > now ? at : undefined, data: { route: '/check', nudgeId: x.id } });
-    os.brain.nudges.update(x.id, { notifiedAt: now, at: now });
+    // The time it shows: now, or when quiet hours end (the notification plan keeps it until then).
+    os.brain.nudges.update(x.id, { notifiedAt: Math.max(at, now), at: now });
     n++;
   }
   return n;

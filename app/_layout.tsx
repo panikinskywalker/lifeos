@@ -28,6 +28,7 @@ import { notifications } from '../src/platform/notifications';
 import { AppState } from 'react-native';
 import { useShareIntent } from 'expo-share-intent';
 import { persistAttachment } from '../src/ui/lib/files';
+import { maybeRunBrain } from '../src/platform/brain';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -74,10 +75,13 @@ export default function RootLayout() {
   // Foreground → run scheduler; tapping a notification → open the record.
   useEffect(() => {
     if (!os) return;
+    // The brain's pass, if one is due (MODEL layer 8): on open, and on every return to the app.
+    void maybeRunBrain(os).catch((e) => console.warn('brain pass failed', e));
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active') {
         bus.emit('app.foreground', { at: Date.now() });
         void os.scheduler.tick();
+        void maybeRunBrain(os).catch((e) => console.warn('brain pass failed', e));
       }
     });
     let nsub: { remove: () => void } | null = null;

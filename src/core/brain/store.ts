@@ -169,6 +169,10 @@ export class NudgeStore {
   since(since: number): Nudge[] {
     return this.db.all<Row>(`SELECT * FROM nudges WHERE created_at >= ? ORDER BY created_at DESC, urgent DESC, rowid`, [since]).map(toNudge);
   }
+  /** Nudges whose notification waits for quiet hours to end. */
+  waitingToNotify(now: number): Nudge[] {
+    return this.db.all<Row>(`SELECT * FROM nudges WHERE notified_at > ? AND state = 'open' ORDER BY notified_at`, [now]).map(toNudge);
+  }
   filedToday(module: string, now: number): number {
     return this.db.get<{ n: number }>(`SELECT COUNT(*) n FROM nudges WHERE module=? AND created_at >= ?`, [module, startOfDay(now)])?.n ?? 0;
   }

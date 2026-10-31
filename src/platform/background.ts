@@ -5,6 +5,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { runFiling } from './filing';
 import { syncSources } from './sources';
 import { syncReminderNotifications } from './notifySync';
+import { maybeRunBrain } from './brain';
 
 const TASK = 'lifeos-scheduler-tick';
 let osRef: LifeOSContext | null = null;
@@ -16,6 +17,8 @@ TaskManager.defineTask(TASK, async () => {
       await osRef.scheduler.tick();
       await syncSources(osRef);
       await runFiling(osRef);
+      // The brain's morning and evening passes (layer 8), once each a day, after what just synced.
+      await maybeRunBrain(osRef).catch((e) => console.warn('brain pass failed', e));
       // The morning brief is written when it's scheduled: refresh it with what just synced.
       await syncReminderNotifications(osRef);
     }

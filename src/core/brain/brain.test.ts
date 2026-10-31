@@ -350,3 +350,18 @@ describe('Claude over fetch (mocked)', () => {
     await expect(m.complete({ system: 's', user: 'u', maxTokens: 10 })).rejects.toMatchObject({ usage: { input: 10 } });
   });
 });
+
+describe('quiet hours', () => {
+  it('a nudge filed inside quiet hours waits for them to end, and stays in the notification plan', async () => {
+    const { notificationPlan } = await import('@core/notify/plan');
+    const notify = vi.fn(async () => 'n');
+    os.notify = notify;
+    offered.home = [cand('paneer', { urgent: true })];
+    const early = new Date(2026, 9, 31, 7, 0).getTime(); // quiet until 7:30 by default
+    await runPass(os, { pass: 'morning', model: null, now: early });
+    const end = new Date(2026, 9, 31, 7, 30).getTime();
+    expect((notify.mock.calls as unknown as Array<[{ at?: number }]>)[0]![0].at).toBe(end);
+    expect(notificationPlan(os, early).filter((p) => p.kind === 'nudge').map((p) => [p.at, p.body, p.title])).toEqual([[end, "paneer: code's words", 'Home']]);
+    expect(notificationPlan(os, end + 1).filter((p) => p.kind === 'nudge')).toEqual([]);
+  });
+});
