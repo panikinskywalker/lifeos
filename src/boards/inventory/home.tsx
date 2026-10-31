@@ -7,6 +7,7 @@ import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, IconButton, Screen, Text } from '@ui/kit';
 import { goingOffCandidates, justCameIn, runningLow, useByWords, runningOutCandidates, spaces, stockState, type StockData } from '@modules/inventory';
+import { clothesByState } from '@modules/assets';
 import { ToCheckBell } from '../../screens/ToCheckBell';
 import { AddSheet, usePillActions } from './actions';
 import { BrainSlot, Card, HomeEmpty, PillCloud, SectionHead, SpaceTile, StockPill, Why } from './parts';
@@ -36,6 +37,12 @@ export function HomeScreen({ ctx }: { ctx: LifeOSContext; params: Record<string,
     });
     const low = runningOutCandidates(os, now);
     const sp = spaces(os).map((s) => {
+      if (s.data.holds === 'clothes') {
+        // Clothes are Assets (R7a): the count, and how many are in the wash or packed.
+        const c = os.registry.objects.has('asset') ? clothesByState(os, s.id) : { clean: [], wash: [], packed: [] };
+        const hints = [c.wash.length ? `${c.wash.length} in the wash` : null, c.packed.length ? `${c.packed.length} packed` : null].filter(Boolean).join(' · ') || null;
+        return { space: s, count: c.clean.length + c.wash.length + c.packed.length, hints, urgent: 0 };
+      }
       const here = inHome.filter((x) => x.data.spaceId === s.id);
       const useSoon = here.filter((x) => stockState(x.data, now).state === 'use soon').length;
       const gone = here.filter((x) => stockState(x.data, now).state === 'probably gone').length;
@@ -52,8 +59,7 @@ export function HomeScreen({ ctx }: { ctx: LifeOSContext; params: Record<string,
       <IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.fg.onAccent} accessibilityLabel="Add to Home" onPress={() => setAdding(true)} />
     </>
   );
-  const usedSpaces = d.spaces.filter((s) => s.space.data.holds !== 'clothes').length;
-  const header = { title: 'Home', subtitle: `${d.count} ${d.count === 1 ? 'thing' : 'things'} · ${usedSpaces} spaces`, right, onBack: () => (router.canGoBack() ? router.back() : router.replace('/browse' as never)) };
+  const header = { title: 'Home', subtitle: `${d.count} ${d.count === 1 ? 'thing' : 'things'} · ${d.spaces.length} spaces`, right, onBack: () => (router.canGoBack() ? router.back() : router.replace('/browse' as never)) };
   const add = <AddSheet ctx={ctx} visible={adding} onClose={() => setAdding(false)} />;
 
   if (!d.all.length) {
@@ -112,7 +118,7 @@ export function HomeScreen({ ctx }: { ctx: LifeOSContext; params: Record<string,
       <SectionHead title="Spaces" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         {d.spaces.map((s) => (
-          <SpaceTile key={s.space.id} name={s.space.title} icon={s.space.data.icon ?? 'box'} count={s.count} hints={s.space.data.holds === 'clothes' ? 'with Assets, soon' : s.hints} onPress={() => router.push({ pathname: '/module/[id]/[page]', params: { id: 'inventory', page: 'space', space: s.space.id } } as never)} />
+          <SpaceTile key={s.space.id} name={s.space.title} icon={s.space.data.icon ?? 'box'} count={s.count} hints={s.hints} onPress={() => router.push({ pathname: '/module/[id]/[page]', params: { id: 'inventory', page: 'space', space: s.space.id } } as never)} />
         ))}
         {d.spaces.length % 2 ? <View style={{ flexBasis: '46%', flexGrow: 1 }} /> : null}
       </View>

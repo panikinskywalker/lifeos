@@ -35,7 +35,7 @@ export interface ExtractResult {
 
 /** The filing instructions: short, because free tiers count tokens per minute. */
 export function filingPrompt(os: LifeOSContext, subject?: { type: string; title: string } | null, now = new Date()): string {
-  const keep = ['person', 'place', 'org', 'trip', 'event', 'task', 'vehicle', 'asset', 'subscription', 'document', 'routine', 'note', 'project', 'account'];
+  const keep = ['person', 'place', 'org', 'trip', 'event', 'task', 'asset', 'subscription', 'document', 'routine', 'note', 'project', 'account'];
   const types = keep
     .map((t) => os.registry.objects.get(t))
     .filter((d): d is NonNullable<typeof d> => !!d)

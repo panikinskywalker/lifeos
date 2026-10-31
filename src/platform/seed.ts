@@ -81,10 +81,11 @@ export function seedDemoData(os: LifeOSContext) {
     os.records.create({ object: 'subscription', data: { name: 'iCloud 200GB', amount: 219, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: daysAhead(3), category: 'subscriptions', accountId: card.id }, status: 'active' });
     os.records.create({ object: 'subscription', data: { name: 'Cult.fit', amount: 14000, rrule: 'FREQ=YEARLY;INTERVAL=1', nextBillingAt: daysAhead(140), category: 'health', accountId: card.id }, status: 'active' });
 
-    const car = os.records.create({ object: 'vehicle', data: { make: 'Hyundai', model: 'Creta', year: 2022, plate: 'KA 05 MZ 1234', odometerKm: 28400, fuel: 'petrol', insuranceUntil: daysAhead(9), nextServiceKm: 30000 } });
+    const car = os.records.create({ object: 'asset', title: '2022 Hyundai Creta', data: { category: 'vehicle', purchaseDate: '2022-03-12', purchasePrice: 1450000, plate: 'KA 05 MZ 1234', odometerKm: 28400, fuel: 'petrol', nextServiceKm: 30000 }, status: 'owned' });
+    os.cycles.create({ entityId: car.id, name: 'Insurance renewal', kind: 'fixed', everyN: 1, everyUnit: 'year', nextDueAt: new Date(`${daysAhead(9)}T09:00:00`).getTime(), leadDays: 30 }, 'system');
     os.records.create({ object: 'document', title: 'Car insurance policy', data: { kind: 'insurance', issuer: 'ICICI Lombard', expiresOn: daysAhead(9), assetId: car.id } });
     os.records.create({ object: 'document', title: 'Passport', data: { kind: 'id', number: 'P•••••12', expiresOn: '2031-06-10' } });
-    os.records.create({ object: 'asset', title: 'MacBook Pro 14"', data: { category: 'electronics', purchaseDate: daysAgo(400), purchasePrice: 240000, currentValue: 170000, warrantyUntil: daysAhead(330) }, status: 'owned' });
+    os.records.create({ object: 'asset', title: 'MacBook Pro 14"', data: { category: 'device', purchaseDate: daysAgo(400), purchasePrice: 240000, currentValue: 170000, warrantyUntil: daysAhead(330) }, status: 'owned' });
 
     for (const [title, freq] of [['Morning run', 'daily'], ['Read 20 pages', 'daily'], ['No sugar', 'weekdays']] as const) {
       const h = os.records.create({ object: 'habit', title, data: { frequency: freq }, status: 'active' });
@@ -189,4 +190,11 @@ function seedHome(os: LifeOSContext) {
     buy(os, { name, size, quantity, price, at: ago(0, 18), ...blinkit });
   }
   fileMessage(os, { source: 'notification', from: BLINKIT_APP, title: 'Order delivered', body: 'Your Blinkit order of ₹437 has been delivered. Enjoy!', receivedAt: ago(0, 18) });
+  // Clothes are Assets (R7a), kept in Clothes: 6 shirts (2 in the wash), 3 jeans, the Turf kit packed for Thursday.
+  const clothes = spaceNamed(os, 'Clothes')?.id;
+  if (clothes && os.registry.objects.has('asset')) {
+    for (const [title, state] of [['White oxford shirt', 'clean'], ['Blue linen shirt', 'wash'], ['Black polo', 'clean'], ['Checked flannel shirt', 'clean'], ['Grey tee', 'wash'], ['Olive kurta', 'clean'], ['Dark blue jeans', 'clean'], ['Black jeans', 'clean'], ['Light jeans', 'wash'], ['Turf kit', 'packed'], ['The bibs', 'packed']] as const) {
+      os.records.create({ object: 'asset', title, data: { category: 'clothing', spaceId: clothes, state }, status: 'owned' });
+    }
+  }
 }

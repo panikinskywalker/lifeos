@@ -35,9 +35,9 @@ describe('parser', () => {
   });
 
   it('"add a new vehicle" opens the form, no model call', async () => {
-    const { vehicleType } = await import('../../modules/assets/types');
-    os.registry.objects.set('vehicle', vehicleType as never);
-    for (const t of ['add a new vehicle', 'Add vehicle', 'new car', 'create a vehicle.']) expect(parseMessage(os, t)).toMatchObject({ intent: 'new_record', steps: [], card: { kind: 'new', type: 'vehicle' } });
+    const { assetType } = await import('../../modules/assets/types');
+    os.registry.objects.set('asset', assetType as never);
+    for (const t of ['add a new vehicle', 'Add vehicle', 'new car', 'create a vehicle.']) expect(parseMessage(os, t)).toMatchObject({ intent: 'new_record', steps: [], card: { kind: 'new', type: 'asset' } });
     expect(parseMessage(os, 'add a new spaceship')).toBeNull();
   });
 

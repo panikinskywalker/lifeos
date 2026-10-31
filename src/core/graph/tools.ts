@@ -132,7 +132,7 @@ export function upsertNode(os: LifeOSContext, s: GraphSession, ref: NodeRef, opt
 }
 
 function pickType(os: LifeOSContext, type: string | undefined, name: string): string {
-  const alias: Record<string, string> = { people: 'person', friend: 'person', contact: 'person', organisation: 'org', organization: 'org', company: 'org', employer: 'org', brand: 'org', shop: 'org', city: 'place', country: 'place', venue: 'place', location: 'place', flight: 'event', meeting: 'event', car: 'vehicle', bike: 'vehicle', todo: 'task', book: 'note' };
+  const alias: Record<string, string> = { people: 'person', friend: 'person', contact: 'person', organisation: 'org', organization: 'org', company: 'org', employer: 'org', brand: 'org', shop: 'org', city: 'place', country: 'place', venue: 'place', location: 'place', flight: 'event', meeting: 'event', car: 'asset', bike: 'asset', todo: 'task', book: 'note' };
   const t = type ? (alias[type] ?? type) : TYPE_GUESS.find(([re]) => re.test(name))?.[1] ?? 'person';
   if (os.registry.objects.has(t)) return t;
   return os.registry.objects.has('note') ? 'note' : [...os.registry.objects.keys()][0]!;

@@ -3,10 +3,10 @@ import type { LifeOSContext } from '../registry/context';
 import type { Cycle } from './cycleRepo';
 import { addPeriod, startOfDay, type CycleStatus, type UpkeepBucket } from './schedule';
 
-/** Upkeep filter chips → record types (PRODUCT §5, SCOPE C2). */
+/** Upkeep filter chips → record types (PRODUCT §5, SCOPE C2); `asset:vehicle` is an Asset of that category (R7a). */
 export const UPKEEP_FILTERS = {
   Subscriptions: ['subscription'],
-  Vehicles: ['vehicle'],
+  Vehicles: ['asset:vehicle'],
   Things: ['asset', 'stock'],
   Chores: ['routine'],
   People: ['person'],
@@ -30,13 +30,16 @@ export interface Upkeep {
   monthCostCount: number;
 }
 
+/** "asset:vehicle" for a record with a category, so a kind of Asset can be named without its module. */
+export const kindOf = (e: ObjectRecord): string => (typeof e.data?.category === 'string' ? `${e.object}:${e.data.category}` : e.object);
+
 /** Every live cycle with its record and status, grouped for the Upkeep tab. */
 export function upkeep(os: LifeOSContext, filter: UpkeepFilter = 'All', now = Date.now()): Upkeep {
   const types: readonly string[] | null = filter === 'All' ? null : UPKEEP_FILTERS[filter];
   const items: UpkeepItem[] = [];
   for (const cycle of os.cycles.all()) {
     const entity = os.records.get(cycle.entityId);
-    if (!entity || (types && !types.includes(entity.object))) continue;
+    if (!entity || (types && !types.includes(entity.object) && !types.includes(kindOf(entity)))) continue;
     items.push({ cycle, entity, def: os.registry.objects.get(entity.object), status: os.cycles.status(cycle, now) });
   }
   const rank = (i: UpkeepItem) => (i.status.daysLeft ?? (i.status.meterLeft != null && i.cycle.meterEvery ? (i.status.meterLeft / i.cycle.meterEvery) * 180 : 9999));
@@ -56,7 +59,7 @@ export function upkeep(os: LifeOSContext, filter: UpkeepFilter = 'All', now = Da
 }
 
 /** Finance category for a cost logged against a record of this type. */
-const COST_CATEGORY: Record<string, string> = { vehicle: 'transport', subscription: 'subscriptions', document: 'fees', person: 'gifts', routine: 'housing', asset: 'housing', item: 'shopping' };
+const COST_CATEGORY: Record<string, string> = { 'asset:vehicle': 'transport', subscription: 'subscriptions', document: 'fees', person: 'gifts', routine: 'housing', asset: 'housing', item: 'shopping' };
 
 export interface LoggedDone {
   eventId: string;
@@ -81,7 +84,7 @@ export function logDone(os: LifeOSContext, cycleId: string, input: { cost?: numb
       const record = os.records.get(cycle.entityId);
       const tx = os.records.create({
         object: 'transaction',
-        data: { amount: input.cost, kind: 'expense', category: COST_CATEGORY[record?.object ?? ''] ?? 'other', merchant: record ? `${record.title} · ${cycle.name}` : cycle.name, date: localDate(at), note: input.note ?? undefined, currency: cycle.currency ?? undefined },
+        data: { amount: input.cost, kind: 'expense', category: (record && (COST_CATEGORY[kindOf(record)] ?? COST_CATEGORY[record.object])) ?? 'other', merchant: record ? `${record.title} · ${cycle.name}` : cycle.name, date: localDate(at), note: input.note ?? undefined, currency: cycle.currency ?? undefined },
       });
       if (record) os.links.link(tx.id, record.id, record.object);
       transactionId = tx.id;

@@ -95,9 +95,9 @@ function namesAfterWith(text: string): string[] {
   return m[1]!.split(/\s*(?:,|\band\b|&)\s*/i).map((s) => s.trim()).filter((s) => s && !/^(me|us)$/i.test(s));
 }
 
-const TYPE_SYNONYMS: Record<string, string> = { car: 'vehicle', bike: 'vehicle', scooter: 'vehicle', motorcycle: 'vehicle', motorbike: 'vehicle', contact: 'person', friend: 'person', expense: 'transaction', chore: 'routine' };
+const TYPE_SYNONYMS: Record<string, string> = { car: 'asset', bike: 'asset', scooter: 'asset', motorcycle: 'asset', motorbike: 'asset', vehicle: 'asset', contact: 'person', friend: 'person', expense: 'transaction', chore: 'routine' };
 
-/** "vehicle" / "vehicles" / "car" → 'vehicle', only for a record type that is installed. */
+/** "asset" / "assets" / "car" → 'asset', only for a record type that is installed. */
 function typeFromWord(os: LifeOSContext, word: string): string | null {
   const w = word.trim().toLowerCase().replace(/^(?:my|the)\s+/, '');
   for (const def of os.registry.objects.values()) {

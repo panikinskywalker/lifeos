@@ -7,6 +7,23 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.12 · 31 Oct 2026
+
+**Assets** (R7a), built in its own session and merged here. The screens are a
+first pass from the kit until the *NR-Assets* artboards are drawn.
+- **Vehicles are Assets now**: your car keeps its readings, service,
+  insurance and the spends linked to it; it is folded in once, on first open.
+- **Clothes are Assets**, kept in Home's **Clothes** space as pills: clean,
+  in the wash, packed. Tap moves one between clean and in the wash (with
+  Undo); hold for packed or to open it.
+- **The Asset page**: the warranty as a bar with days left, the service with
+  *Serviced*, and for a vehicle its km and next service on both clocks.
+- **Service by months** for anything (the AC every 6 months), and by km too
+  for a vehicle (6 months or 10,000 km unless you set it).
+- New AI tools: what's under warranty, what's due for service, the clothes by
+  state.
+- Add an Asset, a vehicle or clothes from the quick actions.
+
 ## v0.0.11 · 31 Oct 2026
 
 **Home** (R7e), built in its own session and merged here. The screens are a

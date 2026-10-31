@@ -20,7 +20,7 @@ import { edgeLabel } from '@core/graph/edges';
 import { accountType, debtType, subscriptionType, transactionType } from './finance/types';
 import { financeAiTools } from './finance/aiTools';
 import { financeFilingTools } from './finance/filing/tools';
-import { assetsAiTools, assetType, routineType, vehicleType } from './assets/types';
+import { assetsAiTools, assetType, routineType } from './assets';
 import { groupType, personType } from './crm/types';
 import { eventType, projectType, taskType } from './projects/types';
 import { orgType, placeType } from './places/types';
@@ -29,7 +29,7 @@ import { tripType } from './travel/types';
 const modules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, groupType] },
   { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools, filingTools: financeFilingTools },
-  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
+  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, routineType], aiTools: assetsAiTools },
   { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', objects: [taskType, projectType, eventType] },
   { id: 'places', name: 'Places', version: '1', description: '', icon: 'x', color: '#000', objects: [placeType, orgType] },
   { id: 'travel', name: 'Travel', version: '1', description: '', icon: 'x', color: '#000', objects: [tripType] },
@@ -262,7 +262,6 @@ describe('filing mechanics', () => {
   });
 
   it('create anything: defaults for required fields, "32k" and "2 years" understood', () => {
-    expect(fillDefaults(vehicleType as never, {}, 'Honda City')).toMatchObject({ make: 'Honda City' });
     expect(fillDefaults(assetType as never, { purchasePrice: '32k', warrantyUntil: 'in 2 years', category: 'Appliance' })).toMatchObject({ purchasePrice: 32000, warrantyUntil: parseDateish('2 years'), category: 'appliance' });
     expect(fillDefaults(routineType as never, {}, 'Water plants')).toMatchObject({ name: 'Water plants' });
   });

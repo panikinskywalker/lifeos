@@ -18,7 +18,7 @@ export const documentType: ObjectDef<DocumentData> = {
     { key: 'expiresOn', label: 'Expires', type: 'date', section: 'Validity', summary: true },
     { key: 'personId', label: 'Person', type: 'link', linkTo: 'person', linkWord: 'person', section: 'Links' },
     { key: 'tripId', label: 'Trip', type: 'link', linkTo: 'trip', linkWord: 'trip', section: 'Links' },
-    { key: 'assetId', label: 'Asset / vehicle', type: 'link', linkTo: ['asset', 'vehicle'], linkWord: 'asset', section: 'Links' },
+    { key: 'assetId', label: 'Asset / vehicle', type: 'link', linkTo: 'asset', linkWord: 'asset', section: 'Links' },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   indexed: ['kind', 'expiresOn'], occurredAtField: 'expiresOn',

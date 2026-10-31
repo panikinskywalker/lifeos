@@ -21,7 +21,7 @@ import { Assistant, READ_ONLY_TOOLS } from '../src/core/ai/assistant';
 import { edgeLabel } from '../src/core/graph/edges';
 import { accountType, debtType, subscriptionType, transactionType } from '../src/modules/finance/types';
 import { financeAiTools } from '../src/modules/finance/aiTools';
-import { assetsAiTools, assetType, routineType, vehicleType } from '../src/modules/assets/types';
+import { assetsAiTools, assetType, routineType } from '../src/modules/assets';
 import { groupType, personType } from '../src/modules/crm/types';
 import { eventType, projectType, taskType } from '../src/modules/projects/types';
 import { orgType, placeType } from '../src/modules/places/types';
@@ -39,7 +39,7 @@ if (!chain.length) { console.error(`No keys: put GROQ_API_KEY / GEMINI_API_KEY i
 const modules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, groupType] },
   { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools },
-  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
+  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, routineType], aiTools: assetsAiTools },
   { id: 'projects', name: 'Projects', version: '1', description: '', icon: 'x', color: '#000', objects: [taskType, projectType, eventType] },
   { id: 'places', name: 'Places', version: '1', description: '', icon: 'x', color: '#000', objects: [placeType, orgType] },
   { id: 'travel', name: 'Travel', version: '1', description: '', icon: 'x', color: '#000', objects: [tripType] },

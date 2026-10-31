@@ -113,7 +113,7 @@ ids as R3 leaves them.
 ### Things
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
-| **Asset** | Something you own, vehicles included | category (vehicle / device / appliance / …), bought on, price, vendor → Organisation, warranty cycle, meter readings (km, hours) for cycles by meter, serial, location → Place | dumps, you, mail receipts |
+| **Asset** | Something you own, vehicles and clothes included | category (vehicle / device / appliance / clothing / …), bought on, price, vendor → Organisation, warranty cycle, meter readings (km) for cycles by meter, serial, location → Place, kept in → Space, a clothing state; see below | dumps, you, mail receipts |
 | **Document** | ID, policy, contract, certificate | kind, number, issuer → Organisation, issued, expires (cycle), file, about → any record | you, dumps, mail |
 | **Delivery** | A parcel on its way | shop → Organisation, carrier, tracking, expected, status, OTP, order → Transaction link | SMS, mail |
 | **Stock** | Something kept at home that runs out or goes off (butter, detergent, a medicine) | see below | you (one line, the form), a shared order invoice, dumps |
@@ -176,6 +176,35 @@ renaming one keeps everything in it.
 | Holds | select | stock · clothes (Assets, R7a) |
 
 Spaces are hidden from Browse's record lists; Home draws them.
+
+**Asset** (module `assets`, Object id `asset`; Fields agreed 31 Oct with
+R7a). The old `vehicle` Object folds into it (see *Retired*). Fields that
+belong to one category sit in their own section of the form.
+| Field | Type | Notes |
+|---|---|---|
+| Name | text (the title) | "Hyundai Creta", "MacBook Pro 14", "Blue linen shirt" |
+| Category | select | vehicle · device · appliance · clothing · furniture · jewellery · property · other; *electronics* becomes device once |
+| Bought on | date | |
+| Price | money | what it cost |
+| Current value | money | what it is worth now (Things worth on the Overview) |
+| Vendor | link → Organisation, word *vendor* | where it was bought; was a link to a Person, those Links stay |
+| Warranty until | date | drives the **Warranty** Cycle (fixed, 30 days' notice) |
+| Serial | text | serial or model number |
+| Where | link → Place, word *at*, **and** the typed text | the link when a Place is picked; the text (`location`) stays as the fallback, as Person's Lives in |
+| Kept in | link → Space, word *kept in* | a Space in Home (layer 2, Space); clothing goes to Clothes |
+| State | select, clothing | clean · in the wash · packed (default clean); on Home a tap cycles clean → in the wash → clean, a packed one comes back clean; packing for a trip (R7d) sets packed |
+| Service every | number (months) | drives the **Service** Cycle; a vehicle's default is 6 months |
+| Service every (km) | number, vehicle | default 10,000; with months, whichever comes first |
+| Next service | date and km | written back by the Service Cycle |
+| Registration | text, vehicle | the number plate |
+| Odometer | meter (km), vehicle | the latest reading; readings drive the Service Cycle by km |
+| Fuel | select, vehicle | petrol · diesel · electric · hybrid · CNG |
+| Notes | long text | |
+
+Statuses: owned · sold · lost / broken. **Cycles**: Warranty, Service (by
+months, by km, or either). A folded vehicle keeps its **Insurance** and
+**PUC** renewals as Cycles on the Asset, as they were; whether they become
+Documents (R7c) is open.
 
 ### Money
 | Object | Meaning | Key fields | Filed by |
@@ -365,7 +394,7 @@ large OTP on Delivery).
 ### Retired from today's code
 | Was | Becomes |
 |---|---|
-| `vehicle` | Asset, category vehicle, with meter readings |
+| `vehicle` | Asset, category vehicle, with meter readings (R7a, 31 Oct); your records folded in once (plate → registration, service cycle and readings kept, insurance and PUC stay as Cycles, spends linked to it stay linked) |
 | `item` (inventory) | Stock (R7e, 30 Oct); your records folded in once (location → a Space, expires → your life, restock-below → on the list) |
 | `routine` | Habit, kind chore |
 | `habit_log` | Event, kind check-in |
@@ -403,7 +432,7 @@ what a Person is).
 **The modules (decided 4 Oct: all twelve existing data modules stay):**
 `finance` (Account, Transaction, Debt, Subscription, Budget, Group) · `crm`
 (Person) · `projects` (Task, Project, Goal, Event) · `travel` (Trip) · `assets`
-(Asset, Vehicle) · `inventory` (Stock, Space; shown as Home since R7e) · `documents` (Document) · `health`
+(Asset; Routine until R5) · `inventory` (Stock, Space; shown as Home since R7e) · `documents` (Document) · `health`
 (Measurement, Workout) · `habits` (Habit, Habit log, Routine) · `knowledge`
 (Note) · `places` (Place, Organisation) · `deliveries` (Delivery). `dashboard`
 and `automation` own no data and become boards. Added 17 Oct: `games` (Game,
@@ -844,7 +873,26 @@ screens checked on the phone → overrides only where the default is wrong)
   Upkeep; Upkeep re-hung on cycles from every module.
 - [ ] **R6 health** — Measurement, Workout; Health Connect and Usage access
   sources; one page per metric; Metric screen comparisons.
-- [ ] **R7a assets** — Asset, Vehicle (meters); warranty, service and km cycles.
+- [x] **R7a assets**: built 31 Oct 2026 (branch `claude/r7a-assets`; no migration). Asset as agreed
+  (layer 2, *Things*): the category clothing, *kept in* a Space by Link (the assets module does not
+  import inventory; it finds spaces that hold clothes by their data), a clothing state (clean · in the
+  wash · packed), vendor → Organisation, where → Place with the typed text kept. **The fold** (once,
+  on first open): `vehicle` records become Assets in place, category vehicle (plate, odometer, next
+  service, fuel kept; readings, the Service cycle, Insurance and PUC cycles, and spends linked with
+  the word `vehicle`, now `asset`, stay); *electronics* becomes device; Stock R7e filed in Clothes
+  becomes clothing, clean (this part waits for Home's spaces). **Cycles**: Warranty (fixed, 30 days'
+  notice); Service by months for anything, by km too for a vehicle (6 months or 10,000 km by
+  default), written back to next service. **Tools**: `under_warranty`, `due_for_service`, `clothes`.
+  **Core, small**: "the car", Upkeep's Vehicles chip and the transport cost category name an Asset of
+  category vehicle (`asset:vehicle`); "add a car" opens the Asset form. **Board** (a first pass from
+  the kit until the `NR-Assets-*` artboards): the Asset page (warranty bar, service with Serviced), a
+  vehicle's odometer, insurance, spend and service on both clocks, clothing's state and space; the
+  Overview (due for service, warranty ending, in the wash); quick actions Asset · Vehicle · Clothes.
+  **Home**: the Clothes space shows clothing Assets as pills in clean · in the wash · packed (tap
+  cycles clean → in the wash → clean, a packed one comes back clean; hold for the rest), and its tile
+  counts them. `docs/design/ASSETS-BRIEF.md` asks for `NR-Assets-*`, with the packing picker R7d
+  uses. 431 tests green; the web export builds. *Not in R7a*: a form that shows only a category's
+  Fields (the form shows every section); the packing picker itself (R7d). **Phone check pending.**
 - [ ] **R7b deliveries** — Delivery; shipping parsers; OTP; tracking.
 - [ ] **R7c documents** — Document; expiry cycles; files.
 - [ ] **R7d travel** — Trip; spend vs budget; flights and stays from mail.
