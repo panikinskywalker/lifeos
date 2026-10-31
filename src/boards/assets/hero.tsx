@@ -45,7 +45,7 @@ export function whenText(i: UpkeepItem): string {
 export function AssetHero({ entity, ctx }: { entity: ObjectRecord<AssetData>; ctx: LifeOSContext }) {
   if (entity.data.category === 'vehicle') return <VehicleHero entity={entity} ctx={ctx} />;
   if (entity.data.category === 'clothing') return <ClothingCard entity={entity} />;
-  return <ThingHero entity={entity} ctx={ctx} />;
+  return <ThingHero entity={entity} />;
 }
 
 /** Warranty as a bar from bought on to the end, with days left. */
@@ -86,24 +86,14 @@ function ServiceCard({ item, onDone }: { item: UpkeepItem; onDone: () => void })
   );
 }
 
-/** A device, an appliance, furniture: warranty, service, what needs a look. */
-function ThingHero({ entity, ctx }: { entity: ObjectRecord<AssetData>; ctx: LifeOSContext }) {
+/** A device, an appliance, furniture: warranty and service (price and value are in the header). */
+function ThingHero({ entity }: { entity: ObjectRecord<AssetData> }) {
   const router = useRouter();
   const items = useRecordCycles(entity);
   const [costFor, setCostFor] = useState<UpkeepItem | null>(null);
   const service = items.find((i) => i.cycle.template === 'asset.service') ?? null;
-  const worth = entity.data.currentValue ?? entity.data.purchasePrice;
   return (
     <View style={{ gap: 16 }}>
-      {worth != null || entity.data.purchaseDate ? (
-        <StatTrio
-          stats={[
-            { label: entity.data.currentValue != null ? 'Worth' : 'Paid', value: worth != null ? ctx.format.currency(worth) : '–' },
-            { label: 'Bought', value: entity.data.purchaseDate ? format(new Date(`${entity.data.purchaseDate.slice(0, 10)}T12:00:00`), 'MMM yyyy') : '–' },
-            { label: 'Cycles', value: String(items.length), caption: 'tracked' },
-          ]}
-        />
-      ) : null}
       <WarrantyCard entity={entity} />
       {service ? <ServiceCard item={service} onDone={() => setCostFor(service)} /> : null}
       <QuickActions

@@ -196,7 +196,7 @@ belong to one category sit in their own section of the form.
 | Service every | number (months) | drives the **Service** Cycle; a vehicle's default is 6 months |
 | Service every (km) | number, vehicle | default 10,000; with months, whichever comes first |
 | Next service | date and km | written back by the Service Cycle |
-| Registration | text, vehicle | the number plate (was `plate`) |
+| Registration | text, vehicle | the number plate |
 | Odometer | meter (km), vehicle | the latest reading; readings drive the Service Cycle by km |
 | Fuel | select, vehicle | petrol · diesel · electric · hybrid · CNG |
 | Notes | long text | |
@@ -873,13 +873,26 @@ screens checked on the phone → overrides only where the default is wrong)
   Upkeep; Upkeep re-hung on cycles from every module.
 - [ ] **R6 health** — Measurement, Workout; Health Connect and Usage access
   sources; one page per metric; Metric screen comparisons.
-- [ ] **R7a assets**: Asset as agreed 31 Oct (layer 2, *Things*): the category clothing, *kept in* a
-  Space by Link (the assets module does not import inventory), a clothing state (clean · in the wash ·
-  packed); `vehicle` folded into Asset (category vehicle, odometer readings), once, on first open, with
-  Stock R7e had put in Clothes becoming clothing Assets. Warranty, service and km Cycles. **Tools**:
-  `under_warranty`, `due_for_service`, `clothes`. **Board**: the Asset page (warranty, service), a
-  vehicle's km and next service, and Home's **Clothes** space as pills by state.
-  `docs/design/ASSETS-BRIEF.md` asks for `NR-Assets-*` artboards, with the packing picker R7d uses.
+- [x] **R7a assets**: built 31 Oct 2026 (branch `claude/r7a-assets`; no migration). Asset as agreed
+  (layer 2, *Things*): the category clothing, *kept in* a Space by Link (the assets module does not
+  import inventory; it finds spaces that hold clothes by their data), a clothing state (clean · in the
+  wash · packed), vendor → Organisation, where → Place with the typed text kept. **The fold** (once,
+  on first open): `vehicle` records become Assets in place, category vehicle (plate, odometer, next
+  service, fuel kept; readings, the Service cycle, Insurance and PUC cycles, and spends linked with
+  the word `vehicle`, now `asset`, stay); *electronics* becomes device; Stock R7e filed in Clothes
+  becomes clothing, clean (this part waits for Home's spaces). **Cycles**: Warranty (fixed, 30 days'
+  notice); Service by months for anything, by km too for a vehicle (6 months or 10,000 km by
+  default), written back to next service. **Tools**: `under_warranty`, `due_for_service`, `clothes`.
+  **Core, small**: "the car", Upkeep's Vehicles chip and the transport cost category name an Asset of
+  category vehicle (`asset:vehicle`); "add a car" opens the Asset form. **Board** (a first pass from
+  the kit until the `NR-Assets-*` artboards): the Asset page (warranty bar, service with Serviced), a
+  vehicle's odometer, insurance, spend and service on both clocks, clothing's state and space; the
+  Overview (due for service, warranty ending, in the wash); quick actions Asset · Vehicle · Clothes.
+  **Home**: the Clothes space shows clothing Assets as pills in clean · in the wash · packed (tap
+  cycles clean → in the wash → clean, a packed one comes back clean; hold for the rest), and its tile
+  counts them. `docs/design/ASSETS-BRIEF.md` asks for `NR-Assets-*`, with the packing picker R7d
+  uses. 431 tests green; the web export builds. *Not in R7a*: a form that shows only a category's
+  Fields (the form shows every section); the packing picker itself (R7d). **Phone check pending.**
 - [ ] **R7b deliveries** — Delivery; shipping parsers; OTP; tracking.
 - [ ] **R7c documents** — Document; expiry cycles; files.
 - [ ] **R7d travel** — Trip; spend vs budget; flights and stays from mail.
