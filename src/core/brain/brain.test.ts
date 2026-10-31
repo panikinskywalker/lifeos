@@ -365,3 +365,22 @@ describe('quiet hours', () => {
     expect(notificationPlan(os, end + 1).filter((p) => p.kind === 'nudge')).toEqual([]);
   });
 });
+
+describe('which model', () => {
+  it('Opus on the first day the brain runs, Haiku from the next; Opus can be turned on for one more day', async () => {
+    const { brainModelId, setModelForToday } = await import('.');
+    expect(brainModelId(os, NOW)).toBe('claude-opus-5-5');
+    expect(brainModelId(os, NOW + 3600_000)).toBe('claude-opus-5-5');
+    expect(brainModelId(os, NOW + DAY)).toBe('claude-haiku-5-5');
+    setModelForToday(os, 'claude-opus-5-5', NOW + 5 * DAY);
+    expect(brainModelId(os, NOW + 5 * DAY)).toBe('claude-opus-5-5');
+    expect(brainModelId(os, NOW + 6 * DAY)).toBe('claude-haiku-5-5');
+    setModelForToday(os, null, NOW + 6 * DAY);
+    expect(brainModelId(os, NOW + 6 * DAY)).toBe('claude-haiku-5-5');
+  });
+
+  it('someone who already set the brain up does not get a surprise Opus day', () => {
+    setBrainSettings(os, { budget: 20_000 });
+    return import('.').then(({ brainModelId }) => expect(brainModelId(os, NOW)).toBe('claude-haiku-5-5'));
+  });
+});

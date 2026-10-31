@@ -3,7 +3,7 @@ import { Linking, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { format } from 'date-fns';
-import { brainSettings, exportBrain, setBrainSettings, type Learned, type SentEntry } from '@core/brain';
+import { brainModelId, brainSettings, exportBrain, setBrainSettings, setModelForToday, STRONG_MODEL, type Learned, type SentEntry } from '@core/brain';
 import { BRAIN_MODELS } from '@core/ai/brainModel';
 import { PROVIDER_PRESETS } from '@core/ai/providers';
 import { useLive, useOS } from '@ui/hooks';
@@ -26,6 +26,8 @@ export default function BrainSettingsRoute() {
   const t = useTheme();
   const toast = useToast();
   const s = useLive((o) => brainSettings(o), []);
+  const today = useLive((o) => brainModelId(o), []);
+  const label = (id: string) => BRAIN_MODELS.find((m) => m.id === id)?.label ?? id;
   const used = useLive((o) => o.brain.sent.tokensToday(Date.now()), []);
   const sent = useLive((o) => o.brain.sent.recent(20), []);
   const learned = useLive((o) => o.brain.learned.all({ limit: 200 }), []);
@@ -75,11 +77,13 @@ export default function BrainSettingsRoute() {
           <Button title={key.trim() === (stored ?? '') && stored ? 'Saved' : 'Save key'} icon="check" size="sm" disabled={key.trim() === (stored ?? '')} onPress={() => void saveKey()} style={{ flex: 1 }} />
           <Button title="Get a key" icon="link" size="sm" variant="secondary" onPress={() => void Linking.openURL(PROVIDER_PRESETS.claude.keyUrl!)} style={{ flex: 1 }} />
         </View>
+        <Text variant="caption" color="secondary">{today === s.model ? `Every pass uses ${label(s.model)}` : `Today: ${label(today)}, then back to ${label(s.model)}`}</Text>
         <ChipRow>
           {BRAIN_MODELS.map((m) => (
             <FilterChip key={m.id} label={m.label} selected={s.model === m.id} onPress={() => setBrainSettings(os, { model: m.id })} />
           ))}
         </ChipRow>
+        {s.model !== STRONG_MODEL ? <SwitchField label={`${label(STRONG_MODEL)} for today`} hint="A stronger model until midnight, then the one above again" value={today === STRONG_MODEL} onChange={(on) => setModelForToday(os, on ? STRONG_MODEL : null)} /> : null}
       </Card>
 
       <Card icon="gauge" tint="memory" title="Daily budget" meta={`${k(used)} of ${k(s.budget)} today`}>

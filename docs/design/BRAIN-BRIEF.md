@@ -44,7 +44,7 @@ Design **the brain** for LifeOS, my personal life-OS app for Android (390 × 844
 
 3. **You › Agent › Brain**
    - On / off for the morning and evening passes, their times, and **Run a pass now** with its outcome.
-   - **Claude**: the key (saved / missing, paste, Get a key), the model (Opus 5.5 · Sonnet 5.5 · Haiku 5.5).
+   - **Claude**: the key (saved / missing, paste, Get a key), the model (Haiku 5.5 by default · Sonnet 5.5 · Opus 5.5), and **Opus 5.5 for today** (a stronger model until midnight; the first day the brain runs starts on it). Say which model today's passes use ("Today: Opus 5.5, then back to Haiku 5.5").
    - **Daily budget**: today's tokens against it, the number to change.
    - **Sent to Claude**: the log, each entry expanding to its lines. This is what makes the privacy believable: make it calm and readable, not a debug dump.
    - **What it has learned**: answers, facts, Not this's, each with Forget; **Skills** with where each came from; **Copy as Markdown**.

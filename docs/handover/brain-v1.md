@@ -79,9 +79,11 @@ birthday cards and profile, and the drafted wish in the wish card.
 
 ## What you must decide
 
-1. **The model and the budget.** Default `claude-opus-5-5` (Sonnet 5.5 and
-   Haiku 5.5 are one tap away) and 40k tokens a day. A pass is roughly 1 to 3k
-   tokens in and under 1k out.
+1. **The budget.** 40k tokens a day. A pass is roughly 1 to 3k tokens in and
+   under 1k out. *The model is decided (31 Oct): Opus 5.5 for the first day
+   the brain runs, then Haiku 5.5 (`brainModelId`); "Opus 5.5 for today" in
+   You › Agent › Brain gives it one more day, and the standing model is one tap
+   away.*
 2. **Caching may not engage yet.** The cached part (house rules and four
    Skills) is under 1,000 tokens; the API caches only prefixes above a
    model-dependent minimum (512 to 4,096 tokens). It is set up and will start
@@ -149,7 +151,8 @@ drawn.
   never again.
 - **Cook tonight** on Home, **gift ideas** on People's birthday cards and
   profile, and **a drafted wish** in the wish card, from Claude.
-- **You › Agent › Brain**: the Claude key, the model, a daily budget, the
+- **You › Agent › Brain**: the Claude key, the model (Opus 5.5 on the first
+  day, Haiku 5.5 after; Opus for today when you want it), a daily budget, the
   **Sent to Claude** log (exactly what left the phone: records only), what it
   has learned and its Skills, Copy as Markdown, Run a pass now.
 - It learns: an answer it already has never costs a call again, and what it

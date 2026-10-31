@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
-import { brainSettings, passDue, runPass, type BrainModel, type PassName, type PassResult } from '@core/brain';
+import { brainModelId, passDue, runPass, type BrainModel, type PassName, type PassResult } from '@core/brain';
 import { createClaudeBrain } from '@core/ai/brainModel';
 import { getProviderKey } from './keys';
 import { syncReminderNotifications } from './notifySync';
@@ -13,7 +13,7 @@ import { syncReminderNotifications } from './notifySync';
 
 export async function brainModel(os: LifeOSContext): Promise<BrainModel | null> {
   const apiKey = await getProviderKey('claude').catch(() => null);
-  return apiKey ? createClaudeBrain({ apiKey, model: brainSettings(os).model }) : null;
+  return apiKey ? createClaudeBrain({ apiKey, model: brainModelId(os) }) : null;
 }
 
 let running: Promise<PassResult> | null = null;

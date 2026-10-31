@@ -18,14 +18,17 @@ export type PassName = 'morning' | 'evening' | 'event' | 'manual';
 
 export interface BrainSettings {
   on: boolean;
+  /** The standing model (Haiku 5.5: enough for the passes). */
   model: string;
+  /** A stronger model for one day only (Opus 5.5 on the first day); back to `model` the next. */
+  forToday?: { model: string; day: string };
   /** Tokens a day (cache reads count a tenth). */
   budget: number;
   morning: string;
   evening: string;
 }
 
-export const DEFAULT_BRAIN: BrainSettings = { on: true, model: 'claude-opus-5-5', budget: 40_000, morning: '07:00', evening: '19:00' };
+export const DEFAULT_BRAIN: BrainSettings = { on: true, model: 'claude-haiku-5-5', budget: 40_000, morning: '07:00', evening: '19:00' };
 /** In To check and the brief: per module, per day (layer 8, *How many*). */
 export const PER_MODULE = 2;
 /** As phone notifications, across LifeOS, per day. */
@@ -37,6 +40,24 @@ export function brainSettings(os: LifeOSContext): BrainSettings {
 }
 export function setBrainSettings(os: LifeOSContext, patch: Partial<BrainSettings>) {
   os.settings.set('brain', { ...brainSettings(os), ...patch });
+}
+
+export const STRONG_MODEL = 'claude-opus-5-5';
+
+/**
+ * The model for a pass now: the one-day model on its day, else the standing
+ * one. The very first time the brain runs it starts with a day on Opus (agreed
+ * 31 Oct: Opus for the first day, then Haiku).
+ */
+export function brainModelId(os: LifeOSContext, now = Date.now()): string {
+  if (os.settings.get<unknown>('brain', null) === null) setBrainSettings(os, { forToday: { model: STRONG_MODEL, day: iso(now) } });
+  const s = brainSettings(os);
+  return s.forToday?.day === iso(now) ? s.forToday.model : s.model;
+}
+
+/** Use `model` for the rest of today only (null: back to the standing model now). */
+export function setModelForToday(os: LifeOSContext, model: string | null, now = Date.now()) {
+  setBrainSettings(os, { forToday: model ? { model, day: iso(now) } : undefined });
 }
 
 export interface Brains {
