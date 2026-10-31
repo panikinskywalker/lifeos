@@ -16,14 +16,14 @@ import type { ContentBlock, LLMProvider } from '@core/ai/provider';
 import { accountType, debtType, subscriptionType, transactionType } from './finance/types';
 import { financeAiTools } from './finance/aiTools';
 import { balanceWith } from './finance/split';
-import { assetsAiTools, assetType, routineType, vehicleType } from './assets/types';
+import { assetsAiTools, assetType, routineType } from './assets';
 import { groupType, personType } from './crm/types';
 import { spaceType, stockType } from './inventory';
 
 const modules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, groupType] },
   { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools },
-  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
+  { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, routineType], aiTools: assetsAiTools },
   { id: 'inventory', name: 'Home', version: '1', description: '', icon: 'x', color: '#000', objects: [stockType, spaceType] },
 ];
 
@@ -72,8 +72,8 @@ afterEach(() => os.db.close());
 
 describe('golden flows (PRODUCT §7)', () => {
   it('1 · "Did the car service today, 6,400 at Hyundai" → service logged, expense linked, cycle rolled, card with Undo; zero taps but the money confirm', async () => {
-    const car = os.records.create({ object: 'vehicle', data: { make: 'Hyundai', model: 'Creta', odometerKm: 29400, nextServiceKm: 30000 } });
-    const service = os.cycles.forEntity(car.id).find((c) => c.template === 'vehicle.service')!;
+    const car = os.records.create({ object: 'asset', title: 'Hyundai Creta', data: { category: 'vehicle', odometerKm: 29400, nextServiceKm: 30000 } });
+    const service = os.cycles.forEntity(car.id).find((c) => c.template === 'asset.service')!;
     const r = await say('Did the car service today, 6,400 at Hyundai', [
       () => [{ name: 'resolve_entity', input: { text: 'the car' } }],
       ([res]) => [{ name: 'log_event', input: { entityId: res!.match.id, what: 'Service', cost: 6400, note: 'Hyundai' } }],
@@ -85,7 +85,7 @@ describe('golden flows (PRODUCT §7)', () => {
     expect(rolled.nextDueMeter).toBe(39400);
     const tx = os.records.query<{ amount: number; category: string; kind: string }>('transaction');
     expect(tx.map((t) => t.data)).toEqual([expect.objectContaining({ amount: 6400, kind: 'expense', category: 'transport' })]);
-    expect(os.links.targets(tx[0]!.id, 'vehicle')).toEqual([car.id]);
+    expect(os.links.targets(tx[0]!.id, 'asset')).toEqual([car.id]);
     const turn = r.tools[1]!;
     expect(turn.card).toMatchObject({ kind: 'cycle', cycleId: service.id });
     turn.undo!();
@@ -150,7 +150,7 @@ describe('golden flows (PRODUCT §7)', () => {
   });
 
   it('8 · questions answer from data, change nothing and ask nothing', async () => {
-    const car = os.records.create({ object: 'vehicle', data: { make: 'Hyundai', model: 'Creta' } });
+    const car = os.records.create({ object: 'asset', title: 'Hyundai Creta', data: { category: 'vehicle' } });
     os.records.timeline.add({ entityId: car.id, kind: 'event', title: 'Tyre change', actor: 'user', occurredAt: Date.now() - 40 * 864e5 });
     const priya = os.records.create({ object: 'person', data: {}, title: 'Priya Sharma' });
     os.records.create({ object: 'debt', status: 'open', data: { personId: priya.id, direction: 'they_owe', amount: 900, date: today(), kind: 'loan' } });
@@ -187,8 +187,8 @@ async function offline(text: string) {
 
 describe('golden flows with no model (parser first)', () => {
   it('1 · car service with cost, vendor and the money confirm', async () => {
-    const car = os.records.create({ object: 'vehicle', data: { make: 'Hyundai', model: 'Creta', odometerKm: 29400, nextServiceKm: 30000 } });
-    const service = os.cycles.forEntity(car.id).find((c) => c.template === 'vehicle.service')!;
+    const car = os.records.create({ object: 'asset', title: 'Hyundai Creta', data: { category: 'vehicle', odometerKm: 29400, nextServiceKm: 30000 } });
+    const service = os.cycles.forEntity(car.id).find((c) => c.template === 'asset.service')!;
     const r = await offline('Did the car service today, 6,400 at Hyundai');
     expect(r).toMatchObject({ calls: ['log_event'], asked: ['log_event'] });
     expect(os.cycles.get(service.id)!.nextDueMeter).toBe(39400);

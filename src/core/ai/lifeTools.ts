@@ -7,9 +7,11 @@ import type { Cycle } from '../cycles/cycleRepo';
 import { cycleStatus, dateField } from '../cycles/schedule';
 import { withExtras, type ReplyCard } from './cards';
 
-/** Words that name a record type rather than a record ("the car", "my passport"). */
+const VEHICLE_WORDS = ['car', 'bike', 'scooter', 'vehicle', 'motorcycle'];
+/** Words that name a record type rather than a record ("the car", "my passport"); `asset:vehicle` is an Asset of that category (R7a). */
 const TYPE_WORDS: Record<string, string[]> = {
-  vehicle: ['car', 'bike', 'scooter', 'vehicle', 'motorcycle'],
+  'asset:vehicle': VEHICLE_WORDS,
+  vehicle: VEHICLE_WORDS,
   subscription: ['subscription', 'recharge', 'plan', 'membership'],
   document: ['passport', 'licence', 'license', 'insurance', 'policy', 'document'],
   routine: ['chore', 'routine', 'laundry', 'cleaning'],
@@ -64,11 +66,12 @@ export function resolveCandidates(os: LifeOSContext, text: string, types?: strin
       }
     }
   }
-  for (const [type, ws] of Object.entries(TYPE_WORDS)) {
+  for (const [key, ws] of Object.entries(TYPE_WORDS)) {
+    const [type, category] = key.split(':') as [string, string | undefined];
     if (!words.some((w) => ws.includes(w)) || !os.registry.objects.has(type)) continue;
-    const all = os.records.query(type, {}, { limit: 3 });
-    if (all.length === 1) add(all[0]!, 0.9, `your only ${type}`);
-    else for (const e of all) add(e, 0.5, `a ${type}`);
+    const all = os.records.query(type, category ? { filter: { and: [{ field: 'data.category', op: 'eq', value: category }] } } : {}, { limit: 3 });
+    if (all.length === 1) add(all[0]!, 0.9, `your only ${category ?? type}`);
+    else for (const e of all) add(e, 0.5, `a ${category ?? type}`);
   }
   return [...out.values()].sort((a, b) => b.score - a.score).slice(0, 6);
 }
