@@ -121,6 +121,32 @@ export class FilingRepo {
   }
 
 
+  /** Filings of one kind, newest first (a board's own cards: Home's Blinkit order). */
+  ofKind(kind: string, opts: { since?: number; open?: boolean; limit?: number } = {}): Filing[] {
+    return this.db
+      .all<Row>(`SELECT * FROM filings WHERE kind=? AND created_at >= ?${opts.open ? ' AND checked=0 AND undone=0' : ''} ORDER BY created_at DESC, rowid DESC LIMIT ?`, [kind, opts.since ?? 0, opts.limit ?? 50])
+      .map(toFiling);
+  }
+
+  /** What was filed from one message (its ingest_queue id), oldest first: a later parser finds the Transaction an earlier one made. */
+  forSource(sourceRef: string): Filing[] {
+    return this.db.all<Row>(`SELECT * FROM filings WHERE source_ref=? ORDER BY created_at, rowid`, [sourceRef]).map(toFiling);
+  }
+
+  /** Change a card's words, record or what it keeps (a second message about the same order adds the amount). */
+  update(id: string, patch: { label?: string; flag?: string | null; entityId?: string | null; before?: Record<string, unknown> | null }) {
+    const x = this.get(id);
+    if (!x) return;
+    this.db.run(`UPDATE filings SET label=?, flag=?, record_id=?, before=? WHERE id=?`, [
+      patch.label ?? x.label,
+      patch.flag !== undefined ? patch.flag : x.flag,
+      patch.entityId !== undefined ? patch.entityId : x.entityId,
+      patch.before !== undefined ? (patch.before ? JSON.stringify(patch.before) : null) : x.before ? JSON.stringify(x.before) : null,
+      id,
+    ]);
+    bus.emit('data.changed', { table: 'dumps', id: x.dumpId ?? x.id });
+  }
+
   markUndone(filingId: string, undone = true) {
     const x = this.get(filingId);
     this.db.run(`UPDATE filings SET undone=? WHERE id=?`, [undone ? 1 : 0, filingId]);

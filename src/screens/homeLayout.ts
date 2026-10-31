@@ -1,7 +1,7 @@
 import type { LifeOSContext } from '@core/registry/context';
 
 /** Everything Today can show, in its default order (You › Home screen turns each on / off and moves it). */
-export type TileId = 'myday' | 'turf' | 'progress' | 'activity' | 'habits' | 'steps' | 'sleep' | 'spend' | 'done' | 'areas' | 'upcoming' | 'screen' | 'people' | 'overdue' | 'onthisday';
+export type TileId = 'myday' | 'turf' | 'progress' | 'activity' | 'habits' | 'steps' | 'sleep' | 'spend' | 'done' | 'areas' | 'upcoming' | 'screen' | 'people' | 'home' | 'overdue' | 'onthisday';
 
 export const TILES: Record<TileId, { label: string; line: string; wide: boolean }> = {
   myday: { label: 'My day', line: 'Today in time order: events, tasks, things due, deliveries', wide: true },
@@ -17,6 +17,7 @@ export const TILES: Record<TileId, { label: string; line: string; wide: boolean 
   upcoming: { label: 'Upcoming', line: 'The next two weeks', wide: true },
   screen: { label: 'Screen time', line: 'Today, top apps, 7 days', wide: true },
   people: { label: 'People', line: 'Who to call, who’s overdue, a birthday this week', wide: false },
+  home: { label: 'Home', line: 'What to use soon and what’s running low', wide: false },
   overdue: { label: 'Overdue', line: 'Upkeep that’s late', wide: false },
   onthisday: { label: 'On this day', line: 'A month, six months, years ago', wide: true },
 };

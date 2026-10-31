@@ -2,6 +2,8 @@ import { setCategoryTarget } from '@modules/finance/categories';
 import { applyTurfSync } from '@modules/games';
 import { sampleSync } from '@modules/games/fixtures/sampleSync';
 import type { LifeOSContext } from '@core/registry/context';
+import { fileMessage } from '@core/filing/messages';
+import { BLINKIT_APP, buy, ensureSpaces, halfLeft, setLife, spaceNamed, useOne } from '@modules/inventory';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const daysAgo = (n: number) => {
@@ -110,8 +112,7 @@ export function seedDemoData(os: LifeOSContext) {
     }
     os.records.create({ object: 'event', title: 'Dentist', data: { startAt: Date.now() + 2 * 86400000, location: 'Indiranagar' } });
     os.records.create({ object: 'event', title: 'Priya\'s birthday dinner', data: { startAt: Date.now() + 9 * 86400000, personIds: [priya.id] } });
-    os.records.create({ object: 'item', title: 'Paracetamol', data: { quantity: 4, unit: 'strips', location: 'Medicine box', category: 'medicine', minQuantity: 2 } });
-    os.records.create({ object: 'item', title: 'Coffee beans', data: { quantity: 1, unit: 'kg', location: 'Kitchen', category: 'pantry', minQuantity: 1 } });
+    seedHome(os);
 
     // Money between people (M2): a household group and an IOU.
     os.records.create({ object: 'group', data: { name: 'Flat 4B', kind: 'home', memberIds: [priya.id, arjun.id] } });
@@ -141,4 +142,51 @@ export function seedDemoData(os: LifeOSContext) {
   if (os.registry.objects.has('game')) {
     applyTurfSync(os, sampleSync);
   }
+}
+
+/** Home (R7e): docs/design/HOME-BRIEF.md's fridge, kitchen and the rest; the butter's and the shampoo's rates; today's Blinkit order and its card. */
+function seedHome(os: LifeOSContext) {
+  ensureSpaces(os);
+  const DAY = 86_400_000;
+  const ago = (d: number, hour = 19) => {
+    const t = new Date(Date.now() - d * DAY);
+    t.setHours(hour, 40, 0, 0);
+    return Math.min(t.getTime(), Date.now() - 60_000);
+  };
+  const blinkit = { source: 'order' as const, shop: 'blinkit' };
+  const zepto = { source: 'order' as const, shop: 'zepto' };
+  // Rates: butter lasts about 3 weeks, the shampoo a month.
+  const butter = buy(os, { name: 'Amul butter', size: '100 g', at: ago(39), ...zepto });
+  useOne(os, butter.id, ago(19));
+  buy(os, { name: 'Amul butter', size: '100 g', at: ago(18), price: 58, ...blinkit });
+  const hs = buy(os, { name: 'Head & Shoulders', size: '340 ml', at: ago(64), ...zepto });
+  useOne(os, hs.id, ago(33));
+  buy(os, { name: 'Head & Shoulders', size: '340 ml', at: ago(32), price: 389, ...zepto });
+  // Fridge.
+  buy(os, { name: 'Malai paneer', size: '200 g', at: ago(3), price: 90, ...zepto });
+  buy(os, { name: 'Eggs', quantity: 12, at: ago(4), price: 96, ...zepto });
+  buy(os, { name: 'Spinach', at: ago(2), price: 30, ...zepto });
+  const cream = buy(os, { name: 'Amul fresh cream', size: '250 ml', at: ago(2), price: 69, ...zepto });
+  halfLeft(os, cream.id);
+  buy(os, { name: 'Leftover dal', at: ago(1, 21), spaceId: spaceNamed(os, 'Fridge')?.id });
+  // Freezer, Kitchen, Cabinets, Bathroom, Cleaning.
+  buy(os, { name: 'Frozen peas', size: '500 g', at: ago(20), ...zepto });
+  buy(os, { name: 'McCain fries', size: '420 g', at: ago(20), ...zepto });
+  buy(os, { name: 'Aashirvaad atta', size: '5 kg', at: ago(30), ...zepto });
+  buy(os, { name: 'Basmati rice', size: '1 kg', at: ago(40) });
+  buy(os, { name: 'Toor dal', size: '1 kg', at: ago(25) });
+  buy(os, { name: 'Tata salt', size: '1 kg', at: ago(60) });
+  const dolo = buy(os, { name: 'Dolo 650', size: 'strip of 15', at: ago(10) });
+  setLife(os, dolo.id, 150);
+  buy(os, { name: 'ORS', quantity: 4, at: ago(10) });
+  buy(os, { name: 'Band-aids', at: ago(50) });
+  buy(os, { name: 'Colgate', size: '200 g', at: ago(12) });
+  buy(os, { name: 'Surf Excel Matic', size: '2 kg', at: ago(26), ...zepto });
+  buy(os, { name: 'Vim bar', at: ago(26), ...zepto });
+  buy(os, { name: 'Garbage bags', at: ago(26), ...zepto });
+  // Today's Blinkit order (₹437), and its card in To check.
+  for (const [name, size, quantity, price] of [['Mother Dairy toned milk', '1 L', 2, 148], ['Curd', '400 g', 1, 70], ['Coriander', undefined, 1, 15], ['Maggi', '70 g', 4, 56], ['Dettol handwash', '200 ml', 1, 99], ['Bread', '400 g', 1, 49]] as const) {
+    buy(os, { name, size, quantity, price, at: ago(0, 18), ...blinkit });
+  }
+  fileMessage(os, { source: 'notification', from: BLINKIT_APP, title: 'Order delivered', body: 'Your Blinkit order of ₹437 has been delivered. Enjoy!', receivedAt: ago(0, 18) });
 }

@@ -1,34 +1,36 @@
-import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
-import type { ObjectDef } from '@core/domain/types';
-import { dateField } from '@core/cycles/schedule';
+import { INVENTORY_COLOR, spaceType, stockType } from './types';
+import { ensureSpaces } from './stock';
+import { foldItems } from './fold';
+import { groceryOrderParser } from './groceries';
+import { inventoryAiTools } from './aiTools';
 
-export const INVENTORY_COLOR = 'teal';
+export * from './types';
+export * from './stock';
+export * from './nudges';
+export { foldItems } from './fold';
+export { BLINKIT_APP, HOME_ORDER, HOME_STOCKED, groceryOrderParser, orderAskOf, parseBlinkitInvoice, readInvoice, stockFromInvoice, stockedNoteOf, undoStocked, type Invoice, type InvoiceLine, type OrderAsk, type StockedNote } from './groceries';
 
-export interface ItemData { quantity: number; unit?: string; location?: string; minQuantity?: number; expiresOn?: string; category?: string; notes?: string }
-export const itemType: ObjectDef<ItemData> = {
-  id: 'item', module: 'inventory', label: 'Item', labelPlural: 'Inventory', icon: 'shippingbox',
-  schema: z.object({ quantity: z.coerce.number().default(1), unit: z.string().optional(), location: z.string().optional(), minQuantity: z.coerce.number().optional(), expiresOn: z.string().optional(), category: z.string().optional(), notes: z.string().optional() }),
-  cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'item.expiry', name: 'Use or replace', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: 7 }] : []),
-  fields: [
-    { key: 'quantity', label: 'Quantity', type: 'number', required: true, default: 1, summary: true },
-    { key: 'unit', label: 'Unit', type: 'text', placeholder: 'pcs, kg, L' },
-    { key: 'location', label: 'Location', type: 'text', summary: true, placeholder: 'Kitchen, Garage, Storage box 3' },
-    { key: 'category', label: 'Category', type: 'select', options: [{ value: 'pantry', label: 'Pantry' }, { value: 'household', label: 'Household' }, { value: 'medicine', label: 'Medicine' }, { value: 'tools', label: 'Tools' }, { value: 'clothing', label: 'Clothing' }, { value: 'other', label: 'Other' }] },
-    { key: 'minQuantity', label: 'Restock when below', type: 'number', section: 'Details' },
-    { key: 'expiresOn', label: 'Expires', type: 'date', section: 'Details' },
-    { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
-  ],
-  indexed: ['location', 'category'],
-  searchText: (d) => [d.location, d.category, d.notes].filter(Boolean).join(' '),
-  defaultViews: [{ name: 'Low stock', icon: 'exclamationmark.triangle', definition: { filter: { and: [{ field: 'data.minQuantity', op: 'notNull' }] }, sort: [{ field: 'data.quantity', dir: 'asc' }] } }],
-};
-
+/**
+ * Home (module id `inventory`; docs/MODEL.md §2 Things and layer 8, R7e):
+ * Stock and Space, the fold from the old `item` Object, the Blinkit order
+ * card and invoice, and Home's tools. Its companion board draws Home.
+ */
 export const inventoryModule: ModuleManifest = {
-  id: 'inventory', name: 'Inventory', version: '1.0.0', description: 'What you have, where it is, and when to restock.', icon: 'shippingbox', color: INVENTORY_COLOR,
-  objects: [itemType],
-  aiTools: [{
-    name: 'low_stock', description: 'Inventory items at or below their restock threshold.', input: z.object({}),
-    run: async (_i, os) => os.records.query<ItemData>('item').filter((i) => i.data.minQuantity != null && i.data.quantity <= i.data.minQuantity).map((i) => ({ id: i.id, title: i.title, quantity: i.data.quantity, min: i.data.minQuantity, location: i.data.location })),
-  }],
+  id: 'inventory',
+  name: 'Home',
+  version: '2.0.0',
+  description: 'Everything kept at home, in spaces: what to use soon, what’s running low, the shopping list.',
+  icon: 'home',
+  color: INVENTORY_COLOR,
+  objects: [stockType, spaceType],
+  aiTools: inventoryAiTools,
+  filing: { parsers: [groceryOrderParser] },
+  onStart: (os) => {
+    // R7e, once: the seven spaces, and the old items folded into Stock.
+    if (!os.settings.get<boolean>('inventory.r7e', false)) {
+      foldItems(os);
+      os.settings.set('inventory.r7e', true);
+    } else ensureSpaces(os);
+  },
 };

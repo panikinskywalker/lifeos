@@ -7,6 +7,28 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.11 · 31 Oct 2026
+
+**Home** (R7e), built in its own session and merged here. The screens are a
+first pass from the kit until the *NR-Home* artboards are drawn.
+- **Stock and Space** replace the old inventory items; any you had are
+  folded into Stock once, on first open.
+- **Home** in Browse › Boards: Use soon, Running low, Spaces, Just came in.
+- **A page of pills per space**: tap uses one (with Undo); long-press for
+  half left, still good, or move.
+- **A Stock page**, the **shopping list** (Copy list, Open Blinkit or
+  Zepto; LifeOS never orders), and a **Home tile** on Today.
+- **Add several from one line** ("eggs, butter, 2 milk"); each goes to the
+  space its name suggests.
+- Shelf life is estimated by name until you correct it; how often you rebuy
+  is learned from purchases.
+- **Blinkit**: its delivery notification, or a bank or UPI SMS naming it,
+  puts one card in To check, linked to the payment. A shared invoice will
+  stock Home once the phone can read PDFs.
+- New AI tools: stock low, use soon, what's in a space, add stock.
+- Cook tonight and the fridge photo have their place; they fill in when the
+  brain (MODEL.md layer 8) is built.
+
 ## v0.0.10 — 30 Oct 2026
 
 **People and your Notion CRM, kept in step both ways** (R2b).

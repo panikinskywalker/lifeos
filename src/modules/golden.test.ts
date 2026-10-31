@@ -18,13 +18,13 @@ import { financeAiTools } from './finance/aiTools';
 import { balanceWith } from './finance/split';
 import { assetsAiTools, assetType, routineType, vehicleType } from './assets/types';
 import { groupType, personType } from './crm/types';
-import { itemType } from './inventory';
+import { spaceType, stockType } from './inventory';
 
 const modules: ModuleManifest[] = [
   { id: 'crm', name: 'People', version: '1', description: '', icon: 'x', color: '#000', objects: [personType, groupType] },
   { id: 'finance', name: 'Finance', version: '1', description: '', icon: 'x', color: '#000', objects: [accountType, transactionType, subscriptionType, debtType], aiTools: financeAiTools },
   { id: 'assets', name: 'Things', version: '1', description: '', icon: 'x', color: '#000', objects: [assetType, vehicleType, routineType], aiTools: assetsAiTools },
-  { id: 'inventory', name: 'Inventory', version: '1', description: '', icon: 'x', color: '#000', objects: [itemType] },
+  { id: 'inventory', name: 'Home', version: '1', description: '', icon: 'x', color: '#000', objects: [stockType, spaceType] },
 ];
 
 type Step = (results: Array<Record<string, any>>) => Array<{ name: string; input: Record<string, unknown> }>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -106,9 +106,9 @@ describe('golden flows (PRODUCT §7)', () => {
     expect(os.records.query<{ amount: number }>('transaction').map((t) => t.data.amount)).toEqual([719]);
   });
 
-  it('3 · "did laundry" / "Washed the white sneakers" → routine and item cycles roll', async () => {
+  it('3 · "did laundry" / "Washed the white sneakers" → routine and asset cycles roll', async () => {
     const laundry = os.records.create({ object: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', lastDoneOn: daysFrom(-5) } });
-    const sneakers = os.records.create({ object: 'item', title: 'White sneakers', data: { quantity: 1 } });
+    const sneakers = os.records.create({ object: 'asset', title: 'White sneakers', data: { category: 'clothing' } });
     const wash = os.cycles.create({ entityId: sneakers.id, name: 'Wash', kind: 'interval', everyN: 3, everyUnit: 'week', lastDoneAt: Date.now() - 25 * 864e5 });
     const a = await say('did laundry', [() => [{ name: 'resolve_entity', input: { text: 'laundry' } }], ([res]) => [{ name: 'mark_cycle_done', input: { entityId: res!.match.id } }]]);
     expect(a).toMatchObject({ calls: ['resolve_entity', 'mark_cycle_done'], asked: [] });
@@ -206,7 +206,7 @@ describe('golden flows with no model (parser first)', () => {
 
   it('3 · did laundry / washed the white sneakers — no confirms', async () => {
     const laundry = os.records.create({ object: 'routine', data: { name: 'Laundry', everyN: 4, everyUnit: 'day', lastDoneOn: daysFrom(-5) } });
-    const sneakers = os.records.create({ object: 'item', title: 'White sneakers', data: { quantity: 1 } });
+    const sneakers = os.records.create({ object: 'asset', title: 'White sneakers', data: { category: 'clothing' } });
     const wash = os.cycles.create({ entityId: sneakers.id, name: 'Wash', kind: 'interval', everyN: 3, everyUnit: 'week', lastDoneAt: Date.now() - 25 * 864e5 });
     expect(await offline('did laundry')).toMatchObject({ calls: ['mark_cycle_done'], asked: [] });
     expect(os.records.get<{ lastDoneOn: string }>(laundry.id)!.data.lastDoneOn).toBe(today());

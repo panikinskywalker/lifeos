@@ -7,7 +7,7 @@ import { addPeriod, startOfDay, type CycleStatus, type UpkeepBucket } from './sc
 export const UPKEEP_FILTERS = {
   Subscriptions: ['subscription'],
   Vehicles: ['vehicle'],
-  Things: ['asset', 'item'],
+  Things: ['asset', 'stock'],
   Chores: ['routine'],
   People: ['person'],
   Documents: ['document'],

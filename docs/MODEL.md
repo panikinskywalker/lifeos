@@ -116,6 +116,66 @@ ids as R3 leaves them.
 | **Asset** | Something you own, vehicles included | category (vehicle / device / appliance / …), bought on, price, vendor → Organisation, warranty cycle, meter readings (km, hours) for cycles by meter, serial, location → Place | dumps, you, mail receipts |
 | **Document** | ID, policy, contract, certificate | kind, number, issuer → Organisation, issued, expires (cycle), file, about → any record | you, dumps, mail |
 | **Delivery** | A parcel on its way | shop → Organisation, carrier, tracking, expected, status, OTP, order → Transaction link | SMS, mail |
+| **Stock** | Something kept at home that runs out or goes off (butter, detergent, a medicine) | see below | you (one line, the form), a shared order invoice, dumps |
+| **Space** | A part of Home that holds Stock and Assets (Fridge, Clothes) | see below | the seven defaults, you |
+
+**Stock and Space** (module `inventory`, shown as **Home**; Fields agreed 30 Oct
+with R7e, from layer 8 and `docs/design/HOME-BRIEF.md`). They replace the old
+`item` Object: the records you had are folded into Stock once, on first open.
+
+**Stock's Fields** (Object id `stock`). One record per product per space:
+buying it again adds to the same record, and each purchase is a *bought* Event
+on its timeline (when, how many, price, the order), which is what the rate
+learns from.
+| Field | Type | Notes |
+|---|---|---|
+| Name | text (the title) | "Amul butter"; matched with sizes and case ignored ("Amul Butter 100g" is the same product) |
+| Size | text | "100 g", "1 L", "strip of 15" |
+| Quantity | number, in halves | how many you have (×2); *used up* takes one off, *half left* halves the last one; 0 is used up |
+| Space | link → Space, word *kept in* | the pill's page |
+| Bought on | date | the latest purchase |
+| Life | number (days) + whose: **estimated** · **yours** | how long it keeps once bought. Estimated from a table of shelf lives by name in code until the brain gives better (milk 3 d, paneer 4, butter 30, atta 90…); yours when you correct it, and yours stays on the product from then on. Empty for things that don't go off (salt) |
+| Rate | number (days), **learned** | how long one lasts you: the median of the last five spans from a purchase to when it was used up or bought again; empty until it has been bought twice, or bought and used up |
+| Source | select | order · receipt · you; an order also names its **shop** (Blinkit · Zepto · Instamart · BigBasket · other) |
+| Order | link → Transaction, word *bought in* | the latest order's payment, when finance has one |
+| Price | money | what the latest one cost (from the invoice) |
+| On the list | boolean | you put it on the shopping list |
+| Checked on | date | *still good*: you looked and it's fine |
+| Notes | long text | |
+
+**State** is derived, not stored (it changes every day on its own):
+- **used up**: quantity 0. It leaves its space (with Undo) and stays a record,
+  so the rate, your life and the shopping list remember it.
+- **probably gone**: its life has passed since bought on. LifeOS can't see
+  you eat it, so it waits for you (faded).
+- **use soon**: in the last 2 days of its life, or the last tenth of a long one
+  (a medicine's last 50 days).
+- **fresh**: otherwise, and always for things with no life.
+- *Still good* on a use-soon or probably-gone thing sets *checked on*: it
+  counts as use soon for 2 more days, then probably gone again.
+
+**A rebuy** adds to what is left, unless what was left is probably gone or
+its rate is nearly up (80 %): LifeOS never sees things used up, so then it
+assumes the last one ran out.
+
+**Running low** is the rate's, apart from state: a thing with a rate, one or
+less left, and its rate nearly up ("every 3 wk · 18 d", from 3 days before),
+or half of the last one left. Used-up things you rebuy stay on the shopping
+list as LifeOS's suggestions.
+
+**Space** (Object id `space`), **a small Object, not a setting** (decided 30
+Oct): Clothes are Assets in another module, and modules reach each other only
+through Links, so an Asset is *kept in* a Space the way a Person *works at* an
+Organisation; a Space is also found by search ("fridge" opens it), and
+renaming one keeps everything in it.
+| Field | Type | Notes |
+|---|---|---|
+| Name | text (the title) | Fridge · Freezer · Kitchen · Cabinets · Clothes · Bathroom · Cleaning are made once; add, rename and reorder your own |
+| Icon | select | fridge · snow · pot · cabinet · shirt · drop · spray · box |
+| Order | number | Fridge and Kitchen first |
+| Holds | select | stock · clothes (Assets, R7a) |
+
+Spaces are hidden from Browse's record lists; Home draws them.
 
 ### Money
 | Object | Meaning | Key fields | Filed by |
@@ -297,7 +357,7 @@ large OTP on Delivery).
 | Was | Becomes |
 |---|---|
 | `vehicle` | Asset, category vehicle, with meter readings |
-| `item` (inventory) | dropped; revisit when wanted |
+| `item` (inventory) | Stock (R7e, 30 Oct); your records folded in once (location → a Space, expires → your life, restock-below → on the list) |
 | `routine` | Habit, kind chore |
 | `habit_log` | Event, kind check-in |
 | `subscription` | Cycle on an Organisation or Asset |
@@ -308,7 +368,7 @@ large OTP on Delivery).
 | reminders table | Cycles |
 
 Count: 19 domain Objects, down from 25 kinds plus two side tables; 23 with
-the four games Objects added 17 Oct.
+the four games Objects added 17 Oct; 25 with Stock and Space (R7e, 30 Oct).
 
 ## 3. Three tiers: core, modules, boards + automations — agreed 4 Oct
 
@@ -334,7 +394,7 @@ what a Person is).
 **The modules (decided 4 Oct: all twelve existing data modules stay):**
 `finance` (Account, Transaction, Debt, Subscription, Budget, Group) · `crm`
 (Person) · `projects` (Task, Project, Goal, Event) · `travel` (Trip) · `assets`
-(Asset, Vehicle) · `inventory` (Item) · `documents` (Document) · `health`
+(Asset, Vehicle) · `inventory` (Stock, Space; shown as Home since R7e) · `documents` (Document) · `health`
 (Measurement, Workout) · `habits` (Habit, Habit log, Routine) · `knowledge`
 (Note) · `places` (Place, Organisation) · `deliveries` (Delivery). `dashboard`
 and `automation` own no data and become boards. Added 17 Oct: `games` (Game,
@@ -777,7 +837,29 @@ screens checked on the phone → overrides only where the default is wrong)
 - [ ] **R7b deliveries** — Delivery; shipping parsers; OTP; tracking.
 - [ ] **R7c documents** — Document; expiry cycles; files.
 - [ ] **R7d travel** — Trip; spend vs budget; flights and stays from mail.
-- [ ] **R7e inventory** — Item; quantity, restock.
+- [x] **R7e Home** — built 30 Oct 2026 (branch `claude/r7e-home-1f3592`; no migration), layer 8's first slice: Stock and Space
+  (layer 2, *Things*) in `inventory`, shown as Home; the old `item` records folded in once.
+  **Module**: state from bought on and life; the rate learned from purchases and used up;
+  *used up* and *half left* with Undo; the *running out* and *going off* candidates as plain
+  functions the brain calls later (no model calls); several things from one line ("eggs,
+  butter, 2 milk"), each into the space its name suggests. **Tools**: `stock_low`, `use_soon`,
+  `whats_in(space)`. **Groceries in, code only**: a Blinkit delivery notification or a bank /
+  UPI SMS naming Blinkit → a To check card ("Blinkit · ₹437 · just delivered. Share the
+  invoice…"), linked to finance's Transaction; the shared invoice PDF's text read by a Blinkit
+  parser behind a seam (written against a plausible layout until a real invoice; the phone
+  can't read a PDF's text yet). Zepto and Instamart mail parsers wait for a real mail each.
+  **Board** (a first pass from the kit until the `NR-Home-*` artboards): Home (Use soon,
+  Running low, Spaces, Just came in), a space page of pills (tap = used up, long-press = half
+  left · still good · move), the Stock page, the shopping list (Copy list · Open Blinkit /
+  Zepto; LifeOS never orders), a Home tile for Today. Cook tonight and the fridge photo are
+  slots until the brain. Home is a board in Browse › Boards (a companion board placed there).
+  Core gains small pieces: `filings.ofKind / forSource / update`, the parser contract's
+  `packages` (the notifications source listens to Blinkit too), the device bridge's `pdfText`
+  seam, link words *kept in* and *bought in*; five Lucide icons (fridge, snow, pot, spray,
+  bath). 420 tests green; the web export builds. *Waiting*: a real Blinkit invoice (text or
+  scan) to check the parser; a PDF reader on the phone (`pdfText`: no Expo SDK 57 package reads
+  a PDF's text, so it needs a JS reader such as `pdfjs-dist` or a small native module — to
+  choose); the `NR-Home-*` artboards. **Phone check pending.**
 - [ ] **R7f knowledge** (later) — Note, Fact as the Second Brain; Memory replaced.
 
 ### Boards and automations
@@ -1101,8 +1183,8 @@ them.
 ### Words (to add to layer 1)
 - **Stock** (agreed 24 Oct) — the Object for something kept at home that
   runs out or goes off (butter, detergent, a medicine): product, space,
-  bought, quantity, life, rate, state. Not "item", which layer 1 retires for
-  a record. Clothes are Assets.
+  bought, quantity, life, rate, state; its Fields are in layer 2 (*Things*,
+  30 Oct). Not "item", which layer 1 retires for a record. Clothes are Assets.
 - **Space** (agreed 24 Oct) — a part of Home that holds Stock and Assets
   (Fridge, Clothes); not a Place, which is somewhere on a map.
 - **Nudge** (agreed 24 Oct) — what the brain brings you (one of the four kinds); it lives in

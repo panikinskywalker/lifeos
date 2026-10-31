@@ -65,6 +65,8 @@ export interface MessageParser {
   proposes?: boolean;
   /** What to call a sender and whether to trust it by default: feeds the SMS senders list. */
   sender?: (from: string, body: string) => { name?: string | null; trusted?: boolean } | null;
+  /** Apps whose notifications this parser reads (Home: Blinkit's delivery); the notifications source listens to them too. */
+  packages?: string[];
   /** A short label for a message's origin in To check ("HDFC Bank SMS", "GPay"). */
   label?: (m: RawMessage) => string | null;
   read: (os: LifeOSContext, m: RawMessage) => ParserRead | null;
