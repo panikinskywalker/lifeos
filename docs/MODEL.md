@@ -247,7 +247,7 @@ board (layer 3).
 No category Field: finance's payee rules already learn the category per payee.
 Person's company becomes a link to an Organisation (*works at*) in R2.
 
-### Agenda (module `agenda`; the day / month / year view keeps the name Time)
+### Agenda (Event, Task, Project in module `projects`, shown as Projects; Trip is `travel`'s, Habit is `habits`'; the day / month / year view keeps the name Time)
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
 | **Event** | Something that happened or will | kind (met / call / flight / stay / service / meeting / check-in / created / edited / cycle done …), start, end, roles → records, kind-specific fields | everything |
@@ -255,6 +255,76 @@ Person's company becomes a link to an Organisation (*works at*) in R2.
 | **Project** | A set of tasks and events with an aim | status, target date, spend (derived) | dumps, you |
 | **Trip** | Travel with dates, people and spend | destination → Place, dates, companions, budget, currency | dumps, mail, calendar |
 | **Habit** | Something you do on a rhythm, chores included | cadence (daily / weekdays / N per week / every N weeks / weekday), kind (habit / chore), minutes; check-ins are Events; streaks where cadence is daily-ish | dumps, you |
+
+**The module's name** (checked 31 Oct, R4): layer 3 and R4 call it `projects`
+and so does the code, so `projects` stands; *Agenda* is this group's name in
+this layer only. Its board is **Projects**.
+
+**Two kinds of Event** (as the code has them, 31 Oct). Core keeps every
+record's timeline (created, edited, status, cycle done: the `events` table,
+`LifeEvent` in code). An Event you can open, edit and link (a meeting, a
+dinner, a flight) is a record of the Event Object, which `projects` declares
+because it has Fields and a form. Joining the two is not R4.
+
+**Event's Fields** (Object id `event`; R4, 31 Oct). Keys unchanged.
+| Field | Type | Notes |
+|---|---|---|
+| Title | text | |
+| Kind | text, an open list | met · call · meeting · flight · stay · reservation · check-in; `event` from the calendar. Modules file their own (travel: flight, stay; places: reservation), so it stays text, not a select |
+| Starts | datetime (`startAt`) | |
+| Ends | datetime (`endAt`) | |
+| All day | boolean | |
+| Location | text | as written; places links the Event *at* its Place (R3) |
+| *at* | link → Place | a Link made by places' filing from Location, not a Field |
+| *with* | link → Person | from the calendar's attendees and dumps; moves their last spoke (R2) |
+| People | link → Person, many, word *person* | picked in the form; also moves last spoke |
+| Project | link → Project, word *project* | **new**: an Event can belong to a Project, as a Task does |
+| Trip | link → Trip | as before |
+| Airline, Flight no. | text | travel's, for flights |
+| Cost | money | |
+| Notes | long text | |
+| *(hidden)* source, source key, calendars | | `calendar` and the calendar key, so a re-sync updates in place; which of your calendars it is on |
+
+**Task's Fields** (Object id `task`; R4, 31 Oct). Keys unchanged.
+| Field | Type | Notes |
+|---|---|---|
+| Title | text | |
+| Status | to do · doing · done · blocked | as before |
+| Due | date (`dueDate`) | drives the task's **Due** Cycle: a one-off Cycle, so the task is in Upkeep and is *overdue* there like any Cycle |
+| Repeats | select (`repeat`) | **new**: never · every day · every week · every 2 weeks · every month · every 3 months · every year. Makes the Due Cycle repeat on the calendar: *done* logs a cycle done Event and moves Due on, and the task stays open |
+| Priority | select | low · medium · high · urgent |
+| Project | link → Project, word *project* | |
+| People | link → Person, many, word *person* | |
+| Estimate | number (minutes) | |
+| Notes | long text | |
+| *(hidden)* done on | (`completedAt`) | when it was last ticked |
+| Goal | link → Goal | stays while Goal is open (below) |
+
+A done task's Cycle leaves Upkeep (`cycleActiveStatuses`); undone, it comes back.
+
+**Project's Fields** (Object id `project`; R4, 31 Oct). Keys unchanged.
+| Field | Type | Notes |
+|---|---|---|
+| Title | text | |
+| Status | planning · active · on hold · done | as before |
+| Aim | long text (`description`) | was Description |
+| Target date | date (`dueDate`) | |
+| Area | select | work · personal · home · side project · learning |
+
+Derived, not Fields: **progress** (tasks done of all), **overdue** (its open
+tasks past due), **next** (the soonest open task), its Events, and **spend**
+(the money of Transactions linked to the Project, read through Links only).
+
+**The fold** (once, on first open after R4): open tasks with a due date get
+their Due Cycle (the templates backfill has already run on the phone, so it
+would not add them). No other record changes.
+
+**Goal is open** (31 Oct, for you to decide): the *Retired* table below says
+`goal` is dropped (activity goals parked in ADHOC), and R4's line in layer 6
+names Goal. R4 leaves the Goal Object and its records exactly as they are,
+off the Projects board, until you choose: drop it (and fold each goal into a
+Project: target date, why it matters → Aim, the numbers as a Fact) or keep it
+(and take it out of *Retired*).
 
 ### Games (module `games`, agreed 17 Oct, revised 20 Oct; feeds the Turf board)
 The football you already run in **Turf Ledger**, your web app
@@ -839,7 +909,11 @@ screens checked on the phone → overrides only where the default is wrong)
   chosen; no migration (Fields live in record JSON). **Phone check pending.**
   **Design prompt 30 Oct**: `docs/design/PLACES-BRIEF.md` asks for
   `NR-Places-*` artboards that replace this first pass.
-- [ ] **R4 projects** — Task, Project, Goal, Event; calendar source.
+- [ ] **R4 projects** — Task, Project, Goal, Event; calendar source. *Fields written 31 Oct
+  (layer 2, Agenda)*: Due and Repeats as a task's Cycle, Event gains a Project, Project's
+  Description is its Aim, spend and progress derived. **Goal conflicts with *Retired***: left as
+  it is until you decide (layer 2). The **calendar source** moves from core and platform into
+  `projects`, reading the phone through `os.device.calendar` like crm's contacts.
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
   Upkeep; Upkeep re-hung on cycles from every module.
 - [ ] **R6 health** — Measurement, Workout; Health Connect and Usage access
