@@ -37,7 +37,7 @@ describe('Home’s candidates', () => {
       ['Malai paneer', 'going off', 'check', true],
       ['Amul butter', 'running out', 'done', false],
     ]);
-    expect(c.map((x) => x.line).join('\n')).not.toMatch(/[—–]/);
+    expect(c.map((x) => x.line).join('\n')).not.toMatch(/[\u2014\u2013]/);
     expect(c[0]!.line).toMatch(/^Milk: bought \w+, probably gone\. Still there\?$/);
     expect(c[0]!.yes).toBe('It’s gone');
     expect(c[3]!.line).toBe('Amul butter: on the shopping list (every 3 wk · 18 d)');

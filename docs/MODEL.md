@@ -1217,6 +1217,11 @@ them.
 3. **The brain's first pass** — candidates from Stock and Upkeep, one
    morning nudge pass through Claude, the learned store, the Sent to Claude
    log.
+   *Built 31 Oct (branch `claude/brain-v1`), wider than first planned:
+   candidates from Home, Upkeep, People and Turf, morning and evening passes,
+   the Morning brief on Today, Cook tonight, gift ideas and the wish; see
+   *The contract* below and `docs/handover/brain-v1.md`. Not yet checked on
+   the phone.*
 4. **Cook tonight and the fridge photo.**
 5. **Travel** — packing and before you go.
 6. **Every module offers candidates** — Turf, People, Money, Documents.

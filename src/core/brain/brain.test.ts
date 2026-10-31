@@ -54,7 +54,7 @@ function mockModel(over: (user: { nudges: Array<{ id: string; urgent: boolean; a
       const u = JSON.parse(user);
       const allAsks = [...u.asks, ...u.nudges.flatMap((n: { asks?: unknown[] }) => n.asks ?? [])];
       const base = {
-        nudges: u.nudges.map((n: { id: string }) => ({ id: n.id, keep: true, line: `Claude: ${n.id} — worded` })),
+        nudges: u.nudges.map((n: { id: string }) => ({ id: n.id, keep: true, line: `Claude: ${n.id} \u2014 worded` })),
         fills: allAsks.map((a: { id: string; list: boolean }) => ({ id: a.id, text: a.list ? '' : `text for ${a.id}`, items: a.list ? ['one', 'two'] : [] })),
         remember: [],
         skills: [],

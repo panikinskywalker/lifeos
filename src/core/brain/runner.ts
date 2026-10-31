@@ -59,7 +59,7 @@ export function brainOf(os: LifeOSContext, module: string): BrainDef | undefined
 const iso = (at: number) => new Date(at - new Date(at).getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /** The house style: no em dashes in anything shown. */
-export const plainDashes = (s: string) => s.replace(/\s*—\s*/g, ', ').replace(/\s*–\s*/g, ' to ').trim();
+export const plainDashes = (s: string) => s.replace(/\s*\u2014\s*/g, ', ').replace(/\s*\u2013\s*/g, ' to ').trim();
 
 /**
  * How many a module may file today: two, or one once its nudges keep being
