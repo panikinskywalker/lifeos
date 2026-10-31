@@ -225,6 +225,15 @@ Derived, not Fields: visits (Events linked *at* the Place), last been, what was
 spent there (Transactions whose payee is an Organisation *at* the Place), the
 Places inside it.
 
+**Places and travel stay apart** (decided 30 Oct). A Place is *where*
+something is and has no dates (Toit, the gym, Goa); a Trip is *going
+somewhere for a while* (Goa, 20–24 Dec: dates, companions, budget, spend) and
+stays in `travel` (R7d); a planned tour is a Trip with status planning. They
+meet through Links only: a Trip's destination → Place (R7d turns today's text
+into the link), its stays and flights *at* their Places. Once that link
+exists, a Place's page shows **Trips here**. A Trip planner stays a candidate
+board (layer 3).
+
 **Organisation** (Object id `org`), agreed 22 Oct:
 | Field | Type | Notes |
 |---|---|---|
@@ -828,6 +837,8 @@ screens checked on the phone → overrides only where the default is wrong)
   web export builds. *Not in R3*: Person's company → Organisation is R2's;
   maps are drawn, not tiled, so there is no real map until a provider is
   chosen; no migration (Fields live in record JSON). **Phone check pending.**
+  **Design prompt 30 Oct**: `docs/design/PLACES-BRIEF.md` asks for
+  `NR-Places-*` artboards that replace this first pass.
 - [ ] **R4 projects** — Task, Project, Goal, Event; calendar source.
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
   Upkeep; Upkeep re-hung on cycles from every module.
