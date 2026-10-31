@@ -1,20 +1,16 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import * as Contacts from 'expo-contacts/legacy';
 import * as Calendar from 'expo-calendar/legacy';
-import type { LifeOSContext } from '@core/registry/context';
-import { saveCalendarEvents, PHONE_SYNC_WINDOW } from '@core/sources/phone';
-import type { Access, CallEntry, DeviceContact } from '@core/registry/context';
-import { setSourceState } from '@core/sources/deviceData';
+import type { Access, CalendarEvent, CallEntry, DeviceContact } from '@core/registry/context';
 import { Device } from '../../modules/lifeos-device';
 
 /**
  * Phone connectors (M4.2b): contacts you pick, the phone's calendar, the
- * call log. Contacts never sync wholesale — only the people you imported
- * are kept up to date. Contacts and the call log are crm's sources (R2):
- * platform only hands the phone to them through the device bridge.
+ * call log. Contacts never sync wholesale: only the people you imported
+ * are kept up to date. Contacts and the call log are crm's sources (R2), the
+ * calendar is projects' (R4): platform only hands the phone to them through
+ * the device bridge.
  */
-
-const W = PHONE_SYNC_WINDOW;
 
 export async function contactsGranted(): Promise<boolean> {
   try {
@@ -65,21 +61,23 @@ export async function requestCallLog(): Promise<boolean> {
   return (await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.READ_CALL_LOG)) === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-async function syncCalendar(os: LifeOSContext) {
-  if (!(await calendarGranted())) return;
-  const cals = (await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT)).filter((c) => c.isVisible !== false);
-  if (!cals.length) return;
-  const now = Date.now();
-  const events = await Calendar.getEventsAsync(cals.map((c) => c.id), new Date(now - W.calendarPastDays * W.day), new Date(now + W.calendarFutureDays * W.day));
-  const calName = new Map(cals.map((c) => [c.id, [c.title, c.source?.name && c.source.name !== c.title ? c.source.name : null].filter(Boolean).join(' · ')]));
-  const out = [];
-  for (const e of events.slice(0, 600)) {
-    const attendees = await Calendar.getAttendeesForEventAsync(e.id).catch(() => []);
-    out.push({ id: e.id, title: e.title, start: new Date(e.startDate).getTime(), end: e.endDate ? new Date(e.endDate).getTime() : null, allDay: e.allDay, location: e.location, notes: e.notes, attendees: attendees.map((a) => ({ name: a.name, email: a.email })), calendars: calName.get(e.calendarId) ? [calName.get(e.calendarId)!] : [] });
-  }
-  const r = saveCalendarEvents(os, out);
-  setSourceState(os, 'calendar', { enabled: true, lastSync: now, addTotal: r.created, error: null });
-}
+/** The phone's calendars as projects' calendar source reads them (os.device; R4). */
+export const calendarBridge = {
+  access: async (): Promise<Access> => ((await calendarGranted()) ? 'granted' : 'needed'),
+  read: async (from: number, to: number): Promise<CalendarEvent[]> => {
+    if (!(await calendarGranted())) return [];
+    const cals = (await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT)).filter((c) => c.isVisible !== false);
+    if (!cals.length) return [];
+    const events = await Calendar.getEventsAsync(cals.map((c) => c.id), new Date(from), new Date(to));
+    const calName = new Map(cals.map((c) => [c.id, [c.title, c.source?.name && c.source.name !== c.title ? c.source.name : null].filter(Boolean).join(' · ')]));
+    const out: CalendarEvent[] = [];
+    for (const e of events.slice(0, 600)) {
+      const attendees = await Calendar.getAttendeesForEventAsync(e.id).catch(() => []);
+      out.push({ id: e.id, title: e.title, start: new Date(e.startDate).getTime(), end: e.endDate ? new Date(e.endDate).getTime() : null, allDay: e.allDay, location: e.location, notes: e.notes, attendees: attendees.map((a) => ({ name: a.name, email: a.email })), calendars: calName.get(e.calendarId) ? [calName.get(e.calendarId)!] : [] });
+    }
+    return out;
+  },
+};
 
 /** The phone's contacts and call log as crm's sources read them (os.device; R2). */
 export const contactsBridge = {
@@ -90,14 +88,3 @@ export const callLogBridge = {
   access: async (): Promise<Access> => (Platform.OS !== 'android' || !Device ? 'unavailable' : (await callLogGranted()) ? 'granted' : 'needed'),
   read: async (since: number, limit: number): Promise<CallEntry[]> => (Device && (await callLogGranted()) ? ((await Device.readCallLog(since, limit)) as CallEntry[]) : []),
 };
-
-/** Called by the main source sync: the calendar (until R4 makes it a module's source). */
-export async function syncPhoneSources(os: LifeOSContext) {
-  for (const [id, fn] of [['calendar', syncCalendar]] as const) {
-    try {
-      await fn(os);
-    } catch (e) {
-      setSourceState(os, id, { error: (e as Error).message.slice(0, 200) });
-    }
-  }
-}
