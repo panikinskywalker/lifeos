@@ -59,7 +59,8 @@ export function myDay(os: LifeOSContext, now = Date.now(), u: Upkeep = upkeep(os
   }
   for (const i of [...u.sections.overdue, ...u.sections.week]) {
     const d = i.status.daysLeft;
-    if (d == null || d > 0) continue;
+    // A record already listed (a task, whose due date is its Due Cycle since R4) is not listed twice.
+    if (d == null || d > 0 || out.some((x) => x.entityId === i.entity.id)) continue;
     out.push({ id: `cycle:${i.cycle.id}`, at: a, allDay: true, kind: 'due', title: i.cycle.name.trim().toLowerCase() === i.entity.title.trim().toLowerCase() ? i.entity.title : `${i.cycle.name} · ${i.entity.title}`, sub: d < 0 ? `${-d} d late` : 'due today', entityId: i.entity.id, type: i.entity.object, done: false, late: d < 0 });
   }
   if (has('delivery')) {

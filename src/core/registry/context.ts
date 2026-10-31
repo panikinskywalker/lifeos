@@ -88,6 +88,20 @@ export interface CallEntry {
   type: 'incoming' | 'outgoing' | 'missed' | 'other';
 }
 
+/** One event from the phone's calendar, as the device bridge hands it over (R4: projects' calendar source). */
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: number;
+  end?: number | null;
+  allDay?: boolean;
+  location?: string | null;
+  notes?: string | null;
+  attendees?: Array<{ name?: string | null; email?: string | null }>;
+  /** Which calendar(s) it's on ("Work · you@company.com"). */
+  calendars?: string[];
+}
+
 export interface DeviceBridge {
   sms?: {
     access(): Promise<Access>;
@@ -116,6 +130,12 @@ export interface DeviceBridge {
     access(): Promise<Access>;
     /** Calls since `since`, newest first. */
     read(since: number, limit: number): Promise<CallEntry[]>;
+  };
+  /** The phone's calendars (R4: projects' calendar source files Events from them). */
+  calendar?: {
+    access(): Promise<Access>;
+    /** Every event on a visible calendar between `from` and `to`, with its attendees. */
+    read(from: number, to: number): Promise<CalendarEvent[]>;
   };
   /**
    * The text of a PDF shared into LifeOS (Home: a Blinkit invoice), or null

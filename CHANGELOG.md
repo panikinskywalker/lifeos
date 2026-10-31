@@ -7,6 +7,25 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.13 · 31 Oct 2026
+
+**Projects, rebuilt** (R4), built in its own session and merged here. The
+screens are a first pass from the kit until the *NR-Projects* artboards are
+drawn.
+- **The Projects home** shows today's events and tasks, what's overdue, your
+  projects with their progress and what's coming up. Tasks, projects and
+  events have their own pages.
+- **Repeating tasks**: a task can repeat (every day to every year); ticking
+  it moves its due date on.
+- **Tasks are in Upkeep**: a task with a due date is a Cycle, due and
+  overdue like the rest.
+- **Events can belong to a project.**
+- **Goals are Projects now**: each goal became a Project with its target
+  date and why it matters; its numbers are kept as a note on it.
+- **The calendar is Projects' own source** now; nothing changes in how it
+  syncs.
+- **Ask Claude**: today's agenda, what's overdue, and how a project is going.
+
 ## v0.0.12 · 31 Oct 2026
 
 **Assets** (R7a), built in its own session and merged here. The screens are a

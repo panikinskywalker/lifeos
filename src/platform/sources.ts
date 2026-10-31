@@ -8,7 +8,7 @@ import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
 import { syncMail } from './email';
-import { calendarGranted, callLogBridge, callLogGranted, contactsBridge, contactsGranted, requestCalendar, requestCallLog, syncPhoneSources } from './phoneSources';
+import { calendarBridge, calendarGranted, callLogBridge, callLogGranted, contactsBridge, contactsGranted, requestCalendar, requestCallLog } from './phoneSources';
 
 /**
  * Data sources on the phone (M4.2): bank SMS, payment-app notifications,
@@ -112,10 +112,12 @@ const secrets: NonNullable<DeviceBridge['secrets']> = {
 export function deviceBridge(os: LifeOSContext): DeviceBridge {
   // Contacts work wherever expo-contacts does; the call log needs the Android module.
   const contacts = Platform.OS === 'web' ? undefined : contactsBridge;
-  if (!Device) return { secrets, contacts };
+  const calendar = Platform.OS === 'web' ? undefined : calendarBridge;
+  if (!Device) return { secrets, contacts, calendar };
   return {
     secrets,
     contacts,
+    calendar,
     callLog: callLogBridge,
     sms: {
       access: () => access('sms'),
@@ -208,9 +210,8 @@ export function syncSources(os: LifeOSContext): Promise<void> {
   if (running && Date.now() - running.at < 5 * 60_000) return running.p;
   const p = (async () => {
     await withLimit('fx', STEP_LIMIT_MS.fx, () => refreshFxRates(os));
-    await withLimit('calendar', STEP_LIMIT_MS.phone, () => syncPhoneSources(os));
-    // People's sources (crm, R2): the contacts you picked, the call log.
-    for (const id of ['contacts', 'calllog'] as const) await withLimit(id, STEP_LIMIT_MS.phone, () => syncRegistered(os, id));
+    // Projects' calendar (R4) and People's sources (crm, R2): the contacts you picked, the call log.
+    for (const id of ['calendar', 'contacts', 'calllog'] as const) await withLimit(id, STEP_LIMIT_MS.phone, () => syncRegistered(os, id));
     if (deviceAvailable) {
       // Message sources are declared by their modules (finance: sms, notifications) and run through the registry.
       for (const id of ['sms', 'notifications'] as const) await withLimit(id, STEP_LIMIT_MS.device, () => syncRegistered(os, id));

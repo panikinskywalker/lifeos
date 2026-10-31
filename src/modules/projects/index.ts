@@ -1,23 +1,64 @@
-import { z } from 'zod';
 import type { ModuleManifest } from '@core/registry/types';
 import type { ObjectRecord } from '@core/domain/types';
-import { PRIORITIES, taskType, projectType, goalType, eventType, type TaskData, type ProjectData, type GoalData } from './types';
-import { projectProgress } from './lib';
+import { bus } from '@core/events/bus';
+import { PRIORITIES, TASK_DUE, OPEN_TASK, taskType, projectType, eventType, type TaskData } from './types';
+import { projectsTools } from './aiTools';
+import { calendarSource } from './sources';
+import { foldGoals } from './fold';
 
 export const PROJECTS_COLOR = 'blue';
 export * from './types';
 export * from './lib';
-const today = () => new Date().toISOString().slice(0, 10);
+export * from './calendar';
+export { calendarSource, CALENDAR_WINDOW } from './sources';
+export { foldGoals } from './fold';
+
+/** R4, once: open tasks with a due date get their Due Cycle (the templates backfill ran before tasks had one). */
+export function foldR4(os: Parameters<NonNullable<ModuleManifest['onStart']>>[0]): number {
+  let n = 0;
+  os.db.transaction(() => {
+    for (const t of os.records.query<TaskData>('task', { filter: { and: [{ field: 'data.dueDate', op: 'notNull' }] } }, { limit: 100000 })) {
+      if (!OPEN_TASK.includes(t.status ?? 'todo')) continue;
+      n += os.cycles.applyTemplates(t as unknown as ObjectRecord, taskType as never).length;
+    }
+  });
+  return n;
+}
 
 export const projectsModule: ModuleManifest = {
   id: 'projects',
   name: 'Projects & Tasks',
-  version: '1.0.0',
-  description: 'Projects, tasks, goals and events. Everything else links to them.',
+  version: '1.1.0',
+  description: 'Tasks, projects and events, the calendar with them. Everything else links to them.',
   icon: 'checkmark.circle',
   color: PROJECTS_COLOR,
   dependencies: ['crm', 'travel'],
-  objects: [projectType, taskType, goalType, eventType],
+  objects: [projectType, taskType, eventType],
+  sources: [calendarSource],
+  onStart: (os) => {
+    // Goal is dropped: each goal becomes a Project, once (before the R4 fold, so its tasks get their Due Cycle with the rest).
+    if (!os.settings.get<boolean>('projects.foldedGoals', false)) {
+      foldGoals(os);
+      os.settings.set('projects.foldedGoals', true);
+    }
+    if (!os.settings.get<boolean>('projects.foldedR4', false)) {
+      foldR4(os);
+      os.settings.set('projects.foldedR4', true);
+    }
+    // A due date taken off a task: its Due Cycle has no date (out of Upkeep) until one is set again.
+    bus.on('entity.updated', ({ entity, changed }) => {
+      if (entity.object !== 'task' || !changed.includes('data.dueDate') || (entity.data as { dueDate?: string }).dueDate) return;
+      for (const c of os.cycles.forEntity(entity.id)) if (c.template === TASK_DUE && c.nextDueAt != null) os.cycles.update(c.id, { nextDueAt: null });
+    });
+    // Done in Upkeep: a one-off task's Due Cycle is finished, so the task is done.
+    bus.on('data.changed', ({ table, id }) => {
+      if (table !== 'cycles' || !id) return;
+      const c = os.cycles.get(id);
+      if (!c || c.template !== TASK_DUE || c.everyN || c.nextDueAt != null || c.lastDoneAt == null) return;
+      const t = os.records.get(c.entityId);
+      if (t && OPEN_TASK.includes(t.status ?? 'todo')) os.records.update(t.id, { status: 'done', data: { completedAt: c.lastDoneAt } });
+    });
+  },
   triggers: [
     {
       id: 'projects.task.completed', module: 'projects', label: 'Task completed', event: 'entity.status',
@@ -40,18 +81,5 @@ export const projectsModule: ModuleManifest = {
       },
     },
   ],
-  aiTools: [
-    {
-      name: 'tasks_overview',
-      description: 'Open tasks due today/overdue, upcoming tasks, active projects with progress, and active goals.',
-      input: z.object({}),
-      run: async (_i, os) => ({
-        dueOrOverdue: os.records.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'lte', value: today() }] } }).map((x) => ({ id: x.id, title: x.title, due: x.data.dueDate, priority: x.data.priority, status: x.status })),
-        upcoming: os.records.query<TaskData>('task', { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'gt', value: today() }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }] }, { limit: 15 }).map((x) => ({ id: x.id, title: x.title, due: x.data.dueDate })),
-        projects: os.records.query<ProjectData>('project', { filter: { and: [{ field: 'status', op: 'in', value: ['active', 'planning'] }] } }).map((p) => ({ id: p.id, title: p.title, status: p.status, ...projectProgress(os, p.id) })),
-        goals: os.records.query<GoalData>('goal', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }).map((g) => ({ id: g.id, title: g.title, target: g.data.targetValue, current: g.data.currentValue, unit: g.data.unit, by: g.data.targetDate })),
-      }),
-    },
-  ],
+  aiTools: projectsTools,
 };
-

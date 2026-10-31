@@ -1,34 +1,17 @@
-import type { LifeOSContext } from '../registry/context';
+import type { CalendarEvent, LifeOSContext } from '@core/registry/context';
 
 /**
- * The phone's calendar (M4.2b). Pure — the platform reads the phone and hands
- * the events here; they only link people already in LifeOS. Contacts and the
- * call log are crm's sources since R2 (src/modules/crm/contacts.ts); the
- * calendar becomes a module's source with R4.
+ * The phone's calendar as Events (R4; was core's since M4.2b). Pure: the
+ * calendar source reads the phone through the device bridge and hands the
+ * events here. Attendees link (*with*) only people already in LifeOS, which
+ * moves their last spoke (crm, R2); a location is linked *at* its Place by
+ * places (R3) when the Event is made or its location changes.
  */
 
-const DAY = 86_400_000;
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 type PersonRow = { id: string; title: string; data: { email?: string } };
 const people = (os: LifeOSContext) => os.records.query<PersonRow['data']>('person', {}, { limit: 5000 }) as unknown as PersonRow[];
-
-/* ------------------------------------------------------------------ */
-/* Calendar                                                              */
-/* ------------------------------------------------------------------ */
-
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  start: number;
-  end?: number | null;
-  allDay?: boolean;
-  location?: string | null;
-  notes?: string | null;
-  attendees?: Array<{ name?: string | null; email?: string | null }>;
-  /** Which calendar(s) it's on ("Work · you@company.com"). */
-  calendars?: string[];
-}
 
 /**
  * One event however many calendars it's in: the same meeting shows up once
@@ -66,7 +49,7 @@ export function dedupeCalendarEvents(os: LifeOSContext): number {
   return removed;
 }
 
-/** Calendar events → events, one per real event (not per calendar), linked to the people in them who are in LifeOS. Re-sync updates in place. */
+/** Calendar events → Events, one per real event (not per calendar), linked to the people in them who are in LifeOS. Re-sync updates in place. */
 export function saveCalendarEvents(os: LifeOSContext, events: CalendarEvent[]): { created: number; updated: number; merged: number } {
   if (!os.registry.objects.has('event')) return { created: 0, updated: 0, merged: 0 };
   const merged = dedupeCalendarEvents(os);
@@ -105,5 +88,3 @@ export function saveCalendarEvents(os: LifeOSContext, events: CalendarEvent[]): 
   });
   return { created, updated, merged };
 }
-
-export const PHONE_SYNC_WINDOW = { calendarPastDays: 30, calendarFutureDays: 60, callLogDays: 30, day: DAY };

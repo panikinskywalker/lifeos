@@ -5,7 +5,7 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { whoIs } from '@core/identity';
-import { saveCalendarEvents } from '@core/sources/phone';
+import { saveCalendarEvents } from '../projects/calendar';
 import { fileMail } from '@core/filing/messages';
 import { graphTools, newSession, upsertNode } from '@core/graph/tools';
 import { projectsModule } from '../projects';

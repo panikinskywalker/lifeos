@@ -1,7 +1,29 @@
 import { z } from 'zod';
 import type { ObjectDef } from '@core/domain/types';
 
-/** Projects record types (no React Native — unit-tested). */
+/** Projects' Objects (docs/MODEL.md layer 2, Agenda; R4). No React Native: unit-tested. */
+
+/** How often a task comes back (MODEL.md, Task's Repeats): its Due Cycle's period. */
+export const REPEATS: Array<{ value: string; label: string; everyN: number; everyUnit: 'day' | 'week' | 'month' | 'year' }> = [
+  { value: 'day', label: 'Every day', everyN: 1, everyUnit: 'day' },
+  { value: 'week', label: 'Every week', everyN: 1, everyUnit: 'week' },
+  { value: '2weeks', label: 'Every 2 weeks', everyN: 2, everyUnit: 'week' },
+  { value: 'month', label: 'Every month', everyN: 1, everyUnit: 'month' },
+  { value: '3months', label: 'Every 3 months', everyN: 3, everyUnit: 'month' },
+  { value: 'year', label: 'Every year', everyN: 1, everyUnit: 'year' },
+];
+
+/** A yyyy-MM-dd day as local midnight (a Cycle's due). */
+export const dayStart = (day: string | undefined): number | null => {
+  if (!day) return null;
+  const t = new Date(`${day.slice(0, 10)}T00:00:00`).getTime();
+  return Number.isFinite(t) ? t : null;
+};
+
+/** The task's Due Cycle template (MODEL.md: due dates and recurring tasks are Cycles). */
+export const TASK_DUE = 'task.due';
+/** Statuses in which a task's Due Cycle is live (in Upkeep). */
+export const OPEN_TASK = ['todo', 'doing', 'blocked'];
 
 export const PRIORITIES = [{ value: 'low', label: 'Low', color: 'gray' }, { value: 'medium', label: 'Medium', color: 'blue' }, { value: 'high', label: 'High', color: 'orange' }, { value: 'urgent', label: 'Urgent', color: 'red' }];
 
@@ -9,8 +31,9 @@ export interface TaskData {
   notes?: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   dueDate?: string;
+  /** REPEATS value; empty = once. */
+  repeat?: string;
   projectId?: string;
-  goalId?: string;
   estimateMin?: number;
   completedAt?: number;
   personIds?: string[];
@@ -22,21 +45,29 @@ export const taskType: ObjectDef<TaskData> = {
   label: 'Task',
   labelPlural: 'Tasks',
   icon: 'checkmark.circle',
-  schema: z.object({ notes: z.string().optional(), priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'), dueDate: z.string().optional(), projectId: z.string().optional(), goalId: z.string().optional(), estimateMin: z.coerce.number().optional(), completedAt: z.number().optional(), personIds: z.array(z.string()).optional() }),
+  schema: z.object({ notes: z.string().optional(), priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'), dueDate: z.string().optional(), repeat: z.string().optional(), projectId: z.string().optional(), estimateMin: z.coerce.number().optional(), completedAt: z.number().optional(), personIds: z.array(z.string()).optional() }),
   fields: [
     { key: 'dueDate', label: 'Due', type: 'date', summary: true },
+    { key: 'repeat', label: 'Repeats', type: 'select', options: REPEATS.map(({ value, label }) => ({ value, label })), description: 'Done moves Due on; the task stays open' },
     { key: 'priority', label: 'Priority', type: 'select', default: 'medium', options: PRIORITIES },
     { key: 'projectId', label: 'Project', type: 'link', linkTo: 'project', linkWord: 'project', summary: true },
-    { key: 'goalId', label: 'Goal', type: 'link', linkTo: 'goal', linkWord: 'goal', section: 'Links' },
     { key: 'personIds', label: 'People', type: 'link', linkTo: 'person', linkWord: 'person', section: 'Links', default: [] },
     { key: 'estimateMin', label: 'Estimate (minutes)', type: 'number', section: 'Details' },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   indexed: ['dueDate', 'projectId', 'priority'],
   occurredAtField: 'dueDate',
+  cycleFields: { [TASK_DUE]: { nextDueAt: 'dueDate' } },
+  cycleActiveStatuses: OPEN_TASK,
+  cycleTemplates: (d) => {
+    const due = dayStart(d.dueDate);
+    if (due == null) return [];
+    const r = REPEATS.find((x) => x.value === d.repeat);
+    return [{ template: TASK_DUE, name: 'Due', kind: 'fixed', everyN: r?.everyN ?? null, everyUnit: r?.everyUnit ?? null, nextDueAt: due }];
+  },
   statuses: [{ value: 'todo', label: 'To do' }, { value: 'doing', label: 'In progress', color: 'orange' }, { value: 'done', label: 'Done', color: 'green' }, { value: 'blocked', label: 'Blocked', color: 'red' }],
   searchText: (d) => d.notes ?? '',
-  links: [{ kind: 'project', label: 'Project', to: 'project', cardinality: 'one' }, { kind: 'goal', label: 'Goal', to: 'goal', cardinality: 'one' }],
+  links: [{ kind: 'project', label: 'Project', to: 'project', cardinality: 'one' }],
   defaultViews: [
     { name: 'Today', icon: 'sun.max', isDefault: false, definition: { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'lte', value: '__TODAY__' }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }] } },
     { name: 'Upcoming', icon: 'calendar', definition: { filter: { and: [{ field: 'status', op: 'neq', value: 'done' }, { field: 'data.dueDate', op: 'gt', value: '__TODAY__' }] }, sort: [{ field: 'data.dueDate', dir: 'asc' }], groupBy: 'day' } },
@@ -60,46 +91,17 @@ export const projectType: ObjectDef<ProjectData> = {
   icon: 'folder',
   schema: z.object({ description: z.string().optional(), dueDate: z.string().optional(), color: z.string().optional(), area: z.string().optional() }),
   fields: [
-    { key: 'description', label: 'Description', type: 'longtext' },
+    { key: 'description', label: 'Aim', type: 'longtext', placeholder: 'What done looks like' },
     { key: 'dueDate', label: 'Target date', type: 'date', summary: true },
     { key: 'area', label: 'Area', type: 'select', summary: true, options: [{ value: 'work', label: 'Work' }, { value: 'personal', label: 'Personal' }, { value: 'home', label: 'Home' }, { value: 'side', label: 'Side project' }, { value: 'learning', label: 'Learning' }] },
   ],
   statuses: [{ value: 'active', label: 'Active' }, { value: 'planning', label: 'Planning', color: 'gray' }, { value: 'on_hold', label: 'On hold', color: 'orange' }, { value: 'done', label: 'Done', color: 'green' }],
   searchText: (d) => d.description ?? '',
-  links: [{ kind: 'project', label: 'Tasks', to: 'task', cardinality: 'many' }, { kind: 'goal', label: 'Goal', to: 'goal', cardinality: 'one' }],
-};
-
-export interface GoalData {
-  description?: string;
-  targetDate?: string;
-  targetValue?: number;
-  currentValue?: number;
-  unit?: string;
-  area?: string;
-}
-
-export const goalType: ObjectDef<GoalData> = {
-  id: 'goal',
-  module: 'projects',
-  label: 'Goal',
-  labelPlural: 'Goals',
-  icon: 'target',
-  color: 'indigo',
-  schema: z.object({ description: z.string().optional(), targetDate: z.string().optional(), targetValue: z.coerce.number().optional(), currentValue: z.coerce.number().optional(), unit: z.string().optional(), area: z.string().optional() }),
-  fields: [
-    { key: 'description', label: 'Why this matters', type: 'longtext' },
-    { key: 'targetDate', label: 'Target date', type: 'date', summary: true },
-    { key: 'targetValue', label: 'Target value', type: 'number', section: 'Progress' },
-    { key: 'currentValue', label: 'Current value', type: 'number', section: 'Progress' },
-    { key: 'unit', label: 'Unit', type: 'text', placeholder: 'kg, ₹, books…', section: 'Progress' },
-    { key: 'area', label: 'Area', type: 'select', options: [{ value: 'health', label: 'Health' }, { value: 'money', label: 'Money' }, { value: 'career', label: 'Career' }, { value: 'learning', label: 'Learning' }, { value: 'relationships', label: 'Relationships' }, { value: 'other', label: 'Other' }] },
-  ],
-  statuses: [{ value: 'active', label: 'Active' }, { value: 'achieved', label: 'Achieved', color: 'green' }, { value: 'dropped', label: 'Dropped', color: 'gray' }],
-  occurredAtField: 'targetDate',
+  links: [{ kind: 'project', label: 'Tasks and events', to: ['task', 'event'], cardinality: 'many' }],
 };
 
 export interface EventData {
-  /** Free label: flight, dinner, meeting, concert, hike… (docs/GRAPH.md — any activity is an event with a kind). */
+  /** An open list: met, call, meeting, flight, stay, reservation, check-in; `event` from the calendar (MODEL.md, Event's Fields). */
   kind?: string;
   startAt: number;
   endAt?: number;
@@ -107,6 +109,7 @@ export interface EventData {
   notes?: string;
   allDay?: boolean;
   personIds?: string[];
+  projectId?: string;
   tripId?: string;
   airline?: string;
   flightNo?: string;
@@ -124,7 +127,7 @@ export const eventType: ObjectDef<EventData> = {
   labelPlural: 'Events',
   icon: 'calendar',
   color: 'red',
-  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), tripId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional(), source: z.string().optional(), sourceKey: z.string().optional(), calendars: z.array(z.string()).optional() }),
+  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), projectId: z.string().optional(), tripId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional(), source: z.string().optional(), sourceKey: z.string().optional(), calendars: z.array(z.string()).optional() }),
   fields: [
     { key: 'kind', label: 'Kind', type: 'text', summary: true, placeholder: 'flight, dinner, meeting, concert…' },
     { key: 'startAt', label: 'Starts', type: 'datetime', required: true, default: () => Date.now() + 3600000 },
@@ -132,6 +135,7 @@ export const eventType: ObjectDef<EventData> = {
     { key: 'allDay', label: 'All day', type: 'boolean' },
     { key: 'location', label: 'Location', type: 'text', summary: true },
     { key: 'personIds', label: 'People', type: 'link', linkTo: 'person', linkWord: 'person', section: 'Links', default: [] },
+    { key: 'projectId', label: 'Project', type: 'link', linkTo: 'project', linkWord: 'project', section: 'Links' },
     { key: 'tripId', label: 'Trip', type: 'link', linkTo: 'trip', linkWord: 'trip', section: 'Links' },
     { key: 'airline', label: 'Airline', type: 'text', section: 'Travel' },
     { key: 'flightNo', label: 'Flight no.', type: 'text', section: 'Travel' },
@@ -145,7 +149,4 @@ export const eventType: ObjectDef<EventData> = {
   defaultViews: [{ name: 'Upcoming', definition: { filter: { and: [{ field: 'occurredAt', op: 'gte', value: '__TODAY__' }] }, sort: [{ field: 'occurredAt', dir: 'asc' }], groupBy: 'day' } }],
 };
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
 

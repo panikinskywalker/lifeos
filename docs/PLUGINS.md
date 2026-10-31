@@ -139,7 +139,7 @@ Organisation's kind from its name), so core's generic tools never import a
 module; core's `upsertNode` calls it for every record it makes from a name (R3).
 
 Places (R3) files without a source of its own: it listens for Events created
-or edited with a `location` (whoever wrote them: core's calendar reading,
+or edited with a `location` (whoever wrote them: projects' calendar source,
 travel's booking parser, a dump) and links them *at* a Place, and its mail
 parser `places.mail` runs last (priority 90) so it can mark what the other
 parsers filed from a mail as *sent by* the Organisation whose website matches
@@ -166,7 +166,9 @@ files messages through the parsers in batches, upserts readings by `sourceKey`
 Finance declares sms, notifications and gmail; crm declares contacts and
 calllog (R2: `os.device.contacts` reads the phone's contacts, `os.device.callLog`
 the calls; both are `readings` sources that file their own records and report
-`filed`); usage, health and the calendar stay in platform until R6 / R4.
+`filed`); projects declares calendar (R4: `os.device.calendar.read(from, to)`
+hands over the phone's events, a month back and two ahead, and the module files
+them as Events); usage and health stay in platform until R6.
 
 crm also declares `notion` (R2b): a `readings` source that also writes, to a
 copy of your Notion People CRM only (`src/modules/crm/notion/client.ts`:

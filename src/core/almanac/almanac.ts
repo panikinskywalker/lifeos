@@ -35,7 +35,7 @@ export const SECTIONS: SectionDef[] = [
   { id: 'things', label: 'Things', icon: 'cube.box', tint: 'upkeep', line: 'What you own, and its upkeep', types: ['asset', 'stock', 'document', 'delivery', 'routine'] },
   { id: 'money', label: 'Money', icon: 'wallet', tint: 'finance', line: 'Spending, accounts, subscriptions, who you pay', types: ['transaction', 'account', 'subscription', 'investment', 'debt', 'org'] },
   { id: 'body', label: 'Body', icon: 'activity', tint: 'health', line: 'Steps, sleep, heart, weight, workouts', types: ['workout'], metrics: ['steps', 'sleep', 'heart_rate', 'resting_hr', 'weight'] },
-  { id: 'mind', label: 'Mind', icon: 'brain', tint: 'memory', line: 'Dumps, what you’ve told it, notes, plans', types: ['note', 'task', 'project', 'goal', 'habit'] },
+  { id: 'mind', label: 'Mind', icon: 'brain', tint: 'memory', line: 'Dumps, what you’ve told it, notes, plans', types: ['note', 'task', 'project', 'habit'] },
   { id: 'places', label: 'Places', icon: 'location', tint: 'travel', line: 'Places, trips and what happened where', types: ['place', 'trip', 'event'] },
   { id: 'time', label: 'Time', icon: 'calendar', tint: 'tasks', line: 'Any day, month or year at a glance', types: [] },
 ];
