@@ -909,11 +909,23 @@ screens checked on the phone → overrides only where the default is wrong)
   chosen; no migration (Fields live in record JSON). **Phone check pending.**
   **Design prompt 30 Oct**: `docs/design/PLACES-BRIEF.md` asks for
   `NR-Places-*` artboards that replace this first pass.
-- [ ] **R4 projects** — Task, Project, Goal, Event; calendar source. *Fields written 31 Oct
-  (layer 2, Agenda)*: Due and Repeats as a task's Cycle, Event gains a Project, Project's
-  Description is its Aim, spend and progress derived. **Goal conflicts with *Retired***: left as
-  it is until you decide (layer 2). The **calendar source** moves from core and platform into
-  `projects`, reading the phone through `os.device.calendar` like crm's contacts.
+- [x] **R4 projects** (Task, Project, Goal, Event; calendar source): built 31 Oct 2026 (branch
+  `claude/r4-projects`; no migration). Fields as written in layer 2 (*Agenda*): a task's Due
+  and **Repeats** are its **Due Cycle** (fixed; repeating when Repeats is set), so tasks are in
+  Upkeep while open; ticking a repeating task marks the Cycle done and moves Due on; done in
+  Upkeep finishes a one-off task; a due date taken off leaves the Cycle undated. Event gains a
+  Project; Project's Description is its Aim; progress, overdue, next and spend derived. **The
+  fold** (once, `projects.foldedR4`): open tasks with a due date get their Due Cycle. **The
+  calendar source is declared by `projects`** (`src/modules/projects/sources.ts`), reading the
+  phone through `os.device.calendar` (platform's expo-calendar bridge); the calendar code moved
+  out of core unchanged, and its Events still link *at* their Place (R3) and move last spoke
+  (R2). **Tools**: `agenda_today`, `tasks_overdue`, `project_status` (`tasks_overview` kept).
+  **Board** (a first pass from the kit until the `NR-Projects-*` artboards of
+  `docs/design/PROJECTS-BRIEF.md`): the Projects home (Today, Overdue, Projects with progress,
+  Coming up), the Task, Project and Event pages. Core: My day lists a task once, not again for
+  its Due Cycle. 427 tests green; the web export builds. **Open**: Goal (layer 2), the brain's
+  *coming up* from Events (no candidates contract on this branch yet). **Phone check pending**
+  (the calendar).
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
   Upkeep; Upkeep re-hung on cycles from every module.
 - [ ] **R6 health** — Measurement, Workout; Health Connect and Usage access
