@@ -8,6 +8,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, IconButton, Screen, Text } from '@ui/kit';
 import { stockState, type SpaceData, type StockData, type StockState } from '@modules/inventory';
 import { AddSheet, usePillActions } from './actions';
+import { ClothesSpace } from './clothes';
 import { BrainSlot, HomeEmpty, PillCloud, SectionHead, StockPill } from './parts';
 
 /**
@@ -16,8 +17,8 @@ import { BrainSlot, HomeEmpty, PillCloud, SectionHead, StockPill } from './parts
  * Field yet (an open question for the artboard), so the cloud is ordered by
  * what needs you — probably gone, then use soon, then fresh — so the faded
  * ones that wait for you come first. Tap = used up, long-press = half left
- * · still good · move. Snap the fridge is a slot until the brain. Clothes
- * hold Assets, which arrive with R7a.
+ * · still good · move. Snap the fridge is a slot until the brain. A space
+ * that holds clothes draws its clothing Assets instead (./clothes, R7a).
  */
 
 const ORDER: Record<StockState, number> = { 'probably gone': 0, 'use soon': 1, fresh: 2, 'used up': 3 };
@@ -49,13 +50,7 @@ export function SpaceScreen({ ctx, params }: { ctx: LifeOSContext; params: Recor
   const subtitle = [`${here.length} ${here.length === 1 ? 'thing' : 'things'}`, counts.soon ? `${counts.soon} to use soon` : null, counts.gone ? `${counts.gone} probably gone` : null].filter(Boolean).join(' · ');
   const right = space.data.holds === 'clothes' ? null : <IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.fg.onAccent} accessibilityLabel={`Add to ${space.title}`} onPress={() => setAdding(true)} />;
 
-  if (space.data.holds === 'clothes') {
-    return (
-      <Screen title={space.title} subtitle="Clean · in the wash · packed" onBack={back} contentStyle={{ gap: 16 }}>
-        <HomeEmpty icon="shirt" title="Clothes are Assets" line="They don't run out, so they aren't Stock. They arrive here with R7a, when an Asset can be clothing and kept in a space; tap will cycle clean → in the wash." />
-      </Screen>
-    );
-  }
+  if (space.data.holds === 'clothes') return <ClothesSpace ctx={ctx} space={space} onBack={back} />;
 
   const group = (state: StockState, label: string, items: typeof here) =>
     items.length ? (
