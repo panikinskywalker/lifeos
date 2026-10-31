@@ -2,7 +2,7 @@
 
 Branch `claude/r4-projects`, from `m1-design-system` at 617c509 (LifeOS v0.0.11).
 No version bump, no CHANGELOG edit, no migration. `npm run typecheck`, `npm test`
-(427 tests) and `npx expo export --platform web` are green.
+(428 tests) and `npx expo export --platform web` are green.
 
 ## What was built
 
@@ -35,21 +35,25 @@ No version bump, no CHANGELOG edit, no migration. `npm run typecheck`, `npm test
   in the web export on demo data. `docs/design/PROJECTS-BRIEF.md` asks for the `NR-Projects-*`
   artboards.
 
+- **Goal dropped** (your call, 31 Oct): each goal becomes a Project once, in place (same id, so
+  links, tags, Facts and timeline stay): target date, why it matters as the Aim, its numbers as a
+  Fact ("Was a goal: 6,40,000 of 10,00,000 ₹"), area career → work, learning → learning, the
+  rest → personal; active → active, achieved → done, dropped → done and archived. Tasks toward a
+  goal join that Project when they had none; otherwise their *goal* Link becomes *related*. The
+  Goal Object, Task's Goal Field, its board section and overview block are gone; the demo
+  data's two goals are Projects. Tested (`foldGoals`).
+
 ## What you must decide
 
-1. **Goal.** MODEL.md's *Retired* table drops `goal` (activity goals parked in ADHOC), and R4's
-   line names Goal. I did not pick: the Goal Object and its records are untouched, off the
-   Projects home and out of the brief. Drop it (fold each goal into a Project: target date, why
-   it matters as the Aim, the numbers as a Fact) or keep it (and take it out of *Retired*).
-2. **Tasks in Upkeep.** Since due dates are Cycles, every open task with a due date is now in
+1. **Tasks in Upkeep.** Since due dates are Cycles, every open task with a due date is now in
    Upkeep and in its notifications (*Due · Pay rent*). That is what "due dates as Cycles" means;
    say if Upkeep should keep tasks out.
-3. **Event in core or in projects.** Layers 1 and 3 call Event a core Object. The code has two:
+2. **Event in core or in projects.** Layers 1 and 3 call Event a core Object. The code has two:
    core's timeline (`LifeEvent`, the `events` table) and the Event Object that `projects`
    declares. Written down in layer 2; joining them is not R4.
-4. **People on an Event, two link words.** The calendar links attendees *with*; the form's
+3. **People on an Event, two link words.** The calendar links attendees *with*; the form's
    People Field links *person*. Both move last spoke and both show on the Event page. One word?
-5. **The brain's *coming up*.** There is no candidates contract on this branch (inventory has
+4. **The brain's *coming up*.** There is no candidates contract on this branch (inventory has
    plain functions of its own), so no Events candidates function was written. When the brain's
    contract lands, *coming up* from Events is `eventsOn(os, now, days)` in `projects/lib.ts`,
    filtered to the kinds that need something from you (a flight, guests, a match).
@@ -61,8 +65,8 @@ No version bump, no CHANGELOG edit, no migration. `npm run typecheck`, `npm test
   shows today's. Check: one Event for a meeting that is in several accounts, attendees who are in
   People linked and their last spoke moved, a location with an address linked *at* a Place (and
   the new Place in To check), a meeting link left as text.
-- **The fold** on first open: tasks with a due date appear in Upkeep; ticking one there finishes
-  it on the Projects home.
+- **The folds** on first open: your goals are Projects (with their numbers as a Fact); tasks
+  with a due date appear in Upkeep; ticking one there finishes it on the Projects home.
 - **A repeating task**: tick it on its page; the toast says when it is next due; Undo puts the
   date back.
 - **Notifications**: tasks due now get Upkeep's nudges.
@@ -76,6 +80,8 @@ No version bump, no CHANGELOG edit, no migration. `npm run typecheck`, `npm test
   date on.
 - **Tasks are in Upkeep.** A task with a due date is a Cycle, due and overdue like the rest.
 - **Events can belong to a project.**
+- **Goals are Projects now.** Each goal became a Project with its target date and why it matters;
+  its numbers are kept as a note on it.
 - **The calendar is Projects' own source** now; nothing changes in how it syncs.
 - **Ask Claude**: today's agenda, what's overdue, and how a project is going.
 - *For whoever merges*: shared files touched, each a small edit: `src/core/registry/context.ts`
@@ -84,4 +90,6 @@ No version bump, no CHANGELOG edit, no migration. `npm run typecheck`, `npm test
   here first on a conflict), `src/platform/phoneSources.ts` and `src/platform/sources.ts`,
   `docs/MODEL.md` (layer 2 *Agenda*, R4), `docs/PLUGINS.md` (Sources). `src/core/sources/phone.ts`
   is gone. Two tests (`src/modules/phone.golden.test.ts`, `src/modules/places/places.test.ts`)
-  import `saveCalendarEvents` from its new home; no assertion changed.
+  import `saveCalendarEvents` from its new home; no assertion changed. With Goal dropped,
+  `src/core/almanac/almanac.ts` no longer lists `goal`, and `src/modules/overviews.golden.test.ts`
+  and `scripts/bench-today.ts` no longer register `goalType` (a fixture line; no assertion changed).

@@ -7,7 +7,7 @@ const startOf = (t: number) => {
   return d.getTime();
 };
 
-/** Tasks and projects at a glance: open / overdue / done this week, done per day, projects' progress, goals, what's overdue. */
+/** Tasks and projects at a glance: open / overdue / done this week, done per day, projects' progress, what's overdue. */
 export function projectsOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
   const today = isoOf(now);
   const tasks = os.records.query<{ dueDate?: string; completedAt?: number; projectId?: string; priority?: string }>('task', {}, { limit: 5000 });
@@ -35,10 +35,6 @@ export function projectsOverview(os: LifeOSContext, now = Date.now()): ModuleOve
       })
       .filter((x) => x.sub !== '0 of 0 tasks');
     if (items.length) blocks.push({ kind: 'progress', title: 'Projects', items });
-  }
-  if (os.registry.objects.has('goal')) {
-    const goals = os.records.query<{ targetValue?: number; currentValue?: number; unit?: string }>('goal', { filter: { and: [{ field: 'status', op: 'neq', value: 'dropped' }] } }, { limit: 50 }).filter((g) => g.data.targetValue);
-    if (goals.length) blocks.push({ kind: 'progress', title: 'Goals', items: goals.map((g) => ({ label: g.title, ratio: (g.data.currentValue ?? 0) / g.data.targetValue!, sub: `${g.data.currentValue ?? 0} of ${g.data.targetValue} ${g.data.unit ?? ''}`.trim(), entityId: g.id, type: 'goal' })) });
   }
   return { card: { headline: overdue.length ? `${overdue.length} overdue` : `${open.length} open`, sub: `${dueToday.length} due today · ${doneWeek} done this week`, series: perDay.slice(7), seriesFormat: 'number', alert: overdue.length > 0 }, blocks };
 }

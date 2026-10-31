@@ -76,4 +76,4 @@ Design **Projects** for LifeOS, my personal life-OS app for Android (390 × 844,
 - Dark only: the light theme is undecided.
 - Notes on every decision this prompt didn't cover.
 
-*Goal is not in this design*: MODEL.md has it open (dropped in *Retired*, named in R4) until Rutvij decides.
+*Goal is dropped* (31 Oct): each goal became a Project, so a project like **Save ₹10L emergency fund** (aim, target date, its numbers as a Fact) should look at home among the rest.

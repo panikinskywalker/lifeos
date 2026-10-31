@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { AiToolDef } from '@core/registry/types';
-import type { GoalData, ProjectData } from './types';
+import type { ProjectData } from './types';
 import { agendaToday, findProject, overdueTasks, projectProgress, projectStatus, upcomingTasks } from './lib';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -36,14 +36,12 @@ export const projectsTools: AiToolDef[] = [
   },
   {
     name: 'tasks_overview',
-    description: 'Open tasks due today/overdue, upcoming tasks, active projects with progress, and active goals.',
+    description: 'Open tasks due today/overdue, upcoming tasks, active projects with progress.',
     input: z.object({}),
     run: async (_i, os) => ({
       dueOrOverdue: [...overdueTasks(os), ...agendaToday(os).tasks].map((x) => ({ id: x.id, title: x.title, due: x.due, priority: x.priority, status: x.status })),
       upcoming: upcomingTasks(os, Date.now(), 15).map((x) => ({ id: x.id, title: x.title, due: x.due })),
       projects: os.records.query<ProjectData>('project', { filter: { and: [{ field: 'status', op: 'in', value: ['active', 'planning'] }] } }).map((p) => ({ id: p.id, title: p.title, status: p.status, ...projectProgress(os, p.id) })),
-      // Goal stays as it was until it is decided (MODEL.md layer 2, Agenda).
-      goals: os.records.query<GoalData>('goal', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }).map((g) => ({ id: g.id, title: g.title, target: g.data.targetValue, current: g.data.currentValue, unit: g.data.unit, by: g.data.targetDate })),
       today: today(),
     }),
   },

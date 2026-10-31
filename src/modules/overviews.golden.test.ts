@@ -14,7 +14,7 @@ import { measurementType, workoutType } from './health/types';
 import { accountType, subscriptionType, transactionType } from './finance/types';
 import { setCategoryTarget } from './finance/categories';
 import { groupType, personType } from './crm/types';
-import { eventType, goalType, projectType, taskType } from './projects/types';
+import { eventType, projectType, taskType } from './projects/types';
 import { tripType } from './travel/types';
 import { deliveryType } from './deliveries/types';
 import { financeOverview } from '@boards/finance/overview';
@@ -35,7 +35,7 @@ beforeEach(async () => {
   bus.clear();
   os = await createLifeOS({
     db: createBetterSqliteAdapter(':memory:'),
-    modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, subscriptionType, transactionType, personType, groupType, eventType, taskType, projectType, goalType, tripType, deliveryType] }],
+    modules: [{ id: 'm', name: 'm', version: '1', description: '', icon: 'x', color: '#000', objects: [measurementType, workoutType, accountType, subscriptionType, transactionType, personType, groupType, eventType, taskType, projectType, tripType, deliveryType] }],
     registry: new Registry(),
   });
 });

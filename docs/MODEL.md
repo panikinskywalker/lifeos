@@ -298,7 +298,6 @@ because it has Fields and a form. Joining the two is not R4.
 | Estimate | number (minutes) | |
 | Notes | long text | |
 | *(hidden)* done on | (`completedAt`) | when it was last ticked |
-| Goal | link → Goal | stays while Goal is open (below) |
 
 A done task's Cycle leaves Upkeep (`cycleActiveStatuses`); undone, it comes back.
 
@@ -319,12 +318,13 @@ tasks past due), **next** (the soonest open task), its Events, and **spend**
 their Due Cycle (the templates backfill has already run on the phone, so it
 would not add them). No other record changes.
 
-**Goal is open** (31 Oct, for you to decide): the *Retired* table below says
-`goal` is dropped (activity goals parked in ADHOC), and R4's line in layer 6
-names Goal. R4 leaves the Goal Object and its records exactly as they are,
-off the Projects board, until you choose: drop it (and fold each goal into a
-Project: target date, why it matters → Aim, the numbers as a Fact) or keep it
-(and take it out of *Retired*).
+**Goal is dropped** (decided 31 Oct, as *Retired* says). Each goal becomes a
+Project once, on first open, in place (same id: links, tags, Facts and
+timeline stay): target date → target date, why it matters → Aim, its numbers
+(6,40,000 of 10,00,000 ₹) → a Fact on it; area career → work, learning →
+learning, the rest → personal; active → active, achieved → done, dropped →
+done and archived. A task toward a goal is in that Project when it had none;
+when it had one, its *goal* Link becomes *related*. Task's Goal Field goes.
 
 ### Games (module `games`, agreed 17 Oct, revised 20 Oct; feeds the Turf board)
 The football you already run in **Turf Ledger**, your web app
@@ -441,7 +441,7 @@ large OTP on Delivery).
 | `habit_log` | Event, kind check-in |
 | `subscription` | Cycle on an Organisation or Asset |
 | `budget` | monthly target on a Category setting |
-| `goal` | dropped; activity goals are parked in ADHOC |
+| `goal` | dropped (31 Oct, R4): each goal folded into a Project; activity goals are parked in ADHOC |
 | `org` with payee / merchant / shop kinds | Organisation, one kind field |
 | comments | Facts |
 | reminders table | Cycles |
@@ -472,7 +472,7 @@ what a Person is).
 
 **The modules (decided 4 Oct: all twelve existing data modules stay):**
 `finance` (Account, Transaction, Debt, Subscription, Budget, Group) · `crm`
-(Person) · `projects` (Task, Project, Goal, Event) · `travel` (Trip) · `assets`
+(Person) · `projects` (Task, Project, Event; Goal dropped in R4) · `travel` (Trip) · `assets`
 (Asset, Vehicle) · `inventory` (Stock, Space; shown as Home since R7e) · `documents` (Document) · `health`
 (Measurement, Workout) · `habits` (Habit, Habit log, Routine) · `knowledge`
 (Note) · `places` (Place, Organisation) · `deliveries` (Delivery). `dashboard`
@@ -909,7 +909,7 @@ screens checked on the phone → overrides only where the default is wrong)
   chosen; no migration (Fields live in record JSON). **Phone check pending.**
   **Design prompt 30 Oct**: `docs/design/PLACES-BRIEF.md` asks for
   `NR-Places-*` artboards that replace this first pass.
-- [x] **R4 projects** (Task, Project, Goal, Event; calendar source): built 31 Oct 2026 (branch
+- [x] **R4 projects** (Task, Project, Event; calendar source; Goal dropped): built 31 Oct 2026 (branch
   `claude/r4-projects`; no migration). Fields as written in layer 2 (*Agenda*): a task's Due
   and **Repeats** are its **Due Cycle** (fixed; repeating when Repeats is set), so tasks are in
   Upkeep while open; ticking a repeating task marks the Cycle done and moves Due on; done in
@@ -923,7 +923,8 @@ screens checked on the phone → overrides only where the default is wrong)
   **Board** (a first pass from the kit until the `NR-Projects-*` artboards of
   `docs/design/PROJECTS-BRIEF.md`): the Projects home (Today, Overdue, Projects with progress,
   Coming up), the Task, Project and Event pages. Core: My day lists a task once, not again for
-  its Due Cycle. 427 tests green; the web export builds. **Open**: Goal (layer 2), the brain's
+  its Due Cycle. **Goal is dropped** (decided 31 Oct): each goal is folded into a Project once
+  (`projects.foldedGoals`, layer 2). 428 tests green; the web export builds. **Open**: the brain's
   *coming up* from Events (no candidates contract on this branch yet). **Phone check pending**
   (the calendar).
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in

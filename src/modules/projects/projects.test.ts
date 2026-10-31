@@ -9,7 +9,7 @@ import { crmModule } from '../crm';
 import { travelModule } from '../travel';
 import { placesModule } from '../places';
 import { financeModule } from '../finance';
-import { agendaToday, completeTask, dueCycle, foldR4, overdueTasks, projectStatus, projectsModule, undoComplete, type TaskData } from '.';
+import { agendaToday, completeTask, dueCycle, foldGoals, foldR4, overdueTasks, projectStatus, projectsModule, undoComplete, type TaskData } from '.';
 
 const DAY = 86_400_000;
 const iso = (t: number) => {
@@ -86,6 +86,36 @@ describe('tasks: due dates and repeats are Cycles', () => {
     expect(dueCycle(os, t.id)).not.toBeNull();
     expect(dueCycle(os, done.id)).toBeNull();
     expect(foldR4(os)).toBe(0);
+  });
+});
+
+describe('Goal is dropped', () => {
+  it('each goal becomes a Project in place, once: aim, target date, its numbers as a Fact, its tasks in it', () => {
+    // A goal as an older install has it (Goal is no longer an Object, so it is written as it was stored).
+    const g = os.records.create({ object: 'project', title: 'Save ₹10L emergency fund', status: 'active', data: {} });
+    os.db.run(`UPDATE records SET object='goal', status='active', data=? WHERE id=?`, [JSON.stringify({ description: 'Six months of expenses', targetDate: '2027-03-31', targetValue: 1000000, currentValue: 640000, unit: '₹', area: 'money' }), g.id]);
+    const dropped = os.records.create({ object: 'project', title: 'Learn Japanese', data: {} });
+    os.db.run(`UPDATE records SET object='goal', status='dropped', data='{"area":"learning"}' WHERE id=?`, [dropped.id]);
+    const loose = task('Open an FD', { goalId: g.id } as Partial<TaskData>);
+    os.links.link(loose.id, g.id, 'goal', {}, 'user');
+    const other = os.records.create({ object: 'project', title: 'Taxes', status: 'active', data: {} });
+    const held = task('Move the bonus', { projectId: other.id });
+    os.links.link(held.id, g.id, 'goal', {}, 'user');
+
+    expect(foldGoals(os)).toBe(2);
+    const p = os.records.get<{ description?: string; dueDate?: string; area?: string; targetValue?: number }>(g.id)!;
+    expect(p).toMatchObject({ object: 'project', status: 'active', archived: false, data: { description: 'Six months of expenses', dueDate: '2027-03-31', area: 'personal' } });
+    expect(p.data.targetValue).toBeUndefined();
+    expect(os.facts.list({ subjectId: g.id }).map((f) => f.text)).toEqual(['Was a goal: 6,40,000 of 10,00,000 ₹']);
+    expect(os.records.get(dropped.id)).toMatchObject({ object: 'project', status: 'done', archived: true, data: { area: 'learning' } });
+    // A task toward it is in the Project now; one already in a project keeps it and is related.
+    expect(os.records.get<TaskData>(loose.id)!.data).toMatchObject({ projectId: g.id });
+    expect((os.records.get(loose.id)!.data as Record<string, unknown>).goalId).toBeUndefined();
+    expect(os.records.get<TaskData>(held.id)!.data.projectId).toBe(other.id);
+    expect(os.links.forEntity(held.id, 'related').map((l) => l.other.id)).toEqual([g.id]);
+    expect(os.links.forEntity(g.id, 'goal')).toEqual([]);
+    expect(projectStatus(os, os.records.get(g.id) as never).total).toBe(1);
+    expect(foldGoals(os)).toBe(0);
   });
 });
 

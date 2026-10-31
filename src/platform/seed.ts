@@ -32,8 +32,8 @@ export function seedDemoData(os: LifeOSContext) {
 
     const lifeos = os.records.create({ object: 'project', title: 'Build LifeOS', data: { description: 'A personal operating system replacing a dozen apps.', dueDate: daysAhead(60), area: 'side' }, status: 'active' });
     const home = os.records.create({ object: 'project', title: 'Home renovation', data: { dueDate: daysAhead(120), area: 'home' }, status: 'planning' });
-    const goal = os.records.create({ object: 'goal', title: 'Save ₹10L emergency fund', data: { targetValue: 1000000, currentValue: 640000, unit: '₹', targetDate: '2027-03-31', area: 'money' }, status: 'active' });
-    os.records.create({ object: 'goal', title: 'Run a half marathon', data: { targetValue: 21, currentValue: 12, unit: 'km', targetDate: '2027-02-15', area: 'health' }, status: 'active' });
+    const goal = os.records.create({ object: 'project', title: 'Save ₹10L emergency fund', data: { description: '₹10,00,000 put by for six months of expenses.', dueDate: '2027-03-31', area: 'personal' }, status: 'active' });
+    os.records.create({ object: 'project', title: 'Run a half marathon', data: { description: '21 km, under 2 h 15 min.', dueDate: '2027-02-15', area: 'personal' }, status: 'active' });
 
     const tasks: Array<[string, string, string | undefined, string, string?]> = [
       ['Ship finance module', 'doing', daysAgo(0), 'high', lifeos.id],

@@ -1,15 +1,17 @@
 import type { ModuleManifest } from '@core/registry/types';
 import type { ObjectRecord } from '@core/domain/types';
 import { bus } from '@core/events/bus';
-import { PRIORITIES, TASK_DUE, OPEN_TASK, taskType, projectType, goalType, eventType, type TaskData } from './types';
+import { PRIORITIES, TASK_DUE, OPEN_TASK, taskType, projectType, eventType, type TaskData } from './types';
 import { projectsTools } from './aiTools';
 import { calendarSource } from './sources';
+import { foldGoals } from './fold';
 
 export const PROJECTS_COLOR = 'blue';
 export * from './types';
 export * from './lib';
 export * from './calendar';
 export { calendarSource, CALENDAR_WINDOW } from './sources';
+export { foldGoals } from './fold';
 
 /** R4, once: open tasks with a due date get their Due Cycle (the templates backfill ran before tasks had one). */
 export function foldR4(os: Parameters<NonNullable<ModuleManifest['onStart']>>[0]): number {
@@ -31,9 +33,14 @@ export const projectsModule: ModuleManifest = {
   icon: 'checkmark.circle',
   color: PROJECTS_COLOR,
   dependencies: ['crm', 'travel'],
-  objects: [projectType, taskType, goalType, eventType],
+  objects: [projectType, taskType, eventType],
   sources: [calendarSource],
   onStart: (os) => {
+    // Goal is dropped: each goal becomes a Project, once (before the R4 fold, so its tasks get their Due Cycle with the rest).
+    if (!os.settings.get<boolean>('projects.foldedGoals', false)) {
+      foldGoals(os);
+      os.settings.set('projects.foldedGoals', true);
+    }
     if (!os.settings.get<boolean>('projects.foldedR4', false)) {
       foldR4(os);
       os.settings.set('projects.foldedR4', true);
