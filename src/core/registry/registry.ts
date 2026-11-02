@@ -1,5 +1,5 @@
 import type { ObjectDef } from '../domain/types';
-import type { ActionDef, AiToolDef, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, RecordFormProps, SourceDef, TileDef, TriggerDef } from './types';
+import type { ActionDef, AiToolDef, AutomationTemplate, BoardManifest, EntityDetailSection, ModuleManifest, QuickAction, RecordFormProps, SourceDef, TileDef, TriggerDef } from './types';
 import type { ComponentType } from 'react'; // type-only (deps.test allows `import type`)
 import type { MessageParser } from '../filing/contract';
 
@@ -14,6 +14,7 @@ export class Registry {
   readonly tiles = new Map<string, TileDef>();
   readonly triggers = new Map<string, TriggerDef>();
   readonly actions = new Map<string, ActionDef>();
+  readonly templates = new Map<string, AutomationTemplate>();
   readonly aiTools = new Map<string, AiToolDef>();
   readonly sources = new Map<string, SourceDef>();
   readonly parsers = new Map<string, MessageParser>();
@@ -30,6 +31,7 @@ export class Registry {
     for (const t of m.objects ?? []) this.objects.set(t.id, { ...t, module: m.id });
     for (const t of m.triggers ?? []) this.triggers.set(t.id, { ...t, module: m.id });
     for (const a of m.actions ?? []) this.actions.set(a.id, { ...a, module: m.id });
+    for (const x of m.templates ?? []) this.templates.set(x.id, { ...x, module: m.id });
     for (const t of m.aiTools ?? []) this.aiTools.set(t.name, t);
     for (const src of m.sources ?? []) this.sources.set(src.id, src);
     for (const p of m.filing?.parsers ?? []) this.parsers.set(p.id, { ...p, module: m.id });

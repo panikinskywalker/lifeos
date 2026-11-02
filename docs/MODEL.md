@@ -593,6 +593,47 @@ Modules contribute triggers and actions through their Objects and Cycles, never
 UI. Core runs the engine (the existing When / If / Then engine with its loop
 guard, extended to multi-step with data passing, manual runs and a model step).
 
+**As built in R10 (2 Nov; the simplest where the above was open):**
+- **A rule** is a name, one trigger, conditions (all must hold), **steps** in
+  order, on / off. Stored where rules always were (`automation_rules`, the
+  steps in its `actions` column): no migration. Rules from before R10 (one
+  action each, no keys) become steps once, in place, same id, name, trigger,
+  conditions, run count.
+- **A step** is one action from core or a module, with its settings and a key
+  (`s1`, `s2`, … kept when steps move). Branch and wait are not built: a
+  **Continue only if** step (a field, an op, a value) ends the run quietly
+  when it fails, which covers the branches the templates need.
+- **Data passing**: every step hands back an **output** (plain values: a made
+  record's `id` and `title`, the model's `text`, a count). A later step's
+  text settings and a Continue only if read it as `{{steps.s1.title}}`, as
+  they read the triggering record as `{{title}}`, `{{data.amount}}`,
+  `{{vars.x}}`. Each action says which outputs it gives, so the editor can
+  offer them.
+- **The model step** (*Ask Claude*): a prompt you write, filled in like any
+  text setting, sent to Claude with the brain's key and model, counted against
+  the brain's **daily budget** (You › Agent › Brain) and capped per step (400
+  tokens by default); every send is in the *Sent to Claude* log, as a pass
+  named `automation`. What leaves is only the filled prompt. With no key, over
+  budget or offline, the step uses its **fallback** words when it has them,
+  else it fails and the run stops.
+- **Manual run**: the trigger *Run by hand*, with an optional phrase (the
+  name by default). Started from its button on the Automations board, from
+  Run now on the rule, or from a sentence in Talk: "run month close" runs the
+  rule whose phrase or name is "month close", without the model, and answers
+  with a toast and Undo. *Every day* fires once a day after its time (08:00 by
+  default), not on every scheduler tick.
+- **The run log**: each run keeps, per step, what went in (the filled
+  settings), what came out, its line ("Tagged #review"), done · failed ·
+  skipped · stopped, and what Undo needs. A run is undone step by step,
+  last first, for the actions that can be undone (tag, status, fact,
+  reminder, star, a record made); a notification or a model answer cannot
+  be, and the log says so. A failed run can be run again on the same record.
+  The last 200 runs are kept; runs are not in backups (as before).
+- **Templates** come from modules (`ModuleManifest.templates`): Big spend
+  flag (finance), Subscription auto-posted (finance), Document expiry
+  (documents), Contact nudge (crm, with the model step and its fallback).
+  Picking one opens the editor filled in; nothing runs until it is saved.
+
 Dependency direction, strictly one way: boards and automations → modules → core.
 ## 4. Inputs: sources and filing — proposed, revised 4 Oct
 
@@ -1196,8 +1237,17 @@ screens checked on the phone → overrides only where the default is wrong)
     photos) imported into Turf web once with ids kept, paid amounts as opening
     entries; the old address redirects to Turf web; Turf Ledger retired. Done
     when you have run a week's game from the two phones alone.
-- [ ] **R10 Automations** — multi-step with data passing, manual run from a
+- [x] **R10 Automations** — multi-step with data passing, manual run from a
   button or a sentence, model step, run log per step; templates.
+  *Built 2 Nov 2026* (branch `claude/r10-automations`; layer 3 *Automations*,
+  *As built in R10*): steps with keys and outputs read as `{{steps.s1.x}}`,
+  Continue only if, Ask Claude on the brain's key and budget with a fallback,
+  Run by hand from the board and "run …" in Talk, Every day once a day, the run
+  log per step with Undo and Run again, templates from finance, documents and
+  crm; rules from before folded into steps once, no migration. The board's
+  screens are a first pass from the kit until `NR-Automations-*`
+  (`docs/design/AUTOMATIONS-BRIEF.md`). See `docs/handover/r10-automations.md`.
+  *Not yet checked on the phone.*
 - [ ] **R11 Activity and Links** — Activity board over trackers; Links screen and
   card everywhere, tinted by module.
 

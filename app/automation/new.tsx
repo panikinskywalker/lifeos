@@ -1,6 +1,6 @@
-import React from 'react';
-import { RuleEditor } from '../../src/ui/screens/RuleEditor';
+import { Redirect } from 'expo-router';
 
-export default function NewRuleRoute() {
-  return <RuleEditor />;
+/** Old links to /automation/new: the board's editor since R10. */
+export default function NewRuleRedirect() {
+  return <Redirect href={'/board/automation/edit' as never} />;
 }

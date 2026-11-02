@@ -5,6 +5,7 @@ import { installedModules } from '@modules/index';
 import { installedBoards } from '@boards/index';
 import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
 import { registerBackgroundTick } from './background';
+import { brainModel } from './brain';
 import { getProviderKey, setProviderKey } from './keys';
 import { notifications } from './notifications';
 import { syncReminderNotifications } from './notifySync';
@@ -55,6 +56,8 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     },
   });
   os.device = deviceBridge(os);
+  // The automations' Ask Claude step: the brain's key and model (R10).
+  os.automation.modelProvider = () => brainModel(os);
 
   // Settings: DB → zustand, and zustand → DB on change.
   const stored = os.settings.all();

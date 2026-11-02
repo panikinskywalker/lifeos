@@ -8,6 +8,7 @@ import { classifyFailure } from '@core/ai/limits';
 import { localAnswer } from '@core/ai/localAnswer';
 import { parseMessage } from '@core/ai/parser';
 import type { DumpSource } from '@core/repo/dumpRepo';
+import type { AutomationRule } from '@core/automation/engine';
 import { noteUnreadInvoice, stockFromInvoice, undoStocked } from '@modules/inventory';
 import { useLive, useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -123,6 +124,15 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
     }
   };
 
+  const runAutomation = async (rule: AutomationRule, said: string) => {
+    const run = await os.automation.runManual(rule, said);
+    const failed = run.steps.find((x) => x.status === 'failed');
+    const open = { label: 'Open', onPress: () => router.push(`/board/automation/run?run=${run.id}` as never) };
+    if (failed) return toast.show({ message: `${rule.name}: stopped at step ${run.steps.indexOf(failed) + 1}`, icon: 'alert', action: open });
+    const done = run.steps.filter((x) => x.status === 'done').length;
+    toast.show({ message: `${rule.name}: ${done} step${done === 1 ? '' : 's'} done`, icon: 'bolt', ...(run.steps.some((x) => x.canUndo) ? { undo: () => void os.automation.undoRun(run.id) } : { action: open }) });
+  };
+
   const submit = (said?: string, from?: DumpSource) => {
     let body = (said ?? text).trim();
     if (!body && !file) return;
@@ -147,6 +157,9 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
         void ask(`${body || 'I shared this — attach it where it belongs.'}\n[Shared file: ${file.name}${file.mime ? ` (${file.mime})` : ''} — uri ${file.uri}. Use attach_file to put it on the right record.]`);
       })();
     }
+    // "run month close": a manual automation by its phrase or name, no model (R10).
+    const rule = os.automation.findManual(body);
+    if (rule) return void runAutomation(rule, body);
     if (classifyInput(body) === 'ask') return void ask(body);
     saveDump(os, body, src);
   };

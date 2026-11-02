@@ -1,8 +1,7 @@
-import React from 'react';
-import { useLocalSearchParams } from 'expo-router';
-import { RuleEditor } from '../../src/ui/screens/RuleEditor';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-export default function EditRuleRoute() {
+/** Old links to /automation/<id>: the rule's page on the Automations board since R10. */
+export default function RuleRedirect() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  return <RuleEditor id={id} />;
+  return <Redirect href={`/board/automation/rule?rule=${encodeURIComponent(id ?? '')}` as never} />;
 }

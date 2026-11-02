@@ -77,8 +77,10 @@ export const projectsModule: ModuleManifest = {
         const due = cfg.inDays != null && cfg.inDays !== '' ? new Date(Date.now() + Number(cfg.inDays) * 86400000).toISOString().slice(0, 10) : undefined;
         const task = os.records.create<TaskData>({ object: 'task', title: String(cfg.title), data: { priority: (cfg.priority as TaskData['priority']) || 'medium', dueDate: due, projectId: ctx.entity?.object === 'project' ? ctx.entity.id : undefined } }, 'automation');
         if (ctx.entity && ctx.entity.object !== 'project') os.links.link(task.id, ctx.entity.id, 'related', {}, 'automation');
-        return task.title;
+        return { line: `Task: ${task.title}`, output: { id: task.id, title: task.title }, undo: { id: task.id } };
       },
+      outputs: ['id', 'title'],
+      undo: (u, os) => os.records.delete((u as { id: string }).id, 'automation'),
     },
   ],
   aiTools: projectsTools,

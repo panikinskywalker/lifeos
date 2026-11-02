@@ -15,6 +15,7 @@ import { applyRelationships } from './relationships';
 import { listenForNotion } from './notion';
 
 import { crmBrain } from './brain';
+import { crmActions, crmTemplates } from './automation';
 export * from './types';
 export { crmBrain, giftIdeasKey, wishKey } from './brain';
 export { nextBirthday };
@@ -44,6 +45,8 @@ export const crmModule: ModuleManifest = {
   objects: [personType, groupType],
   sources: crmSources,
   brain: crmBrain,
+  actions: crmActions,
+  templates: crmTemplates,
   onStart: (os) => {
     applyRelationships(os);
     // A group's member field is mirrored into group_members (default shares for splits, "groups Priya is in").
