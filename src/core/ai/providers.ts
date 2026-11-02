@@ -1,6 +1,8 @@
 import { createClaudeProvider, type LLMProvider } from './provider';
 import { createOpenAICompatProvider, ProviderError } from './openaiCompat';
 import { classifyFailure, type LimitStore } from './limits';
+import { createOllamaProvider } from './ollama';
+import { isLocalProvider } from './provider';
 
 /* ------------------------------------------------------------------ */
 /* Presets — where each host lives and a sensible default model.        */
@@ -57,12 +59,12 @@ export const PROVIDER_PRESETS: Record<ProviderKind, ProviderPreset> = {
   },
   ollama: {
     kind: 'ollama',
-    label: 'Ollama (your Mac)',
-    baseUrl: 'http://100.64.0.1:11434/v1', // replace with the Mac's Tailscale IP
+    label: 'Your Mac',
+    baseUrl: '', // the Mac's Tailscale IP or name, set in You › Agent
     defaultModel: 'qwen3:8b',
-    smallModel: 'qwen3:4b',
+    smallModel: 'qwen3:8b', // one model for every job: one pull (MODEL.md layer 7)
     needsKey: false,
-    note: 'Free and private; only works while the Mac is on and reachable.',
+    note: 'Ollama over Tailscale: free and private. Tried first; the cloud only when the Mac fails.',
   },
   claude: {
     kind: 'claude',
@@ -105,6 +107,7 @@ export function createProvider(cfg: ProviderConfig, role: 'main' | 'small' = 'ma
     if (!cfg.apiKey) throw new ProviderError('claude: no API key', 'claude', 401);
     return createClaudeProvider({ apiKey: cfg.apiKey, model, baseUrl });
   }
+  if (cfg.kind === 'ollama') return createOllamaProvider({ baseUrl, model });
   if (preset.needsKey && !cfg.apiKey) throw new ProviderError(`${cfg.kind}: no API key`, cfg.kind, 401);
   return createOpenAICompatProvider({ id: cfg.kind, baseUrl, apiKey: cfg.apiKey, model, onModelChanged });
 }
@@ -211,7 +214,9 @@ export interface AgentProviderSettings {
 
 /** main = conversation, small = fact mining and other side jobs. */
 export function buildAgentProviders(s: AgentProviderSettings): { main: LLMProvider; small: LLMProvider } {
-  const active = s.chain.filter((c) => c.enabled !== false);
+  // The Mac always goes first; the cloud keeps your order behind it (MODEL.md layer 7).
+  const on = s.chain.filter((c) => c.enabled !== false);
+  const active = [...on.filter((c) => isLocalProvider(c.kind)), ...on.filter((c) => !isLocalProvider(c.kind))];
   const build = (role: 'main' | 'small') =>
     createChainProvider(
       active.map((c) => {

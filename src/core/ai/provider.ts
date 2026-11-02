@@ -26,6 +26,9 @@ export interface CompletionResult {
   usage?: { input: number; output: number };
 }
 
+/** Providers that run on your own machine (R12): free, so no cap or budget counts them. */
+export const isLocalProvider = (id: string): boolean => id === 'ollama';
+
 export interface LLMProvider {
   id: string;
   /** Model id, for usage accounting. */

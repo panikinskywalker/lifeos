@@ -1205,6 +1205,13 @@ screens checked on the phone → overrides only where the default is wrong)
 - [ ] **R12 Mac model first** — Ollama over Tailscale as the first provider; a
   7–9B open model; golden sentences pass; cloud only on failure; budget applies
   to cloud only.
+  - [x] *Code side built 2 Nov* (`claude/r12-mac-model`; decisions in layer 7,
+    *The provider chain*): the Mac provider over Ollama's `/api/chat`, first in
+    the chain, the cloud on failure, caps and budgets cloud only, You › Agent ›
+    Your Mac with Test the Mac, the golden sentences against a mocked Mac in
+    `npm test`, `scripts/golden-mac.ts` for the real one.
+  - [ ] *The run on the Mac*: `qwen3:8b` pulled, the golden script green on the
+    Mac, Test the Mac green from the S22 over Tailscale.
 - [ ] **R13 Phone model** — a 1–3B quantised model on the S22 for offline
   filing of everyday dumps; chain: phone → Mac → cloud.
 - [ ] **R14 Your own fine-tune** — dumps + what filing did + corrections exported
@@ -1244,6 +1251,33 @@ providers as fallback only.
   are the acceptance bar for any model in the chain.
 - **Not wanted**: Odysseus's chat / email / calendar screens. LifeOS already has
   the records; the model serves them.
+
+### The provider chain (agreed 2 Nov, R12)
+- **The Mac model**: `qwen3:8b` in Ollama (Q4, about 5 GB), the same model for
+  filing, questions and fact mining, so one pull is enough. Spoken to over
+  Ollama's own `/api/chat` (not its `/v1` copy) because only there can the
+  context be set: 16k tokens, thinking off, kept loaded for 30 minutes.
+  Address and model in You › Agent › Your Mac; the address is the Mac's
+  Tailscale IP or name, port 11434 assumed.
+- **Order**: phone parser → your Mac → the cloud providers in your order. The
+  Mac always goes first when it is on; it is not in the cloud list.
+- **A failure, judged per call** (the next provider takes that call; nothing
+  is retried on the Mac): the Mac does not answer a 3-second check (then it
+  is skipped for 2 minutes), the call takes over 2 minutes, Ollama answers
+  with an error (model not pulled, out of memory), or the reply is unusable:
+  empty, a tool that was not offered, or arguments that are not an object.
+  A reply in words instead of a tool call is not a failure; filing already
+  nudges once and accepts "done".
+- **Budget**: the Mac's calls are written to usage (shown as free) but never
+  count against a cap or the free-tier bar; monthly caps, the "low on free
+  budget" rule and the Brain's daily budget are cloud only.
+- **Harder asks** (Claude for plans, when that switch is on) stay as they are:
+  an explicit choice to pay for those.
+- **Acceptance**: the golden sentences (`scripts/golden-sentences.ts`: the
+  filing flows of PRODUCT §5 and the Jarvis dumps, plus two questions) pass
+  against a mocked Mac in `npm test`, and against the real Mac with
+  `scripts/golden-mac.ts`. A model enters the chain only when that run is
+  green.
 
 *24 Oct: layer 8 proposes widening this job — Claude as the brain that
 notices, with what it learns kept here so a local model can take over. Not

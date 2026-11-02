@@ -1,6 +1,6 @@
 import { newId } from '../domain/ids';
 import type { LifeOSContext } from '../registry/context';
-import type { LLMProvider } from './provider';
+import { isLocalProvider, type LLMProvider } from './provider';
 
 export type Tier = 'fast' | 'smart';
 
@@ -57,6 +57,7 @@ export class UsageCapError extends Error {
  * Meter a provider (SCOPE B5): every call is written to ai_usage with its
  * provider and model; once this month's tokens reach the provider's cap it
  * refuses (UsageCapError), and a chain simply moves on to the next provider.
+ * Your Mac is metered too (shown as free) but never capped: budgets are cloud only.
  */
 export function meterProvider(os: LifeOSContext, provider: LLMProvider, opts: { purpose: UsagePurpose; cap?: (providerId: string) => number | undefined; conversationId?: () => string | null }): LLMProvider {
   return {
@@ -65,7 +66,7 @@ export function meterProvider(os: LifeOSContext, provider: LLMProvider, opts: { 
       return provider.model;
     },
     async complete(args) {
-      const cap = opts.cap?.(provider.id);
+      const cap = isLocalProvider(provider.id) ? undefined : opts.cap?.(provider.id);
       if (cap && providerTokensThisMonth(os, provider.id) >= cap) throw new UsageCapError(provider.id, cap);
       const result = await provider.complete(args);
       if (result.usage) recordUsage(os, { provider: provider.id, model: provider.model ?? provider.id, purpose: opts.purpose, ...result.usage, conversationId: opts.conversationId?.() ?? null });

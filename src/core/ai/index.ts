@@ -6,3 +6,4 @@ export * from './retrieval';
 export * from './routing';
 export * from './openaiCompat';
 export * from './providers';
+export * from './ollama';
