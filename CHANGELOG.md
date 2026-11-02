@@ -7,6 +7,17 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.20 · 2 Nov 2026
+
+**Today and Time** (R8), built in its own session and merged here.
+- **Today's tiles now come from the boards that own them** (People, Home,
+  Turf, Health, Money, Habits, Time, and a Today board for My day, Overdue,
+  Upcoming and the rest). Nothing changes on screen; your order, switches
+  and looks carry over.
+- **Time is a board** in Browse › Boards, at `/time`. A day shows **On this
+  day**: what happened on that date a month, six months and years before,
+  each item opening its record or dump. The On this day tile opens it.
+
 ## v0.0.19 · 2 Nov 2026
 
 **Your Mac first** (R12, the code side), built in its own session and merged
