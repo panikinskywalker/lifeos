@@ -7,6 +7,25 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.26 · 2 Nov 2026
+
+**Second Brain** (R7f), built in its own session and merged here. The
+screens are a first pass from the kit until the *NR-Knowledge* artboards are
+drawn.
+- **Memory is now the Second Brain**: your notes and everything you've told
+  LifeOS, in one place (Browse › Boards). Facts are grouped by who or what
+  they're about, with the names Talk learned ("the landlord") below them.
+  Nothing is lost: facts Talk kept under a name move onto that person once
+  they're in LifeOS. Browse's Memory row is now **Facts**.
+- **Notes link to what they mention**: write `[[Karan]]` (or tap Mention)
+  and the note shows on Karan's page. A name with no record yet is faded;
+  tap it to find or make it.
+- **No title needed**: a note is named by its first line until you name it.
+- **Pin** notes to keep them on top; filter by kind; one search over notes
+  and facts.
+- Put a fact on the right person later with *About a record…*.
+- Ask "what do I know about Dad?" or say "write a note: …" in the Dump box.
+
 ## v0.0.25 · 2 Nov 2026
 
 **Travel** (R7d, with layer 8's travel slice), built in its own session and
