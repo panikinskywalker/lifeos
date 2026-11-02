@@ -7,6 +7,7 @@ import { SubscriptionHero } from './subscriptionHero';
 import { PayeeGuess } from './payeeGuess';
 import { InvestmentHero } from './investmentHero';
 import { SpendScreen } from './spendScreen';
+import { financeTiles } from './tile';
 
 /** Companion board of the finance module: Overview, the Finance home and Reports screens, quick actions, record sections (also on Person and Group). */
 export const financeBoard: BoardManifest = {
@@ -17,6 +18,7 @@ export const financeBoard: BoardManifest = {
   color: 'green',
   placement: 'module',
   overview: financeOverview,
+  tiles: financeTiles,
   screens: [{ key: 'index', title: 'Finance', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }],
   quickActions: [
     { id: 'finance.addTransaction', label: 'Transaction', icon: 'arrow.up.arrow.down', route: '/entity/transaction/new', global: true },

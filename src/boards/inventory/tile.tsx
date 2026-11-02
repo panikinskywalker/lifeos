@@ -1,4 +1,5 @@
 import React from 'react';
+import type { TileDef } from '@core/registry/types';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLive } from '@ui/hooks';
@@ -49,3 +50,5 @@ export function HomeTodayTile({ wide }: { wide?: boolean } = {}) {
     </Pressable>
   );
 }
+
+export const inventoryTiles: TileDef[] = [{ type: 'home', board: 'inventory', name: 'Home', description: 'What to use soon and what’s running low', icon: 'home', sizes: ['small', 'medium'], defaultSize: 'small', component: ({ size }) => <HomeTodayTile wide={size !== 'small'} /> }];

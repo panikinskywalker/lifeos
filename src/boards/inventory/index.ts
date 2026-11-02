@@ -1,6 +1,7 @@
 import type { BoardManifest } from '@core/registry/types';
 import { HOME_ORDER, HOME_STOCKED, HOME_UNREAD } from '@modules/inventory';
 import { inventoryOverview } from './overview';
+import { inventoryTiles } from './tile';
 import { HomeScreen } from './home';
 import { SpaceScreen } from './space';
 import { ShoppingList } from './list';
@@ -21,6 +22,7 @@ export const inventoryBoard: BoardManifest = {
   color: 'teal',
   placement: 'browse',
   overview: inventoryOverview,
+  tiles: inventoryTiles,
   screens: [
     { key: 'index', title: 'Home', component: HomeScreen },
     { key: 'space', title: 'Space', component: SpaceScreen },

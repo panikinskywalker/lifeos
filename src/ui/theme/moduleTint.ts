@@ -17,6 +17,7 @@ const MODULE_TINT: Record<string, TintKey> = {
   deliveries: 'upkeep',
   games: 'health',
   turf: 'health',
+  time: 'tasks',
 };
 
 export function tintForModule(moduleId: string | undefined): TintKey {

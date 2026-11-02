@@ -1,5 +1,6 @@
 import type { BoardManifest } from '@core/registry/types';
 import { peopleOverview } from './overview';
+import { crmTiles } from './tile';
 import { PersonPage } from './profile';
 import { GroupPage } from './group';
 import { PeopleHome } from './screens';
@@ -23,6 +24,7 @@ export const crmBoard: BoardManifest = {
   color: 'pink',
   placement: 'module',
   overview: peopleOverview,
+  tiles: crmTiles,
   screens: [
     { key: 'index', title: 'People', component: PeopleHome },
     { key: 'list', title: 'Everyone', component: PeopleList },

@@ -1,4 +1,5 @@
 import React from 'react';
+import type { TileDef } from '@core/registry/types';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { allPlayers, currentGame, kitsOf, lineup, turfDues, type GameData } from '@modules/games';
@@ -120,3 +121,5 @@ export function TurfTodayTile() {
     </Pressable>
   );
 }
+
+export const turfTiles: TileDef[] = [{ type: 'turf', board: 'turf', name: 'Turf', description: 'The next match: who’s in and what’s still to collect', icon: 'target', sizes: ['medium'], defaultSize: 'medium', component: () => <TurfTodayTile /> }];
