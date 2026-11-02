@@ -7,6 +7,26 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.22 · 2 Nov 2026
+
+**Automations** (R10), built in its own session and merged here. The screens
+are a first pass from the kit until the *NR-Automations* artboards are drawn.
+- **Automations do several steps in order**, and a step can use what the
+  steps before it made ("Review: {{steps.s1.title}}").
+- **Ask Claude as a step**: your prompt, filled in from the record, within
+  the brain's daily budget and in the Sent to Claude log; with fallback
+  words for when Claude can't be asked.
+- **Run by hand** from its button on the Automations board, from Run now,
+  or by typing "run month close" in the Dump box; a toast tells you what it
+  did, with Undo.
+- **Every run is kept step by step**: what went in, what came out, what
+  failed. Undo a run where its steps allow; run a failed one again.
+- **Continue only if** stops a run quietly when something doesn't hold.
+- **Templates**: Big spend flag, Subscription auto-post, Document expiry,
+  Contact nudge.
+- **Every day** automations now run once a day after their time.
+- Your existing automations moved over as they were.
+
 ## v0.0.21 · 2 Nov 2026
 
 **Activity and Links** (R11), built in its own session and merged here. The
