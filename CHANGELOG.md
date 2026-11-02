@@ -7,6 +7,26 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.23 · 2 Nov 2026
+
+**Health, rebuilt** (R6), built in its own session and merged here. The
+screens are a first pass from the kit until the *NR-Health* artboards are
+drawn.
+- **A card per metric** (steps, sleep, heart rate, weight, screen time) on
+  Health, each opening its own page: best days and walks, nights from asleep
+  to awake, resting heart rate, weight readings, apps this week.
+- **This week vs last, and vs your usual** (the median of your last eight
+  weeks), on every metric's page and on the full chart.
+- **Sleep shows when you fell asleep and woke**; workouts keep when they
+  started.
+- **Log a weight** in one tap from the Weight page or the + menu.
+- **A gentle weigh-in reminder** in To check if you weigh yourself by hand
+  and it has been a while.
+- **Ask Claude**: today's body numbers, how a metric compares, your
+  workouts; log a reading.
+- **Health Connect and screen time are Health's own sources** now; nothing
+  changes in how they sync.
+
 ## v0.0.22 · 2 Nov 2026
 
 **Automations** (R10), built in its own session and merged here. The screens
