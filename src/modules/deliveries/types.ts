@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import type { ObjectDef } from '@core/domain/types';
 
-/** A parcel on its way (M4.2c): one record per order, updated by each shipping text. */
+/** A parcel on its way (docs/MODEL.md layer 2, *Delivery*; R7b): one record per order, updated by each text, notification and mail. */
 export interface DeliveryData {
+  /** The shop's name as the text says it ("Amazon"); `shopId` is its Organisation (word `vendor`). */
   shop?: string;
+  shopId?: string;
   item?: string;
   carrier?: string;
   tracking?: string;
@@ -16,6 +18,8 @@ export interface DeliveryData {
   /** Code for the delivery agent, and when it came (codes go stale). */
   otp?: string;
   otpAt?: number;
+  /** The order's payment: a Transaction (word `bought_in`), matched by the shop's name; deliveries never imports finance. */
+  paymentId?: string;
   notes?: string;
 }
 
@@ -37,6 +41,7 @@ export const deliveryType: ObjectDef<DeliveryData> = {
   color: 'brown',
   schema: z.object({
     shop: z.string().optional(),
+    shopId: z.string().optional(),
     item: z.string().optional(),
     carrier: z.string().optional(),
     tracking: z.string().optional(),
@@ -47,15 +52,18 @@ export const deliveryType: ObjectDef<DeliveryData> = {
     trackingUrl: z.string().optional(),
     otp: z.string().optional(),
     otpAt: z.number().optional(),
+    paymentId: z.string().optional(),
     notes: z.string().optional(),
   }),
   fields: [
     { key: 'status', label: 'Status', type: 'select', required: true, summary: true, options: DELIVERY_STATUSES },
     { key: 'item', label: 'Item', type: 'text' },
-    { key: 'shop', label: 'From', type: 'text', summary: true },
+    { key: 'shop', label: 'Shop', type: 'text', summary: true },
+    { key: 'shopId', label: 'Shop (Organisation)', type: 'link', linkTo: 'org', linkWord: 'vendor' },
     { key: 'expectedDate', label: 'Expected', type: 'date', summary: true },
     { key: 'otp', label: 'Delivery OTP', type: 'text', summary: true },
-    { key: 'trackingUrl', label: 'Tracking link', type: 'text', section: 'Tracking' },
+    { key: 'paymentId', label: 'Order', type: 'link', linkTo: 'transaction', linkWord: 'bought_in', description: 'The payment for it' },
+    { key: 'trackingUrl', label: 'Tracking link', type: 'contact', contactKind: 'url', section: 'Tracking' },
     { key: 'carrier', label: 'Carrier', type: 'text', section: 'Tracking' },
     { key: 'tracking', label: 'Tracking number', type: 'text', section: 'Tracking' },
     { key: 'orderId', label: 'Order ID', type: 'text', section: 'Tracking' },
