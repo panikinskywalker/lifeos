@@ -7,6 +7,25 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.18 · 2 Nov 2026
+
+**Build and ship** (R15), built in its own session and merged here. Needs a
+new APK: install it over the current one (data kept); this version does not
+arrive as an update.
+- **Your database can be encrypted** (SQLCipher, AES-256). You › Lock &
+  backup › Database: *Try on a copy* checks it without changing anything;
+  *Encrypt the database* moves it on the next start, checked table by table
+  before it switches. The key stays in the phone's secure store and in no
+  backup: keep making backup files to move to a new phone. New installs
+  start encrypted.
+- **The daily clean-up**: To check items you haven't touched in 15 days are
+  ticked; dumps filed more than 15 days ago leave the Dump tab and search
+  (still on their records); texts' wording goes after 60 days as before. The
+  last run is shown in You › Lock & backup.
+- **App lock fixes**: removing the phone's screen lock no longer locks you
+  out of LifeOS; Back does nothing while locked; the lock can be turned off
+  even when the phone has no screen lock.
+
 ## v0.0.17 · 2 Nov 2026
 
 - **Today**: a small tile alone on its row (Overdue, Steps, Sleep) is drawn
