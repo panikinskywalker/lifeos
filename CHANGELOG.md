@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.15 · 2 Nov 2026
+
+**The first build to install on the phone** since the 4 Oct reset: a
+standalone APK with everything up to v0.0.14 in it.
+- **Home reads a shared invoice PDF on the phone** (R7e, built in its own
+  session and merged here). Share Blinkit's invoice into LifeOS and it
+  stocks Home; a scan or a locked PDF gives a "Couldn't read this invoice"
+  card in To check instead.
+
 ## v0.0.14 · 31 Oct 2026
 
 **The brain, a first pass** (MODEL.md layer 8), built in its own session and

@@ -130,6 +130,7 @@ export function deviceBridge(os: LifeOSContext): DeviceBridge {
       drain: () => Device!.drain('notifications') as Array<{ package: string; title: string; text: string; at: number }>,
     },
     mail: { sync: () => syncMail(os) },
+    pdfText: (uri) => Device!.pdfText(uri).then((t) => (t.trim() ? t : null)),
   };
 }
 

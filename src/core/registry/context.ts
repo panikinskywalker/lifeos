@@ -142,8 +142,8 @@ export interface DeviceBridge {
   };
   /**
    * The text of a PDF shared into LifeOS (Home: a Blinkit invoice), or null
-   * when it has none (a scan). Not filled yet: the app has no PDF reader
-   * (docs/MODEL.md R7e), so shared invoices wait for it.
+   * when it has none (a scan). Rejects when the PDF can't be opened. Android
+   * only (PdfBox-Android in the device module).
    */
   pdfText?: (uri: string) => Promise<string | null>;
   /** The phone's secure store (keys a source needs, e.g. Turf web's): never in settings, never in a backup. */

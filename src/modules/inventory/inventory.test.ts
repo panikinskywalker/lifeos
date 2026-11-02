@@ -15,6 +15,8 @@ import {
   BLINKIT_APP,
   HOME_ORDER,
   HOME_STOCKED,
+  HOME_UNREAD,
+  noteUnreadInvoice,
   addFromLine,
   addToList,
   buy,
@@ -354,6 +356,11 @@ Invoice Value 731.00`;
     expect(findStock(os, 'Eggs')).toBeUndefined();
     expect(os.filings.get(card.id)!.checked).toBe(false);
     expect(orderAskOf(os.filings.get(card.id)!)).toMatchObject({ shop: 'blinkit', amount: 437 });
+  });
+
+  it('a PDF with no text gets a "couldn’t read" card in To check', () => {
+    noteUnreadInvoice(os, 'blinkit-invoice.pdf');
+    expect(os.filings.toCheck().map((f) => [f.kind, f.label])).toEqual([[HOME_UNREAD, 'Couldn’t read this invoice · blinkit-invoice.pdf']]);
   });
 
   it('the notifications source listens to Blinkit as well as the payment apps', async () => {
