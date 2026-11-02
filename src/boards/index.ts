@@ -15,6 +15,7 @@ import { automationBoard } from './automation';
 import { turfBoard } from './turf';
 import { todayBoard } from './today';
 import { timeBoard } from './time';
+import { activityBoard } from './activity';
 
 /**
  * The boards (docs/MODEL.md §3): what you see on screen. Companion boards
@@ -39,4 +40,5 @@ export const installedBoards: BoardManifest[] = [
   turfBoard,
   todayBoard,
   timeBoard,
+  activityBoard,
 ];

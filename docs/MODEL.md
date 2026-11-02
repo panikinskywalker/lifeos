@@ -572,6 +572,18 @@ new Object, that is a new module. It may add filing hints scoped to itself
   Those five sections are the board's own; the LifeOS bottom bar stays.
 - **Today** and **Upkeep**: boards over every module, pinned to the bottom bar.
 - **Time**: what happened in a day / month / year, over every module.
+- **Activity** (R11, 2 Nov): a Browse board (`src/boards/activity`) over core's
+  **trackers**, the GitHub-style grid of days. A tracker is a setting, not an
+  Object (`activity.trackers`: name, icon, tint, rules, shown on Today); a day
+  counts when any rule matches what is already filed (a text or mail saying a
+  word, a payment, a record of an Object, a health number at a line, time in
+  apps, a calendar event, a habit ticked). Core keeps the trackers and their
+  sums (`src/core/activity`); the board draws them and defines no Objects.
+  Screens: **home** (every tracker: today's tick, the grid, this week · this
+  month · streak; New tracker; On Today: show, hide, reorder), **tracker**
+  (26 weeks, this week / month / streak, the rules), **edit** (name, icon,
+  colour, rules). Its **Activity tile** on Today shows one tracker at a time
+  (swipe) or all of them (You › Home).
 - Candidates: Trip planner (Agenda + Money + People + Places), Car (Things +
   Money + Documents), Household (chores + shared bills).
 
@@ -790,7 +802,8 @@ A tile reads through its module's tools and core's queries only; Today reads
 nothing but the layout. Each tile lives with the board that owns its data:
 | Tile | Board | Reads |
 |---|---|---|
-| My day · Progress · Done today · Upcoming · Overdue · Screen time · Activity · Areas | Today (`src/boards/today`) | core: the day, goals, Cycles, usage, trackers; Areas asks each module's Overview |
+| My day · Progress · Done today · Upcoming · Overdue · Screen time · Areas | Today (`src/boards/today`) | core: the day, goals, Cycles, usage; Areas asks each module's Overview |
+| Activity | Activity (`src/boards/activity`) | core's trackers |
 | Steps · Sleep | Health | core metrics over Measurements |
 | Spend this month | Finance | core spend pace over Transactions |
 | Habits | Habits | the board's own checklist and week |
@@ -884,13 +897,33 @@ Component gallery (dev).
   by module, link words on the lines; tap re-centres, long-press opens. Reads
   Link records only, so every module gets it without writing anything. Not to
   be confused with the tiles on Today, which are charts and open Metric.
+  Decided with R11 (2 Nov):
+  - **The Links card** is on every record: the generic page draws it, and a
+    board that draws the whole page gets it below its page unless it draws its
+    own (Person's, from NR-People). It shows a small map when two or more
+    things are linked, then **groups by link word as read from this record**
+    ("Works at", and on the Organisation "People here"), each row tinted by the
+    other record's module, dated things newest first, payments with their sum.
+    Four rows a group, then *N more* (opens Links). Tap opens the record;
+    long-press offers Open · Show in Links · **Remove link** (with Undo).
+    **Link** adds one by hand: pick the word (this Object's own words, related,
+    or your own) and the record. Mentions are not here (Mentioned in has them).
+  - **The Links screen** (`/links/<id>`): the network (direct links or two
+    steps out), a legend of the modules on it in their tints, and under it the
+    centre's Links card in full, so adding and removing work here too;
+    re-centring shows *Back to* the start.
+  - **From Browse** (`/links`): the records with the most links, each opening
+    its Links screen.
 - **Automations**: a tile in the Browse grid. The list of your automations with
   last run and state; the editor (trigger → conditions → steps, outputs passed
   along); templates; run log per run and per step; run now. Manual-run
   automations can also sit as buttons on Today. See layer 3.
-- **Activity**: a core board, a tile in the Browse grid and a Today tile. The
-  GitHub-style grid per tracker ("days coded", "days with Zomato", "8,000 steps"),
-  rules over messages, payments, records, metrics, habits.
+- **Activity**: a board (layer 3, *Activity*), a tile in Browse › Boards and a
+  Today tile. The GitHub-style grid per tracker ("days coded", "days with
+  Zomato", "8,000 steps"), rules over messages, payments, records, metrics,
+  screen time, calendar events and habits. Its screens are
+  `/board/activity` (home), `/board/activity/tracker?tracker=<id>` and
+  `/board/activity/edit` (`?tracker=<id>` to edit).
 - **Tags**: tag chips on every Record and List; a Tags page from Browse › Recent;
   one page per tag listing its records across modules.
 - **Memory**: the Facts list, a row in Browse (by who they are about; edit, forget).
@@ -1261,8 +1294,18 @@ screens checked on the phone → overrides only where the default is wrong)
     when you have run a week's game from the two phones alone.
 - [ ] **R10 Automations** — multi-step with data passing, manual run from a
   button or a sentence, model step, run log per step; templates.
-- [ ] **R11 Activity and Links** — Activity board over trackers; Links screen and
-  card everywhere, tinted by module.
+- [x] **R11 Activity and Links**: Activity board over trackers; Links screen and
+  card everywhere, tinted by module. Built 2 Nov 2026 (branch
+  `claude/r11-activity-links`; no migration). **Activity** is a Browse board
+  (`src/boards/activity`: home, tracker, edit, and the Today tile), over core's
+  trackers unchanged; the old `/activity` routes are gone (layer 3, layer 5).
+  **Links**: core's `linkGroups` (the word as read from each side) and
+  `mostLinked` (`src/core/graph/read.ts`); one Links card (`src/ui/components/LinksCard.tsx`)
+  on every record, below a board's own page unless it draws its own
+  (`ownLinks`, set by Person), with Remove link and Undo; the Links screen with
+  a module legend and the card in full; Browse › Links. Design prompt
+  `docs/design/LINKS-BRIEF.md` (`NR-Links-*`, `NR-Activity-*`); hand-over
+  `docs/handover/r11-activity-links.md`. **Phone check pending.**
 
 ### The model
 - [ ] **R12 Mac model first** — Ollama over Tailscale as the first provider; a

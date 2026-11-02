@@ -5,7 +5,6 @@ import { format } from 'date-fns';
 import { upkeep, type Upkeep } from '@core/cycles/upkeep';
 import { formatMetric, metricSeries, screenTopApps, upcoming } from '@core/dashboard/metrics';
 import { doneToday, myDay, progress, setGoal, type DayItem, type GoalId, type Progress } from '@core/dashboard/day';
-import { trackerSummary, trackers } from '@core/activity/trackers';
 import type { LifeOSContext } from '@core/registry/context';
 import type { TileDef, TileProps } from '@core/registry/types';
 import { useDataVersion, useLive, useOS } from '@ui/hooks';
@@ -14,7 +13,6 @@ import type { IconName } from '@ui/icons';
 import type { TintKey } from '@ui/theme/tokens';
 import { tintForModule } from '@ui/theme/moduleTint';
 import { Button, DeltaChip, Icon, MiniBars, NumberField, Ring, RowItem, RowList, Sheet, Stat, Text, Tile } from '@ui/kit';
-import { ActivityRow } from '../../screens/ActivityGrid';
 import { NeedsSource } from '../../screens/NeedsSource';
 import { homeAreas } from '../../screens/homeLayout';
 
@@ -291,59 +289,6 @@ function ProgressTile({ config }: TileProps) {
   );
 }
 
-/** Activity: one tracker at a time (swipe for the next), its last 18 weeks as a grid of days like GitHub's; tap for all of them. Two looks: one at a time or all stacked. */
-function ActivityTile({ config }: TileProps) {
-  const router = useRouter();
-  const t = useTheme();
-  const rows = useLive((o) => trackers(o).filter((x) => !x.hidden).map((x) => trackerSummary(o, x, Date.now(), 26)), []);
-  const [width, setWidth] = useState(0);
-  const [page, setPage] = useState(0);
-  const open = () => router.push('/activity' as never);
-  if (config.style === 'all')
-    return (
-      <Tile size="2x1" tint="tasks" icon="grid" label="Activity" onPress={open}>
-        <View style={{ gap: 22 }}>
-          {rows.map((s) => (
-            <ActivityRow key={s.tracker.id} s={s} onPress={() => router.push(`/activity/${s.tracker.id}` as never)} />
-          ))}
-        </View>
-      </Tile>
-    );
-  return (
-    <Tile size="2x1" tint="tasks" icon="grid" label="Activity" meta={rows.length > 1 ? `${page + 1} of ${rows.length}` : undefined} onPress={open}>
-      {rows.length ? (
-        <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ gap: 10 }}>
-          {width > 0 ? (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
-              onScroll={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
-              scrollEventThrottle={64}
-            >
-              {rows.map((s) => (
-                <View key={s.tracker.id} style={{ width }}>
-                  <ActivityRow s={s} onPress={open} />
-                </View>
-              ))}
-            </ScrollView>
-          ) : null}
-          {rows.length > 1 ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }} accessibilityRole="adjustable" accessibilityLabel={`Tracker ${page + 1} of ${rows.length}`}>
-              {rows.map((s, k) => (
-                <View key={s.tracker.id} style={{ width: k === page ? 16 : 6, height: 6, borderRadius: 3, backgroundColor: k === page ? t.c.fg.primary : t.c.fg.tertiary }} />
-              ))}
-            </View>
-          ) : null}
-        </View>
-      ) : (
-        <Text variant="caption" color="secondary">No trackers — tap to add one.</Text>
-      )}
-    </Tile>
-  );
-}
-
 /** One card per part of life: its number, a line, a 7-point trend; tap for the module's overview. */
 function AreasTile() {
   const t = useTheme();
@@ -387,7 +332,6 @@ const looks = (options: Array<{ value: string; label: string }>): Pick<TileDef, 
 export const todayTiles: TileDef[] = [
   tile('myday', 'My day', 'Today in time order: events, tasks, things due, deliveries', 'calendar', MyDayTile),
   tile('progress', 'Progress', 'Rings: steps, sleep, screen time, habits, tasks, spend vs your goals', 'target', ProgressTile, looks([{ value: 'rows', label: 'Rows' }, { value: 'rings', label: 'Rings' }])),
-  tile('activity', 'Activity', 'GitHub-style grids: days worked, workouts, steps, your own trackers', 'grid', ActivityTile, looks([{ value: 'swipe', label: 'One at a time' }, { value: 'all', label: 'All stacked' }])),
   tile('done', 'Done today', 'What you’ve spent, logged and ticked off so far', 'check', DoneTile),
   tile('areas', 'Areas', 'A card per part of life with its number and trend', 'grid', AreasTile),
   tile('upcoming', 'Upcoming', 'The next two weeks', 'calendar', UpcomingTile),

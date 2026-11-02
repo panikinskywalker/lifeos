@@ -18,6 +18,7 @@ const MODULE_TINT: Record<string, TintKey> = {
   games: 'health',
   turf: 'health',
   time: 'tasks',
+  activity: 'tasks',
 };
 
 export function tintForModule(moduleId: string | undefined): TintKey {
