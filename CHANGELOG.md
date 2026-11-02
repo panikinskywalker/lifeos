@@ -15,6 +15,7 @@ standalone APK with everything up to v0.0.14 in it.
   session and merged here). Share Blinkit's invoice into LifeOS and it
   stocks Home; a scan or a locked PDF gives a "Couldn't read this invoice"
   card in To check instead.
+- A Turf dues nudge says the date as "17 Oct", not "2026-10-17".
 
 ## v0.0.14 · 31 Oct 2026
 

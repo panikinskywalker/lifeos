@@ -62,7 +62,7 @@ function dues(os: LifeOSContext, now: number): Candidate[] {
         subjectId: p.playerId,
         route: '/board/turf/dues',
         title: p.name,
-        line: `${p.name.split(/\s+/)[0]} owes ${os.format.currency(rupees)} for ${p.games.length} game${p.games.length === 1 ? '' : 's'} since ${p.since}`,
+        line: `${p.name.split(/\s+/)[0]} owes ${os.format.currency(rupees)} for ${p.games.length} game${p.games.length === 1 ? '' : 's'} since ${os.format.date(`${p.since}T12:00:00`, 'short')}`,
         record: { name: p.name, owes_rupees: rupees, games: p.games.length, since: p.since },
         rank: 10 - Math.min(9, Math.floor(rupees / 100)),
         yes: 'Remind',
