@@ -7,6 +7,24 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.24 · 2 Nov 2026
+
+**Deliveries** (R7b), built in its own session and merged here. The screens
+are a first pass from the kit until the *NR-Deliveries* artboards are drawn.
+The parsers are written against plausible samples until real ones come.
+- **Deliveries come from shop apps' notifications** (Amazon, Flipkart,
+  Myntra) as well as texts and mail, and couriers' texts (Delhivery, Blue
+  Dart, Ekart, Shadowfax, XpressBees, India Post).
+- **Instamart, Zepto and Blinkit orders are tracked too**, one record from
+  placed to delivered.
+- **A delivery shows its shop and the payment that paid for it**, even when
+  the payment comes after the shipping text.
+- **The delivery OTP is large** on a new Deliveries screen and on the
+  delivery, and goes once it has come; **Delivered** marks one by hand, with
+  Undo.
+- **A parcel arriving today comes up in the Morning brief**, its code kept on
+  the phone.
+
 ## v0.0.23 · 2 Nov 2026
 
 **Health, rebuilt** (R6), built in its own session and merged here. The
