@@ -118,6 +118,31 @@ export interface CalendarEvent {
   calendars?: string[];
 }
 
+/** One day from Health Connect, as the device bridge hands it over (R6: health's source files Measurements and Workouts from it). */
+export interface HealthDay {
+  /** ISO day ('2026-11-02'); a night's sleep is on the day you woke. */
+  day: string;
+  steps?: number;
+  sleepMin?: number;
+  sleepStart?: number | null;
+  sleepEnd?: number | null;
+  heartRateAvg?: number;
+  restingHr?: number;
+  weightKg?: number;
+  /** Exercise sessions: Health Connect's id and exercise type, the start (ms) and minutes. */
+  workouts?: Array<{ id: string; type: number; title?: string | null; start: number; minutes: number }>;
+}
+
+/** One day of screen time from Usage access (R6: health's source keeps it in core's usage tables). */
+export interface UsageDay {
+  day: string;
+  totalMs: number;
+  pickups?: number | null;
+  firstUse?: number | null;
+  lastUse?: number | null;
+  apps: Array<{ package: string; label?: string | null; ms: number; launches?: number | null }>;
+}
+
 export interface DeviceBridge {
   sms?: {
     access(): Promise<Access>;
@@ -152,6 +177,17 @@ export interface DeviceBridge {
     access(): Promise<Access>;
     /** Every event on a visible calendar between `from` and `to`, with its attendees. */
     read(from: number, to: number): Promise<CalendarEvent[]>;
+  };
+  /** Health Connect (R6: health's source). */
+  health?: {
+    access(): Promise<Access>;
+    /** One entry per day between `from` and `to` (ms) that has anything. */
+    read(from: number, to: number): Promise<HealthDay[]>;
+  };
+  /** Usage access: screen time per day and per app (R6: health's source). */
+  usage?: {
+    access(): Promise<Access>;
+    read(from: number, to: number): Promise<UsageDay[]>;
   };
   /**
    * The text of a PDF shared into LifeOS (Home: a Blinkit invoice), or null

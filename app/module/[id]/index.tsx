@@ -4,7 +4,6 @@ import { useLive, useOS } from "@ui/hooks";
 import { tintForModule } from "@ui/theme/moduleTint";
 import { EmptyState, RowItem, RowList, Screen, Section } from "@ui/kit";
 import { OverviewBlocks } from "@ui/components/OverviewBlocks";
-import { HealthHome } from "../../../src/screens/HealthHome";
 
 /** A module's page: its dashboard (numbers, charts, what needs you), then every record type with a count. */
 export default function ModuleRoute() {
@@ -28,8 +27,9 @@ export default function ModuleRoute() {
       </Screen>
     );
   }
-  // Health is its metrics, one section each — not a list of record types.
-  if (m.id === "health") return <HealthHome />;
+  // Health is its metrics (R6): the board's home, one card per metric, not a list of record types.
+  const home = m.id === "health" ? screens.find((s) => s.key === "index") : undefined;
+  if (home) return <home.component ctx={os} params={{}} />;
   const tint = tintForModule(m.id);
   const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
   const hasHome = screens.some((s) => s.key === "index");

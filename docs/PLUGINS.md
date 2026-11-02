@@ -168,7 +168,10 @@ calllog (R2: `os.device.contacts` reads the phone's contacts, `os.device.callLog
 the calls; both are `readings` sources that file their own records and report
 `filed`); projects declares calendar (R4: `os.device.calendar.read(from, to)`
 hands over the phone's events, a month back and two ahead, and the module files
-them as Events); usage and health stay in platform until R6.
+them as Events); health declares health and usage (R6: `os.device.health.read(from, to)`
+hands over Health Connect's days, `os.device.usage.read(from, to)` screen time per day and
+per app; `saveHealthDays` moved from core to `src/modules/health/healthConnect.ts`, and
+screen time stays in core's usage tables). Every phone source is now declared by a module.
 
 crm also declares `notion` (R2b): a `readings` source that also writes, to a
 copy of your Notion People CRM only (`src/modules/crm/notion/client.ts`:

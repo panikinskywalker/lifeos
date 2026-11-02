@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { LifeOSContext } from '@core/registry/context';
 import { importSource, runSource } from '@core/filing/sources';
 import type { DeviceBridge } from '@core/registry/context';
-import { saveHealthDays, saveUsageDays, setSourceState, sourceState } from '@core/sources/deviceData';
+import { sourceState } from '@core/sources/deviceData';
 import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance/filing/fx';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
@@ -15,7 +15,9 @@ import { calendarBridge, calendarGranted, callLogBridge, callLogGranted, contact
  * Data sources on the phone (M4.2): bank SMS, payment-app notifications,
  * screen time and Health Connect. Each syncs on start, on every foreground,
  * from the background task, and (SMS / notifications) live as they arrive.
- * Everything lands through core: raw kept, parsed, deduped, filed, To check.
+ * Every source is declared by its module and reads the phone through the
+ * device bridge below (health's Health Connect and Usage access since R6);
+ * everything lands through core: raw kept, parsed, deduped, filed, To check.
  */
 
 export type SourceId = 'sms' | 'notifications' | 'usage' | 'health' | 'contacts' | 'calendar' | 'calllog';
@@ -39,10 +41,7 @@ export const SOURCES: SourceInfo[] = [
 
 export type Access = 'granted' | 'needed' | 'unavailable';
 
-const DAY = 86_400_000;
 const HISTORY_SMS_DAYS = 180;
-const HISTORY_HEALTH_DAYS = 90;
-const HISTORY_USAGE_DAYS = 30;
 
 /** What's needed to read a source right now. */
 export async function access(id: SourceId): Promise<Access> {
@@ -131,6 +130,8 @@ export function deviceBridge(os: LifeOSContext): DeviceBridge {
       drain: () => Device!.drain('notifications') as Array<{ package: string; title: string; text: string; at: number }>,
     },
     mail: { sync: () => syncMail(os) },
+    health: { access: () => access('health'), read: (from, to) => Device!.readHealth(from, to) },
+    usage: { access: () => access('usage'), read: (from, to) => Device!.queryUsage(from, to) },
     pdfText: (uri) => Device!.pdfText(uri).then((t) => (t.trim() ? t : null)),
     folders: foldersBridge(Device),
   };
@@ -143,32 +144,12 @@ export async function importSmsHistory(os: LifeOSContext): Promise<number> {
   return quietly(() => importSource(os, src, HISTORY_SMS_DAYS));
 }
 
-/** A message source from the registry (sms, notifications, gmail), if it is usable now. */
+/** A source from the registry, if it is usable now (each module's: sms, notifications, gmail, health, usage…). */
 async function syncRegistered(os: LifeOSContext, id: string) {
   const src = os.registry.sources.get(id);
   if (!src) return;
   if (id === 'sms' && !sourceState(os, id).enabled) return void console.log('[sync] sms skipped: not enabled');
   await quietly(() => runSource(os, src));
-}
-
-async function syncUsage(os: LifeOSContext) {
-  if (!Device || !Device.usageAccess()) return void console.log('[sync] usage skipped: no Usage access');
-  const st = sourceState(os, 'usage');
-  const from = st.lastSync ? Math.min(st.lastSync, Date.now() - DAY) - DAY : Date.now() - HISTORY_USAGE_DAYS * DAY;
-  const start = new Date(from);
-  start.setHours(0, 0, 0, 0);
-  const days = await Device.queryUsage(start.getTime(), Date.now());
-  saveUsageDays(os, days);
-  setSourceState(os, 'usage', { enabled: true, lastSync: Date.now(), addTotal: st.lastSync ? 0 : days.length, error: null });
-}
-
-async function syncHealth(os: LifeOSContext) {
-  if (!Device || Device.healthStatus() !== 'available' || !(await Device.healthGranted()).length) return void console.log(`[sync] health skipped: ${Device ? Device.healthStatus() : 'no module'}, permissions ${Device ? (await Device.healthGranted().catch(() => [])).length : 0}`);
-  const st = sourceState(os, 'health');
-  const from = st.lastSync ? Math.min(st.lastSync, Date.now() - DAY) - DAY : Date.now() - HISTORY_HEALTH_DAYS * DAY;
-  const days = await Device.readHealth(from, Date.now());
-  const created = saveHealthDays(os, days);
-  setSourceState(os, 'health', { enabled: true, lastSync: Date.now(), addTotal: created, error: null });
 }
 
 /** Today's exchange rates for USD / GBP / JPY / AED (once a day, when online), then convert anything waiting. */
@@ -217,18 +198,8 @@ export function syncSources(os: LifeOSContext): Promise<void> {
     // Documents' folders (R7c) after them: a rescan of the folders you picked.
     for (const id of ['calendar', 'contacts', 'calllog', 'folders'] as const) await withLimit(id, STEP_LIMIT_MS.phone, () => syncRegistered(os, id));
     if (deviceAvailable) {
-      // Message sources are declared by their modules (finance: sms, notifications) and run through the registry.
-      for (const id of ['sms', 'notifications'] as const) await withLimit(id, STEP_LIMIT_MS.device, () => syncRegistered(os, id));
-      for (const [id, fn] of [['usage', syncUsage], ['health', syncHealth]] as const) {
-        await withLimit(id, STEP_LIMIT_MS.device, async () => {
-          try {
-            await fn(os);
-          } catch (e) {
-            setSourceState(os, id, { error: (e as Error).message.slice(0, 200) });
-            throw e;
-          }
-        });
-      }
+      // Declared by their modules and run through the registry: finance's sms and notifications, health's usage and Health Connect (R6).
+      for (const id of ['sms', 'notifications', 'usage', 'health'] as const) await withLimit(id, STEP_LIMIT_MS.device, () => syncRegistered(os, id));
     }
     // Turf web (games): only once its address and key are set.
     await withLimit('turf', STEP_LIMIT_MS.turf, () => syncRegistered(os, 'turf'));

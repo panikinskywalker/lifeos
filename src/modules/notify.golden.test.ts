@@ -4,7 +4,7 @@ import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
-import { saveHealthDays } from '@core/sources/deviceData';
+import { saveHealthDays } from '@modules/health/healthConnect';
 import { measurementType } from './health/types';
 import { transactionType } from './finance/types';
 import { eventType, taskType } from './projects/types';

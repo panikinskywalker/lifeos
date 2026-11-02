@@ -7,7 +7,8 @@
 import { createBetterSqliteAdapter } from '../src/core/db/betterSqliteAdapter';
 import { createLifeOS } from '../src/core/lifeos';
 import { Registry } from '../src/core/registry/registry';
-import { saveHealthDays, saveUsageDays } from '../src/core/sources/deviceData';
+import { saveUsageDays } from '../src/core/sources/deviceData';
+import { saveHealthDays } from '../src/modules/health/healthConnect';
 import { metricSeries, peopleToCall, spendPace, upcoming } from '../src/core/dashboard/metrics';
 import { doneToday, myDay, progress } from '../src/core/dashboard/day';
 import { upkeep } from '../src/core/cycles/upkeep';

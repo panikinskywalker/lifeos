@@ -135,6 +135,48 @@ export function metricSeries(os: LifeOSContext, id: MetricId, period: Period, no
   return { def, period, buckets, value, prev, change, daysWithData: cur.size, from, to: today };
 }
 
+/* ------------------------------------------------------------------ */
+/* Comparisons (R6): this week vs last, vs your usual                    */
+/* ------------------------------------------------------------------ */
+
+export interface MetricCompare {
+  def: MetricDef;
+  /** The last 7 days and the 7 before: the average per day with data (weight: the latest reading). */
+  thisWeek: number | null;
+  lastWeek: number | null;
+  /** The median of the 8 weeks before this one that have data; null with fewer than two. */
+  usual: number | null;
+  /** How many of those 8 weeks had data. */
+  usualWeeks: number;
+  /** Relative changes (0.12 = +12%), null when either side is missing. */
+  vsLast: number | null;
+  vsUsual: number | null;
+}
+
+const rel = (a: number | null, b: number | null) => (a != null && b != null && b !== 0 ? (a - b) / Math.abs(b) : null);
+
+/** A week's value: per-day average over the days that have data (so a day the watch was off is not a zero); weight's latest. */
+function weekValue(def: MetricDef, m: Map<string, number>, from: string, to: string): number | null {
+  const vals = [...m.entries()].filter(([k]) => k >= from && k <= to).sort(([a], [b]) => a.localeCompare(b)).map(([, v]) => v);
+  if (!vals.length) return null;
+  return def.agg === 'last' ? vals[vals.length - 1]! : vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+/** This week against last week and against your usual week (docs/MODEL.md layer 2, *Body*). */
+export function compareMetric(os: LifeOSContext, id: MetricId, now = Date.now()): MetricCompare {
+  const def = METRICS[id];
+  const today = isoDay(now);
+  const from = addDays(today, -(10 * 7 - 1));
+  const m = daily(os, id, from, today);
+  const week = (k: number) => weekValue(def, m, addDays(today, -(7 * (k + 1) - 1)), addDays(today, -7 * k));
+  const thisWeek = week(0);
+  const lastWeek = week(1);
+  const past = Array.from({ length: 8 }, (_, i) => week(i + 1)).filter((v): v is number => v != null).sort((a, b) => a - b);
+  const mid = past.length >> 1;
+  const usual = past.length < 2 ? null : past.length % 2 ? past[mid]! : (past[mid - 1]! + past[mid]!) / 2;
+  return { def, thisWeek, lastWeek, usual, usualWeeks: past.length, vsLast: rel(thisWeek, lastWeek), vsUsual: rel(thisWeek, usual) };
+}
+
 /** Screen time's top apps over the same range. */
 export function screenTopApps(os: LifeOSContext, period: Period, now = Date.now(), limit = 5) {
   const today = isoDay(now);

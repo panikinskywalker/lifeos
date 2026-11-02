@@ -1,16 +1,31 @@
 import type { ModuleManifest } from '@core/registry/types';
-import { measurementType, workoutType, type MeasurementData, type WorkoutData } from './types';
+import { measurementType, workoutType } from './types';
+import { healthSources } from './sources';
+import { healthTools } from './aiTools';
+import { healthBrain } from './brain';
 
-export { measurementType, workoutType, type MeasurementData, type WorkoutData };
+export * from './types';
+export { saveHealthDays } from './healthConnect';
+export { healthSource, usageSource, healthSources, readFrom, HISTORY } from './sources';
+export { HEALTH_METRICS, isHealthMetric, latestMeasurement, healthToday, sleepNights, workoutsIn, compareInWords, logMeasurement, type HealthMetric, type WorkoutSummary } from './lib';
+export { healthTools } from './aiTools';
+export { healthBrain } from './brain';
 export const HEALTH_COLOR = 'red';
 
-/** Body: Measurement and Workout, fed by Health Connect and Usage access (sources move in at R6). Screens live in `src/boards/health`. */
+/**
+ * Body (docs/MODEL.md layer 2, *Body*; R6): Measurement and Workout, fed by
+ * Health Connect and Usage access (screen time, kept in core's usage tables).
+ * Its pages live in `src/boards/health`.
+ */
 export const healthModule: ModuleManifest = {
   id: 'health',
   name: 'Health & Fitness',
-  version: '1.0.0',
-  description: 'Workouts and body measurements with trends.',
+  version: '1.1.0',
+  description: 'Steps, sleep, heart rate, weight, screen time and workouts.',
   icon: 'heart',
   color: HEALTH_COLOR,
   objects: [workoutType, measurementType],
+  sources: healthSources,
+  aiTools: healthTools,
+  brain: healthBrain,
 };

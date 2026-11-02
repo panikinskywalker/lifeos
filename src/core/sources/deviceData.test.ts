@@ -4,7 +4,8 @@ import { createLifeOS } from '../lifeos';
 import { Registry } from '../registry/registry';
 import type { LifeOSContext } from '../registry/context';
 import { bus } from '../events/bus';
-import { metricDays, saveHealthDays, saveUsageDays, setSourceState, sourceState, topApps, usageDays } from './deviceData';
+import { metricDays, saveUsageDays, setSourceState, sourceState, topApps, usageDays } from './deviceData';
+import { saveHealthDays } from '../../modules/health/healthConnect';
 import { measurementType, workoutType } from '../../modules/health/types';
 
 let os: LifeOSContext;
