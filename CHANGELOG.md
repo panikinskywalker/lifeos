@@ -7,6 +7,27 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.27 · 2 Nov 2026
+
+**The brain, more of it** (MODEL.md layer 8, slices 4 and 6), built in its
+own session and merged here. The screens are a first pass from the kit until
+the artboards are drawn.
+- **Snap the fridge** on Home and the Fridge: take one photo, Claude compares
+  it with the pills and lights up the differences ("Not seen: butter · Found:
+  coriander"). Tap to accept, hold to fix. The photo goes to Claude only
+  because you pressed the button, and LifeOS keeps it nowhere; Sent to Claude
+  shows it left.
+- **Cook tonight** takes the dish from the fridge photo, and **Ask now** /
+  **Another idea** ask straight away instead of waiting for the next pass.
+- **Money** brings renewals coming up, bills to pay (Paid files the
+  expense), a deposit maturing, and a spend far above your usual.
+- **Documents** brings papers expiring (Renewed opens it) and new files in
+  your folders you haven't looked at.
+- **Projects** brings late tasks (Done) and the dinner, appointment or match
+  coming up today or tomorrow.
+- **Assets** brings a warranty about to end and a service due by date or km.
+- Fixed: something due today in Upkeep now comes as a nudge.
+
 ## v0.0.26 · 2 Nov 2026
 
 **Second Brain** (R7f), built in its own session and merged here. The

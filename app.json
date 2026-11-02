@@ -2,7 +2,7 @@
   "expo": {
     "name": "LifeOS",
     "slug": "lifeos",
-    "version": "0.0.26",
+    "version": "0.0.27",
     "scheme": "lifeos",
     "orientation": "default",
     "icon": "./assets/icon.png",
