@@ -46,7 +46,12 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite",
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
       "expo-secure-store",
       "expo-notifications",
       "expo-background-task",

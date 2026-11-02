@@ -66,7 +66,7 @@ export function OneBox({ share, centerPress }: { share?: Shared | null; centerPr
   const [source, setSource] = useState<DumpSource>('typed');
   const [file, setFile] = useState<Shared['file'] | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
-  const dumps = useLive((o) => o.dumps.list({ limit: 30 }), []);
+  const dumps = useLive((o) => o.dumps.recent({ limit: 30 }), []);
   const queued = useLive((o) => o.questions.list(20), []);
 
   const [focusTick, setFocusTick] = useState(0);

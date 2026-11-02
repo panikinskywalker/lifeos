@@ -1,7 +1,12 @@
 import type { LifeOSContext } from '../registry/context';
 import { bus } from '../events/bus';
+import { DUMP_DAYS } from '../repo/dumpRepo';
 
 /**
+ * Retention (docs/MODEL.md layer 6, R15): once a day, To check items untouched
+ * for 15 days are ticked, dumps filed more than 15 days ago leave the Dump
+ * list and search, and the 60-day clean-up below runs; each run is logged.
+ *
  * The 60-day clean-up (M4.2c, Rutvij's choice): keeps the phone light
  * without losing anything that matters.
  *  - ignored messages (OTPs, promos, untrusted senders, duplicates): deleted
@@ -58,11 +63,40 @@ export function pruneOldData(os: LifeOSContext, opts: { days?: number; now?: num
   return r;
 }
 
+/** One day's clean-up (docs/MODEL.md layer 6, R15), as kept in the log. */
+export interface RetentionRun extends PruneResult {
+  at: number;
+  /** To check items untouched for 15 days, ticked as filed. */
+  toCheckApproved: number;
+  /** Dumps filed more than 15 days ago, cleared from the Dump list and search. */
+  dumpsCleared: number;
+}
+
+const LOG_KEY = 'retention.log';
+const LOG_KEEP = 30;
+
+/** The three retention jobs, each counted, and the run added to the log (newest first). */
+export function runRetention(os: LifeOSContext, now = Date.now()): RetentionRun {
+  const run: RetentionRun = {
+    at: now,
+    toCheckApproved: os.filings.autoApprove(15, now),
+    dumpsCleared: os.dumps.clearOld(DUMP_DAYS, now),
+    ...pruneOldData(os, { now }),
+  };
+  os.settings.set(LOG_KEY, [run, ...retentionLog(os)].slice(0, LOG_KEEP));
+  return run;
+}
+
+/** The last runs, newest first. */
+export function retentionLog(os: LifeOSContext): RetentionRun[] {
+  return os.settings.get<RetentionRun[]>(LOG_KEY, []);
+}
+
 /** Once a day at most. */
-export function pruneIfDue(os: LifeOSContext, now = Date.now()): PruneResult | null {
+export function pruneIfDue(os: LifeOSContext, now = Date.now()): RetentionRun | null {
   const last = os.settings.get<number>('retention.lastRun', 0);
   if (now - last < DAY) return null;
-  const r = pruneOldData(os, { now });
+  const r = runRetention(os, now);
   os.settings.set('retention.lastRun', now);
   return r;
 }

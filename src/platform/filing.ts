@@ -37,9 +37,7 @@ export function runFiling(os: LifeOSContext): Promise<void> {
   if (running) return running;
   running = (async () => {
     try {
-      // To check: what you haven't touched in 15 days is approved as filed.
-      os.filings.autoApprove(15);
-      // Once a day: the 60-day clean-up (ignored messages, raw wording, per-app screen time, past calendar events).
+      // Once a day, logged: To check auto-approve and dumps cleared (15 days), the 60-day clean-up (MODEL layer 6, R15).
       pruneIfDue(os);
       const dumpsDue = os.dumps.pending().length > 0;
       const questionsDue = os.questions.due().length > 0;

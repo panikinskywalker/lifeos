@@ -11,6 +11,9 @@ import { useLive, useOS } from '@ui/hooks';
 import { Button, ChipRow, FilterChip, Screen, Section, SwitchField, Text, TextField, useToast } from '@ui/kit';
 import { exportAll, importAll } from '../../src/platform/exportImport';
 import { lockAvailability, lockPrefs, setLockPrefs, unlock } from '../../src/platform/lock';
+import { databaseState, encryptOnNextStart, tryEncryptedCopy } from '../../src/platform/openDatabase';
+import { retentionLog } from '@core/sources/retention';
+import type { CopyReport } from '@core/db/encryption';
 
 const AFTER = [
   { value: 0, label: 'Right away' },
@@ -23,6 +26,7 @@ const AFTER = [
  * You › Lock & backup (M5): lock the app with fingerprint / face (or the
  * phone's PIN); export everything as a password-encrypted file; restore
  * from one. API keys and Gmail passwords are never in a backup.
+ * R15 (docs/MODEL.md layer 6): the database's encryption and the daily clean-up.
  */
 export default function DataSettingsRoute() {
   const os = useOS();
@@ -37,6 +41,29 @@ export default function DataSettingsRoute() {
   const [restorePw, setRestorePw] = useState('');
   const [error, setError] = useState<string | null>(null);
   useEffect(() => void lockAvailability().then(setAvail), []);
+  const [dbState, setDbState] = useState(databaseState);
+  const [copy, setCopy] = useState<{ report?: CopyReport; error?: string } | null>(null);
+  const lastClean = useLive((o) => retentionLog(o)[0] ?? null, []);
+
+  const tryCopy = (encrypt: boolean) => {
+    setCopy(null);
+    try {
+      const report = encrypt ? encryptOnNextStart(os.db) : tryEncryptedCopy(os.db);
+      setCopy({ report });
+      setDbState(databaseState());
+    } catch (e) {
+      setCopy({ error: (e as Error).message });
+    }
+  };
+  const restart = () => {
+    const fallback = () => toast.show({ message: 'Close LifeOS fully and open it again', icon: 'lock' });
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require('expo-updates') as typeof import('expo-updates')).reloadAsync().catch(fallback);
+    } catch {
+      fallback();
+    }
+  };
 
   const toggleLock = async (on: boolean) => {
     // Prove it works before relying on it.
@@ -114,7 +141,7 @@ export default function DataSettingsRoute() {
       <Section title="App lock">
         {avail === 'needs-build' ? (
           <Text variant="caption" color="secondary">The lock needs the new app build (it uses the phone’s fingerprint / face unlock).</Text>
-        ) : avail === 'no-lock-set' ? (
+        ) : avail === 'no-lock-set' && !lock.on ? (
           <Text variant="caption" color="secondary">Set a screen lock (fingerprint, face or PIN) in the phone’s settings first.</Text>
         ) : (
           <>
@@ -128,6 +155,33 @@ export default function DataSettingsRoute() {
             ) : null}
           </>
         )}
+      </Section>
+
+      <Section title="Database">
+        {dbState.encrypted ? (
+          <Text variant="caption" color="secondary">Encrypted (SQLCipher, AES-256). The key is in this phone’s secure store and is in no backup: to move to a new phone, use a backup file below.{dbState.moved ? ` Moved this start: ${dbState.moved.tables} tables, ${dbState.moved.rows.toLocaleString()} rows, all matched.` : ''}</Text>
+        ) : !dbState.cipher ? (
+          <Text variant="caption" color="secondary">Not encrypted. {Platform.OS === 'web' ? 'The web build stays plain.' : 'Encryption needs the new app build.'}</Text>
+        ) : dbState.keySaved ? (
+          <>
+            <Text variant="caption" color="secondary">{dbState.moveError ? `Not encrypted: the last move didn’t match and was thrown away (${dbState.moveError}). Your data is as it was; it tries again on the next start.` : 'Ready: the next start makes an encrypted copy, checks it, and switches to it.'}</Text>
+            <Button title="Restart now" icon="refresh" size="sm" onPress={restart} />
+          </>
+        ) : (
+          <>
+            <Text variant="caption" color="secondary">Not encrypted yet. Export a backup first. “Try on a copy” makes an encrypted copy, checks every table, and deletes it; nothing changes. “Encrypt” does the same, then the next start moves the database for real.</Text>
+            <Button title="Try on a copy" variant="secondary" size="sm" icon="check" onPress={() => tryCopy(false)} />
+            <Button title="Encrypt the database" icon="lock" size="sm" onPress={() => tryCopy(true)} />
+          </>
+        )}
+        {copy?.report ? <Text variant="caption" color="secondary">The encrypted copy matched: {copy.report.tables} tables, {copy.report.rows.toLocaleString()} rows.</Text> : null}
+        {copy?.error ? <Text variant="caption" color="alert">{copy.error}</Text> : null}
+        {dbState.setAside ? <Text variant="caption" color="alert">An encrypted database whose key was missing was kept aside as {dbState.setAside}; restore a backup file to bring your data back.</Text> : null}
+        {lastClean ? (
+          <Text variant="caption" color="secondary">
+            Clean-up, {os.format.date(lastClean.at, 'relative')}: {lastClean.toCheckApproved} To check ticked, {lastClean.dumpsCleared} dumps cleared, {lastClean.rawTexts} texts’ wording and {lastClean.ignoredMessages} ignored messages removed.
+          </Text>
+        ) : null}
       </Section>
 
       <Section title="Back up everything">

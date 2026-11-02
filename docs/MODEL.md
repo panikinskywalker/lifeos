@@ -1212,9 +1212,49 @@ screens checked on the phone → overrides only where the default is wrong)
   the chain.
 
 ### Around it
-- [ ] **R15 Build and ship** — standalone dev / preview build with OTA updates
+- [x] **R15 Build and ship** — standalone dev / preview build with OTA updates
   (ADHOC), app lock, database encryption; retention jobs (dumps 15 days, raw
-  texts 60 days, To check auto-approve 15 days).
+  texts 60 days, To check auto-approve 15 days). Built 2 Nov 2026 (branch
+  `claude/r15-ship`; no migration; `docs/handover/r15-ship.md`). Encryption
+  needs the new APK. *Phone check pending.*
+  - [x] **Standalone build and OTA** (v0.0.15 to v0.0.17): EAS preview APK,
+    updates on the `preview` channel, the fingerprint leaves out app.json's
+    version so a JS-only version arrives as an update.
+  - **Database encryption** (decided 2 Nov): the whole database file is
+    SQLCipher (expo-sqlite's `useSQLCipher`, AES-256), `lifeos-secure.db`. The
+    key is 32 random bytes in the phone's secure store (`lifeos.db.key`,
+    Android Keystore), not tied to the fingerprint, so filing and syncs in the
+    background still open it; it never leaves the phone and is not in any
+    backup. A new install starts encrypted. Today's plain `lifeos.db` moves
+    only when you ask (You › Lock & backup › Encrypt the database): first a
+    copy is made encrypted and checked (every table's row count, SQLite's
+    quick check) and thrown away; if it matches, the key is saved and the
+    next start makes the real copy, checks it the same way, and only then
+    switches to it; the plain file is deleted on the start after that. A copy
+    that does not match is deleted and the plain database stays in use.
+    Encrypted with its key missing (a phone restore brings the file, not the
+    key): the file is set aside, never deleted, and a new database starts;
+    your backup file is how data crosses phones. The web build stays plain.
+  - **App lock** (decided 2 Nov): covers every screen with an opaque cover on
+    open and after you've been away longer than your setting (every time, 1, 5
+    or 15 minutes); fingerprint, face or the phone's PIN opens it. Work in the
+    background (filing, syncs, the brain, reminders) carries on while locked;
+    notification text is the phone's to hide. Back does nothing while locked.
+    A phone with no screen lock set never locks you out. The lock and the
+    encryption are separate: the lock guards the screen, the key the file.
+  - **Retention** (decided 2 Nov): one job in core, once a day (from the
+    filing run: app open, return to the app, the background task), each part
+    counted in a log (the last 30 runs, `retention.log` in settings; the last
+    run shown in You › Lock & backup). *To check*: what you haven't ticked or
+    undone in 15 days is ticked as filed; nothing is removed. *Dumps*: a dump
+    filed (or with nothing to file) more than 15 days ago leaves the Dump list
+    and search, so the model is not shown it either; its row stays, as the
+    provenance behind "Dumps that mention it" and the record timelines, which
+    keep the sentence. Waiting or failed dumps stay until filed. (Deleting the
+    rows needs a migration, since the database refuses it by design; not
+    done.) *Raw texts* (60 days, from M4.2c): ignored messages deleted, the
+    wording of filed messages and of the transaction's Original text cleared,
+    the per-app screen time and ended synced calendar events removed.
 - [ ] **R16 Docs** — `ARCHITECTURE.md`, `GRAPH.md` and SCOPE §C retired into
   this file; `HANDOFF.md` rewritten for the three tiers.
 

@@ -18,15 +18,11 @@ What the app couldn't handle goes through a nightly Claude run and comes back fi
 ### Import file — 28 Sep
 A friendly "LifeOS import" file (records + links, not raw backup rows) that goes through normal filing, opened via Share → LifeOS or the file picker. The results file above is a superset; build them together.
 
-### Standalone app + over-the-air updates — 27 Sep
-Preview build (no Mac / Metro / Wi-Fi dance), updates arrive by themselves on next open; install over the current app (same signing key, data kept). Carries the app lock (built, needs a build) and anything native from this list.
-
 ## Offered, waiting on a decision
 
 - **Notion connector** (28 Sep): internal-integration token pasted once; you share pages / databases with it. Could bring pages in as searchable notes linked to people / projects, a task database as tasks, a journal onto the Time view. *24 Oct: the People CRM part is pushed as R2b (MODEL layer 4, *Notion*); notes, tasks and the journal stay open.*
 - **Other token connectors:** GitHub (commits → an Activity tracker "days coded"), Todoist / Linear (tasks), Splitwise (shared expenses). Strava / Spotify need a sign-in flow like Google.
 - **Missing-keys warning** (27 Sep): "Your AI keys are missing — add them in You › Agent" instead of dumps quietly waiting.
-- **Database encryption** (SQLCipher, key in secure storage) — needs a build.
 - **Automatic encrypted backups** to a folder you pick (e.g. Drive).
 - **"Replace everything" restore** (restore today only adds / updates).
 - **Cloud sync** (backlog) — also enables a web / iPhone client.

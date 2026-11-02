@@ -4,6 +4,10 @@ import { bus } from '../events/bus';
 import type { ChangeLog } from '../sync/changeLog';
 
 export type DumpSource = 'typed' | 'voice' | 'share';
+
+/** Dumps are cleared from the Dump list and search after this many days (docs/MODEL.md layer 4). */
+export const DUMP_DAYS = 15;
+const FINISHED = `('done','skipped')`;
 export type DumpStatus = 'pending' | 'done' | 'failed' | 'skipped';
 
 export interface Dump {
@@ -134,6 +138,34 @@ export class DumpRepo {
 
 
 
+  /**
+   * The Dump list (docs/MODEL.md layer 5): the last `days` days, plus any
+   * older dump not filed yet. Newest first.
+   */
+  recent(opts: { days?: number; now?: number; limit?: number } = {}): Dump[] {
+    const from = (opts.now ?? Date.now()) - (opts.days ?? DUMP_DAYS) * 86_400_000;
+    return this.db
+      .all<Row>(`SELECT * FROM dumps WHERE created_at >= ? OR status NOT IN ${FINISHED} ORDER BY created_at DESC LIMIT ?`, [from, opts.limit ?? 50])
+      .map(toDump);
+  }
+
+  /**
+   * Retention (docs/MODEL.md layer 6, R15): a dump filed (or with nothing to
+   * file) more than `days` days ago leaves search, and with it the Dump list
+   * and what the model is shown. The row stays as provenance; the database
+   * refuses deleting it. Returns how many left search now.
+   */
+  clearOld(days = DUMP_DAYS, now = Date.now()): number {
+    const old = `SELECT id FROM dumps WHERE status IN ${FINISHED} AND created_at < ?`;
+    const cutoff = now - days * 86_400_000;
+    const n = this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records_fts WHERE object='dump' AND id IN (${old})`, [cutoff])?.n ?? 0;
+    if (n) {
+      this.db.run(`DELETE FROM records_fts WHERE object='dump' AND id IN (${old})`, [cutoff]);
+      bus.emit('data.changed', { table: 'dumps', id: 'retention' });
+    }
+    return n;
+  }
+
   /** Dumps that produced or touched a record (for "Dumps that mention it" on its page). */
   forEntity(entityId: string): Dump[] {
     return this.db
@@ -142,9 +174,10 @@ export class DumpRepo {
   }
 
 
-  /** Put every dump back in the search index (after a full rebuild). */
-  reindex(): void {
-    for (const r of this.db.all<{ id: string; body: string }>(`SELECT id, body FROM dumps`)) this.index(r.id, r.body);
+  /** Put every dump not cleared by retention back in the search index (after a full rebuild). */
+  reindex(now = Date.now()): void {
+    const rows = this.db.all<{ id: string; body: string }>(`SELECT id, body FROM dumps WHERE created_at >= ? OR status NOT IN ${FINISHED}`, [now - DUMP_DAYS * 86_400_000]);
+    for (const r of rows) this.index(r.id, r.body);
   }
 
   private index(id: string, body: string) {
