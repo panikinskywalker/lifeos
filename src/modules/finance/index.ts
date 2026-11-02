@@ -42,8 +42,32 @@ export const financeModule: ModuleManifest = {
       run: async (cfg, ctx, os) => {
         const tx = os.records.create({ object: 'transaction', data: { amount: Number(cfg.amount), kind: (cfg.kind as string) || 'expense', category: (cfg.category as string) || 'other', merchant: cfg.merchant ? String(cfg.merchant) : undefined, accountId: cfg.accountId ? String(cfg.accountId) : undefined, date: new Date().toISOString().slice(0, 10) } }, 'automation');
         if (ctx.entity) os.links.link(tx.id, ctx.entity.id, 'related', {}, 'automation');
-        return tx.title;
+        return { line: `Logged ${tx.title}`, output: { id: tx.id, title: tx.title, amount: Number(cfg.amount) }, undo: { id: tx.id } };
       },
+      outputs: ['id', 'title', 'amount'],
+      undo: (u, os) => os.records.delete((u as { id: string }).id, 'automation'),
+    },
+  ],
+  templates: [
+    {
+      id: 'finance.bigSpend', name: 'Big spend flag',
+      description: 'An expense over ₹10,000 is tagged #review, with a reminder to look at it tomorrow.',
+      trigger: { id: 'core.entity.created', config: { entityType: 'transaction' } },
+      conditions: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.amount', op: 'gt', value: 10000 }],
+      steps: [
+        { action: 'core.addTag', config: { tag: 'review' } },
+        { action: 'core.createReminder', config: { title: 'Review: {{title}} (₹{{data.amount}})', inDays: 1 } },
+      ],
+    },
+    {
+      id: 'finance.subscriptionPosted', name: 'Subscription auto-post',
+      description: 'When Finance posts a due subscription bill on its own, it is tagged #subscription and you are told what went out.',
+      trigger: { id: 'core.entity.created', config: { entityType: 'transaction' } },
+      conditions: [{ field: 'data.note', op: 'eq', value: 'Auto-posted subscription' }],
+      steps: [
+        { action: 'core.addTag', config: { tag: 'subscription' } },
+        { action: 'core.notify', config: { title: '{{data.merchant}} renewed', body: '₹{{data.amount}} posted for {{data.date}}' } },
+      ],
     },
   ],
   aiTools: financeAiTools,

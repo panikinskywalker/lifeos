@@ -1,7 +1,7 @@
 import type { FilterClause } from '../domain/types';
 import type { AutomationContext } from '../registry/types';
 
-/** Resolve "title", "status", "data.amount", "vars.to", "previous.status" from a context. */
+/** Resolve "title", "status", "data.amount", "vars.to", "previous.status", "steps.s1.title" from a context. */
 export function resolvePath(path: string, ctx: AutomationContext): unknown {
   const [head, ...rest] = path.split('.');
   let root: unknown;
@@ -9,6 +9,7 @@ export function resolvePath(path: string, ctx: AutomationContext): unknown {
   else if (head === 'previous') root = ctx.previous;
   else if (head === 'data') root = ctx.entity?.data;
   else if (head === 'entity') root = ctx.entity;
+  else if (head === 'steps') root = ctx.steps;
   else return (ctx.entity as unknown as Record<string, unknown> | undefined)?.[head] ?? ctx.vars[head];
   let cur: unknown = root;
   for (const k of rest) {

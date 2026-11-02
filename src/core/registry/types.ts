@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'; // type-only: core has no runtime dependency on React (deps.test allows `import type`)
 import type { ZodTypeAny } from 'zod';
-import type { ObjectRecord, ObjectDef, WidgetSize } from '../domain/types';
+import type { FilterClause, ObjectRecord, ObjectDef, WidgetSize } from '../domain/types';
 import type { CoreEvents, EventName } from '../events/bus';
 import type { LifeOSContext } from './context';
 import type { MessageParser } from '../filing/contract';
@@ -36,8 +36,8 @@ export interface TriggerDef {
   module: string;
   label: string;
   description?: string;
-  /** Which bus event fires it. */
-  event: EventName;
+  /** Which bus event fires it (none: started by hand, R10). */
+  event?: EventName;
   /** Turn the event payload into the automation context (or null = ignore). */
   toContext: (payload: CoreEvents[EventName]) => AutomationContext | null;
   configFields?: ObjectDef['fields'];
@@ -48,6 +48,20 @@ export interface AutomationContext {
   previous?: ObjectRecord;
   changed?: string[];
   vars: Record<string, unknown>;
+  /** Earlier steps' outputs by step key (R10): `{{steps.s1.title}}`. */
+  steps?: Record<string, Record<string, unknown>>;
+}
+
+/** What a step hands back (R10). A plain string is its line. */
+export interface StepResult {
+  /** The run log's line ("Tagged #review"). */
+  line?: string;
+  /** Plain values later steps read as {{steps.<key>.<name>}}. */
+  output?: Record<string, unknown>;
+  /** What `ActionDef.undo` needs; absent = nothing to undo. */
+  undo?: unknown;
+  /** End the run here, quietly (Continue only if). */
+  stop?: boolean;
 }
 
 export interface ActionDef {
@@ -56,7 +70,22 @@ export interface ActionDef {
   label: string;
   description?: string;
   configFields?: ObjectDef['fields'];
-  run: (config: Record<string, unknown>, ctx: AutomationContext, os: LifeOSContext) => Promise<string | void>;
+  /** The output names this action gives, for the editor ("id", "title", "text"). */
+  outputs?: string[];
+  run: (config: Record<string, unknown>, ctx: AutomationContext, os: LifeOSContext) => Promise<string | void | StepResult>;
+  /** Undo one run of this step, from its `StepResult.undo`. */
+  undo?: (undo: unknown, os: LifeOSContext) => void | Promise<void>;
+}
+
+/** A rule to start from (R10): offered in the editor, saved only when you save it. */
+export interface AutomationTemplate {
+  id: string;
+  module?: string;
+  name: string;
+  description: string;
+  trigger: { id: string; config: Record<string, unknown> };
+  conditions: FilterClause[];
+  steps: Array<{ action: string; config: Record<string, unknown> }>;
 }
 
 /** Tool exposed to the AI assistant (Claude tool-use). */
@@ -274,6 +303,8 @@ export interface ModuleManifest {
   objects?: ObjectDef<any>[]; // eslint-disable-line @typescript-eslint/no-explicit-any
   triggers?: TriggerDef[];
   actions?: ActionDef[];
+  /** Automation templates (R10): big spend flag, document expiry… */
+  templates?: AutomationTemplate[];
   aiTools?: AiToolDef[];
   /** The sources that feed this module (contract above). */
   sources?: SourceDef[];

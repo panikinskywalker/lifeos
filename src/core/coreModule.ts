@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { ModuleManifest, TriggerDef, ActionDef, AiToolDef } from './registry/types';
 import type { CoreEvents } from './events/bus';
-import type { ObjectRecord, FilterGroup, SortSpec } from './domain/types';
+import type { ObjectRecord, FilterClause, FilterGroup, SortSpec } from './domain/types';
+import { evaluateCondition } from './automation/conditions';
 import type { LifeOSContext } from './registry/context';
 import { lifeTools, recordCard, touchesMoneyOrPeople } from './ai/lifeTools';
 import { withExtras } from './ai/cards';
@@ -52,10 +53,19 @@ const triggers: TriggerDef[] = [
     },
   },
   {
-    id: 'core.schedule.daily', module: 'core', label: 'Every day (scheduler tick)', event: 'schedule.tick',
+    id: 'core.schedule.daily', module: 'core', label: 'Every day', event: 'schedule.tick', description: 'Once a day, after its time',
+    configFields: [{ key: 'time', label: 'After (HH:MM)', type: 'text', placeholder: '08:00', default: '08:00' }],
     toContext: (p) => ({ vars: { at: (p as CoreEvents['schedule.tick']).at } }),
   },
+  {
+    id: 'core.manual', module: 'core', label: 'Run by hand', description: 'Its button, Run now, or a sentence in Talk ("run month close")',
+    configFields: [{ key: 'phrase', label: 'Run it by saying "run …"', type: 'text', placeholder: 'the rule’s name' }],
+    toContext: () => null,
+  },
 ];
+
+const OP_WORDS: Record<string, string> = { eq: 'is', neq: 'is not', gt: 'more than', gte: 'at least', lt: 'less than', lte: 'at most', contains: 'contains', isNull: 'empty', notNull: 'not empty' };
+const targetOf = (ctx: { entity?: ObjectRecord; vars: Record<string, unknown> }) => ctx.entity?.id ?? (ctx.vars.entityId as string | undefined);
 
 /* ------------------------------------------------------------------ */
 /* Generic actions                                                     */
@@ -63,29 +73,41 @@ const triggers: TriggerDef[] = [
 
 const actions: ActionDef[] = [
   {
-    id: 'core.setStatus', module: 'core', label: 'Set status', configFields: [{ key: 'status', label: 'Status', type: 'text', required: true }],
+    id: 'core.setStatus', module: 'core', label: 'Set status', configFields: [{ key: 'status', label: 'Status', type: 'text', required: true }], outputs: ['status'],
     run: async (cfg, ctx, os) => {
-      if (!ctx.entity) return 'no entity';
+      if (!ctx.entity) return 'no record';
+      const from = os.records.get(ctx.entity.id)?.status ?? null;
       os.records.setStatus(ctx.entity.id, String(cfg.status), 'automation');
-      return `status=${cfg.status}`;
+      return { line: `Status ${cfg.status}`, output: { status: String(cfg.status) }, undo: { id: ctx.entity.id, from } };
+    },
+    undo: (u, os) => {
+      const x = u as { id: string; from: string | null };
+      os.records.setStatus(x.id, x.from, 'automation');
     },
   },
   {
-    id: 'core.addTag', module: 'core', label: 'Add tag', configFields: [{ key: 'tag', label: 'Tag', type: 'text', required: true }],
+    id: 'core.addTag', module: 'core', label: 'Add tag', configFields: [{ key: 'tag', label: 'Tag', type: 'text', required: true }], outputs: ['tag'],
     run: async (cfg, ctx, os) => {
-      const id = ctx.entity?.id ?? (ctx.vars.entityId as string | undefined);
-      if (!id) return 'no entity';
-      os.tags.apply(id, String(cfg.tag), 'automation');
-      return `#${cfg.tag}`;
+      const id = targetOf(ctx);
+      if (!id) return 'no record';
+      const had = os.tags.forEntity(id).some((t) => t.name.toLowerCase() === String(cfg.tag).replace(/^#/, '').toLowerCase());
+      const tag = os.tags.apply(id, String(cfg.tag), 'automation');
+      return { line: `Tagged #${tag.name}`, output: { tag: tag.name }, undo: had ? undefined : { id, tagId: tag.id } };
+    },
+    undo: (u, os) => {
+      const x = u as { id: string; tagId: string };
+      os.tags.remove(x.id, x.tagId);
     },
   },
   {
-    id: 'core.addComment', module: 'core', label: 'Add a fact', configFields: [{ key: 'body', label: 'Fact (supports {{title}} templates)', type: 'longtext', required: true }],
+    id: 'core.addComment', module: 'core', label: 'Add a fact', configFields: [{ key: 'body', label: 'Fact', type: 'longtext', required: true, description: 'Fills in {{title}}, {{data.amount}}, {{steps.s1.text}}' }], outputs: ['text'],
     run: async (cfg, ctx, os) => {
-      const id = ctx.entity?.id ?? (ctx.vars.entityId as string | undefined);
-      if (!id) return 'no entity';
-      os.facts.add({ text: String(cfg.body), subjectId: id, source: 'automation' });
+      const id = targetOf(ctx);
+      if (!id) return 'no record';
+      const f = os.facts.add({ text: String(cfg.body), subjectId: id, source: 'automation' });
+      return { line: `Noted: ${f.text}`, output: { text: f.text }, undo: { factId: f.id } };
     },
+    undo: (u, os) => os.facts.forget((u as { factId: string }).factId),
   },
   {
     id: 'core.createReminder', module: 'core', label: 'Create reminder',
@@ -96,6 +118,7 @@ const actions: ActionDef[] = [
       { key: 'offsetDays', label: 'Days before that date', type: 'number', default: 0 },
       { key: 'rrule', label: 'Repeat (RRULE)', type: 'text', placeholder: 'FREQ=WEEKLY;INTERVAL=1' },
     ],
+    outputs: ['id', 'title', 'dueAt'],
     run: async (cfg, ctx, os) => {
       let dueAt = Date.now() + Number(cfg.inDays ?? 1) * 86400000;
       if (cfg.atField && ctx.entity) {
@@ -105,15 +128,17 @@ const actions: ActionDef[] = [
       }
       if (dueAt < Date.now()) dueAt = Date.now() + 3600000;
       const r = os.reminders.create({ entityId: ctx.entity?.id ?? null, title: String(cfg.title), dueAt, rrule: cfg.rrule ? String(cfg.rrule) : null }, 'automation');
-      return r.title;
+      return { line: `Reminder: ${r.title}`, output: { id: r.id, title: r.title, dueAt: new Date(dueAt).toISOString().slice(0, 10) }, undo: { id: r.id } };
     },
+    undo: (u, os) => os.reminders.remove((u as { id: string }).id),
   },
   {
     id: 'core.notify', module: 'core', label: 'Send notification',
     configFields: [{ key: 'title', label: 'Title', type: 'text', required: true }, { key: 'body', label: 'Body', type: 'longtext' }],
+    outputs: ['title'],
     run: async (cfg, ctx, os) => {
       await os.notify({ title: String(cfg.title), body: cfg.body ? String(cfg.body) : undefined, data: { entityId: ctx.entity?.id } });
-      return String(cfg.title);
+      return { line: `Notified: ${cfg.title}`, output: { title: String(cfg.title) } };
     },
   },
   {
@@ -124,28 +149,58 @@ const actions: ActionDef[] = [
       { key: 'data', label: 'Fields (JSON, supports templates)', type: 'longtext' },
       { key: 'linkKind', label: 'Link to triggering record as', type: 'text', placeholder: 'related' },
     ],
+    outputs: ['id', 'title'],
     run: async (cfg, ctx, os) => {
       let data: Record<string, unknown> = {};
       if (typeof cfg.data === 'string' && cfg.data.trim()) data = JSON.parse(cfg.data);
       else if (cfg.data && typeof cfg.data === 'object') data = cfg.data as Record<string, unknown>;
       const e = os.records.create({ object: String(cfg.entityType), title: cfg.title ? String(cfg.title) : undefined, data }, 'automation');
       if (ctx.entity && cfg.linkKind) os.links.link(e.id, ctx.entity.id, String(cfg.linkKind), {}, 'automation');
-      return e.title;
+      return { line: `Made ${e.title}`, output: { id: e.id, title: e.title }, undo: { id: e.id } };
     },
+    undo: (u, os) => os.records.delete((u as { id: string }).id, 'automation'),
   },
   {
     id: 'core.star', module: 'core', label: 'Star record',
     run: async (_cfg, ctx, os) => {
-      if (ctx.entity) os.records.update(ctx.entity.id, { starred: true }, 'automation');
+      if (!ctx.entity) return 'no record';
+      const was = !!os.records.get(ctx.entity.id)?.starred;
+      os.records.update(ctx.entity.id, { starred: true }, 'automation');
+      return { line: 'Starred', undo: was ? undefined : { id: ctx.entity.id } };
+    },
+    undo: (u, os) => void os.records.update((u as { id: string }).id, { starred: false }, 'automation'),
+  },
+  {
+    id: 'core.continueIf', module: 'core', label: 'Continue only if', description: 'Ends the run quietly when it doesn’t hold',
+    configFields: [
+      { key: 'field', label: 'Field', type: 'text', required: true, placeholder: 'steps.s1.count', description: 'title, data.<key>, vars.<name>, steps.<key>.<output>' },
+      { key: 'op', label: 'Is', type: 'select', default: 'notNull', options: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'isNull', 'notNull'].map((v) => ({ value: v, label: OP_WORDS[v] ?? v })) },
+      { key: 'value', label: 'Value', type: 'text' },
+    ],
+    run: async (cfg, ctx) => {
+      const c = { field: String(cfg.field ?? ''), op: String(cfg.op || 'notNull'), value: cfg.value } as FilterClause;
+      const ok = evaluateCondition(c, ctx);
+      return ok ? { line: `${c.field} ${OP_WORDS[c.op] ?? c.op} ${c.value ?? ''}`.trim() } : { line: `Stopped: ${c.field} is not ${OP_WORDS[c.op] ?? c.op} ${c.value ?? ''}`.trim(), stop: true };
     },
   },
   {
-    id: 'core.archive', module: 'core', label: 'Archive record',
-    run: async (_cfg, ctx, os) => {
-      if (ctx.entity) os.records.update(ctx.entity.id, { archived: true }, 'automation');
+    id: 'core.askModel', module: 'core', label: 'Ask Claude', description: 'Sends only this prompt, filled in; counts against the brain’s daily budget',
+    configFields: [
+      { key: 'prompt', label: 'Prompt', type: 'longtext', required: true, description: 'Fills in {{title}}, {{data.amount}}, {{steps.s1.title}}' },
+      { key: 'maxTokens', label: 'Longest answer (tokens)', type: 'number', default: 400 },
+      { key: 'fallback', label: 'If Claude can’t be asked, use', type: 'longtext', description: 'Leave empty to stop the run instead' },
+    ],
+    outputs: ['text'],
+    run: async (cfg, _ctx, os) => {
+      const r = await os.automation.ask(String(cfg.prompt ?? ''), { maxTokens: Number(cfg.maxTokens) || 400, why: 'automation step' });
+      if ('text' in r) return { line: r.text, output: { text: r.text, asked: true } };
+      const fb = String(cfg.fallback ?? '').trim();
+      if (!fb) throw new Error(`Claude not asked: ${r.error}`);
+      return { line: `Claude not asked (${r.error}): ${fb}`, output: { text: fb, asked: false } };
     },
   },
 ];
+
 
 /* ------------------------------------------------------------------ */
 /* AI tools — the data-access layer Claude uses                        */
@@ -322,7 +377,7 @@ const aiTools: AiToolDef[] = [
   },
   {
     name: 'create_automation',
-    description: 'Create an automation rule. Triggers: core.entity.created, core.entity.updated, core.entity.status, core.tag.applied, core.reminder.due, core.schedule.daily plus module triggers. Actions: core.setStatus, core.addTag, core.addComment, core.createReminder, core.notify, core.createEntity plus module actions.',
+    description: 'Create an automation rule; its actions run in order as steps s1, s2…, and a later step\'s text can use an earlier one\'s output as {{steps.s1.title}} (and the record as {{title}}, {{data.amount}}). Triggers: core.entity.created, core.entity.updated, core.entity.status, core.tag.applied, core.reminder.due, core.schedule.daily (config time HH:MM), core.manual (run by hand; config phrase) plus module triggers. Actions: core.setStatus, core.addTag, core.addComment, core.createReminder, core.notify, core.createEntity, core.continueIf (field, op, value: ends the run when false), core.askModel (prompt, fallback: output text) plus module actions.',
     input: z.object({ name: z.string(), trigger: z.object({ id: z.string(), config: z.record(z.string(), z.unknown()).default({}) }), conditions: z.array(clauseSchema).default([]), actions: z.array(z.object({ id: z.string(), config: z.record(z.string(), z.unknown()).default({}) })) }),
     confirm: true,
     run: async (input, os) => {

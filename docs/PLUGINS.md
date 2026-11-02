@@ -317,16 +317,39 @@ Form, Links, and Metric for numbers — for every Object; a board only overrides
 Module colours are palette names (`'pink'`); the theme resolves them per scheme
 (`useTheme().paletteColor`).
 
-## Automations
+## Automations (R10, as built)
 
-User-built, stored as data (`automation_rules` + `automation_runs`, extended with
-steps and per-step outputs). Code contributes only:
-- **triggers** and **actions** from modules (above);
-- **step kinds** from core: `create`, `set`, `link`, `roll_cycle`, `post_transaction`,
-  `notify`, `ask_model`, `wait`, `branch`, `run_tool`;
-- **templates** (`AutomationTemplate { id, name, trigger, conditions, steps }`)
-  from modules or boards, offered in the editor.
-A manual-run trigger lets a sentence ("run month close") or a board button start one.
+User-built, stored as data: `automation_rules` (the steps in its `actions`
+column as `{ key, action, config }`; rules from before R10 are folded once,
+setting `automation.stepsV1`) and `automation_runs` (the per-step log in its
+`log` column as `{ steps: StepRun[], lines }`; the last 200 kept). No migration.
+Code contributes only:
+- **triggers** and **actions** from modules (above). An action may return a
+  `StepResult` instead of a string, declare its `outputs`, and offer `undo`:
+
+```ts
+interface StepResult { line?: string; output?: Record<string, unknown>; undo?: unknown; stop?: boolean }
+interface ActionDef { …; outputs?: string[]; run(cfg, ctx, os): Promise<string | void | StepResult>; undo?(undo: unknown, os): void | Promise<void> }
+interface AutomationContext { entity?; previous?; changed?; vars; steps?: Record<string, Record<string, unknown>> }
+```
+
+- **core's actions**: `core.setStatus`, `core.addTag`, `core.addComment`,
+  `core.createReminder`, `core.notify`, `core.createEntity`, `core.star`,
+  `core.continueIf` (field, op, value; `stop` when false), `core.askModel`
+  (prompt, maxTokens, fallback; through `os.automation.ask`, which uses
+  `os.automation.modelProvider`, set by platform to the brain's Claude, keeps
+  the brain's daily budget and writes `brain_sent` with pass `automation`).
+  Triggers added: `core.manual` (no bus event; `TriggerDef.event` is optional)
+  and `core.schedule.daily` with a `time`, once a day.
+- **templates** (`AutomationTemplate { id, name, description, trigger,
+  conditions, steps: Array<{ action, config }> }`) on `ModuleManifest.templates`,
+  collected in `registry.templates`, offered in the editor.
+
+The engine (`os.automation`): `execute(rule, ctx)`, `runManual(rule, said?)`,
+`findManual(sentence)` ("run <phrase or name>"), `undoRun(runId)` (last step
+first; returns what it undid and what it kept), `retry(runId)`, `templates()`.
+Not built: `wait`, `branch` (beyond Continue only if), `link`, `roll_cycle` as
+steps; `BoardManifest.buttons` stays unused (the board lists by-hand rules).
 
 ## Storage (migrations v11–v13, append-only)
 
