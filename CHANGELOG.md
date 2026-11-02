@@ -7,6 +7,20 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.21 · 2 Nov 2026
+
+**Activity and Links** (R11), built in its own session and merged here. The
+screens are a first pass from the kit until the *NR-Links* and
+*NR-Activity* artboards are drawn.
+- **Activity is a board** in Browse › Boards: every tracker with "2 of 4
+  done today", New tracker, On Today, each tracker's page. Its tile on Today
+  is unchanged.
+- **Every record has a Links card**: grouped by link word, coloured by
+  module, payments summed, a small map when two or more are linked. Hold a
+  row to Open, Show in Links or Remove link (with Undo); Link adds one.
+- **The Links screen** shows which colour is which module and lists every
+  Link under the network; **Browse › Links** lists your most linked records.
+
 ## v0.0.20 · 2 Nov 2026
 
 **Today and Time** (R8), built in its own session and merged here.
