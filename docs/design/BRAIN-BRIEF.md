@@ -76,3 +76,40 @@ Design **the brain** for LifeOS, my personal life-OS app for Android (390 × 844
 - **No backdrop blur**: draw sheets as the semi-opaque version that ships.
 - Dark only: the light theme is undecided.
 - Notes on every decision this prompt didn't cover.
+
+---
+
+## Addendum, 2 Nov: slices 4 and 6 (branch `claude/brain-more`)
+
+Paste after the prompt above, or on its own once the first artboards exist.
+Source: `docs/MODEL.md` layer 8, *Slices 4 and 6*.
+
+**More modules bring nudges.** Money, Documents, Projects and Assets now
+bring their own (and their Cycles stop coming as Upkeep's). The nudge card
+and the brief line stay as drawn; add these to the realistic content and
+draw one card of each in `NR-Brain-ToCheck`:
+- Money: "Netflix: ₹649 renews Thu" (is this right?, Keep it) · "Electricity: ₹2,140 due tomorrow" (shall I?, Paid; urgent on the day) · "HDFC FD: matures on 14 Nov" · "Swiggy: ₹1,800 today, about 4x your usual Food & Drink" (is this right?, Right).
+- Documents: "Passport: expires 12 Mar, in 4 months" (shall I?, Renewed opens it) · "4 new files in your folders: Lease 2026, Payslip Oct, Scan 0042 and 1 more" (Look).
+- Projects: "Send the lease: 3 days late" (Done) · "Dinner at Bombay Canteen: tomorrow 8 pm, Lower Parel" (Open).
+- Assets: "MacBook Air: warranty ends in 20 days, on 22 Nov" (Right) · "Hyundai Creta: service 200 km overdue" (Serviced, urgent).
+
+**Cook tonight, two states more** (`NR-Brain-Fills`): no dish yet, with
+**Ask now** (a pass runs at once; "Asking…" while it does), and the filled
+card's **Another idea** in its asking state. Say where a dish came from when
+it came from the fridge photo, or decide it needn't.
+
+**Snap the fridge** is drawn in the Home brief (`NR-Home-Snap`, screen 5).
+What it needs from this one: the Sent to Claude entry for a photo, which
+reads "Mon 2 Nov, 6:40 pm · you pressed Snap the fridge · claude-haiku-5-5 ·
+1.9k in · 120 out", lines "Home · a photo of the fridge: read once, not kept"
+and "Home · in_the_fridge=Amul butter/Malai paneer/Milk/Eggs, use_soon=Malai
+paneer". Mark it as a photo entry (not a pass) and keep it as calm as the rest.
+The build (a first pass from the kit) adds to screen 5 what `NR-Home-Snap`
+should also show: the reading state (the photo small, "Claude is looking…"),
+tap = accept and hold = fix on each pill with its result under it ("used up",
+"still there", "added", "not there"), the photo's dish as a Cook tonight card,
+Take another, and a failed state ("Nothing changed": no key, over budget,
+Claude didn't answer, the photo too big).
+
+**Deliverables**: the new cards in `NR-Brain-ToCheck`, the two Cook tonight
+states in `NR-Brain-Fills`, the photo entry in `NR-Brain-Agent`.

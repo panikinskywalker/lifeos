@@ -2,11 +2,13 @@ import type { ModuleManifest } from '@core/registry/types';
 import { ASSETS_COLOR, assetType, routineType } from './types';
 import { assetsAiTools } from './aiTools';
 import { foldClothes, foldVehicles } from './fold';
+import { assetsBrain } from './brain';
 
 export * from './types';
 export * from './assets';
 export { foldClothes, foldVehicles } from './fold';
 export { assetsAiTools } from './aiTools';
+export { assetsBrain, assetCandidates } from './brain';
 
 /**
  * Assets (docs/MODEL.md §2 Things, R7a): what you own, vehicles and clothes
@@ -22,6 +24,7 @@ export const assetsModule: ModuleManifest = {
   color: ASSETS_COLOR,
   objects: [assetType, routineType],
   aiTools: assetsAiTools,
+  brain: assetsBrain,
   onStart: (os) => {
     // R7a, once: vehicles become Assets; Stock in Clothes becomes clothing once Home's spaces exist.
     if (!os.settings.get<boolean>('assets.r7a', false)) {

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Button, Icon, Text, useToast } from '@ui/kit';
 import { useLive, useOS } from '@ui/hooks';
@@ -179,21 +180,44 @@ export function HomeEmpty({ icon = 'home', title, line, children }: { icon?: str
 export { INK };
 
 /**
- * Cook tonight (layer 8): the dish Claude suggested at the last pass from what
- * is fresh and what to use soon, kept in the learned store under the key made
- * from those things (so the same fridge never costs a second call). Another
- * idea forgets it; the next pass asks again. The slot until there is one.
+ * Cook tonight (layer 8): the dish Claude suggested at the last pass, or from
+ * the last fridge photo, for what is fresh and what to use soon, kept in the
+ * learned store under the key made from those things (so the same fridge
+ * never costs a second call). Another idea forgets it and runs a pass now;
+ * with no dish yet, Ask now does the same.
  */
 export function CookTonight() {
   const t = useTheme();
   const os = useOS();
   const toast = useToast();
+  const [asking, setAsking] = useState(false);
   const d = useLive((o) => {
     const ask = dishAsk(o);
     return { ask, dish: ask ? o.brain.learned.get<string>(ask.key) : undefined };
   }, []);
+  const ask = async (forget: boolean) => {
+    if (forget && d.ask) os.brain.learned.forget(d.ask.key);
+    if (!os.device?.brain) return toast.show({ message: 'A new idea comes with the next pass', icon: 'refresh' });
+    setAsking(true);
+    try {
+      const r = await os.device.brain.pass('you asked Cook tonight for an idea');
+      const filled = d.ask && os.brain.learned.has(dishAsk(os)?.key ?? '');
+      if (!filled) toast.show({ message: r.note === 'no key' ? 'Add your Claude key in You › Agent › Brain' : r.note === 'over budget' ? 'Today’s budget for Claude is used up' : 'No idea this time; try again later', icon: 'info' });
+    } finally {
+      setAsking(false);
+    }
+  };
   if (!d.ask) return <BrainSlot title="Cook tonight" line="Fewer than three things in the Fridge and Kitchen to cook from." icon="food" />;
-  if (!d.dish) return <BrainSlot title="Cook tonight" line="A dish from what's fresh and what to use soon, at the brain's next pass." icon="food" />;
+  if (!d.dish)
+    return (
+      <View style={{ padding: 16, borderRadius: 24, borderWidth: 1, borderStyle: 'dashed', borderColor: t.c.line, gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Icon name="food" size={18} color={t.c.fg.tertiary} />
+          <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, color: t.c.fg.secondary }}>Cook tonight: a dish from what’s fresh and what to use soon, at the brain’s next pass.</Text>
+        </View>
+        <Button title={asking ? 'Asking…' : 'Ask now'} icon="refresh" size="sm" variant="secondary" disabled={asking} onPress={() => void ask(false)} />
+      </View>
+    );
   const [name, uses] = d.dish.split(/:\s*/, 2);
   return (
     <View style={{ padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 10 }}>
@@ -204,17 +228,26 @@ export function CookTonight() {
       <Text style={{ fontSize: 20, lineHeight: 25, fontWeight: '700', color: t.c.fg.primary }}>{name}</Text>
       {uses ? <Text style={{ fontSize: 13, lineHeight: 17, color: t.c.fg.secondary }}>{uses}</Text> : null}
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Button
-          title="Another idea"
-          icon="refresh"
-          size="sm"
-          variant="secondary"
-          onPress={() => {
-            os.brain.learned.forget(d.ask!.key);
-            toast.show({ message: 'A new idea comes with the next pass', icon: 'refresh' });
-          }}
-        />
+        <Button title={asking ? 'Asking…' : 'Another idea'} icon="refresh" size="sm" variant="secondary" disabled={asking} onPress={() => void ask(true)} />
       </View>
     </View>
+  );
+}
+
+/** Snap the fridge's way in (Home and the Fridge): opens the camera screen. Nothing leaves until you take the photo. */
+export function SnapFridge() {
+  const t = useTheme();
+  const router = useRouter();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Snap the fridge" onPress={() => router.push('/module/inventory/snap' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, opacity: pressed ? 0.75 : 1 })}>
+      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="camera" size={18} color={t.c.accent.mustard} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '600', color: t.c.fg.primary }}>Snap the fridge</Text>
+        <Text style={{ fontSize: 12, lineHeight: 16, color: t.c.fg.tertiary }}>One photo, compared with the pills. It goes to Claude only when you take it.</Text>
+      </View>
+      <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} />
+    </Pressable>
   );
 }

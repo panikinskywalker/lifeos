@@ -5,13 +5,13 @@ import { installedModules } from '@modules/index';
 import { installedBoards } from '@boards/index';
 import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
 import { registerBackgroundTick } from './background';
-import { brainModel } from './brain';
 import { getProviderKey, setProviderKey } from './keys';
 import { notifications } from './notifications';
 import { syncReminderNotifications } from './notifySync';
 export { syncReminderNotifications };
 import { openDatabase } from './openDatabase';
 import { deviceBridge } from './sources';
+import { brainModel, runBrainPass } from './brain';
 import { runFiling } from './filing';
 import { listenLive, syncSources } from './sources';
 
@@ -55,7 +55,8 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
       await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
     },
   });
-  os.device = deviceBridge(os);
+  // The brain's Claude for boards (Snap the fridge, Another idea): the saved key, passes one at a time.
+  os.device = { ...deviceBridge(os), brain: { model: () => brainModel(os), pass: (why) => runBrainPass(os, 'manual', why) } };
   // The automations' Ask Claude step: the brain's key and model (R10).
   os.automation.modelProvider = () => brainModel(os);
 

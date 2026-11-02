@@ -10,13 +10,13 @@ import { goingOffCandidates, justCameIn, runningLow, useByWords, runningOutCandi
 import { clothesByState } from '@modules/assets';
 import { ToCheckBell } from '../../screens/ToCheckBell';
 import { AddSheet, usePillActions } from './actions';
-import { Card, CookTonight, HomeEmpty, PillCloud, SectionHead, SpaceTile, StockPill, Why } from './parts';
+import { Card, CookTonight, HomeEmpty, PillCloud, SectionHead, SnapFridge, SpaceTile, StockPill, Why } from './parts';
 
 /**
  * Home (the inventory board's index; a first pass from the kit until the
  * NR-Home-Home artboard, laid out as docs/design/HOME-BRIEF.md screen 1):
  * the header with what's in it and +, Use soon (next 2 days, most urgent
- * first), Cook tonight (a slot: it needs the brain), Running low with why and
+ * first), Cook tonight (the brain's dish) and Snap the fridge, Running low with why and
  * the way into the shopping list, Spaces, and Just came in.
  */
 
@@ -96,6 +96,7 @@ export function HomeScreen({ ctx }: { ctx: LifeOSContext; params: Record<string,
       ) : null}
 
       <CookTonight />
+      <SnapFridge />
 
       <SectionHead title="Running low" sub={d.low.length ? 'From how often you rebuy' : 'Nothing running low'} action={d.onList ? `List · ${d.onList}` : 'Shopping list'} onAction={() => router.push('/module/inventory/list' as never)} />
       {d.low.length ? (

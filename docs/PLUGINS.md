@@ -283,6 +283,23 @@ backups). A board reads a fill with `os.brain.learned.get(key)`, the key made
 by the module's exported helper (crm `giftIdeasKey`, `wishKey`; inventory
 `dishAsk`).
 
+Slices 4 and 6 (2 Nov, branch `claude/brain-more`):
+- **A module's own Cycles**: `cycleCandidates(os, now, module)` gives that
+  module's due Cycles as Upkeep words them (same keys); the module rewords them
+  and answers with `cycleAct(os, verb, nudge, { cost?, asExpense? })`. Without
+  `module`, the same function is Upkeep's: modules without a brain only.
+  Finance, Documents, Projects and Assets have brains (`src/modules/*/brain.ts`).
+- **A photo you sent on purpose**: `askWithPhoto(os, model, { module, moduleName,
+  why, what, system, prompt, record, schema, image, maxTokens? })` checks the
+  brain is on, the key and the budget, makes one call with the image
+  (`BrainModel.complete({ ..., image: { mediaType, data } })`: an image block
+  before the text), logs it in Sent to Claude (pass `photo`; the records, never
+  the image) and returns `{ ok, answer }` or `{ ok: false, note }`. Home's
+  Snap the fridge (`inventory/fridge.ts`) is the first user.
+- **Boards reach Claude** through `os.device.brain`: `model()` (null without a
+  key) and `pass(why)` (a manual pass, one at a time with the scheduled ones);
+  platform fills it at boot.
+
 ## Board
 
 ```ts

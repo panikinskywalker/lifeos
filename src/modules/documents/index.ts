@@ -2,9 +2,11 @@ import { z } from 'zod';
 import type { AutomationTemplate, ModuleManifest, SourceDef } from '@core/registry/types';
 import { documentType, type DocumentData } from './types';
 import { folders, rescan } from './folders';
+import { documentsBrain } from './brain';
 
 export * from './types';
 export * from './folders';
+export { documentsBrain, newFiles, FOLDERS_ROUTE } from './brain';
 
 /** Your folders as a source (R7c): each sync is a rescan; it files its own Documents. */
 export const foldersSource: SourceDef = {
@@ -29,6 +31,7 @@ export const documentsModule: ModuleManifest = {
   id: 'documents', name: 'Documents', version: '1.0.0', description: 'Your papers where they already are: folders you pick on the phone, indexed, never copied. Kind, expiry and links on top.', icon: 'folder', color: 'indigo',
   dependencies: ['crm', 'travel', 'assets'], objects: [documentType],
   sources: [foldersSource],
+  brain: documentsBrain,
   aiTools: [{
     name: 'expiring_documents', description: 'Documents expiring within N days (default 90).', input: z.object({ days: z.number().optional() }),
     run: async (i, os) => { const days = (i as { days?: number }).days ?? 90; const until = new Date(Date.now() + days * 86400000).toISOString().slice(0, 10); return os.records.query<DocumentData>('document', { filter: { and: [{ field: 'data.expiresOn', op: 'notNull' }, { field: 'data.expiresOn', op: 'lte', value: until }] }, sort: [{ field: 'data.expiresOn', dir: 'asc' }] }).map((d) => ({ id: d.id, title: d.title, kind: d.data.kind, expiresOn: d.data.expiresOn })); },

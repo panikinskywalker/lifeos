@@ -8,7 +8,8 @@ import type { BrainModel } from '../brain/model';
  *   with `cache_control`, so a pass pays full price only for the records;
  * - the answer constrained to a JSON schema (`output_config.format`);
  * - effort set explicitly (Opus 5.5 defaults to medium);
- * - server-side fallbacks, so a declined request is answered by another model.
+ * - server-side fallbacks, so a declined request is answered by another model;
+ * - a photo only when you sent one on purpose (Snap the fridge), before the text.
  */
 
 export const BRAIN_MODELS = [
@@ -41,12 +42,12 @@ export function createClaudeBrain(opts: ClaudeBrainOptions): BrainModel {
   return {
     id: 'claude',
     model,
-    async complete({ system, user, maxTokens, schema }) {
+    async complete({ system, user, maxTokens, schema, image }) {
       const body: Record<string, unknown> = {
         model,
         max_tokens: maxTokens,
         system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: user }],
+        messages: [{ role: 'user', content: image ? [{ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }, { type: 'text', text: user }] : user }],
         output_config: { effort: opts.effort ?? 'medium', ...(schema ? { format: { type: 'json_schema', schema } } : {}) },
       };
       if (fallbacks) body.fallbacks = 'default';
