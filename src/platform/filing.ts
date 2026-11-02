@@ -6,6 +6,7 @@ import { pruneIfDue } from '@core/sources/retention';
 import { budgetLow, providerLimits } from '@core/ai/limits';
 import { providerTokensToday } from '@core/ai/routing';
 import { PROVIDER_PRESETS } from '@core/ai/providers';
+import { isLocalProvider } from '@core/ai/provider';
 import { buildAgentFromSettings } from './agentProvider';
 
 /**
@@ -45,7 +46,8 @@ export function runFiling(os: LifeOSContext): Promise<void> {
         const agent = await buildAgentFromSettings(os).catch(() => null);
         // Questions first: someone is waiting on those. Then filing (a tool loop: the main chain).
         if (questionsDue) await answerQueued(os, agent?.main, { smart: agent?.smart });
-        const first = agent?.active[0]?.kind;
+        // The free-budget rule is about the cloud: the Mac costs nothing (MODEL.md layer 7).
+        const first = agent?.active.find((c) => !isLocalProvider(c.kind))?.kind;
         const low = first ? budgetLow(providerTokensToday(os, first), PROVIDER_PRESETS[first].freeDailyTokens, !!providerLimits(os).get(first)) : false;
         const results = dumpsDue ? await filePending(os, agent?.main ?? null, { newestFirst: low }) : [];
         const failed = results.some((r) => r.status === 'failed');

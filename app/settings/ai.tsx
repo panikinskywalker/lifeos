@@ -3,6 +3,8 @@ import { Linking, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { PROVIDER_PRESETS, type ProviderConfig, type ProviderKind } from '@core/ai/providers';
 import { listModels, pickModel } from '@core/ai/openaiCompat';
+import { isLocalProvider } from '@core/ai/provider';
+import { normalizeOllamaUrl, testOllama, type MacCheck } from '@core/ai/ollama';
 import { providerTokensThisMonth, providerTokensToday, usageSummary } from '@core/ai/routing';
 import { providerLimits } from '@core/ai/limits';
 import { brainSettings } from '@core/brain';
@@ -21,9 +23,9 @@ const k = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${
 const label = (id: string) => PROVIDER_PRESETS[id as ProviderKind]?.label ?? id;
 
 /**
- * You › Agent (SCOPE v2 A10/B5): how Talk picks a model — on the phone
- * first, then your provider chain in order — with each provider's key,
- * model, monthly cap and usage, plus Claude for harder asks.
+ * You › Agent (SCOPE v2 A10/B5, R12): how Talk picks a model: on the phone
+ * first, then your Mac, then the cloud providers in order, with each cloud
+ * provider's key, model, monthly cap and usage, plus Claude for harder asks.
  */
 export default function AiSettingsRoute() {
   const router = useRouter();
@@ -35,23 +37,28 @@ export default function AiSettingsRoute() {
   const chain: ProviderConfig[] = [...s.aiChain, ...ALL.filter((kind) => !s.aiChain.some((c) => c.kind === kind)).map((kind) => ({ kind, enabled: false }))];
   const save = (next: ProviderConfig[]) => s.set('aiChain', next);
   const update = (kind: ProviderKind, patch: Partial<ProviderConfig>) => save(chain.map((c) => (c.kind === kind ? { ...c, ...patch } : c)));
+  // The Mac is not in the cloud order: it always goes first (MODEL.md layer 7).
+  const mac = chain.find((c) => isLocalProvider(c.kind))!;
+  const cloud = chain.filter((c) => !isLocalProvider(c.kind));
   const move = (kind: ProviderKind, dir: -1 | 1) => {
-    const i = chain.findIndex((c) => c.kind === kind);
+    const i = cloud.findIndex((c) => c.kind === kind);
     const j = i + dir;
-    if (j < 0 || j >= chain.length) return;
-    const next = [...chain];
+    if (j < 0 || j >= cloud.length) return;
+    const next = [...cloud];
     [next[i], next[j]] = [next[j]!, next[i]!];
-    save(next);
+    save([mac, ...next]);
   };
-  const on = chain.filter((c) => c.enabled !== false);
+  const macOn = mac.enabled !== false && !!mac.baseUrl;
+  const on = cloud.filter((c) => c.enabled !== false);
   return (
-    <Screen title="Agent" subtitle="On the phone first, then your providers" onBack={() => (router.canGoBack() ? router.back() : router.replace('/you'))}>
+    <Screen title="Agent" subtitle="On the phone first, then your Mac, then the cloud" onBack={() => (router.canGoBack() ? router.back() : router.replace('/you'))}>
       <Card icon="sparkle" iconTone="accent" title="How Talk answers">
         <Text variant="body" color="secondary">
-          Everyday sentences — “did laundry”, “spent 450 on lunch”, “Priya paid me back 2,600”, “remind me to …” — are understood on the phone: no network, no cost. Anything else goes to the first provider below that has a key; if it’s rate-limited, down or at its cap, the next one is tried.
+          Everyday sentences (“did laundry”, “spent 450 on lunch”, “Priya paid me back 2,600”, “remind me to …”) are understood on the phone: no network, no cost. Anything else goes to your Mac when it is on; the cloud providers below are tried, in order, only when the Mac can’t answer or gets it wrong. Their caps and budgets count the cloud only.
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           <Chip label="On the phone" icon="check" tone="ok" small />
+          {macOn ? <Chip label="Your Mac" icon="check" tone="ok" small /> : null}
           {on.map((c) => (
             <Chip key={c.kind} label={label(c.kind)} small />
           ))}
@@ -65,10 +72,14 @@ export default function AiSettingsRoute() {
         <Button title="Open Brain" icon="chevron-right" size="sm" variant="secondary" onPress={() => router.push('/settings/brain' as never)} />
       </Card>
 
-      <Section title="Providers" meta="in order">
+      <Section title="Your Mac" meta="first">
+        <MacCard cfg={mac} onChange={(p) => update(mac.kind, p)} />
+      </Section>
+
+      <Section title="Cloud" meta="when the Mac can’t, in order">
         <View style={{ gap: 12 }}>
-          {chain.map((c, i) => (
-            <ProviderCard key={c.kind} cfg={c} first={i === 0} last={i === chain.length - 1} onChange={(p) => update(c.kind, p)} onMove={(d) => move(c.kind, d)} cap={s.aiMonthlyCaps[c.kind]} onCap={(v) => s.set('aiMonthlyCaps', { ...s.aiMonthlyCaps, [c.kind]: v ?? 0 })} />
+          {cloud.map((c, i) => (
+            <ProviderCard key={c.kind} cfg={c} first={i === 0} last={i === cloud.length - 1} onChange={(p) => update(c.kind, p)} onMove={(d) => move(c.kind, d)} cap={s.aiMonthlyCaps[c.kind]} onCap={(v) => s.set('aiMonthlyCaps', { ...s.aiMonthlyCaps, [c.kind]: v ?? 0 })} />
           ))}
         </View>
       </Section>
@@ -91,7 +102,7 @@ export default function AiSettingsRoute() {
           <View key={p.provider} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Text variant="label">{label(p.provider)}</Text>
             <Text variant="label" color="secondary">
-              {p.calls} calls · {k(p.input + p.output)} tokens
+              {p.calls} calls · {k(p.input + p.output)} tokens{isLocalProvider(p.provider) ? ' · free' : ''}
             </Text>
           </View>
         ))}
@@ -172,7 +183,7 @@ function ProviderCard({ cfg, first, last, onChange, onMove, cap, onCap }: { cfg:
               <Button title={loading ? 'Loading…' : 'Show available models'} icon="search" size="sm" variant="secondary" disabled={loading} onPress={() => void loadModels()} />
             )
           ) : null}
-          {cfg.kind === 'ollama' || cfg.kind === 'custom' ? <TextField label="Address" value={cfg.baseUrl ?? ''} onChange={(v) => onChange({ baseUrl: v.trim() || undefined })} placeholder={preset.baseUrl || 'http://…/v1'} autoCapitalize="none" autoCorrect={false} hint={cfg.kind === 'ollama' ? 'Your Mac’s Tailscale address, port 11434, ending in /v1' : undefined} /> : null}
+          {cfg.kind === 'custom' ? <TextField label="Address" value={cfg.baseUrl ?? ''} onChange={(v) => onChange({ baseUrl: v.trim() || undefined })} placeholder="http://…/v1" autoCapitalize="none" autoCorrect={false} /> : null}
           <NumberField label="Monthly token cap" value={cap || undefined} onChange={(v) => onCap(v)} placeholder="No cap" hint="Stops using this provider for the month once reached" />
           {cap ? <ProgressBar value={used / cap} color={used >= cap ? t.c.alert.coral : t.c.accent.gold} accessibilityLabel={`${k(used)} of ${k(cap)} tokens used`} /> : null}
           <Text variant="caption" color="secondary">
@@ -190,6 +201,57 @@ function ProviderCard({ cfg, first, last, onChange, onMove, cap, onCap }: { cfg:
               <Chip label="Try now" icon="refresh" small onPress={() => { providerLimits(os).clear(cfg.kind); toast.show({ message: `${preset.label} will be tried again`, icon: 'refresh' }); }} />
             </View>
           ) : null}
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+/** Your Mac (R12): Ollama over Tailscale, tried before any cloud provider; free, so no cap. */
+function MacCard({ cfg, onChange }: { cfg: ProviderConfig; onChange: (p: Partial<ProviderConfig>) => void }) {
+  const t = useTheme();
+  const preset = PROVIDER_PRESETS.ollama;
+  const used = useLive((o) => providerTokensThisMonth(o, 'ollama'), []);
+  const [check, setCheck] = useState<MacCheck | null>(null);
+  const [testing, setTesting] = useState(false);
+  const enabled = cfg.enabled !== false;
+  const model = cfg.model || preset.defaultModel;
+  const ready = enabled && !!cfg.baseUrl;
+  const test = async () => {
+    setTesting(true);
+    setCheck(null);
+    try {
+      setCheck(await testOllama(cfg.baseUrl ?? '', model));
+    } finally {
+      setTesting(false);
+    }
+  };
+  return (
+    <View style={{ backgroundColor: t.c.bg.tile, borderRadius: t.radius.tile, padding: 16, gap: 12, opacity: enabled ? 1 : 0.75 }}>
+      <View style={{ gap: 2 }}>
+        <Text variant="heading">{preset.label}</Text>
+        <Text variant="caption" color={ready ? t.c.ok.sageText : 'secondary'}>
+          {!enabled ? 'Off' : ready ? `Tried first · ${model}` : 'Needs an address'}
+        </Text>
+      </View>
+      <SwitchField label="Use the Mac" hint={preset.note} value={enabled} onChange={(v) => onChange({ enabled: v })} />
+      {enabled ? (
+        <>
+          <TextField label="Address" value={cfg.baseUrl ?? ''} onChange={(v) => onChange({ baseUrl: v.trim() || undefined })} placeholder="100.x.y.z or your-mac.tailnet.ts.net" autoCapitalize="none" autoCorrect={false} hint={cfg.baseUrl ? `Calls ${normalizeOllamaUrl(cfg.baseUrl)}` : 'The Mac’s Tailscale IP or name; port 11434 is assumed'} />
+          <TextField label="Model" value={cfg.model ?? ''} onChange={(v) => onChange({ model: v.trim() || undefined })} placeholder={preset.defaultModel} autoCapitalize="none" autoCorrect={false} hint={`Pulled on the Mac with: ollama pull ${model}`} />
+          <Button title={testing ? 'Testing…' : 'Test the Mac'} icon="signal" size="sm" variant="secondary" disabled={testing || !cfg.baseUrl} onPress={() => void test()} />
+          {check ? (
+            <View style={{ gap: 4 }}>
+              {check.lines.map((l, i) => (
+                <Text key={i} variant="caption" color={i === check.lines.length - 1 ? (check.ok ? t.c.ok.sageText : t.c.alert.coral) : 'secondary'}>
+                  {l}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          <Text variant="caption" color="secondary">
+            {k(used)} tokens this month · free, no cap
+          </Text>
         </>
       ) : null}
     </View>
