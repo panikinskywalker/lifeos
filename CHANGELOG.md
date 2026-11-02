@@ -7,6 +7,22 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.19 · 2 Nov 2026
+
+**Your Mac first** (R12, the code side), built in its own session and merged
+here. The run on the Mac is still to do (steps in
+`docs/handover/r12-mac-model.md`).
+- **Talk and filing try a model on your Mac** (Ollama over Tailscale,
+  `qwen3:8b`) before any cloud provider; the cloud is used only when the Mac
+  is off or gets it wrong. A sleeping Mac is skipped for two minutes, so
+  nothing waits on it.
+- **You › Agent › Your Mac**: the Mac's address and model, and a **Test the
+  Mac** button that says what to fix. The cloud providers are listed below
+  it, in the order they are tried.
+- **Budgets are cloud only**: the Mac is free, never capped, shown as free in
+  usage.
+- Your Mac's old `…/v1` address keeps working.
+
 ## v0.0.18 · 2 Nov 2026
 
 **Build and ship** (R15), built in its own session and merged here. Needs a
