@@ -29,7 +29,7 @@ export const crmBoard: BoardManifest = {
   ],
   quickActions: [{ id: 'crm.addPerson', label: 'Person', icon: 'person', route: '/entity/person/new' }],
   overrides: [
-    { object: 'person', form: PersonForm, record: [{ entityType: 'person', key: 'crm.person', title: 'Person', component: PersonPage, order: 0, placement: 'page' }] },
+    { object: 'person', form: PersonForm, record: [{ entityType: 'person', key: 'crm.person', title: 'Person', component: PersonPage, order: 0, placement: 'page', ownLinks: true }] },
     { object: 'group', record: [{ entityType: 'group', key: 'crm.group', title: 'Group', component: GroupPage, order: 0, placement: 'page' }] },
   ],
   checkCards: { 'payee-who': WhoIsCard, 'notion-match': NotionMatchCard, 'notion-conflict': NotionConflictCard },

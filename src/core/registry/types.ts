@@ -88,6 +88,8 @@ export interface EntityDetailSection {
    * 'top': above the details card (Stitch stat trio, attention, quick actions). Default: below it.
    */
   placement?: 'page' | 'hero' | 'top' | 'body';
+  /** A 'page' that draws its own Links card (Person); else the record page adds the generic one below it (R11). */
+  ownLinks?: boolean;
 }
 
 /** What the record page offers, handed to a 'page' or 'hero' section that draws its own. */

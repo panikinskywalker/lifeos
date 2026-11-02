@@ -82,6 +82,7 @@ export default function BrowseTab() {
         </View>
         )}
       </Section>
+      <RowItem icon="link" tint="people" title="Links" subtitle="How your records connect" onPress={() => router.push('/links' as never)} />
       <RowItem icon="sparkle" tint="memory" title="Memory" subtitle={facts ? `${facts} thing${facts === 1 ? '' : 's'} you’ve told me` : 'What Talk remembers for you'} onPress={() => router.push('/memory')} />
       {recent.length ? (
         <Section title="Recent" action="Tags" onAction={() => router.push('/tag')}>

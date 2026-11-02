@@ -15,12 +15,11 @@ import { TILES, homeLayout, homeAreas, tileStyle, type TileId } from '../../src/
 import { doneToday, myDay, progress, setGoal, type DayItem, type GoalId, type Progress } from '@core/dashboard/day';
 import { tintForModule } from '@ui/theme/moduleTint';
 import { activeHabits } from '@core/habits/habits';
-import { trackerSummary, trackers } from '@core/activity/trackers';
-import { ActivityRow } from '../../src/screens/ActivityGrid';
 import { HabitChecklist, HabitWeek } from '@boards/habits';
 import { TurfTodayTile } from '@boards/turf/today';
 import { PeopleTodayTile } from '@boards/crm/tile';
 import { HomeTodayTile } from '@boards/inventory/tile';
+import { ActivityTodayTile } from '@boards/activity/tile';
 import { MorningBrief } from '../../src/screens/MorningBrief';
 
 function greeting(d = new Date()) {
@@ -123,7 +122,7 @@ function TodayTile({ id, u, alone }: { id: TileId; u: Upkeep; alone?: boolean })
     case 'habits':
       return <HabitsTile />;
     case 'activity':
-      return <ActivityTile />;
+      return <ActivityTodayTile />;
   }
 }
 
@@ -467,60 +466,6 @@ function ProgressTile() {
           </View>
         ) : null}
       </Sheet>
-    </Tile>
-  );
-}
-
-/** Activity: one tracker at a time (swipe for the next), its last 18 weeks as a grid of days like GitHub's; tap for all of them. */
-function ActivityTile() {
-  const router = useRouter();
-  const t = useTheme();
-  const rows = useLive((o) => trackers(o).filter((x) => !x.hidden).map((x) => trackerSummary(o, x, Date.now(), 26)), []);
-  const [width, setWidth] = useState(0);
-  const [page, setPage] = useState(0);
-  const style = useLive((o) => tileStyle(o, 'activity'), []);
-  const open = () => router.push('/activity' as never);
-  if (style === 'all')
-    return (
-      <Tile size="2x1" tint="tasks" icon="grid" label="Activity" onPress={open}>
-        <View style={{ gap: 22 }}>
-          {rows.map((s) => (
-            <ActivityRow key={s.tracker.id} s={s} onPress={() => router.push(`/activity/${s.tracker.id}` as never)} />
-          ))}
-        </View>
-      </Tile>
-    );
-  return (
-    <Tile size="2x1" tint="tasks" icon="grid" label="Activity" meta={rows.length > 1 ? `${page + 1} of ${rows.length}` : undefined} onPress={open}>
-      {rows.length ? (
-        <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ gap: 10 }}>
-          {width > 0 ? (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
-              onScroll={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
-              scrollEventThrottle={64}
-            >
-              {rows.map((s) => (
-                <View key={s.tracker.id} style={{ width }}>
-                  <ActivityRow s={s} onPress={open} />
-                </View>
-              ))}
-            </ScrollView>
-          ) : null}
-          {rows.length > 1 ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }} accessibilityRole="adjustable" accessibilityLabel={`Tracker ${page + 1} of ${rows.length}`}>
-              {rows.map((s, k) => (
-                <View key={s.tracker.id} style={{ width: k === page ? 16 : 6, height: 6, borderRadius: 3, backgroundColor: k === page ? t.c.fg.primary : t.c.fg.tertiary }} />
-              ))}
-            </View>
-          ) : null}
-        </View>
-      ) : (
-        <Text variant="caption" color="secondary">No trackers — tap to add one.</Text>
-      )}
     </Tile>
   );
 }

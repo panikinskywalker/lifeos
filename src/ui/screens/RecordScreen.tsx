@@ -19,8 +19,7 @@ import { useLive, useOS } from '../hooks';
 import { persistAttachment } from '../lib/files';
 import { CyclesSection, MeterSheet } from '../components/cycles';
 import { backlinks } from '@core/links';
-import { egoGraph, neighbours } from '@core/graph/read';
-import { LinksView } from '../components/LinksView';
+import { LinksCard, LinkSheet } from '../components/LinksCard';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
 
@@ -69,6 +68,12 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
         {page ? (
           <page.component entity={entity} ctx={os} controls={controls} say={say ? say(entity) : null} />
+        ) : null}
+        {/* The Links card is on every record: below a board's page unless the page draws its own (MODEL.md layer 5). */}
+        {page && !page.ownLinks ? (
+          <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 20 }}>
+            <LinksCard entity={entity} />
+          </View>
         ) : null}
         {page ? null : hero ? (
           <hero.component entity={entity} ctx={os} controls={controls} />
@@ -121,8 +126,7 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
             </Section>
           ) : null}
           <CyclesSection entity={entity} />
-          <RelationsCard entity={entity} onLink={() => setPanel('link')} />
-          <GraphCard entity={entity} />
+          <LinksCard entity={entity} />
           <BacklinksCard entity={entity} />
           <DumpsCard entity={entity} />
           <RemindersCard entity={entity} tint={tint} />
@@ -290,125 +294,6 @@ function BacklinksCard({ entity }: { entity: ObjectRecord }) {
         })}
       </RowList>
     </Section>
-  );
-}
-
-/** Links card (docs/MODEL.md §5): everything linked, grouped by link word; events dated, with who/where. */
-function RelationsCard({ entity, onLink }: { entity: ObjectRecord; onLink: () => void }) {
-  const os = useOS();
-  const router = useRouter();
-  const toast = useToast();
-  // Incoming [[mentions]] have their own section (Mentioned in).
-  const items = useLive((o) => neighbours(o, entity.id, { limit: 60 }).filter((n) => n.kind !== 'mention'), [entity.id]);
-  if (!items.length) return null;
-  const def = os.registry.object(entity.object);
-  const groups: Array<{ label: string; items: typeof items }> = [];
-  for (const n of items) {
-    const label = def.links?.find((r) => r.kind === n.kind)?.label ?? n.label;
-    const g = groups.find((x) => x.label === label);
-    if (g) g.items.push(n);
-    else groups.push({ label, items: [n] });
-  }
-  const unlink = (n: (typeof items)[number]) => {
-    os.links.unlink(entity.id, n.id, n.kind);
-    toast.show({ message: `Unlinked ${n.title}`, icon: 'link', undo: () => void os.links.link(entity.id, n.id, n.kind) });
-  };
-  return (
-    <Section title="Links" meta={String(items.length)} action="Link" onAction={onLink}>
-      <View style={{ gap: 12 }}>
-        {groups.map((g) => (
-          <View key={g.label} style={{ gap: 6 }}>
-            <Text variant="labelMicro" color="secondary" style={{ textTransform: 'uppercase' }}>
-              {g.label}
-              {g.items.every((n) => n.type === 'transaction') && g.items.length > 1 ? ` · ${g.items.length} · ${os.format.currency(g.items.reduce((sum, n) => sum + ((os.records.get(n.id)?.data as { amount?: number })?.amount ?? 0), 0))}` : ''}
-            </Text>
-            {g.items.some((n) => n.at) ? (
-              <RowList>
-                {g.items.map((n) => (
-                  <RowItem
-                    key={`${n.kind}${n.id}`}
-                    icon={os.registry.objects.get(n.type)?.icon}
-                    tint={tintForModule(os.registry.objects.get(n.type)?.module)}
-                    title={n.title}
-                    subtitle={n.type === 'transaction' ? (n.at ? os.format.date(n.at) : null) : n.context}
-                    meta={n.type === 'transaction' ? undefined : n.at ? os.format.date(n.at) : undefined}
-                    value={n.type === 'transaction' ? txAmount(os, n.id) : undefined}
-                    onPress={() => router.push(`/entity/${n.type}/${n.id}`)}
-                    onLongPress={() => unlink(n)}
-                  />
-                ))}
-              </RowList>
-            ) : (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {g.items.map((n) => (
-                  <Chip key={`${n.kind}${n.id}`} label={n.title} icon={os.registry.objects.get(n.type)?.icon} onPress={() => router.push(`/entity/${n.type}/${n.id}`)} onLongPress={() => unlink(n)} />
-                ))}
-              </View>
-            )}
-          </View>
-        ))}
-      </View>
-      <Text variant="caption" color="tertiary" style={{ marginTop: 8 }}>
-        Long-press to unlink.
-      </Text>
-    </Section>
-  );
-}
-
-function txAmount(os: LifeOSContext, id: string): string | undefined {
-  const d = os.records.get(id)?.data as { amount?: number; kind?: string } | undefined;
-  if (d?.amount == null) return undefined;
-  return `${d.kind === 'income' ? '+' : d.kind === 'expense' ? '−' : ''}${os.format.currency(d.amount)}`;
-}
-
-/** A link the app guessed ("We think JOHN D is John Doe"): confirm it, or say it's someone else. */
-
-/** A small graph of what's linked to this record; opens the full graph view. */
-function GraphCard({ entity }: { entity: ObjectRecord }) {
-  const router = useRouter();
-  const g = useLive((o) => egoGraph(o, entity.id, { hops: 1, limit: 14 }), [entity.id]);
-  if (g.nodes.length < 3) return null;
-  const explore = () => router.push(`/links/${entity.id}` as never);
-  return (
-    <Section title="Around this record" meta={`${g.nodes.length - 1} linked`} action="Explore" onAction={explore}>
-      <LinksView nodes={g.nodes} edges={g.edges} height={240} labels={false} onSelect={explore} onOpen={(n) => router.push(`/entity/${n.type}/${n.id}` as never)} />
-    </Section>
-  );
-}
-
-function LinkSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: ObjectRecord }) {
-  const os = useOS();
-  const toast = useToast();
-  const [kind, setKind] = useState('related');
-  const [picking, setPicking] = useState(false);
-  const def = os.registry.object(entity.object);
-  const kinds = [...new Set(['related', ...(def.links?.map((r) => r.kind) ?? [])])];
-  const kindLabel = (k: string) => def.links?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
-  return (
-    <>
-      <Sheet visible={visible && !picking} onClose={onClose} title="Link to…" footer={<Button title="Choose record" icon="search" block onPress={() => setPicking(true)} />}>
-        <FormField label="Link as">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {kinds.map((k) => (
-              <FilterChip key={k} label={kindLabel(k)} selected={kind === k} onPress={() => setKind(k)} />
-            ))}
-          </View>
-        </FormField>
-        <TextField label="Or a custom kind" value={kinds.includes(kind) ? '' : kind} onChange={(v) => setKind(v || 'related')} placeholder="e.g. vendor, gift for" />
-      </Sheet>
-      <EntityPicker
-        visible={visible && picking}
-        onClose={() => setPicking(false)}
-        types={[]}
-        exclude={[entity.id]}
-        onSelect={(otherId) => {
-          os.links.link(entity.id, otherId, kind || 'related');
-          setPicking(false);
-          onClose();
-          toast.show({ message: `Linked as ${kindLabel(kind).toLowerCase()}`, icon: 'link', undo: () => os.links.unlink(entity.id, otherId, kind || 'related') });
-        }}
-      />
-    </>
   );
 }
 

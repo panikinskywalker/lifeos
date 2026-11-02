@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import type { TintKey } from '@ui/theme/tokens';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { activeHabits } from '@core/habits/habits';
 import { knownApps, knownCalendars, ruleText, trackers, upsertTracker, type MetricRuleId, type Tracker, type TrackerRule } from '@core/activity/trackers';
 import { CATEGORIES } from '@modules/finance/types';
@@ -23,9 +23,9 @@ const ICONS = ['grid', 'briefcase', 'activity', 'shoe', 'food', 'wallet', 'book'
 const TINTS = ['tasks', 'health', 'finance', 'people', 'memory', 'travel', 'upkeep', 'documents'];
 const words = (s: string) => s.split(/[,/]+/).map((w) => w.trim()).filter(Boolean);
 
-/** New tracker or edit one: a name, an icon, and the rules — a day counts when any of them matches. */
-export default function EditTracker() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+/** New tracker or edit one: a name, an icon, and the rules: a day counts when any of them matches. */
+export function ActivityEdit({ params }: { params: Record<string, string> }) {
+  const id = params.tracker;
   const os = useOS();
   const theme = useTheme();
   const router = useRouter();
@@ -33,12 +33,13 @@ export default function EditTracker() {
   const [t, setT] = useState<Tracker>(() => existing ?? { id: `t_${Date.now().toString(36)}`, name: '', icon: 'grid', tint: 'tasks', rules: [] });
   const [adding, setAdding] = useState<Kind | null>(null);
   const setRules = (rules: TrackerRule[]) => setT({ ...t, rules });
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/board/activity' as never));
   const save = () => {
     upsertTracker(os, { ...t, name: t.name.trim() || 'Tracker' });
-    router.back();
+    back();
   };
   return (
-    <Screen title={existing ? 'Edit tracker' : 'New tracker'} onBack={() => router.back()}>
+    <Screen title={existing ? 'Edit tracker' : 'New tracker'} onBack={back}>
       <TextField label="Name" value={t.name} onChange={(name) => setT({ ...t, name })} placeholder="Ordered food, Gym, Days in office…" autoFocus={!existing} />
       <Text variant="label" color="secondary">Icon</Text>
       <ChipRow>
