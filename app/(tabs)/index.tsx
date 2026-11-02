@@ -95,7 +95,7 @@ function TodayTile({ id, u, alone }: { id: TileId; u: Upkeep; alone?: boolean })
   switch (id) {
     case 'steps':
     case 'sleep':
-      return <MetricTile id={id} />;
+      return <MetricTile id={id} wide={alone} />;
     case 'screen':
       return <ScreenTile />;
     case 'spend':
@@ -107,7 +107,7 @@ function TodayTile({ id, u, alone }: { id: TileId; u: Upkeep; alone?: boolean })
     case 'home':
       return <HomeTodayTile wide={alone} />;
     case 'overdue':
-      return <OverdueTile u={u} />;
+      return <OverdueTile u={u} wide={alone} />;
     case 'onthisday':
       return <OnThisDayTile />;
     case 'myday':
@@ -139,7 +139,7 @@ function NeedsSource({ id }: { id: MetricId }) {
   );
 }
 
-function MetricTile({ id }: { id: MetricId }) {
+function MetricTile({ id, wide }: { id: MetricId; wide?: boolean }) {
   const router = useRouter();
   const t = useTheme();
   const os = useOS();
@@ -147,7 +147,7 @@ function MetricTile({ id }: { id: MetricId }) {
   const look = METRIC_LOOK[id]!;
   const has = s.buckets.some((b) => b.value != null);
   return (
-    <Tile tint={look.tint} icon={look.icon} label={METRICS[id].label} meta={id === 'sleep' ? 'last night' : 'today'} onPress={() => router.push(`/metric/${id}` as never)}>
+    <Tile size={wide ? '2x1' : '1x1'} tint={look.tint} icon={look.icon} label={METRICS[id].label} meta={id === 'sleep' ? 'last night' : 'today'} onPress={() => router.push(`/metric/${id}` as never)}>
       {has ? (
         <View style={{ gap: 6 }}>
           <Stat value={s.value != null ? formatMetric(id, s.value, os.format.currency) : '—'} size="count" />
@@ -262,10 +262,11 @@ function OnThisDayTile() {
 }
 const ON_THIS_DAY_ICON = { dump: 'brain', event: 'calendar', trip: 'plane', person: 'user', done: 'repeat', fact: 'sparkle' } as const;
 
-function OverdueTile({ u }: { u: Upkeep }) {
+/** `wide`: alone on its row, it draws 2×1 (short) instead of a full-width square. */
+function OverdueTile({ u, wide }: { u: Upkeep; wide?: boolean }) {
   const router = useRouter();
   return (
-    <Tile iconTone="alert" icon="alert" label="Overdue" onPress={() => router.navigate('/upkeep')}>
+    <Tile size={wide ? '2x1' : '1x1'} iconTone="alert" icon="alert" label="Overdue" onPress={() => router.navigate('/upkeep')}>
       <Stat value={String(u.overdue)} size="count" tone={u.overdue ? 'alert' : undefined} caption={u.overdue ? u.sections.overdue[0]!.entity.title + (u.overdue > 1 ? ` + ${u.overdue - 1} more` : '') : 'Nothing late'} />
     </Tile>
   );

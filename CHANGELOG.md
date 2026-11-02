@@ -7,6 +7,11 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.17 · 2 Nov 2026
+
+- **Today**: a small tile alone on its row (Overdue, Steps, Sleep) is drawn
+  short and wide, not as a full-width square.
+
 ## v0.0.16 · 2 Nov 2026
 
 **Documents, from your own folders** (R7c). LifeOS no longer needs its own
