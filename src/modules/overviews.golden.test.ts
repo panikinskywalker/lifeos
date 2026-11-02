@@ -9,7 +9,7 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { doneToday, goals, myDay, progress, setGoal } from '@core/dashboard/day';
-import { saveHealthDays } from '@core/sources/deviceData';
+import { saveHealthDays } from '@modules/health/healthConnect';
 import { measurementType, workoutType } from './health/types';
 import { accountType, subscriptionType, transactionType } from './finance/types';
 import { setCategoryTarget } from './finance/categories';

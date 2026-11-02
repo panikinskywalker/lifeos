@@ -3,9 +3,10 @@ import type { Row } from '../db/adapter';
 import { bus } from '../events/bus';
 
 /**
- * Device data (M4.2): screen time and Health Connect, stored so Today can
- * chart them. Pure — the platform reads the phone and hands the days here.
- * Re-syncing a day replaces it (a day's totals grow until it ends).
+ * Device data (M4.2): source state, screen time's per-day tables, and a
+ * metric's days read from Measurements. The health module's sources (R6)
+ * read the phone and hand the days here; re-syncing a day replaces it (a
+ * day's totals grow until it ends). Health Connect's filing is the module's.
  */
 
 /* ------------------------------------------------------------------ */
@@ -91,68 +92,12 @@ export function topApps(os: LifeOSContext, from: string, to: string, limit = 5):
 }
 
 /* ------------------------------------------------------------------ */
-/* Health Connect                                                        */
+/* Measurements (filed by the health module; R6)                         */
 /* ------------------------------------------------------------------ */
 
-export interface HealthDayIn {
-  day: string;
-  steps?: number;
-  sleepMin?: number;
-  heartRateAvg?: number;
-  restingHr?: number;
-  weightKg?: number;
-  workouts?: Array<{ id: string; type: number; title?: string | null; start: number; minutes: number }>;
-}
-
-/** Health Connect exercise types → our workout kinds. */
-const EXERCISE: Record<number, string> = { 79: 'walk', 56: 'run', 57: 'run', 8: 'cycle', 9: 'cycle', 70: 'strength', 80: 'strength', 81: 'yoga', 74: 'swim', 73: 'swim', 5: 'sport', 10: 'sport', 14: 'sport', 26: 'sport', 64: 'sport' };
-
-const METRICS: Array<[keyof HealthDayIn, string, string, (v: number) => number]> = [
-  ['steps', 'steps', 'steps', (v) => Math.round(v)],
-  ['sleepMin', 'sleep', 'h', (v) => Math.round((v / 60) * 10) / 10],
-  ['restingHr', 'resting_hr', 'bpm', (v) => Math.round(v)],
-  ['heartRateAvg', 'heart_rate', 'bpm', (v) => Math.round(v)],
-  ['weightKg', 'weight', 'kg', (v) => Math.round(v * 10) / 10],
-];
-
-function upsertBySourceKey(os: LifeOSContext, type: string, key: string, data: Record<string, unknown>): 'created' | 'updated' | 'same' {
-  const [hit] = os.records.query<Record<string, unknown>>(type, { filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 1 });
-  if (!hit) {
-    os.records.create({ object: type, data: { ...data, sourceKey: key } }, 'system');
-    return 'created';
-  }
-  const changed = Object.entries(data).some(([k, v]) => hit.data[k] !== v);
-  if (changed) os.records.update(hit.id, { data }, 'system');
-  return changed ? 'updated' : 'same';
-}
-
-/** Health Connect days → one measurement per metric per day, one workout per session. Returns records created. */
-export function saveHealthDays(os: LifeOSContext, days: HealthDayIn[]): number {
-  let created = 0;
-  const has = (t: string) => os.registry.objects.has(t);
-  os.db.transaction(() => {
-    for (const d of days) {
-      if (has('measurement')) {
-        for (const [k, metric, unit, fmt] of METRICS) {
-          const v = d[k] as number | undefined;
-          if (v == null || !Number.isFinite(v) || v <= 0) continue;
-          if (upsertBySourceKey(os, 'measurement', `hc:${metric}:${d.day}`, { metric, value: fmt(v), unit, date: d.day, source: 'health_connect' }) === 'created') created++;
-        }
-      }
-      if (has('workout')) {
-        for (const w of d.workouts ?? []) {
-          if (!(w.minutes > 0)) continue;
-          if (upsertBySourceKey(os, 'workout', `hc:${w.id}`, { kind: EXERCISE[w.type] ?? 'other', durationMin: Math.round(w.minutes), date: d.day, notes: w.title ?? undefined, source: 'health_connect' }) === 'created') created++;
-        }
-      }
-    }
-  });
-  return created;
-}
-
-/** A metric per day in [from, to] (for Today's charts). */
+/** A metric per day in [from, to] (for Today's charts); with several readings on a day, the latest. */
 export function metricDays(os: LifeOSContext, metric: string, from: string, to: string): Array<{ day: string; value: number }> {
   return os.records
-    .query<{ metric: string; value: number; date: string }>('measurement', { filter: { and: [{ field: 'data.metric', op: 'eq', value: metric }, { field: 'data.date', op: 'gte', value: from }, { field: 'data.date', op: 'lte', value: to }] }, sort: [{ field: 'data.date', dir: 'asc' }] }, { limit: 1000 })
+    .query<{ metric: string; value: number; date: string }>('measurement', { filter: { and: [{ field: 'data.metric', op: 'eq', value: metric }, { field: 'data.date', op: 'gte', value: from }, { field: 'data.date', op: 'lte', value: to }] }, sort: [{ field: 'data.date', dir: 'asc' }, { field: 'createdAt', dir: 'asc' }] }, { limit: 1000 })
     .map((e) => ({ day: e.data.date, value: e.data.value }));
 }

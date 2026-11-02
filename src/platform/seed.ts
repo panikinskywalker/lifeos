@@ -4,6 +4,8 @@ import { sampleSync } from '@modules/games/fixtures/sampleSync';
 import type { LifeOSContext } from '@core/registry/context';
 import { fileMessage } from '@core/filing/messages';
 import { BLINKIT_APP, buy, ensureSpaces, halfLeft, setLife, spaceNamed, useOne } from '@modules/inventory';
+import { saveHealthDays } from '@modules/health';
+import { saveUsageDays } from '@core/sources/deviceData';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const daysAgo = (n: number) => {
@@ -93,6 +95,15 @@ export function seedDemoData(os: LifeOSContext) {
     }
     for (let i = 0; i < 6; i++) os.records.create({ object: 'workout', data: { kind: i % 2 ? 'strength' : 'run', durationMin: 30 + i * 5, date: daysAgo(i * 2 + 1), distanceKm: i % 2 ? undefined : 5 + i * 0.5 } });
     for (let i = 0; i < 8; i++) os.records.create({ object: 'measurement', data: { metric: 'weight', value: 76.4 - i * 0.2, unit: 'kg', date: daysAgo(i * 3) } });
+    // Body (R6): five weeks as Health Connect and Usage access would bring them in.
+    saveHealthDays(os, Array.from({ length: 35 }, (_, i) => {
+      const woke = new Date();
+      woke.setDate(woke.getDate() - i);
+      woke.setHours(7, (i * 7) % 50, 0, 0);
+      const sleepMin = 390 + ((i * 37) % 90);
+      return { day: daysAgo(i), steps: i ? 5200 + ((i * 1733) % 6400) : 3100, sleepMin, sleepStart: woke.getTime() - sleepMin * 60_000, sleepEnd: woke.getTime(), restingHr: 58 + (i % 5), heartRateAvg: 72 + ((i * 3) % 9) };
+    }));
+    saveUsageDays(os, Array.from({ length: 21 }, (_, i) => ({ day: daysAgo(i), totalMs: (i ? 3.2 + ((i * 0.7) % 2.4) : 1.6) * 3_600_000, pickups: 60 + ((i * 11) % 40), apps: [{ package: 'com.whatsapp', label: 'WhatsApp', ms: 3_000_000 }, { package: 'com.instagram.android', label: 'Instagram', ms: 2_400_000 }, { package: 'com.google.android.youtube', label: 'YouTube', ms: 1_800_000 }] })));
 
     os.records.create({ object: 'note', title: 'Japan itinerary ideas', data: { body: 'Tokyo 5 nights → Hakone 1 → Kyoto 4 → Osaka 3. Book teamLab early. Try the 7-day JR pass math vs. point-to-point.', kind: 'idea' }, });
     const meeting = os.records.create({ object: 'note', title: 'Weekly sync with Arjun', data: { body: 'Discussed plugin loading strategy. Decision: manifests stay plain objects; lazy-load screens.', kind: 'meeting', projectId: lifeos.id, personIds: [arjun.id] } });
