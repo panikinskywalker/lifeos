@@ -1,7 +1,7 @@
 # LifeOS — contracts for modules, boards and automations (agreed 4 Oct 2026; as built in R0)
 
 How to write each tier. The shapes below are the contract; `docs/MODEL.md`
-says why. Status: **built in R0** (4 Oct 2026). Where the code differs from the first draft, this file follows the code.
+says why. Status: **built in R0** (4 Oct 2026), checked against the code after the 2 Nov merge (v0.0.27). Where the code differs from the first draft, this file follows the code.
 
 ## Folders and the one-way rule
 
@@ -94,21 +94,16 @@ interface ObjectRecord<T> {
 ```ts
 interface ModuleManifest {
   id: string; name: string; version: string; description: string; icon: string; color: string;
-  objects: ObjectDef[];
-  linkWords?: LinkWordDef[];           // { word, inverse, from: ObjectId[], to: ObjectId[] | 'any' }
-  filing?: {
-    sentences?: SentenceRule[];        // on-phone parser patterns → tool calls, with confidence
-    parsers?: MessageParser[];         // per-sender: { id, matches(msg), parse(msg) → filed records + confidence }
-  };
+  dependencies?: string[];
+  objects?: ObjectDef[];
   sources?: SourceDef[];               // see Sources below
-  filing?: { parsers?: MessageParser[] };
+  filing?: { parsers?: MessageParser[] }; // per-sender: { id, matches(msg), parse(msg) → filed records + confidence }
   filingTools?: (session: GraphSession) => AiToolDef[];
-  aiTools?: AiToolDef[];               // unchanged: { name, description, input: zod, run, confirm?, describe? }; read and write
-  sources?: SourceDef[];               // see Sources below
-  filing?: { parsers?: MessageParser[] };
-  filingTools?: (session: GraphSession) => AiToolDef[];
+  aiTools?: AiToolDef[];               // { name, description, input: zod, run, confirm?, describe? }; read and write
   triggers?: TriggerDef[];             // automation contributions (no UI)
   actions?: ActionDef[];
+  templates?: AutomationTemplate[];    // ready-made automations (R10; see Automations)
+  brain?: BrainDef;                    // the module's candidates for the brain (see The brain)
   onInstall?(os): void; onStart?(os): void;
 }
 ```
@@ -309,15 +304,31 @@ interface BoardManifest {
   placement: 'bar' | 'browse' | 'module';
   module?: string;                     // companion boards: the module this is the board of
   overview?: OverviewFn;               // the module's Overview (Browse › module, Today's area card); pure
-  tiles?: TileDef[];                   // { type, name, sizes, component } — for Today and grid boards (R8)
+  tiles?: TileDef[];                   // Today's tiles (R8, as built; below)
   screens?: BoardScreen[];             // 'index' is the home; others at /module/<m>/<key> or /board/<b>/<key>
   overrides?: ObjectOverride[];        // per Object: { object, form?: the Object's form (new and edit; R2), record?: sections on the Record screen — placement 'page' draws the whole page, 'hero' replaces the header (both get RecordControls: back, edit, more, cover, link, tags, attach; 'page' also gets `say`), 'top' above the details, else cards }
-  checkCards?: Record<string, ComponentType<{ filing }>>; // To check cards for filing kinds (Turf's SMS questions; crm's 'payee-who')
+  checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds (Turf's SMS questions; crm's 'payee-who')
   quickActions?: QuickAction[];        // the global "+" menu
-  buttons?: ManualRun[];               // manual-run automations shown on this board (R10)
-  checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds
+  buttons?: ManualRun[];               // not used yet: R10 put the by-hand runs on the Automations board
 }
 ```
+
+A record section (`overrides[].record`) may also say `ownLinks: true` (a
+'page' that draws its own Links card, as Person does; any other 'page' gets
+the shared Links card below it, R11) and `fields: string[]` (Field keys it
+draws itself, left out of the Details card; R7f's Note body).
+
+**Today's tiles (R8, as built).** A tile is a `TileDef` on the board that owns
+its data: `{ type, board, name, description?, icon, sizes, defaultSize,
+configFields?, component }`. `type` is the tile's id (`steps`, `myday`,
+`activity`…; kept from before R8 so saved order and looks carry over). Sizes
+are `small` (1×1) and `medium` (2×1); a small tile alone on its row is drawn
+medium. A select Field keyed `style` in `configFields` is the tile's **Look**
+(You › Home screen), handed to the component as `config.style`. The component
+gets `{ size, config, ctx }` and reads its module's tools and core queries
+only. `app/(tabs)/index.tsx` lays out the Morning brief and
+`registry.tiles` in your order (`src/screens/homeLayout.ts`: `TILE_ORDER`, a
+tile not in it goes last) and imports no board, module or core query.
 
 A board can put its own questions in **To check**: a module adds a filing of
 its own `kind` (`os.filings.add`), and the board's `checkCards[kind]` is drawn
@@ -371,7 +382,7 @@ first; returns what it undid and what it kept), `retry(runId)`, `templates()`.
 Not built: `wait`, `branch` (beyond Continue only if), `link`, `roll_cycle` as
 steps; `BoardManifest.buttons` stays unused (the board lists by-hand rules).
 
-## Storage (migrations v11–v13, append-only)
+## Storage (append-only migrations; v16 is the latest)
 
 v11 `vocabulary`: `entities` → `records` (column `type` → `object`), `relations`
 → `links`, `timeline_events` → `events`, `entity_tags` → `record_tags`, every
@@ -381,7 +392,34 @@ every comment becomes a fact with the record as subject; `comments` dropped.
 v13 `filings`: `dump_extractions` → `filings`. Backups from before v11 are
 mapped on import (`LEGACY_TABLE_NAMES`, `LEGACY_COLUMN_NAMES`). Object changes
 (vehicle → asset, routine → habit…) are **not** in R0: each module decides them
-in its own milestone.
+in its own milestone, as folds run once on start (a setting each), not
+migrations. Since R0: v14 `outbox`, v15 `facts-from-notion`, v16 `brain`.
+
+**The database file (R15).** On the phone the database is SQLCipher
+(expo-sqlite's `useSQLCipher`), `lifeos-secure.db`, keyed by 32 random bytes in
+the secure store (`lifeos.db.key`). Core decides which file opens
+(`openDatabaseFiles` in `src/core/db/encryption.ts`) through a `DbStore` the
+platform fills (exists, remove, rename, open with a key, export encrypted); a
+plain `lifeos.db` moves only when you ask, copied, checked table by table
+(`tableCounts`, `quick_check`) and then switched. The web build stays plain.
+
+**Retention (R15).** `runRetention` (`src/core/sources/retention.ts`) runs once
+a day from the filing run (`pruneIfDue`): To check left 15 days is ticked;
+dumps filed more than 15 days ago leave `records_fts` and the Dump list
+(`dumps.recent`, `dumps.clearOld`; rows stay, the database refuses deleting a
+dump); raw texts after 60 days as before. Each run is logged in settings
+`retention.log` (last 30).
+
+## AI providers (R12, as built)
+
+`LLMProvider` (`src/core/ai/provider.ts`) is one `complete` over messages and
+tools. Providers are Claude, the OpenAI-compatible presets and **the Mac**
+(`createOllamaProvider`, `src/core/ai/ollama.ts`: Ollama's own `/api/chat`
+with `num_ctx` 16k and `think: false`). `buildAgentProviders` chains them,
+local ones first (`isLocalProvider`), the cloud only when a call throws a
+retryable `ProviderError` (Mac down, too slow, an unusable reply).
+`meterProvider` writes every provider's tokens to `ai_usage` but caps the
+cloud only. `testOllama` is You › Agent's Test the Mac.
 
 ## Writing a module, in order
 1. `types.ts` — ObjectDefs with Fields. 2. parsers with fixtures (R1+: inside

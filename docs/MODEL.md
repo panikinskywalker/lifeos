@@ -1120,6 +1120,13 @@ Thin slices, each usable on the phone when done. `docs/MILESTONES.md` M1–M4 st
 as history; new work is tracked here. "Done" means: typecheck and tests green,
 the slice checked on the S22, the box ticked in the same commit.
 
+**Merged 2 Nov 2026** (branch `claude/merge-r5-r15`, one version each, tests
+green after each; `docs/handover/merge-r5-r15.md`): v0.0.18 R15, v0.0.19 R12
+(code side), v0.0.20 R8, v0.0.21 R11, v0.0.22 R10, v0.0.23 R6, v0.0.24 R7b,
+v0.0.25 R7d, v0.0.26 R7f, v0.0.27 layer 8 slices 4 and 6. R5 had not been
+pushed by its session, so it is not in. None of them is checked on the phone
+yet.
+
 ### R0 — Make the code say what the model says (no new features) — done 4 Oct 2026
 The restructure, in one day, as a chain of commits that each kept typecheck,
 309 tests and the web export green.
@@ -1262,7 +1269,8 @@ screens checked on the phone → overrides only where the default is wrong)
   *coming up* from Events (no candidates contract on this branch yet). **Phone check pending**
   (the calendar).
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
-  Upkeep; Upkeep re-hung on cycles from every module.
+  Upkeep; Upkeep re-hung on cycles from every module. *Built in its own session
+  on 2 Nov but not pushed when the others were merged; not in v0.0.27.*
 - [x] **R6 health**: built 2 Nov 2026 (branch `claude/r6-health`; no migration). Measurement and
   Workout as agreed (layer 2, *Body*; keys unchanged): sleep gains Asleep and Awake, a Workout its
   Started time and a duration Field; screen time stays in core's usage tables (decided, layer 2).
@@ -1628,6 +1636,13 @@ screens checked on the phone → overrides only where the default is wrong)
     the per-app screen time and ended synced calendar events removed.
 - [ ] **R16 Docs** — `ARCHITECTURE.md`, `GRAPH.md` and SCOPE §C retired into
   this file; `HANDOFF.md` rewritten for the three tiers.
+  - [x] `ARCHITECTURE.md` retired (R0, 4 Oct).
+  - [x] *The pass after the 2 Nov merge* (v0.0.27): this layer marks what is
+    built, `docs/PLUGINS.md` matches the code (tiles, record sections, the
+    provider chain, the encrypted database, retention), the hand-overs' parked
+    ideas are in `docs/ADHOC.md`.
+  - [ ] `GRAPH.md` and SCOPE §C retired into this file; `HANDOFF.md` rewritten
+    for the three tiers.
 
 Suggested order: R0 → R1 → R2 → R3 → R8 → R9 → R4 → R5 → R12 → R6 → R7a–e →
 R10 → R11 → R13 → R15 → R14 → R7f → R16. Finance, People, Places and the Turf
@@ -1849,9 +1864,9 @@ them.
    *Built 2 Nov with R7d: pack, check in, before you go and back home; see R7d.*
 6. **Every module offers candidates** — Turf, People, Money, Documents.
    *Turf and People came with slice 3; Money, Documents, Projects and Assets
-   built 2 Nov (branch `claude/brain-more`), see* Slices 4 and 6 *below. The
-   rest come with their own milestones (habits, health, deliveries, travel,
-   knowledge).*
+   built 2 Nov (branch `claude/brain-more`), see* Slices 4 and 6 *below;
+   Health (R6), Deliveries (R7b) and Travel (R7d) came with their milestones,
+   all merged by v0.0.27. Left: Habits (R5); Knowledge (R7f) offers none.*
 
 ### The contract (slice 3, agreed 31 Oct; code contracts in `docs/PLUGINS.md`)
 - **Candidates are a pure function on the module manifest**: `brain.candidates(os,

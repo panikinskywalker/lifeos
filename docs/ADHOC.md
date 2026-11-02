@@ -28,8 +28,41 @@ A friendly "LifeOS import" file (records + links, not raw backup rows) that goes
 - **Cloud sync** (backlog) — also enables a web / iPhone client.
 - **Activity goals:** "at least 4 days a week" / "at most 2", weeks met / missed, streak of weeks.
 
+## Parked by the 2 Nov milestones (from their hand-overs)
+
+Not built; each hand-over in `docs/handover/` has the detail.
+- **Dumps deleted, not only cleared** (R15): after 15 days a dump leaves the
+  Dump list and search but its row stays. Deleting rows needs a migration
+  replacing the `dumps_never_deleted` trigger, and would empty On this day's
+  dumps and "Dumps that mention it".
+- **The Talk tools renamed to the vocabulary** (R12, carried from R0):
+  `create_entity`, `connections`… with the golden fixtures re-recorded.
+- **One retry on the Mac** before the cloud (R12): saves cloud tokens, doubles
+  the wait on a bad reply.
+- **Automations** (R10): a *wait* step (the scheduler holds a run), real
+  branches beyond Continue only if, a budget of their own, by-hand buttons as
+  a Today tile, and "No automation called …" when "run …" matches nothing.
+- **Links** (R11): guessed Links with Right / Not this on the Links card; tap a
+  day on an Activity grid to see what made it count; a search on Browse ›
+  Links.
+- **Health** (R6): custom metrics with their own name; a sentence rule for
+  "weighed 72"; screen time as Measurement records (today it stays in core's
+  usage tables).
+- **Deliveries** (R7b): Swiggy and Zomato food orders; finance's notifications
+  source naming deliveries in its `modules` list.
+- **Travel** (R7d): the airlines' web check-in deep links (once checked on the
+  phone); payments made in the trip's city linked on their own.
+- **Second Brain** (R7f): `[[` suggestions while typing; notes re-linked when a
+  record with a mentioned name is made later; Notion's facts editable here or
+  only in Notion.
+- **The brain** (slices 4 and 6): a category's month over its target as a
+  nudge; a floor for renewal heads-ups (say ₹500); calendar Events with
+  attendees or a place counting as "needs you".
+
 ## Still to check on the phone
 
+- Everything merged on 2 Nov (v0.0.18 to v0.0.27): the list is in
+  `docs/handover/merge-r5-r15.md`.
 - Gmail accounts (first real run), app lock (after the build), Today cold-start time on the S22.
 - Tick M4.2b contacts / calendar / call log once checked on the device.
 - Emails in unknown formats are skipped for now (the nightly loop above would pick them up).

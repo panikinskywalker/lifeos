@@ -158,7 +158,7 @@ function MyDayTile() {
           {items.length > shown.length ? <Text variant="caption" color="secondary">+ {items.length - shown.length} more</Text> : null}
         </View>
       ) : (
-        <Text variant="caption" color="secondary">Nothing on today — no events, tasks or things due.</Text>
+        <Text variant="caption" color="secondary">Nothing on today: no events, tasks or things due.</Text>
       )}
     </Tile>
   );
@@ -277,7 +277,7 @@ function ProgressTile({ config }: TileProps) {
         {editing ? (
           <View style={{ gap: 12 }}>
             <Text variant="caption" color="secondary">
-              {editing.goalSource === 'history' ? 'Learned from your last 30 days — a little better than your usual. Set your own and it stays.' : editing.goalSource === 'you' ? 'Your own goal.' : 'A starting point until there’s a month of history to learn from.'}
+              {editing.goalSource === 'history' ? 'Learned from your last 30 days, a little better than your usual. Set your own and it stays.' : editing.goalSource === 'you' ? 'Your own goal.' : 'A starting point until there’s a month of history to learn from.'}
             </Text>
             <NumberField label={editing.id === 'spend' ? 'Per month (₹)' : editing.unit === 'h' ? 'Hours a day' : 'Per day'} value={value} onChange={setValue} />
             <Button title="Save goal" icon="check" disabled={!value} onPress={() => (setGoal(os, editing.id as GoalId, value ?? null), setEditing(null))} />
