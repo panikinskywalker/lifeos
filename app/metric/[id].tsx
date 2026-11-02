@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import { METRICS, dailyRange, formatMetric, metricSeries, screenTopApps, type MetricId, type Period } from '@core/dashboard/metrics';
+import { METRICS, compareMetric, dailyRange, formatMetric, metricSeries, screenTopApps, type MetricId, type Period } from '@core/dashboard/metrics';
+import { MetricCompareCard } from '@ui/components/MetricCompare';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, ColumnChart, DeltaChip, EmptyState, HeatMap, RowItem, RowList, Screen, Section, Segmented, Stat, Text } from '@ui/kit';
@@ -12,7 +13,8 @@ const TINT = { steps: 'health', sleep: 'memory', screen: 'tasks', spend: 'financ
 
 /**
  * One metric full screen (M4.3): day / week / month / year, the change vs
- * the previous period, the chart, and the records underneath.
+ * the previous period, the chart, this week vs last and vs your usual (R6),
+ * and the records underneath.
  */
 export default function MetricScreen() {
   const { id: raw } = useLocalSearchParams<{ id: string }>();
@@ -23,6 +25,7 @@ export default function MetricScreen() {
   const router = useRouter();
   const [period, setPeriod] = useState<Period>('week');
   const s = useLive((o) => metricSeries(o, id, period), [id, period]);
+  const cmp = useLive((o) => compareMetric(o, id), [id]);
   const yearDays = useLive((o) => (period === 'year' ? dailyRange(o, id) : []), [id, period]);
   const apps = useLive((o) => (id === 'screen' ? screenTopApps(o, period, Date.now(), 8) : []), [id, period]);
   const txs = useLive(
@@ -59,6 +62,7 @@ export default function MetricScreen() {
               formatY={(n) => (id === 'spend' || id === 'steps' ? (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n))) : n.toFixed(def.decimals ? 1 : 0))}
               accessibilityLabel={`${def.label} by ${period === 'year' ? 'month' : 'day'}`}
             />
+            <MetricCompareCard c={cmp} format={fmt} />
             {yearDays.length ? (
               <Section title="Every day this year">
                 <HeatMap days={yearDays} color={tint.ink} accessibilityLabel={`${def.label} per day, last 12 months`} />

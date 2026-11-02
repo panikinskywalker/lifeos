@@ -255,14 +255,56 @@ Not Objects: **Category** is a setting (name, colour, rules, monthly target).
 cost and auto-posted Transaction; the Subscriptions report lists those cycles.
 **Budget** is the monthly target on a Category.
 
-### Body
+### Body (module `health`; Fields agreed 2 Nov with R6)
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
-| **Measurement** | One reading of a metric | metric (steps / sleep / heart rate / weight / water / custom), value, unit, when, source | Health Connect, dumps, you |
-| **Workout** | A session | type, duration, distance, calories, when, source | Health Connect, dumps |
+| **Measurement** | One reading of a metric | see below | Health Connect, you, dumps (the model, through the Object's schema) |
+| **Workout** | A session | see below | Health Connect, you, dumps (the model) |
 
-Screen time is a Measurement too (metric = screen time, with per-app
-breakdown in data), filed by Usage access.
+**Measurement's Fields** (Object id `measurement`). Keys unchanged, so old
+records and backups keep working. Measurements are hidden from Browse's
+record lists: Health draws them as its metrics.
+| Field | Type | Notes |
+|---|---|---|
+| Metric | select | steps · sleep · resting heart rate (`resting_hr`) · heart rate, the day's average (`heart_rate`) · weight · water · mood (1 to 5) · other |
+| Value | number | in the metric's unit |
+| Unit | text | filled from the metric when empty (steps, h, bpm, kg, L) |
+| Date | date | the day it counts for; a night's sleep counts for the day you woke |
+| Asleep, Awake | datetime (`startAt`, `endAt`), sleep | when the night began and ended, from Health Connect |
+| Notes | long text | |
+| *(hidden)* source, source key | text | `health_connect` or empty (you); `hc:<metric>:<day>`, so a re-sync replaces the day, never adds one |
+
+Health Connect files **one Measurement per metric per day** (the day's steps,
+last night's sleep, resting and average heart rate, the day's weight);
+re-syncing a day updates it, since a day's steps grow until it ends. Yours can
+be several a day; a day's value is its latest.
+
+**Workout's Fields** (Object id `workout`). Keys unchanged.
+| Field | Type | Notes |
+|---|---|---|
+| Type | select (`kind`) | run · walk · cycling · strength · yoga · swim · sport · other; Health Connect's exercise types mapped to these |
+| Duration | duration (`durationMin`, minutes) | was a plain number of minutes; the values stay as they are |
+| Date | date | |
+| Started | datetime (`startAt`) | from Health Connect |
+| Distance | number (km) | |
+| Calories | number | |
+| Intensity | select | easy · moderate · hard |
+| Notes | long text | Health Connect's own title for the session goes here ("Morning run") |
+| *(hidden)* source, source key | text | as Measurement's (`hc:<session id>`) |
+
+**Screen time is not a Measurement** (decided 2 Nov, R6): it stays in core's
+per-day tables (`usage_daily`, `usage_app_daily`: the day's total, pickups,
+first and last use, time per app), because the per-app breakdown has no Field
+type (`json` is retired) and Activity, Time and Today already read those
+tables. It is shown as the metric *screen time* like the others, and its
+source, Usage access, is declared by `health`.
+
+**Comparisons** (every metric, on its page and on the Metric screen): *this
+week vs last* (the last 7 days against the 7 before) and *vs your usual* (the
+median of the 8 weeks before this one that have data; needs two such weeks).
+A week's value is its **average per day with data** (steps a day, hours a
+night), so a day the watch was off does not count as zero; weight's is its
+latest reading.
 
 ### Mind
 | Object | Meaning | Key fields | Filed by |
@@ -887,7 +929,7 @@ screens checked on the phone → overrides only where the default is wrong)
   screen, Investment hero, Investments on the Finance home. **Dataset**: all three inboxes, every
   parser's read, what was filed, your corrections. 319 tests green; the web export builds.
   *Deferred inside R1:* You › Data sources still lists sources from a platform table until every
-  source is declared by a module (R2 contacts / call log — done; calendar with R4; R6 health / usage); the
+  source is declared by a module (R2 contacts / call log — done; calendar with R4; R6 health / usage: done); the
   SubscriptionHero does not yet draw the price history; a price feed for current value is R12+.
   **Phone check pending**: migrations v11–v14 and the budget / institution folds run on first open.
 - [x] **R2 crm** — built 22 Oct 2026 (branch `claude/r2-people-058675`; no migration). Person and
@@ -995,8 +1037,22 @@ screens checked on the phone → overrides only where the default is wrong)
   (the calendar).
 - [ ] **R5 habits** — Habit, Habit log, Routine; check-ins; streaks; chores in
   Upkeep; Upkeep re-hung on cycles from every module.
-- [ ] **R6 health** — Measurement, Workout; Health Connect and Usage access
-  sources; one page per metric; Metric screen comparisons.
+- [x] **R6 health**: built 2 Nov 2026 (branch `claude/r6-health`; no migration). Measurement and
+  Workout as agreed (layer 2, *Body*; keys unchanged): sleep gains Asleep and Awake, a Workout its
+  Started time and a duration Field; screen time stays in core's usage tables (decided, layer 2).
+  **Sources declared by the module**: Health Connect and Usage access read the phone through
+  `os.device.health` and `os.device.usage` (platform keeps the native calls), run by core like the
+  others; Health Connect's filing (`saveHealthDays`) moved from core to the module, unchanged but
+  for the new Fields. **Comparisons** in core (`compareMetric`): this week vs last and vs your usual
+  (the median of 8 weeks), a week being its average per day with data; on every metric's page and
+  on the Metric screen. **Tools**: `health_today`, `metric_compare`, `workouts`, `log_measurement`.
+  **Brain**: a *due* weigh-in when you weigh yourself by hand and it has been twice your usual gap.
+  **Board** (a first pass from the kit until the `NR-Health-*` artboards of
+  `docs/design/HEALTH-BRIEF.md`): the Health home (a card per metric, workouts) and one page per
+  metric (steps, sleep, heart rate, weight, screen time); `src/screens/HealthHome.tsx` is gone.
+  Demo data has five weeks of Body. 498 tests green; the web export builds. *Not in R6*: custom
+  metrics with a name of their own, dumps filed by the sentence parser (the model files them).
+  **Phone check pending.**
 - [x] **R7a assets**: built 31 Oct 2026 (branch `claude/r7a-assets`; no migration). Asset as agreed
   (layer 2, *Things*): the category clothing, *kept in* a Space by Link (the assets module does not
   import inventory; it finds spaces that hold clothes by their data), a clothing state (clean · in the
