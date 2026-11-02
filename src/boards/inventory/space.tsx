@@ -9,7 +9,7 @@ import { Button, IconButton, Screen, Text } from '@ui/kit';
 import { stockState, type SpaceData, type StockData, type StockState } from '@modules/inventory';
 import { AddSheet, usePillActions } from './actions';
 import { ClothesSpace } from './clothes';
-import { BrainSlot, HomeEmpty, PillCloud, SectionHead, StockPill } from './parts';
+import { HomeEmpty, PillCloud, SectionHead, SnapFridge, StockPill } from './parts';
 
 /**
  * A space (HOME-BRIEF screen 2; a first pass until NR-Home-Space): every
@@ -17,7 +17,7 @@ import { BrainSlot, HomeEmpty, PillCloud, SectionHead, StockPill } from './parts
  * Field yet (an open question for the artboard), so the cloud is ordered by
  * what needs you — probably gone, then use soon, then fresh — so the faded
  * ones that wait for you come first. Tap = used up, long-press = half left
- * · still good · move. Snap the fridge is a slot until the brain. A space
+ * · still good · move. The Fridge has Snap the fridge (./snap). A space
  * that holds clothes draws its clothing Assets instead (./clothes, R7a).
  */
 
@@ -78,7 +78,7 @@ export function SpaceScreen({ ctx, params }: { ctx: LifeOSContext; params: Recor
           <Button title="Add" size="sm" onPress={() => setAdding(true)} />
         </HomeEmpty>
       )}
-      {space.title === 'Fridge' ? <BrainSlot title="Snap the fridge" line="A photo, compared with the pills: what's gone, what's new. Comes with the brain; the photo goes to Claude only when you press it." icon="camera" /> : null}
+      {space.title === 'Fridge' ? <SnapFridge /> : null}
       {pills.sheets}
       <AddSheet ctx={ctx} visible={adding} onClose={() => setAdding(false)} spaceId={space.id} />
     </Screen>

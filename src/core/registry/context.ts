@@ -13,6 +13,8 @@ import type { QuestionRepo } from '../repo/questionRepo';
 import type { OutboxRepo } from '../repo/outboxRepo';
 import type { Scheduler } from '../automation/scheduler';
 import type { BrainStore } from '../brain/store';
+import type { BrainModel } from '../brain/model';
+import type { PassResult } from '../brain/runner';
 
 /**
  * The "os" object handed to every module, widget, action and AI tool.
@@ -167,6 +169,15 @@ export interface DeviceBridge {
     list(uri: string): Promise<FolderFile[]>;
     /** Open a file in the phone's own viewer. */
     open(uri: string, mime: string): Promise<void>;
+  };
+  /**
+   * The brain's Claude on the phone (docs/MODEL.md layer 8): the model with the
+   * key saved under You › Agent (null without one), and a pass run now, one at
+   * a time with the scheduled ones. Boards reach it here, never platform code.
+   */
+  brain?: {
+    model(): Promise<BrainModel | null>;
+    pass(why: string): Promise<PassResult>;
   };
   /** The phone's secure store (keys a source needs, e.g. Turf web's): never in settings, never in a backup. */
   secrets?: {

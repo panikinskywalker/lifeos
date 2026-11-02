@@ -11,6 +11,7 @@ export * from './stock';
 export * from './nudges';
 export { inventoryBrain, dishAsk } from './brain';
 export { foldItems } from './fold';
+export * from './fridge';
 export { BLINKIT_APP, HOME_ORDER, HOME_STOCKED, HOME_UNREAD, groceryOrderParser, noteUnreadInvoice, orderAskOf, parseBlinkitInvoice, readInvoice, stockFromInvoice, stockedNoteOf, undoStocked, type Invoice, type InvoiceLine, type OrderAsk, type StockedNote } from './groceries';
 
 /**

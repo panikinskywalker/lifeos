@@ -10,8 +10,14 @@ export interface BrainUsage {
   cacheWrite: number;
 }
 
+/** A photo you sent on purpose (Snap the fridge): base64, read once, kept nowhere. */
+export interface BrainImage {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+  data: string;
+}
+
 export interface BrainModel {
   id: string;
   model: string;
-  complete(args: { system: string; user: string; maxTokens: number; schema?: Record<string, unknown> }): Promise<{ text: string; usage: BrainUsage }>;
+  complete(args: { system: string; user: string; maxTokens: number; schema?: Record<string, unknown>; image?: BrainImage }): Promise<{ text: string; usage: BrainUsage }>;
 }

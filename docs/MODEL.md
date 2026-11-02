@@ -1406,8 +1406,13 @@ them.
    *The contract* below and `docs/handover/brain-v1.md`. Not yet checked on
    the phone.*
 4. **Cook tonight and the fridge photo.**
+   *Built 2 Nov (branch `claude/brain-more`): see* Slices 4 and 6 *below.*
 5. **Travel** — packing and before you go.
 6. **Every module offers candidates** — Turf, People, Money, Documents.
+   *Turf and People came with slice 3; Money, Documents, Projects and Assets
+   built 2 Nov (branch `claude/brain-more`), see* Slices 4 and 6 *below. The
+   rest come with their own milestones (habits, health, deliveries, travel,
+   knowledge).*
 
 ### The contract (slice 3, agreed 31 Oct; code contracts in `docs/PLUGINS.md`)
 - **Candidates are a pure function on the module manifest**: `brain.candidates(os,
@@ -1448,4 +1453,45 @@ them.
   Android allows) and when the app opens; a pass can be run by hand. The
   **Morning brief** on Today shows today's nudges and the dish, "Updated 7 pm"
   once the evening pass has run.
+
+### Slices 4 and 6: the fridge photo and more candidates (agreed 2 Nov)
+- **Snap the fridge** (Home, HOME-BRIEF screen 5). On Home and on the Fridge
+  space. You press it, the camera opens, and the photo goes to Claude with the
+  names of the Fridge's pills (and which to use soon), nothing else. Claude says
+  what it **cannot see** (only names from the list) and what it **found** that
+  is not on it, and one dish from what it sees. The differences come back as
+  pills: tap to accept (Not seen: used up · Found: added to the Fridge), hold to
+  fix (Not seen: still there · Found: not there); All right closes it. The
+  photo is read once and kept nowhere: not in LifeOS, not in the log. The
+  Sent to Claude log says *a photo of the fridge* and lists the names that left.
+  The daily budget is checked first; no key or over it, the button says so.
+- **Cook tonight** (slice 3's slot) gains the photo's dish: once the
+  differences are accepted, the dish fills the slot for what is in the Fridge
+  now (the same key), so the next pass does not ask again. Another idea (and
+  Ask now, before there is a dish) runs a pass at once instead of waiting for
+  the next one.
+- **A module with a brain brings its own Cycles.** Upkeep's core candidates
+  leave out every Cycle on a record of a module that has a brain; such a module
+  offers them itself, through core's `cycleCandidates(os, module, now)` (the
+  same keys, so nothing is filed twice), in its own words and verbs.
+
+| Module | Kind · shape | When | Code's line | Yes | What leaves |
+|---|---|---|---|---|---|
+| Money | due · is this right? | a subscription that bills itself renews within 3 days | Netflix: ₹649 renews Thu | Keep it | name, amount, renews on, every |
+| Money | due · shall I? | a bill (a subscription with auto-post off) due within 3 days, or late | Electricity: ₹2,140 due tomorrow | Paid (files the expense) | name, amount, due, days late |
+| Money | due · is this right? | a SIP or a deposit maturing (its Cycles) | PPF SIP: ₹5,000 on 5 Nov | Right | name, amount, due |
+| Money | due · is this right? | one spend in the last 2 days at least 3 times your usual for its category (5 or more in 90 days) and ₹1,000 or more | Swiggy: ₹4,200 yesterday, about 4x your usual Food | Right | payee as filed, category, amount, day, usual |
+| Documents | going off · shall I? | a Document's expiry inside its notice (180 days for an ID, 30 else), or past | Passport: expires 12 Mar, in 4 months | Renewed (opens it for the new date) | title, kind, expires, days left |
+| Documents | coming up · shall I? | files found in your folders a day or more ago, still new | 3 new files in your folders | Look (Your folders) | how many, their titles, guessed kinds |
+| Projects | due · shall I? | an open task past its due day | Send the lease: 3 days late | Done (ticks it; a repeat moves on) | title, project, due, days late, priority |
+| Projects | coming up · shall I? | an Event today or tomorrow whose kind needs you (flight, stay, check-in, reservation, appointment, dinner, party, guests, wedding, concert, match, interview, exam), not on a trip (travel's) | Dinner at Bombay Canteen: tomorrow 8 pm | Open | title, kind, when, where, how many people |
+| Assets | going off · is this right? | a warranty ending inside 30 days | MacBook: warranty ends in 20 days | Right | thing, category, ends, days left |
+| Assets | due · shall I? | a service due by date or km, or late; any other Cycle on an Asset or a Routine | Creta: service due in 5 days or 400 km | Serviced / Done (logs it) | thing, category, cycle, due, days and km left, last done |
+
+Urgent: a bill due today or late; a Document past its expiry, or an ID inside
+7 days; a task marked urgent; an Event within 12 hours; a service due today or
+late (by date or km); a warranty ending today; any other Cycle as Upkeep has it
+(due today or late). Never sent: a bank SMS,
+a transaction's raw text or note, a document's text or file, an Event's notes
+or attendees' mail.
 
