@@ -35,6 +35,10 @@ CITY_CODES.push([/\bBangalore\b/i, 'BLR'], [/\bNew Delhi\b/i, 'DEL'], [/\bBombay
 
 const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 const pad = (n: number) => String(n).padStart(2, '0');
+const isoDay = (t: number) => {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 /** Dates a travel email mentions, in order: "12 Oct 2026", "Sat, 12 Oct", "12-Oct-26", "2026-10-12", "Oct 12, 2026", "12/10/2026". */
 
@@ -54,16 +58,23 @@ export function parseFlight(mail: Mail): ParsedFlight | null {
       break;
     }
   }
+  // "Bengaluru (BLR) 06:15 → Goa (GOX) 07:35": the first two known codes in brackets.
+  if (!from) {
+    const codes = [...t.matchAll(/\(([A-Z]{3})\)/g)].map((m) => m[1]!).filter((c, i, all) => AIRPORTS[c] && all.indexOf(c) === i);
+    if (codes.length >= 2) (from = codes[0]!), (to = codes[1]!);
+  }
   if (!from) {
     const m = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s+(?:to|-|–|→)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\b/.exec(t);
     const a = m ? CITY_CODES.find(([re]) => re.test(m[1]!))?.[1] : undefined;
     const b = m ? CITY_CODES.find(([re]) => re.test(m[2]!))?.[1] : undefined;
     if (a && b && a !== b) (from = a), (to = b);
   }
-  // Departure: the first date after "depart"/"departure"/the route, else the first date in the mail.
-  const dates = mailDates(t, mail.date);
+  // Departure: the first date after "depart"/"departure"/the route, else the first one after the day it was sent, else the first.
+  // A booking or issue date is never the flight's.
+  const dates = mailDates(t, mail.date).filter((x) => !/\b(?:book(?:ing|ed)(?: date| on)?|issued(?: on)?|date of (?:booking|issue))\W{0,4}(?:\w+,?\s)?$/i.test(t.slice(Math.max(0, x.at - 30), x.at)));
   const dep = /\b(?:depart(?:ure|s|ing)?|onward|travel date|flight date|date of (?:journey|travel))\b/i.exec(t);
-  const d = (dep ? dates.find((x) => x.at > dep.index) : undefined) ?? dates[0];
+  const sent = isoDay(mail.date);
+  const d = (dep ? dates.find((x) => x.at > dep.index) : undefined) ?? dates.find((x) => x.day > sent) ?? dates[0];
   if (!d || (!flightNo && !(from && to))) return null;
   const near = t.slice(d.at, d.at + 60);
   const time = /\b([01]?\d|2[0-3])[:.]([0-5]\d)\s*(am|pm|hrs|h)?\b/i.exec(near);
@@ -74,19 +85,28 @@ export function parseFlight(mail: Mail): ParsedFlight | null {
 }
 
 export function parseStay(mail: Mail): ParsedStay | null {
-  const t = `${mail.subject}\n${mail.text}`.replace(/ /g, ' ');
-  const ci = /\bcheck-?\s?in\b[^\n]{0,40}/i.exec(t);
-  const co = /\bcheck-?\s?out\b[^\n]{0,40}/i.exec(t);
+  const body = mail.text.replace(/\u00a0/g, ' ');
+  const t = `${mail.subject}\n${body}`;
+  // The date may sit on the next line ("Check-in\nFri, Dec 18"), as Airbnb writes it.
+  const ci = /\bcheck-?\s?in\b[\s\S]{0,40}/i.exec(t);
+  const co = /\bcheck-?\s?out\b[\s\S]{0,40}/i.exec(t);
   const inDate = ci ? mailDates(ci[0], mail.date)[0] : undefined;
   if (!inDate) return null;
   const outDate = co ? mailDates(co[0], mail.date)[0] : undefined;
+  const NAME = "([A-Z][\\w&'.,-]*(?:[ \\t]+[A-Z&][\\w&'.,-]*){0,6})";
+  const inText = (text: string) =>
+    new RegExp(`\\b(?:[Yy]our (?:stay|booking|reservation) (?:is confirmed )?at|booked at|[Rr]eservation at|[Ww]elcome to|[Hh]otel(?: [Nn]ame)?:|[Pp]roperty:)[ \\t]*${NAME}`).exec(text)?.[1]?.replace(/[.,]+$/, '');
   const name =
-    /\b(?:[Yy]our (?:stay|booking|reservation) (?:is confirmed )?at|booked at|[Rr]eservation at|[Ww]elcome to|[Hh]otel:?)[ \t]+([A-Z][\w&'.,-]*(?:[ \t]+[A-Z&][\w&'.,-]*){0,6})/.exec(t)?.[1]?.replace(/[.,]+$/, '') ??
+    inText(body) ??
+    inText(mail.subject) ??
+    // Airbnb names the listing, lower case and all: "Reservation confirmed - Sea-view studio in Anjuna".
+    /\breservation confirmed(?: for| -| –|:)\s*(.+)$/i.exec(mail.subject)?.[1]?.trim() ??
     /confirm(?:ed|ation)(?:[:\s-]+| at )([A-Z][\w&'.-]*(?:[ \t]+[A-Z&][\w&'.-]*){0,6})/.exec(mail.subject)?.[1] ??
     null;
   if (!name) return null;
-  const place = CITY_CODES.find(([re]) => re.test(t))?.[1];
-  return { name, checkIn: inDate.day, checkOut: outDate?.day ?? null, place: place ? AIRPORTS[place]! : null };
+  const city = CITY_CODES.find(([re]) => re.test(t))?.[1];
+  const place = city ? AIRPORTS[city]! : (/\bin ([A-Z][a-z]+(?: [A-Z][a-z]+)?)$/.exec(name)?.[1] ?? null);
+  return { name, checkIn: inDate.day, checkOut: outDate?.day ?? null, place };
 }
 
 /* ------------------------------------------------------------------ */

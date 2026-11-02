@@ -462,6 +462,29 @@ learning, the rest → personal; active → active, achieved → done, dropped �
 done and archived. A task toward a goal is in that Project when it had none;
 when it had one, its *goal* Link becomes *related*. Task's Goal Field goes.
 
+**Trip's Fields** (module `travel`, Object id `trip`; decided 2 Nov with R7d).
+Keys unchanged; one Field new.
+| Field | Type | Notes |
+|---|---|---|
+| Destination | text (the title) | "Goa", as typed, or the city a booking mail flies to or stays in |
+| To | link → Place, word *to* (`placeId`) | **new**: the Place the destination names, matched by name when the trip is saved (a city, area or country first), else made as a city; the Place's page shows **Trips here** |
+| Starts, Ends | date (`startDate`, `endDate`) | from the first flight or check-in; a return flight or a later check-out moves Ends |
+| Purpose | select | leisure · work · family · other |
+| Travelling with | link → Person, many, word *person* | |
+| Budget | money | what you mean to spend, in ₹ |
+| Local currency | select | INR · USD · EUR · GBP · JPY · AED · SGD · THB; a new expense on the trip starts in it |
+| Notes | long text | |
+| *(hidden)* packed | text list | the things ticked on the packing list that are not clothes (charger, sunscreen) |
+
+Statuses: idea · planning · booked · ongoing · done; a trip made from a booking
+mail is *booked*.
+
+Derived, not Fields: **days** (Starts to Ends, both counted); **spent**: the
+money-out Transactions linked to the trip through Links (word *trip* from the
+form, *part_of* from a booking mail), each counted once, against the budget,
+per day and what is left; **flights and stays**: Events linked to it the same
+way; **packed**: clothing Assets linked *packed for* it (a new core link word).
+
 ### Games (module `games`, agreed 17 Oct, revised 20 Oct; feeds the Turf board)
 The football you already run in **Turf Ledger**, your web app
 (github.com/panikinskywalker/Turf-App: Cloudflare D1 + R2, hosted and
@@ -1260,7 +1283,31 @@ screens checked on the phone → overrides only where the default is wrong)
   folders with Filed), the file card on a Document (Open, Filed, missing), New in your folders on the
   Overview. *Not in R7c*: the text of photos (no OCR), shared files saved into a folder, Insurance and
   PUC as Documents (still open). **Phone check pending.**
-- [ ] **R7d travel** — Trip; spend vs budget; flights and stays from mail.
+- [x] **R7d travel**: built 2 Nov 2026 (branch `claude/r7d-travel`; no migration), with layer 8's travel slice.
+  Trip's Fields as written in layer 2 (*Agenda*): the destination is linked *to* its Place (matched by name, a
+  city, area or country first, else made as a city; once on first open for the trips you had, `travel.foldedR7d`,
+  then whenever a trip is saved), and a Place's page shows **Trips here**. **Spend vs budget** through Links only:
+  money-out Transactions linked by the Trip Field (*trip*) or a booking mail (*part_of*), each once; left, per
+  day, per day left, by category; the payments made on the trip's days that are on no trip are offered to add
+  (through the Trip Field, with Undo), never added on their own. **Mail**: the bookings parser reads IndiGo, Air
+  India and MakeMyTrip tickets (the route also from codes in brackets, the flight day never the booking day) and
+  MakeMyTrip hotel, Booking.com and Airbnb stays (a date on the line after Check-in, the listing's name); a trip
+  made from mail is *booked*, a return flight moves its end; tested on plausible samples, not real mail.
+  **Packing**: the list from the days (three when undated) and the kind of place (beach, cold, a city; abroad
+  from the destination or a local currency that is not INR): tops one a day plus one, bottoms one per three
+  days, sleepwear, swimwear at the beach, two warm layers somewhere cold, chosen from clean clothing Assets
+  found by their data; things from Home's Bathroom Stock (else three defaults) plus charger, ID, medicines and
+  what the trip asks for; Pack sets the picked clothes *packed* and links them *packed for* the trip (a new core
+  link word), Back home puts them *in the wash*; the travel module imports neither assets nor inventory.
+  **Brain** (`travel.brain`, all *coming up*): check in (a flight within 48 hours, urgent within 24; Yes opens
+  the airline's site), pack (a trip within 3 days with nothing packed; Claude fills a list for this kind of trip,
+  kept by `packingKey`), before you go (one or two days out; Claude joins it with the pass's other nudges), back
+  home (clothes still packed after a trip). **Tools**: `trip_spend` (with `plan_trip`). **Board** (a first pass
+  from the kit until the `NR-Travel-*` artboards of `docs/design/TRAVEL-BRIEF.md`): the Travel home (next trip
+  or away now with spend and bookings, coming up, been), the Trip page (dates, spend vs budget, Pack or Back home,
+  flights and stays, expenses, spent on those days), the packing picker, Trips here. 502 tests green; the web
+  export builds. *Not in R7d*: the weather there (a free service still to choose), "forgot last time", the
+  "back: the fridge is probably empty" nudge, trains and buses. **Phone check pending.**
 - [x] **R7e Home** — built 30 Oct 2026 (branch `claude/r7e-home-1f3592`; no migration), layer 8's first slice: Stock and Space
   (layer 2, *Things*) in `inventory`, shown as Home; the old `item` records folded in once.
   **Module**: state from bought on and life; the rate learned from purchases and used up;
@@ -1739,6 +1786,7 @@ them.
    the phone.*
 4. **Cook tonight and the fridge photo.**
 5. **Travel** — packing and before you go.
+   *Built 2 Nov with R7d: pack, check in, before you go and back home; see R7d.*
 6. **Every module offers candidates** — Turf, People, Money, Documents.
 
 ### The contract (slice 3, agreed 31 Oct; code contracts in `docs/PLUGINS.md`)

@@ -14,18 +14,20 @@ const iso = (t: number) => {
 
 const cityOf = (code: string | null) => (code ? (AIRPORTS[code] ?? code) : null);
 
-/** The trip covering this day (or two weeks from an open one's start), else a new "Trip to X". */
+/** The trip covering this day (or two weeks from an open one's start), else a new "Trip to X", booked. */
 function tripOn(os: LifeOSContext, day: string, destination: string | null, ingestId: string, account: string, end?: string | null): string | null {
   if (!os.registry.objects.has('trip')) return null;
   const trips = os.records.query<{ destination?: string; startDate?: string; endDate?: string }>('trip', {}, { limit: 300 });
   const openEnd = (start: string) => iso(new Date(`${start}T12:00:00`).getTime() + 14 * DAY);
   const hit = trips.find((t) => t.data.startDate && t.data.startDate <= day && (t.data.endDate ?? openEnd(t.data.startDate)) >= day);
   if (hit) {
-    if (end && hit.data.endDate && end > hit.data.endDate) os.records.update(hit.id, { data: { endDate: end } }, 'assistant');
+    // A return flight (somewhere other than the trip's destination) or a later check-out moves its end.
+    const until = end ?? (destination && hit.data.destination && destination !== hit.data.destination && day > (hit.data.startDate ?? '') ? day : null);
+    if (until && (!hit.data.endDate || until > hit.data.endDate)) os.records.update(hit.id, { data: { endDate: until } }, 'assistant');
     return hit.id;
   }
   if (!destination) return null;
-  const t = os.records.create({ object: 'trip', title: `Trip to ${destination}`, data: { destination, startDate: day, ...(end ? { endDate: end } : {}) } }, 'assistant');
+  const t = os.records.create({ object: 'trip', title: `Trip to ${destination}`, data: { destination, startDate: day, ...(end ? { endDate: end } : {}) }, status: 'booked' }, 'assistant');
   os.records.timeline.add({ entityId: t.id, kind: 'email', title: `From Email · ${account}`, body: null, actor: 'system', occurredAt: Date.now(), meta: { ingestId } });
   os.filings.add({ source: 'email', sourceRef: ingestId, kind: 'trip', entityId: t.id, label: `Trip: Trip to ${destination} · from ${account}` });
   return t.id;
