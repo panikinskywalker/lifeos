@@ -1,5 +1,6 @@
 import type { BoardManifest } from '@core/registry/types';
 import { healthOverview } from './overview';
+import { healthTiles } from './tile';
 
 /** Companion board of the health module: its Overview and quick actions. The metric pages are `src/screens/HealthHome.tsx` until R6. */
 export const healthBoard: BoardManifest = {
@@ -10,6 +11,7 @@ export const healthBoard: BoardManifest = {
   color: 'red',
   placement: 'module',
   overview: healthOverview,
+  tiles: healthTiles,
   quickActions: [
     { id: 'health.addWorkout', label: 'Workout', icon: 'figure.run', route: '/entity/workout/new', global: true },
     { id: 'health.addMeasurement', label: 'Measurement', icon: 'scalemass', route: '/entity/measurement/new' },

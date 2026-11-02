@@ -1,6 +1,7 @@
 import type { BoardManifest } from '@core/registry/types';
 import { habitsOverview } from './overview';
 import { HabitSection } from './widgets';
+import { habitsTiles } from './tile';
 
 export { HabitChecklist, HabitWeek } from './widgets';
 
@@ -13,6 +14,7 @@ export const habitsBoard: BoardManifest = {
   color: 'orange',
   placement: 'module',
   overview: habitsOverview,
+  tiles: habitsTiles,
   quickActions: [{ id: 'habits.add', label: 'Habit', icon: 'flame', route: '/entity/habit/new' }],
   overrides: [{ object: 'habit', record: [{ entityType: 'habit', key: 'habits.habit', title: 'Streak', component: HabitSection, order: 10 }] }],
 };

@@ -783,6 +783,61 @@ Upcoming · People to call · Overdue · On this day · module cards (number + 7
 trend). Tiles can be added, removed, reordered (You › Home). An empty tile names
 the permission it needs and opens You › Data sources. No placeholder numbers.
 
+**What Today is made of** (R8, 2 Nov). Today is a layout and holds no data
+of its own: the **Morning brief** on top (layer 8), then the **tiles boards
+register** (`tiles` on a BoardManifest, one `TileDef` each), in your order.
+A tile reads through its module's tools and core's queries only; Today reads
+nothing but the layout. Each tile lives with the board that owns its data:
+| Tile | Board | Reads |
+|---|---|---|
+| My day · Progress · Done today · Upcoming · Overdue · Screen time · Activity · Areas | Today (`src/boards/today`) | core: the day, goals, Cycles, usage, trackers; Areas asks each module's Overview |
+| Steps · Sleep | Health | core metrics over Measurements |
+| Spend this month | Finance | core spend pace over Transactions |
+| Habits | Habits | the board's own checklist and week |
+| People | People (`crm`) | crm's `peopleToCall` |
+| Home | Home (`inventory`) | inventory's use soon and running low |
+| Turf | Turf | games' next match and dues |
+| On this day | Time | core's `onThisDay` |
+
+- **Sizes**: *small* (half a row) or *medium* (a full row). Two smalls side
+  by side share a row; a small alone on its row is drawn medium (v0.0.17).
+- **A tile with nothing to show draws nothing** (Turf with no players, On
+  this day with no past, Habits with none). A tile that needs a source and
+  has none names it and opens You › Data sources.
+- **Looks** (Habits: today list · this week; Activity: one at a time · all
+  stacked; Progress: rows · rings) are a tile's config: a select Field in its
+  `configFields`, drawn by You › Home screen, the first option the default.
+- **Ids stay** as they were (`myday`, `steps`, `onthisday` …), so the order,
+  switches and looks you saved carry over. A tile a board adds later lands
+  at the end of Today, shown, until you move it.
+- **Default order**: My day · Turf · Progress · Activity · Habits · Steps ·
+  Sleep · Spend · Done today · Areas · Upcoming · Screen time · People · Home
+  · Overdue · On this day.
+
+### Time (board)
+What happened in a day, a month or a year, over every module (layer 3).
+Route `/time` (`app/time.tsx`) with `span` (day · month · year; month when
+absent) and `day` (any ISO day in the period; today when absent). The old
+`/almanac/time` sends you on with the same params. Opened from the On this
+day tile (that date, as a day), from Browse › Boards › Time (this month), and
+from a day's own On this day rows.
+- **Day · Month · Year** switch; the period's name with earlier and later
+  (later stops at the period holding today).
+- **Month**: a calendar, Monday first, each day marked (dumped, an event,
+  spend as shade); tap a day to open it. **Year**: twelve months with spend,
+  dumps and events; tap one to open it.
+- Then the period, each section only when it has something: **Money** (spent,
+  came in, by category; a day lists its payments), **Body & phone**
+  (averages, each opening its Metric), **What happened** (Events, Trips),
+  **What you dumped**, **Upkeep done**, **Added** (new people, records by
+  Object, facts remembered).
+- **On this day** (a day only): the same date a month, six months and every
+  year back (up to ten), only the dates with something; each date opens as
+  a day, each item its record or dump. Today's tile is this list from today,
+  three dates with two items each.
+- Everything comes from core's `periodOf`, `periodSummary` and `onThisDay`
+  (`src/core/almanac`), pure; the board lays them out.
+
 ### Upkeep (board)
 Every Cycle from every module by due date: overdue · this week · this month ·
 later. Filter chips by module. A 7-day strip with checkable pills. Mark done
@@ -1057,9 +1112,17 @@ screens checked on the phone → overrides only where the default is wrong)
 - [ ] **R7f knowledge** (later) — Note, Fact as the Second Brain; Memory replaced.
 
 ### Boards and automations
-- [ ] **R8 Today and Time** — Today tiles re-hung on module tools and core queries only; Time
+- [x] **R8 Today and Time** — Today tiles re-hung on module tools and core queries only; Time
   board from On this day; the route moves from `app/almanac/time.tsx` to
   `app/time.tsx`.
+  *Built 2 Nov (branch `claude/r8-today-time`)*: layer 5 *What Today is made
+  of* and *Time*. Every Today tile is a `TileDef` on the board that owns its
+  data (Today's own board `src/boards/today` for the tiles over core);
+  `app/(tabs)/index.tsx` lays out the Morning brief and the registered
+  tiles only. The Time board (`src/boards/time`) at `/time`, in Browse ›
+  Boards, with On this day on a day and as its Today tile; `/almanac/time`
+  redirects. Brief `docs/design/TIME-BRIEF.md`; hand-over
+  `docs/handover/r8-today-time.md`. *Not yet checked on the phone.*
 - [ ] **R9 Turf** — the first user board, the whole of Turf Ledger in LifeOS
   (agreed 17 Oct; **plan 2 on 20 Oct**: the whole app rebuilt as ours, Turf web
   on Cloudflare holds the data, LifeOS and the iPhone both run games; layer 2 *Games*, layer 3 *Turf*, layer 4 *Turf web*). Proves the

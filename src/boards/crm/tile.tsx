@@ -1,4 +1,5 @@
 import React from 'react';
+import type { TileDef } from '@core/registry/types';
 import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -108,3 +109,5 @@ export function PeopleTodayTile({ wide }: { wide?: boolean } = {}) {
     </Pressable>
   );
 }
+
+export const crmTiles: TileDef[] = [{ type: 'people', board: 'crm', name: 'People', description: 'Who to call, who’s overdue, a birthday this week', icon: 'people', sizes: ['small', 'medium'], defaultSize: 'small', component: ({ size }) => <PeopleTodayTile wide={size !== 'small'} /> }];

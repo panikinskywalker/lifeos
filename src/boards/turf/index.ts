@@ -1,5 +1,6 @@
 import type { BoardManifest } from '@core/registry/types';
 import { TurfHome } from './home';
+import { turfTiles } from './today';
 import { TurfGames } from './games';
 import { TurfGame } from './game';
 import { TurfPlayers } from './players';
@@ -21,6 +22,7 @@ export const turfBoard: BoardManifest = {
   icon: 'target',
   color: 'green',
   placement: 'browse',
+  tiles: turfTiles,
   screens: [
     { key: 'index', title: 'Turf', component: TurfHome },
     { key: 'games', title: 'Games', component: TurfGames },
