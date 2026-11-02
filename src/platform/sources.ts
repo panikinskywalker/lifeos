@@ -8,6 +8,7 @@ import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
 import { syncMail } from './email';
+import { foldersBridge } from './folders';
 import { calendarBridge, calendarGranted, callLogBridge, callLogGranted, contactsBridge, contactsGranted, requestCalendar, requestCallLog } from './phoneSources';
 
 /**
@@ -131,6 +132,7 @@ export function deviceBridge(os: LifeOSContext): DeviceBridge {
     },
     mail: { sync: () => syncMail(os) },
     pdfText: (uri) => Device!.pdfText(uri).then((t) => (t.trim() ? t : null)),
+    folders: foldersBridge(Device),
   };
 }
 
@@ -212,7 +214,8 @@ export function syncSources(os: LifeOSContext): Promise<void> {
   const p = (async () => {
     await withLimit('fx', STEP_LIMIT_MS.fx, () => refreshFxRates(os));
     // Projects' calendar (R4) and People's sources (crm, R2): the contacts you picked, the call log.
-    for (const id of ['calendar', 'contacts', 'calllog'] as const) await withLimit(id, STEP_LIMIT_MS.phone, () => syncRegistered(os, id));
+    // Documents' folders (R7c) after them: a rescan of the folders you picked.
+    for (const id of ['calendar', 'contacts', 'calllog', 'folders'] as const) await withLimit(id, STEP_LIMIT_MS.phone, () => syncRegistered(os, id));
     if (deviceAvailable) {
       // Message sources are declared by their modules (finance: sms, notifications) and run through the registry.
       for (const id of ['sms', 'notifications'] as const) await withLimit(id, STEP_LIMIT_MS.device, () => syncRegistered(os, id));

@@ -29,6 +29,7 @@ export interface HealthDay {
   workouts?: Array<{ id: string; type: number; title: string | null; start: number; minutes: number }>;
 }
 export interface MailHeaderRaw { uid: number; from: string; fromName: string; subject: string; date: number }
+export interface FolderFile { uri: string; name: string; mime: string; size: number; modified: number; path: string }
 export interface CallEntry { number: string; name: string | null; at: number; seconds: number; type: 'incoming' | 'outgoing' | 'missed' | 'other' }
 
 interface Native {
@@ -48,6 +49,8 @@ interface Native {
   readCallLog(sinceMs: number, limit: number): Promise<CallEntry[]>;
   /** A shared PDF's text (content://, file:// or a path); empty for a scan. Rejects when it can't be opened (locked, broken). */
   pdfText(uri: string): Promise<string>;
+  /** Every file under a picked folder (a SAF tree uri), five deep; nothing copied. Rejects when the access is gone. */
+  listFolder(treeUri: string, maxFiles: number): Promise<FolderFile[]>;
   mailCheck(email: string, password: string): Promise<'ok'>;
   mailHeaders(email: string, password: string, sinceMs: number, afterUid: number, uidValidity: number, max: number): Promise<{ uidValidity: number; total: number; headers: MailHeaderRaw[] }>;
   mailBodies(email: string, password: string, uids: number[]): Promise<Array<{ uid: number; text: string }>>;

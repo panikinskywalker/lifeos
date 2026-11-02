@@ -23,7 +23,6 @@ Preview build (no Mac / Metro / Wi-Fi dance), updates arrive by themselves on ne
 
 ## Offered, waiting on a decision
 
-- **Documents from the phone's own folders, indexed not copied** (2 Nov, for R7c): you pick folders once (Android's folder picker, e.g. Documents, Download, Scans); LifeOS keeps a pointer to each file (name, type, size, date, its link) and its text for search (PdfBox, on the phone), never a copy. Tags, links, kind and expiry live on the Document record that points at the file; tap opens the phone's viewer. A rescan on open finds new, moved and deleted files (a deleted one shows "file missing"). Shared-in files still need saving somewhere, since a share only lends access for a moment: save into a picked folder. Today attachments are copied into the app (`src/ui/lib/files.ts`). Needs a build.
 - **Notion connector** (28 Sep): internal-integration token pasted once; you share pages / databases with it. Could bring pages in as searchable notes linked to people / projects, a task database as tasks, a journal onto the Time view. *24 Oct: the People CRM part is pushed as R2b (MODEL layer 4, *Notion*); notes, tasks and the journal stay open.*
 - **Other token connectors:** GitHub (commits → an Activity tracker "days coded"), Todoist / Linear (tasks), Splitwise (shared expenses). Strava / Spotify need a sign-in flow like Google.
 - **Missing-keys warning** (27 Sep): "Your AI keys are missing — add them in You › Agent" instead of dumps quietly waiting.

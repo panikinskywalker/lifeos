@@ -106,6 +106,10 @@ class LifeosDeviceModule : Module() {
 
     AsyncFunction("pdfText") Coroutine { uri: String -> withContext(Dispatchers.IO) { PdfText.read(context, uri) } }
 
+    /* ---------------- Your folders (Documents) ---------------- */
+
+    AsyncFunction("listFolder") Coroutine { treeUri: String, maxFiles: Int -> withContext(Dispatchers.IO) { FolderTree.list(context, treeUri, maxFiles) } }
+
     /* ---------------- Call log ---------------- */
 
     // Gmail over IMAP (app password) — read-only; see MailReader.

@@ -69,6 +69,19 @@ export interface Formatters {
 
 export type Access = 'granted' | 'needed' | 'unavailable';
 
+/** One file in a folder you picked, as the device bridge hands it over (R7c). */
+export interface FolderFile {
+  /** The folder's link to the file (content://…); stays valid while the folder's access does. */
+  uri: string;
+  name: string;
+  mime: string;
+  size: number;
+  /** Last changed, ms. */
+  modified: number;
+  /** Subfolder inside the picked folder ('' at the top). */
+  path: string;
+}
+
 /** One phone contact, as the device bridge hands it over. */
 export interface DeviceContact {
   id: string;
@@ -146,6 +159,15 @@ export interface DeviceBridge {
    * only (PdfBox-Android in the device module).
    */
   pdfText?: (uri: string) => Promise<string | null>;
+  /** Folders you picked on the phone (R7c: Documents points at their files, never copies them). */
+  folders?: {
+    /** Android's folder picker; the access is remembered. Null when you cancel. */
+    pick(): Promise<{ uri: string; name: string } | null>;
+    /** Every file under a picked folder, five deep. Rejects when the access is gone. */
+    list(uri: string): Promise<FolderFile[]>;
+    /** Open a file in the phone's own viewer. */
+    open(uri: string, mime: string): Promise<void>;
+  };
   /** The phone's secure store (keys a source needs, e.g. Turf web's): never in settings, never in a backup. */
   secrets?: {
     get(key: string): Promise<string | null>;

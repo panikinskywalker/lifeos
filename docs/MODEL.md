@@ -114,7 +114,7 @@ ids as R3 leaves them.
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
 | **Asset** | Something you own, vehicles and clothes included | category (vehicle / device / appliance / clothing / …), bought on, price, vendor → Organisation, warranty cycle, meter readings (km) for cycles by meter, serial, location → Place, kept in → Space, a clothing state; see below | dumps, you, mail receipts |
-| **Document** | ID, policy, contract, certificate | kind, number, issuer → Organisation, issued, expires (cycle), file, about → any record | you, dumps, mail |
+| **Document** | ID, policy, contract, certificate; or any file in a folder you pick | see below | your folders, you, dumps, mail |
 | **Delivery** | A parcel on its way | shop → Organisation, carrier, tracking, expected, status, OTP, order → Transaction link | SMS, mail |
 | **Stock** | Something kept at home that runs out or goes off (butter, detergent, a medicine) | see below | you (one line, the form), a shared order invoice, dumps |
 | **Space** | A part of Home that holds Stock and Assets (Fridge, Clothes) | see below | the seven defaults, you |
@@ -205,6 +205,43 @@ Statuses: owned · sold · lost / broken. **Cycles**: Warranty, Service (by
 months, by km, or either). A folded vehicle keeps its **Insurance** and
 **PUC** renewals as Cycles on the Asset, as they were; whether they become
 Documents (R7c) is open.
+
+**Document** (module `documents`; Fields agreed 2 Nov with R7c). LifeOS does not
+keep its own copy of your papers: **you pick folders on the phone once**
+(Android's folder picker: Documents, Download, a Scans folder) and every file in
+them is a Document that **points at the file where it already is**. Nothing is
+copied; what LifeOS adds (kind, expiry, tags, links) lives on the record.
+
+| Field | Type | Notes |
+|---|---|---|
+| Title | text | from the file name when found in a folder ("Car insurance 2026"), yours to change |
+| Kind | select | ID / passport · insurance · contract / lease · receipt / invoice · ticket / booking · medical · tax · certificate · other; guessed from the name and the text, yours to change |
+| Reference number | text | |
+| Issuer | text | the typed name (an Organisation link later) |
+| Issued | date | |
+| Expires | date | drives the **Renew** Cycle (180 days' notice for an ID, else 30) |
+| Person, Trip, Asset | link | what it is about; words `person`, `trip`, `asset` |
+| File | file | where it lives: the folder's link to it, name, type, size, last changed, and which picked folder; tap opens it in the phone's own viewer |
+| Notes | long text | |
+
+Not shown, for search only: the **text inside** a PDF, read on the phone
+(PdfBox), up to 20,000 characters; it never leaves the phone. A scan has none.
+
+Statuses: **new** (found in a folder, not looked at yet) · **filed** · **missing**
+(the file has gone from the folder). One made by hand is filed.
+
+**Your folders** (Documents › Your folders):
+- Picked once each; Android remembers the access. Remove one and its new Documents
+  go; the ones you filed stay, marked missing (the files are not touched).
+- **Rescan** when the app opens and on Rescan now: a new file is a new Document
+  (status new); a renamed or moved one inside your folders is found again by
+  name and size and keeps its record; a deleted one becomes missing, never
+  silently gone. Subfolders are included, five deep.
+- A few PDFs' text is read on each rescan (15), so a first scan of many files
+  stays quick.
+- A file shared into LifeOS is only lent for a moment, so it is not indexed;
+  save it into one of your folders.
+- Backups keep the Documents (kind, expiry, tags, links), not the files.
 
 ### Money
 | Object | Meaning | Key fields | Filed by |
@@ -981,7 +1018,17 @@ screens checked on the phone → overrides only where the default is wrong)
   uses. 431 tests green; the web export builds. *Not in R7a*: a form that shows only a category's
   Fields (the form shows every section); the packing picker itself (R7d). **Phone check pending.**
 - [ ] **R7b deliveries** — Delivery; shipping parsers; OTP; tracking.
-- [ ] **R7c documents** — Document; expiry cycles; files.
+- [x] **R7c documents** — built 2 Nov 2026 (no migration): Document (layer 2, *Things*) points at files in
+  folders you pick on the phone, indexed and never copied. **Module**: the folders (settings
+  `documents.folders`), the rescan (new files in as *new*, a renamed or moved one followed by its size
+  and its name or date, a deleted one *missing*), 15 PDFs' text read per rescan for search and a better
+  kind, the kind guessed from the name and text, remove a folder (its new ones go, filed ones stay as
+  missing); the `folders` source runs a rescan with every sync. **Phone**: Android's folder picker
+  (expo-file-system, access kept), `listFolder` in the device module (one query per folder, five
+  deep), the phone's own viewer to open. **Board**: Your folders (Add folder, Rescan now, New in your
+  folders with Filed), the file card on a Document (Open, Filed, missing), New in your folders on the
+  Overview. *Not in R7c*: the text of photos (no OCR), shared files saved into a folder, Insurance and
+  PUC as Documents (still open). **Phone check pending.**
 - [ ] **R7d travel** — Trip; spend vs budget; flights and stays from mail.
 - [x] **R7e Home** — built 30 Oct 2026 (branch `claude/r7e-home-1f3592`; no migration), layer 8's first slice: Stock and Space
   (layer 2, *Things*) in `inventory`, shown as Home; the old `item` records folded in once.

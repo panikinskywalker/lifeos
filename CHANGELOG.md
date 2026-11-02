@@ -7,6 +7,26 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.16 · 2 Nov 2026
+
+**Documents, from your own folders** (R7c). LifeOS no longer needs its own
+copy of your papers.
+- **Your folders** (Documents › Your folders): pick the folders where your
+  papers already are (Documents, Download, a Scans folder). Every file in
+  them shows up as a Document that points at the file; nothing is copied.
+- **Search inside them**: PDFs' text is read on the phone (15 per rescan)
+  and never leaves it. A scan is found by its name.
+- **Kind guessed** from the name and the text (ID, insurance, ticket,
+  receipt, tax, medical, contract, certificate); add expiry, tags and
+  links as before.
+- **Kept current** on every sync and with Rescan now: new files arrive as
+  *new*, a renamed or moved file keeps its record, a deleted one is marked
+  *missing* instead of vanishing.
+- **Open** opens the file in the phone's own viewer; **Filed** clears it
+  from New in your folders.
+- From this version, changes that don't touch the phone's native code
+  reach the app as updates on their own, without a new APK.
+
 ## v0.0.15 · 2 Nov 2026
 
 **The first build to install on the phone** since the 4 Oct reset: a
