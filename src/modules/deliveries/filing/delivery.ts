@@ -1,6 +1,6 @@
 /**
  * Shipping texts → deliveries (M4.2c). Pure: reads what a shop or courier
- * SMS says about an order — who it's from, what, the carrier, tracking /
+ * SMS says about an order: who it's from, what, the carrier, tracking /
  * order number, status, and the expected date. Food and quick-commerce
  * "on the way" texts are left out (they're minutes, not parcels).
  */

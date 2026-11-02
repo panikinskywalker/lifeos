@@ -126,6 +126,11 @@ export function seedDemoData(os: LifeOSContext) {
     os.records.create({ object: 'routine', data: { name: 'Haircut', kind: 'personal', everyN: 5, everyUnit: 'week', minutes: 45, lastDoneOn: daysAgo(30) } });
     os.records.create({ object: 'routine', data: { name: 'Clean the AC filters', kind: 'home', everyN: 3, everyUnit: 'month', minutes: 30, lastDoneOn: daysAgo(70) } });
 
+    // Deliveries (R7b): one arriving today with its OTP, one on the way.
+    if (os.registry.objects.has('delivery')) {
+      os.records.create({ object: 'delivery', data: { shop: 'Amazon', item: 'Philips Trimmer BT3221', carrier: 'Delhivery', tracking: '4823106745121', orderId: '403-5512345-1234567', status: 'out_for_delivery', expectedDate: daysAgo(0), otp: '739204', otpAt: Date.now() - 3_600_000, trackingUrl: 'https://amzn.in/d/7Gx2' } });
+      os.records.create({ object: 'delivery', data: { shop: 'Flipkart', item: 'Nike Revolution 6', carrier: 'Ekart', orderId: 'OD128765432109876', status: 'shipped', expectedDate: daysAhead(2) } });
+    }
     os.tags.apply(japan.id, 'travel');
     os.tags.apply(lifeos.id, 'side-project');
     os.tags.apply(goal.id, 'money');

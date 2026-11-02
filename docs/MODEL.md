@@ -243,6 +243,34 @@ Statuses: **new** (found in a folder, not looked at yet) · **filed** · **missi
   save it into one of your folders.
 - Backups keep the Documents (kind, expiry, tags, links), not the files.
 
+**Delivery** (module `deliveries`, Object id `delivery`; Fields agreed 2 Nov with
+R7b). One record per order, moved along by every text, notification and mail
+about it; the keys stay as they were (M4.2c) so old records keep working.
+| Field | Type | Notes |
+|---|---|---|
+| Item | text (the title) | what is in it ("boAt Rockerz 255 Pro"), from the text; else "Amazon order" |
+| Shop | link → Organisation, word *vendor*, **and** the typed text | Amazon · Flipkart · Myntra · Instamart · Zepto · Blinkit · AJIO · Nykaa · Meesho…; linked to the Organisation of that name (made once, kind shop, if you have none; finance's payments to it then land on the same one); the text (`shop`) stays |
+| Carrier | text | Delhivery · Blue Dart · Ekart · Shadowfax · XpressBees · India Post…; empty for quick commerce (the shop's own riders) |
+| Tracking number | text | AWB, waybill, consignment |
+| Order ID | text | the shop's order number |
+| Tracking link | contact (url) | the page the text links to; tap opens it |
+| Status | select | ordered · shipped · out for delivery · delivered · cancelled · returned; **only moves forward**; cancelled and returned close it |
+| Expected | date | from the text ("by Tue, 29 Sep", "today", "in 10 minutes") |
+| Delivered on | date | |
+| OTP | text | the code for the agent; shown large while it is on its way; gone once delivered, and not shown after 3 days; *(hidden)* when it came (`otpAt`) |
+| Order | link → Transaction, word *bought in* | the payment: the newest spend whose payee names the shop, in the 2 days before the first text; or one that comes within 2 days after (cash on delivery, a late SMS); never another delivery's |
+| Notes | long text | |
+
+**Quick commerce** (Instamart, Zepto, Blinkit) is a Delivery too, decided 2 Nov:
+same Fields, minutes instead of days; it is never a nudge. Swiggy and Zomato
+food orders are not deliveries. A delivery that hears nothing for 10 days after
+shipping is taken as delivered, flagged in To check (as before).
+
+**Nudges** (layer 8, *coming up*): a parcel expected today or out for delivery,
+not quick commerce; urgent when it has an OTP. The code never leaves the phone:
+the nudge says it is ready on the delivery. Yes is *Track* (the tracking link)
+or *Open*.
+
 ### Money
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
@@ -1017,7 +1045,25 @@ screens checked on the phone → overrides only where the default is wrong)
   counts them. `docs/design/ASSETS-BRIEF.md` asks for `NR-Assets-*`, with the packing picker R7d
   uses. 431 tests green; the web export builds. *Not in R7a*: a form that shows only a category's
   Fields (the form shows every section); the packing picker itself (R7d). **Phone check pending.**
-- [ ] **R7b deliveries** — Delivery; shipping parsers; OTP; tracking.
+- [x] **R7b deliveries**: built 2 Nov 2026 (branch `claude/r7b-deliveries`; no migration). Delivery as agreed
+  (layer 2, *Things*): shop → Organisation (word *vendor*; made once, kind shop, if you have none) with the
+  typed text kept, order → Transaction (word *bought in*), the tracking link a url. **Filing**: the parcel
+  parser kept (Amazon, Flipkart, Myntra and other shops; Delhivery, Blue Dart, Ekart, Shadowfax and other
+  carriers), plus **quick commerce** (Instamart, Zepto, Blinkit texts and notifications; Swiggy food is
+  not one) and the **shop apps' notifications** (Amazon, Flipkart, Myntra, Swiggy, Zepto, Blinkit; the
+  notifications source listens to them through the parser's `packages`). A quick order is one record
+  from placed to delivered (matched within 6 hours) and stops being on its way after 6 hours of silence.
+  **The payment**: a new delivery takes the newest spend whose payee names the shop in the 2 days before;
+  a payment that comes later (cash on delivery, a late SMS) finds the open delivery through a second
+  parser after the money parser (`deliveries.payments`, priority 45). Deliveries reads only a
+  Transaction's title, when and its kind; it imports neither finance nor places. **Brain**: *coming up*,
+  a parcel (not quick commerce) expected today or out for delivery, urgent with an OTP; the OTP never
+  leaves the phone; Yes is Track or Open. **Board** (a first pass from the kit until the `NR-Deliveries-*`
+  artboards of `docs/design/DELIVERIES-BRIEF.md`): the Deliveries home (Arriving today as cards with the
+  OTP large, On the way, Delivered lately), the Delivery page's top (OTP, status steps, Track, Delivered
+  by hand with Undo, Shop and Paid), the Overview. Every parser is written against **plausible samples**
+  in the tests, not real texts. *Not in R7b*: a Deliveries tile for Today; a raw text Field (the text is
+  on the timeline, as before). **Phone check pending.**
 - [x] **R7c documents** — built 2 Nov 2026 (no migration): Document (layer 2, *Things*) points at files in
   folders you pick on the phone, indexed and never copied. **Module**: the folders (settings
   `documents.folders`), the rescan (new files in as *new*, a renamed or moved one followed by its size
