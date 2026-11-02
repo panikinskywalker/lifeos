@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState, BackHandler, View } from 'react-native';
 import { useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Icon, Text } from '@ui/kit';
@@ -9,7 +9,8 @@ import { lockPrefs, unlock } from '../platform/lock';
  * App lock (M5): when on, LifeOS opens locked and locks again after you've
  * been away longer than your setting. Fingerprint / face, or the phone's PIN.
  * The app stays mounted behind an opaque cover, so nothing shows
- * in the app switcher either.
+ * in the app switcher either. Background work carries on while locked
+ * (docs/MODEL.md layer 6, R15).
  */
 export function LockGate({ children }: { children: React.ReactNode }) {
   const os = useOS();
@@ -47,6 +48,13 @@ export function LockGate({ children }: { children: React.ReactNode }) {
     });
     return () => sub.remove();
   }, [os]);
+
+  // Back does nothing behind the cover (it would move the screens underneath).
+  useEffect(() => {
+    if (!locked) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => sub.remove();
+  }, [locked]);
 
   useEffect(() => {
     if (locked) void tryUnlock();

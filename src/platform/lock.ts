@@ -42,10 +42,15 @@ export async function lockAvailability(): Promise<'ok' | 'needs-build' | 'no-loc
   }
 }
 
-/** Ask for fingerprint / face, falling back to the phone's PIN or pattern. */
+/**
+ * Ask for fingerprint / face, falling back to the phone's PIN or pattern.
+ * Nothing to check against (no screen lock set, or no way to ask) opens:
+ * the lock never locks you out of your own data.
+ */
 export async function unlock(reason = 'Unlock LifeOS'): Promise<boolean> {
   const a = auth();
-  if (!a) return true; // nothing to lock with: never lock you out
+  if (!a) return true;
+  if ((await lockAvailability()) === 'no-lock-set') return true;
   try {
     const r = await a.authenticateAsync({ promptMessage: reason, disableDeviceFallback: false, cancelLabel: 'Cancel' });
     return r.success;
