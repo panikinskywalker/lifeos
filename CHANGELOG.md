@@ -7,6 +7,28 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.25 · 2 Nov 2026
+
+**Travel** (R7d, with layer 8's travel slice), built in its own session and
+merged here. The screens are a first pass from the kit until the
+*NR-Travel* artboards are drawn. The mail parsers are written against
+plausible samples until real ones come.
+- **Trips make themselves from mail**: IndiGo, Air India and MakeMyTrip
+  tickets and MakeMyTrip, Booking.com and Airbnb stays land in one *booked*
+  trip, the return flight sets when it ends, and the fare is its first
+  expense.
+- **Spend vs budget** on every trip: spent, what's left, per day left, by
+  category. Payments from the trip's days that are on no trip are offered
+  with an Add button.
+- **Packing**: a list from the days and the kind of place, picked from your
+  clean clothes and Home's Bathroom; Pack marks the clothes packed, Back home
+  puts them in the wash.
+- **The brain comes to you** before a trip: check in for tomorrow's flight,
+  pack for Friday, what to do before you go, and unpacking when you're back.
+- A trip's destination is now a Place, and a Place's page shows **Trips
+  here**.
+- New AI tool: what a trip cost against its budget.
+
 ## v0.0.24 · 2 Nov 2026
 
 **Deliveries** (R7b), built in its own session and merged here. The screens
