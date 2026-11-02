@@ -8,7 +8,7 @@ import { shortNameForModule, tintForModule } from '@ui/theme/moduleTint';
 import { Icon, IconBox, IconButton, ModuleStack, RowList, Screen, Section, Text, RowItem } from '@ui/kit';
 import { RecordRow } from '@ui/components/RecordRow';
 
-/** Browse (docs/MODEL.md §5): search, Boards, Modules in their tints, Memory, Recent. */
+/** Browse (docs/MODEL.md §5): search, Boards, Modules in their tints, Facts (the Second Brain's), Recent. */
 export default function BrowseTab() {
   const os = useOS();
   const t = useTheme();
@@ -83,7 +83,7 @@ export default function BrowseTab() {
         )}
       </Section>
       <RowItem icon="link" tint="people" title="Links" subtitle="How your records connect" onPress={() => router.push('/links' as never)} />
-      <RowItem icon="sparkle" tint="memory" title="Memory" subtitle={facts ? `${facts} thing${facts === 1 ? '' : 's'} you’ve told me` : 'What Talk remembers for you'} onPress={() => router.push('/memory')} />
+      <RowItem icon="sparkle" tint="memory" title="Facts" subtitle={facts ? `${facts} thing${facts === 1 ? '' : 's'} you’ve told me · in the Second Brain` : 'What you’ve told LifeOS, in the Second Brain'} onPress={() => router.push('/memory')} />
       {recent.length ? (
         <Section title="Recent" action="Tags" onAction={() => router.push('/tag')}>
           <RowList>

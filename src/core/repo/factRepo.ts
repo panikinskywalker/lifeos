@@ -117,6 +117,17 @@ export class FactRepo {
     return next;
   }
 
+  /** What a fact is about: a record, or a name that is not a record yet (R7f). Lands on the record's timeline. */
+  setSubject(id: string, about: { subjectId: string | null; subjectKey?: string | null }): void {
+    const f = this.get(id);
+    if (!f) return;
+    this.db.run(`UPDATE facts SET subject_id=?, subject_key=?, updated_at=?, version=version+1 WHERE id=?`, [about.subjectId, about.subjectKey ?? null, Date.now(), id]);
+    this.changes.record('facts', id, 'update', 1);
+    if (f.active) this.indexFact(id, f.text, about.subjectId);
+    if (about.subjectId && about.subjectId !== f.subjectId && this.events) this.events.add({ entityId: about.subjectId, kind: 'fact', title: 'Fact', body: f.text, actor: 'user', occurredAt: f.statedAt, meta: { factId: id } });
+    bus.emit('data.changed', { table: 'facts', id });
+  }
+
   /** Soft-forget (Undo with restore). */
   forget(id: string): void {
     this.db.run(`UPDATE facts SET deleted_at=?, active=0, version=version+1 WHERE id=?`, [Date.now(), id]);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useLive, useOS } from '@ui/hooks';
 import { tintForModule } from '@ui/theme/moduleTint';
 import { RecordRow } from '@ui/components/RecordRow';
@@ -10,7 +10,8 @@ import { Chip, ChipRow, EmptyState, FilterChip, RowItem, RowList, Screen, Sectio
 export default function SearchRoute() {
   const os = useOS();
   const router = useRouter();
-  const [q, setQ] = useState('');
+  const params = useLocalSearchParams<{ q?: string }>();
+  const [q, setQ] = useState(params.q ?? '');
   const [type, setType] = useState<string | null>(null);
   const query = q.trim();
   const hits = useLive((o) => (query ? o.records.search.search(query, { types: type ? [type] : undefined, limit: 50 }) : []), [query, type]);
@@ -43,7 +44,7 @@ export default function SearchRoute() {
             <Section title={`${hits.length} ${hits.length === 1 ? 'result' : 'results'}`}>
               <RowList>
                 {hits.map((h) => {
-                  if (h.object === 'fact') return <RowItem key={h.id} title={h.title} subtitle={`Memory${h.subtitle ? ` · about ${h.subtitle}` : ''}`} icon="sparkle" tint="memory" onPress={() => router.push({ pathname: '/memory', params: { q: h.title.split(' ').slice(0, 3).join(' ') } })} />;
+                  if (h.object === 'fact') return <RowItem key={h.id} title={h.title} subtitle={`Fact${h.subtitle ? ` · about ${h.subtitle}` : ''}`} icon="sparkle" tint="memory" onPress={() => router.push({ pathname: '/memory', params: { q: h.title.split(' ').slice(0, 3).join(' ') } })} />;
                   const def = os.registry.objects.get(h.object);
                   return <RowItem key={h.id} title={h.title} subtitle={`${def?.label ?? h.object}${h.subtitle ? ` · ${h.subtitle}` : ''}`} icon={def?.icon} tint={tintForModule(def?.module)} onPress={() => router.push(`/entity/${h.object}/${h.id}`)} />;
                 })}

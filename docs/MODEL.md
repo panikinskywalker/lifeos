@@ -338,8 +338,54 @@ latest reading.
 | Object | Meaning | Key fields | Filed by |
 |---|---|---|---|
 | **Dump** | What you said, verbatim, immutable | text, when, source (typed / voice / shared), subject record (optional), filing state | you |
-| **Note** | Long-form text, markdown, `[[links]]` | kind (idea / journal / meeting / reference), body | you, dumps |
+| **Note** | Long-form text, markdown, `[[links]]` | see below | you, dumps, Talk |
 | **Fact** | One line about a record | subject, text, when, source, confidence, active | dumps, you, filing |
+
+**The Second Brain** (module `knowledge`, board *Second Brain*; agreed 2 Nov with
+R7f): your Notes, the Facts, and the names Talk learned, in one place. Memory
+(the old Facts screen) is replaced by it.
+
+**Note's Fields** (Object id `note`; keys unchanged).
+| Field | Type | Notes |
+|---|---|---|
+| Title | text (the title) | yours; left empty, it is the body's first line (marks and brackets dropped, 60 characters) and follows it |
+| Body | long text (`body`) | markdown-ish; `[[Name]]` mentions a record (below) |
+| Kind | select | idea · journal · meeting · reference · recipe · book / article (keys kept) |
+| Source | text (`source`) | where it came from, a URL or a book |
+| Project | link → Project, word *project* | |
+| People | link → Person, many, word *person* | |
+| *Pinned* | the record's star, not a Field | pinned notes come first |
+
+**Mentions.** A `[[Name]]` in a Note's body is a Link with the word *mention*
+(note → record), kept equal to the text on every save (core's `syncMentions`):
+matched on the record's exact title, then a name learned in Talk; an unknown or
+ambiguous name links nothing, shows faded, and a tap searches for it. The
+record mentioned lists the Note under *Mentioned in*. The editor's *Mention*
+picks a record and writes `[[its title]]`. A Fact's first `[[Name]]` says what
+it is about.
+
+**Facts, per record and in one place.** Fact stays a core Object (layer 3). On
+a record: the Facts card (add, long-press to forget). In one place: the
+*Facts* half of the Second Brain, grouped by what each is about (a record, a
+name that is not a record yet, *About you*), searchable; add one, forget with
+Undo, or put one *about* a record. Below them, **What you call things**: the
+names Talk learned ("the car" → Creta), each forgettable. `/memory` opens it.
+
+**The fold** (once, on first open after R7f; nothing is deleted, no migration):
+- a Fact Talk kept under a name (no record then) moves onto the record when
+  exactly one record now has that name (its title or a learned name);
+- a Fact about a record since deleted keeps that record's name as its subject,
+  so it shows under the name, not under *About you*;
+- every Note's `[[mentions]]` are linked again, so those written before a
+  record existed find it.
+
+**Search** in the Second Brain covers Notes (title, body) and Facts together;
+Browse's search stays the whole app's, and a Fact there opens the Facts half.
+
+**Tools**: `write_note` (title, body, kind; mentions linked, unknown ones
+named back), `find_notes` (text, kind), `what_i_know` (about a name or record:
+its Facts, the Notes that mention it, what you call it). Core keeps
+`remember_fact`, `recall`, `forget_fact` and `remember_alias`.
 
 ### Places (module `places`; Objects and Fields agreed 22 Oct, R3)
 | Object | Meaning | Key fields | Filed by |
@@ -1009,7 +1055,7 @@ what they are, each opening the thing itself. Then two sections:
   are boards too but sit in the bottom bar, so they are not repeated here.
 - **Modules** — the twelve, in their tints, each opening its Overview → Lists →
   Records (as the grid is today).
-Then **everything else lives here too**: Memory (facts), Recent, Tags, Reminders,
+Then **everything else lives here too**: Links, Facts (the Second Brain's), Recent, Tags, Reminders,
 To check history, Data sources status, the component gallery (dev). If it is a
 screen and not a tab, Browse reaches it. Any board can also be pinned to Today as a
 tile, and opened by name from the Dump box ("open turf"). A new board is one
@@ -1060,8 +1106,8 @@ Component gallery (dev).
   `/board/activity/edit` (`?tracker=<id>` to edit).
 - **Tags**: tag chips on every Record and List; a Tags page from Browse › Recent;
   one page per tag listing its records across modules.
-- **Memory**: the Facts list, a row in Browse (by who they are about; edit, forget).
-  Stays until the Second Brain work decides what replaces it.
+- **Facts**: the Second Brain's Facts half (R7f; layer 2, *The Second Brain*), a row in
+  Browse (by who they are about; edit, forget); `/memory` opens it.
 - **Reminders**: its own screen listing one-off Cycles (reminders) by time, from
   Today and You › Notifications. Upkeep shows them too; this is the focused list.
 - **Spend**: its own screen from Today's spend tile and the Money overview:
@@ -1332,7 +1378,20 @@ screens checked on the phone → overrides only where the default is wrong)
   PDF with no text (a scan, a locked file) gives a *Couldn't read this invoice* card in To
   check. *Waiting*: a real Blinkit invoice (text or scan) to check the parser; the
   `NR-Home-*` artboards. **Phone check pending** (needs a new dev build).
-- [ ] **R7f knowledge** (later) — Note, Fact as the Second Brain; Memory replaced.
+- [x] **R7f knowledge**: built 2 Nov 2026 (branch `claude/r7f-knowledge`; no migration). Note, Fact as the
+  Second Brain; Memory replaced (layer 2, *The Second Brain*). **Module**: Note's title follows its
+  first line until you name it; `[[mentions]]` as *mention* Links (core's `syncMentions`); notes
+  pinned first, by kind, searched with the Facts; Facts grouped by what they are about; everything
+  known about a record or a name. **The fold** (once): name facts onto the record that now has the
+  name, a deleted record's facts keep its name, every Note's mentions linked again. **Tools**:
+  `write_note`, `find_notes`, `what_i_know` (the last two on the Dump box's question path too).
+  **Core, small**: `facts.setSubject`, `aliases.all`, a record section's `fields` (the Details card
+  leaves them out), the two read tools in `READ_ONLY_TOOLS`. **Board** (a first pass from the kit
+  until the `NR-Knowledge-*` artboards; `docs/design/KNOWLEDGE-BRIEF.md`): the Second Brain in
+  Browse › Boards (search, Notes · Facts, What you call things; `/memory` opens its Facts half), the
+  Note page with its mentions as links (unknown ones faded, a tap searches), the Note form with
+  Mention. 495 tests green; the web export builds. *Not in R7f*: `[[` suggestions while typing.
+  Layer 5's Memory line now says Facts (updated at the merge, v0.0.26). **Phone check pending.**
 
 ### Boards and automations
 - [x] **R8 Today and Time** — Today tiles re-hung on module tools and core queries only; Time

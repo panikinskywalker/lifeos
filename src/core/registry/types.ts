@@ -119,6 +119,8 @@ export interface EntityDetailSection {
   placement?: 'page' | 'hero' | 'top' | 'body';
   /** A 'page' that draws its own Links card (Person); else the record page adds the generic one below it (R11). */
   ownLinks?: boolean;
+  /** Field keys this section draws itself; the Details card leaves them out (R7f: a Note's body). */
+  fields?: string[];
 }
 
 /** What the record page offers, handed to a 'page' or 'hero' section that draws its own. */
