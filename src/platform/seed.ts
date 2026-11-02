@@ -94,8 +94,8 @@ export function seedDemoData(os: LifeOSContext) {
     for (let i = 0; i < 6; i++) os.records.create({ object: 'workout', data: { kind: i % 2 ? 'strength' : 'run', durationMin: 30 + i * 5, date: daysAgo(i * 2 + 1), distanceKm: i % 2 ? undefined : 5 + i * 0.5 } });
     for (let i = 0; i < 8; i++) os.records.create({ object: 'measurement', data: { metric: 'weight', value: 76.4 - i * 0.2, unit: 'kg', date: daysAgo(i * 3) } });
 
-    os.records.create({ object: 'note', title: 'Japan itinerary ideas', data: { body: 'Tokyo 5 nights → Hakone 1 → Kyoto 4 → Osaka 3. Book teamLab early. Try the 7-day JR pass math vs. point-to-point.', kind: 'idea' }, });
-    const meeting = os.records.create({ object: 'note', title: 'Weekly sync with Arjun', data: { body: 'Discussed plugin loading strategy. Decision: manifests stay plain objects; lazy-load screens.', kind: 'meeting', projectId: lifeos.id, personIds: [arjun.id] } });
+    os.records.create({ object: 'note', title: 'Japan itinerary ideas', data: { body: 'Tokyo 5 nights → Hakone 1 → Kyoto 4 → Osaka 3. Book teamLab early. Try the 7-day JR pass math vs. point-to-point.\n- Ask [[Priya Sharma]] about the ryokan\n- [[Kenji]] knows a sushi place in Osaka', kind: 'idea' }, });
+    const meeting = os.records.create({ object: 'note', title: 'Weekly sync with Arjun', data: { body: 'Discussed plugin loading strategy with [[Arjun Mehta]]. Decision: manifests stay plain objects; lazy-load screens.', kind: 'meeting', projectId: lifeos.id, personIds: [arjun.id] } });
     os.links.link(meeting.id, lifeos.id, 'project');
     // Places (R3): a city in its country, areas in the city, places in the areas; events at them.
     const india = os.records.create({ object: 'place', title: 'India', data: { kind: 'country' } });
@@ -130,6 +130,11 @@ export function seedDemoData(os: LifeOSContext) {
     os.tags.apply(lifeos.id, 'side-project');
     os.tags.apply(goal.id, 'money');
     os.facts.add({ text: 'Priya prefers late Dec so we catch New Year in Kyoto.', subjectId: japan.id, source: 'user' });
+    // The Second Brain (R7f): facts about a person, a name that is not a record yet, about you; a name learned in Talk.
+    os.facts.add({ text: 'Dad hates surprises', subjectId: dad.id, source: 'talk' });
+    os.facts.add({ text: 'Suresh fixes the AC, call him in March', subjectKey: 'name:suresh', source: 'talk' });
+    os.facts.add({ text: 'I take my coffee black, no sugar', source: 'talk' });
+    os.aliases.learn('the landlord', landlord.id);
     os.reminders.create({ entityId: dad.id, title: 'Call Dad', dueAt: Date.now() + 3 * 86400000, rrule: 'FREQ=WEEKLY;INTERVAL=1' });
     os.reminders.create({ entityId: car.id, title: 'Renew car insurance', dueAt: Date.now() + 5 * 86400000 });
     os.reminders.create({ title: 'Review budgets', dueAt: Date.now() + 86400000, rrule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1' });

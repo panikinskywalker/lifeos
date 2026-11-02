@@ -106,7 +106,7 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
             );
           })}
 
-          <DetailsCard entity={entity} fields={def.fields} />
+          <DetailsCard entity={entity} fields={def.fields.filter((f) => !sections.some((s) => s.fields?.includes(f.key)))} />
           {sections.filter((s) => s.placement !== 'top' && s.placement !== 'hero').map((s) => {
             const C = s.component;
             return (

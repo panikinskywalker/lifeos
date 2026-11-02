@@ -55,6 +55,11 @@ export class AliasRepo {
       .map((r) => ({ id: r.id, alias: r.alias, entityId: r.record_id, uses: r.uses }));
   }
 
+  /** Every learned name on a live record, most used first (R7f: What you call things). */
+  all(limit = 500): Alias[] {
+    return this.db.all<{ id: string; alias: string; record_id: string; uses: number }>(`SELECT a.id, a.alias, a.record_id, a.uses FROM aliases a JOIN records e ON e.id=a.record_id WHERE a.deleted_at IS NULL AND e.deleted_at IS NULL ORDER BY a.uses DESC, a.alias LIMIT ?`, [limit]).map((r) => ({ id: r.id, alias: r.alias, entityId: r.record_id, uses: r.uses }));
+  }
+
   forEntity(entityId: string): Alias[] {
     return this.db.all<{ id: string; alias: string; record_id: string; uses: number }>(`SELECT id, alias, record_id, uses FROM aliases WHERE record_id=? AND deleted_at IS NULL ORDER BY uses DESC`, [entityId]).map((r) => ({ id: r.id, alias: r.alias, entityId: r.record_id, uses: r.uses }));
   }

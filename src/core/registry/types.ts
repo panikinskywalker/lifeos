@@ -88,6 +88,8 @@ export interface EntityDetailSection {
    * 'top': above the details card (Stitch stat trio, attention, quick actions). Default: below it.
    */
   placement?: 'page' | 'hero' | 'top' | 'body';
+  /** Field keys this section draws itself; the Details card leaves them out (R7f: a Note's body). */
+  fields?: string[];
 }
 
 /** What the record page offers, handed to a 'page' or 'hero' section that draws its own. */
