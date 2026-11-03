@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBetterSqliteAdapter } from '@core/db/betterSqliteAdapter';
 import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
@@ -15,10 +15,16 @@ const dayAgo = (n: number) => isoDay(NOW - n * DAY);
 
 let os: LifeOSContext;
 beforeEach(async () => {
+  // The data is laid out around NOW; the code reads the clock, so pin it there.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
   bus.clear();
   os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [healthModule], registry: new Registry() });
 });
-afterEach(() => os.db.close());
+afterEach(() => {
+  os.db.close();
+  vi.useRealTimers();
+});
 
 const tool = (name: string) => healthModule.aiTools!.find((t) => t.name === name)!;
 /** One reading a day for the last `n` days (today = 0), `value(i)` for day i ago; null skips a day. */
