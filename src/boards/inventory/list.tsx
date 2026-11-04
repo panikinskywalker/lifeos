@@ -6,16 +6,15 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { fonts } from '@ui/theme/tokens';
-import { Button, IconButton, Screen, Text, useToast } from '@ui/kit';
+import { Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
 import { BLINKIT_APP, addToList, listText, setOnList, shoppingList, undoStock, type ListEntry } from '@modules/inventory';
-import { Card, HomeEmpty, PillCloud, PlainPill, SectionHead } from './parts';
+import { Card, HomeEmpty, Note, PillButton, PillCloud, PlainPill, SectionHead } from './parts';
 
 /**
- * The shopping list (HOME-BRIEF screen 4; a first pass until NR-Home-List):
- * what you put on it, then LifeOS's suggestions (dashed, marked), grouped by
- * where you usually buy each. The last step is yours: Copy list, Open Blinkit
- * or Zepto. LifeOS never orders. What comes in leaves the list on its own
- * (a purchase clears "on the list").
+ * The shopping list (NR-Home-List): LifeOS's suggestions (dashed, marked), then
+ * what you put on it, grouped by where you usually buy each, Offline last. The
+ * last step is yours: Copy list, Open Blinkit or Zepto. LifeOS never orders.
+ * What comes in leaves the list on its own (a purchase clears "on the list").
  */
 
 /** The shops' apps (Android packages) and their sites as the fallback. */
@@ -70,7 +69,8 @@ export function ShoppingList({ ctx }: { ctx: LifeOSContext; params: Record<strin
   };
 
   const byShop = new Map<string, ListEntry[]>();
-  for (const e of list) byShop.set(e.shop, [...(byShop.get(e.shop) ?? []), e]);
+  for (const e of [...list].sort((a, b) => Number(b.suggested) - Number(a.suggested))) byShop.set(e.shop, [...(byShop.get(e.shop) ?? []), e]);
+  const shops = [...byShop.entries()].sort((a, b) => Number(a[0] === 'Offline') - Number(b[0] === 'Offline') || a[0].localeCompare(b[0]));
   const yours = list.filter((e) => !e.suggested).length;
 
   return (
@@ -85,14 +85,27 @@ export function ShoppingList({ ctx }: { ctx: LifeOSContext; params: Record<strin
           selectionColor={t.c.accent.mustard}
           returnKeyType="done"
           accessibilityLabel="Add to the list"
-          style={{ flex: 1, minHeight: 48, paddingHorizontal: 18, borderRadius: 16, backgroundColor: t.c.bg.tileRaised, color: t.c.fg.primary, fontFamily: fonts[500], fontSize: 16 }}
+          style={{ flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 18, borderRadius: 16, borderWidth: 1, borderColor: t.c.line, backgroundColor: t.c.bg.tileRaised, color: t.c.fg.primary, fontFamily: fonts[500], fontSize: 16 }}
         />
         <IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.fg.onAccent} accessibilityLabel="Add" onPress={add} />
       </View>
 
       {list.length ? (
-        [...byShop.entries()].map(([shop, entries]) => (
-          <View key={shop} style={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderStyle: 'dashed', borderColor: t.c.accent.mustard }} />
+            <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.c.fg.secondary }}>LifeOS suggests</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: t.dark ? 'rgba(255,255,255,0.18)' : t.c.line, backgroundColor: t.c.bg.tileRaised }} />
+            <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.c.fg.secondary }}>You added</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {list.length ? (
+        shops.map(([shop, entries]) => (
+          <View key={shop} style={{ gap: 14 }}>
             <SectionHead title={shop} sub={shop === 'Offline' ? 'Not from an order yet' : 'Where you last ordered these'} />
             <Card>
               <PillCloud>
@@ -104,17 +117,23 @@ export function ShoppingList({ ctx }: { ctx: LifeOSContext; params: Record<strin
           </View>
         ))
       ) : (
-        <HomeEmpty icon="cart" title="Nothing to buy" line="Things running low show up here on their own, marked as LifeOS's suggestions. Add anything else above." />
+        <HomeEmpty icon="cart" title="Nothing to buy" line="Things running low show up here on their own, marked as LifeOS’s suggestions. Add anything else above." />
       )}
 
       {list.length ? (
         <>
-          <Text style={{ fontSize: 12, lineHeight: 16, color: t.c.fg.tertiary }}>Tap a suggestion to keep it, tap yours to take it off. LifeOS never orders: copy the list and open the app.</Text>
-          <Button title="Copy list" icon="list" onPress={copy} block />
+          <View style={{ paddingTop: 4 }}>
+            <Note>Tap a suggestion to keep it, tap yours to take it off. What comes in leaves the list on its own.</Note>
+          </View>
+          <PillButton title="Copy list" icon="file" height={52} style={{ marginTop: 4 }} onPress={() => void copy()} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {SHOPS.map((s) => (
-              <Button key={s.name} title={`Open ${s.name}`} variant="secondary" style={{ flex: 1 }} onPress={() => void openShop(s)} />
+              <PillButton key={s.name} title={`Open ${s.name}`} icon="share" trailing raised height={48} style={{ flex: 1 }} onPress={() => void openShop(s)} />
             ))}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Icon name="shield" size={14} color={t.c.fg.secondary} />
+            <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.c.fg.secondary }}>LifeOS never orders. The last step is yours.</Text>
           </View>
         </>
       ) : null}

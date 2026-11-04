@@ -6,15 +6,15 @@ import { HomeScreen } from './home';
 import { SpaceScreen } from './space';
 import { ShoppingList } from './list';
 import { StockPage } from './thing';
+import { StockForm } from './form';
 import { FridgeSnap } from './snap';
 import { OrderCard, StockedCard, UnreadCard } from './cards';
 
 /**
- * Home (the inventory module's board; docs/MODEL.md layer 8, R7e): a board
- * in Browse › Boards and a Today tile. Home, a space's pills, the shopping
- * list, Snap the fridge, the Stock page, and the To check cards for groceries
- * coming in.
- * A first pass from the kit; the NR-Home-* artboards replace it.
+ * Home (the inventory module's board; docs/MODEL.md layer 8, R7e; the NR-Home-*
+ * artboards): a board in Browse › Boards and a Today tile. Home, a space's
+ * pills, the shopping list, Snap the fridge, the Stock page and form, and the
+ * To check cards for groceries coming in.
  */
 export const inventoryBoard: BoardManifest = {
   id: 'inventory',
@@ -32,6 +32,6 @@ export const inventoryBoard: BoardManifest = {
     { key: 'snap', title: 'Snap the fridge', component: FridgeSnap },
   ],
   quickActions: [{ id: 'inventory.add', label: 'Stock', icon: 'home', route: '/module/inventory/index' }],
-  overrides: [{ object: 'stock', record: [{ entityType: 'stock', key: 'inventory.stock', title: 'Stock', component: StockPage, order: 0, placement: 'page' }] }],
+  overrides: [{ object: 'stock', form: StockForm, record: [{ entityType: 'stock', key: 'inventory.stock', title: 'Stock', component: StockPage, order: 0, placement: 'page' }] }],
   checkCards: { [HOME_ORDER]: OrderCard, [HOME_STOCKED]: StockedCard, [HOME_UNREAD]: UnreadCard },
 };
