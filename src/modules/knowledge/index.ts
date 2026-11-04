@@ -1,4 +1,6 @@
 import type { ModuleManifest } from '@core/registry/types';
+import { bus } from '@core/events/bus';
+import { relinkNotesNaming } from './brain';
 import { KNOWLEDGE_COLOR, noteType } from './types';
 import { knowledgeAiTools } from './aiTools';
 import { foldMemory } from './fold';
@@ -24,6 +26,9 @@ export const knowledgeModule: ModuleManifest = {
   objects: [noteType],
   aiTools: knowledgeAiTools,
   onStart: (os) => {
+    // A record made or renamed later: notes that already named it [[like this]] link to it.
+    bus.on('entity.created', ({ entity }) => void relinkNotesNaming(os, entity));
+    bus.on('entity.updated', ({ entity, changed }) => void (changed.includes('title') && relinkNotesNaming(os, entity)));
     if (os.settings.get<boolean>('knowledge.r7f', false)) return;
     foldMemory(os);
     os.settings.set('knowledge.r7f', true);

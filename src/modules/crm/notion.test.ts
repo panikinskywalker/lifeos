@@ -143,6 +143,12 @@ class FakeNotion {
     Object.assign(p.properties, this.shape(normId(p.parent.data_source_id), props));
     p.last_edited_time = this.edited(at);
   }
+  /** Someone changes one bullet's words in Notion. */
+  editBullet(id: string, from: string, to: string) {
+    const b = (this.kids.get(normId(id)) ?? []).map((x) => this.blocks.get(normId(x))!).find((x) => !x.in_trash && x.type === 'bulleted_list_item' && x.bulleted_list_item.rich_text.map((t: Json) => t.plain_text).join('') === from)!;
+    b.bulleted_list_item = { rich_text: rt(to) };
+    this.page(id).last_edited_time = this.edited();
+  }
   /** Someone rewrites a section's bullets in Notion. */
   setSection(id: string, heading: string, bullets: string[]) {
     const list = this.kids.get(normId(id))!;
@@ -249,6 +255,15 @@ class FakeNotion {
       const page = this.pages.get(parent);
       if (page) page.last_edited_time = this.edited();
       return this.json(200, { object: 'list', results: made.map((b) => this.blocks.get(normId(b))) });
+    }
+    if ((m = /^\/blocks\/([^/]+)$/.exec(path)) && method === 'PATCH') {
+      // New words for a block (R7f: a Notion Fact edited in LifeOS).
+      const b = this.blocks.get(normId(m[1]));
+      if (!b) return this.missing();
+      b[b.type] = { ...b[b.type], rich_text: rt((body![b.type].rich_text as Json[]).map((t) => t.text.content).join('')) };
+      const page = this.pages.get(b.parent);
+      if (page) page.last_edited_time = this.edited();
+      return this.json(200, b);
     }
     if ((m = /^\/blocks\/([^/]+)$/.exec(path)) && method === 'DELETE') {
       const b = this.blocks.get(normId(m[1]));
@@ -599,6 +614,34 @@ describe('the page body', () => {
     expect(os.records.get<PersonData>(k.id)!.data.likes).toBe('Filter coffee, Chess');
     expect(facts(k.id)).not.toContain('Chess');
     expect(waiting()).toEqual([]);
+    expectOriginalUntouched();
+  });
+});
+
+describe('a Notion Fact edited in LifeOS (R7f)', () => {
+  it('changes its bullet in the copy; changed there afterwards, the Fact follows', async () => {
+    const { kunal } = seed();
+    await sync();
+    await sync();
+    const k = byName('Kunal Shah');
+    const f = os.facts.list({ subjectId: k.id }).find((x) => x.text === 'Koramangala 4th block')!;
+    expect(f.source).toBe('notion');
+    os.facts.edit(f.id, 'HSR Layout, sector 2');
+    expect(waiting().map((i) => i.recordId)).toContain(k.id);
+    await sync();
+    expect(notion.section(kunal, 'Address')).toEqual(['HSR Layout, sector 2']);
+    expect(os.facts.get(f.id)).toMatchObject({ text: 'HSR Layout, sector 2', active: true, source: 'notion' });
+    // Agreed now: another sync writes nothing to it and keeps one Fact.
+    const before = notion.writes().filter((w) => w.method === 'PATCH' && /^\/blocks\/[^/]+$/.test(w.path)).length;
+    notion.editProps(kunal, {});
+    await sync();
+    expect(notion.writes().filter((w) => w.method === 'PATCH' && /^\/blocks\/[^/]+$/.test(w.path))).toHaveLength(before);
+    expect(facts(k.id).filter((t) => /HSR|Koramangala/.test(t))).toEqual(['HSR Layout, sector 2']);
+    // Changed in Notion: Notion's words come back.
+    notion.editBullet(kunal, 'HSR Layout, sector 2', 'Indiranagar 12th main');
+    await sync();
+    expect(facts(k.id).filter((t) => /HSR|Koramangala|Indiranagar/.test(t))).toEqual(['Indiranagar 12th main']);
+    expect(notion.section(kunal, 'Address')).toEqual(['Indiranagar 12th main']);
     expectOriginalUntouched();
   });
 });

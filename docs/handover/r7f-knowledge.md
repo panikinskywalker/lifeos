@@ -48,11 +48,30 @@ migration, no version bump, no CHANGELOG edit.
   learned name.
 - **Design brief**: `docs/design/KNOWLEDGE-BRIEF.md`, artboards
   `NR-Knowledge-*`.
-- Checks: `npm run typecheck` clean, `npm test` 495 green (60 files),
+- Checks: `npm run typecheck` clean, `npm test` 498 green (60 files),
   `npx expo export --platform web` builds. In the web build with the demo
   data: the Second Brain's Notes and Facts halves, search, `/memory`, a
   note's page (Priya linked, Kenji faded) and the note form, no console
   errors.
+
+## Follow-up, 4 Nov (your answers)
+
+- **Facts are editable anywhere.** `facts.edit` changes a fact's words in
+  place (same id, source, subject). The Facts half has *Edit*; on a record's
+  Facts card, tap a fact and the composer edits it. A Notion fact edited here
+  goes back to its bullet on the next sync: crm's Notion sync now keeps each
+  bullet's last agreed text (`NotionSnap.bullets[].t`), so it knows which side
+  changed; when both did, Notion's words win. `NotionClient.updateBlockText`
+  writes the bullet (copy only, `assertWritable`). The fake Notion in
+  `src/modules/crm/notion.test.ts` learned `PATCH /blocks/{id}` and
+  `editBullet` for the new test; no existing test changed. Every Fact change
+  on a Person now queues the Person for Notion (before, Notion's own were
+  skipped; the sync's own writes still aren't queued).
+- **A record made or renamed later links the notes that already named it**
+  (`relinkNotesNaming`, on record created and on title change).
+- **Layer 5's Memory lines** now point to the Second Brain.
+- **The Second Brain concept** (Capture, Organize, Distill, Express; PARA) is
+  written into MODEL.md layer 2 as a proposal, not built.
 
 ## Shared core edits (each a line or a few)
 
@@ -66,6 +85,9 @@ migration, no version bump, no CHANGELOG edit.
 4. `src/core/ai/assistant.ts`: `find_notes` and `what_i_know` added to
    `READ_ONLY_TOOLS`, so the Dump box's question path can use them.
 5. `src/platform/seed.ts`: the demo lines above.
+6. `src/core/repo/factRepo.ts`: `edit(id, text)` (4 Nov).
+7. `src/modules/crm/notion/sync.ts` and `client.ts`: Notion facts edited in
+   LifeOS written back (4 Nov; crm's code, not core).
 
 ## Decisions taken (the simplest where MODEL.md was silent)
 
@@ -89,18 +111,12 @@ migration, no version bump, no CHANGELOG edit.
 
 ## What you must decide
 
-1. **Layer 5's Memory line** (*Also in the app*) still says Memory stays
-   until the Second Brain replaces it. It is outside R7f's sections, so I
-   left it: at merge, replace it with "Facts: the Second Brain's Facts half
-   (R7f)", and Browse's *everything else* list's "Memory (facts)" likewise.
+1. **The Second Brain loop** (MODEL.md layer 2, *proposed 4 Nov*): which of
+   Capture, Organize, Distill, Express, resurfacing and the daily note to
+   build, and in what order.
 2. **`[[` suggestions while typing** in the note body (the brief asks for a
    design); the first build has only the Mention button. Build when the
    artboard lands?
-3. **Re-linking when a record is made later**: a note's mentions are synced
-   when the note is saved (and once by the fold), not when a matching record
-   appears. Add a listener on record created that re-syncs notes naming it?
-4. **Facts made by the brain or Notion** show their source; should a Notion
-   fact be editable here, or only in Notion?
 
 ## Phone checks
 
@@ -114,6 +130,10 @@ migration, no version bump, no CHANGELOG edit.
 - A note with an unknown `[[Name]]`: faded, tap opens Search with it.
 - Fact menu: About a record… moves it (Undo puts it back); Forget with Undo.
 - Hold a learned name to forget it (Undo).
+- Edit a fact that came from Notion; after the next sync the bullet on the
+  Notion copy reads the same. Edit it in Notion; LifeOS follows.
+- Write a note naming `[[Someone new]]`, then add that person: the note
+  shows on their page without saving it again.
 - Dump box: "what do I know about Dad?" and "write a note: … [[Priya
   Sharma]] …".
 
@@ -134,4 +154,8 @@ drawn.
 - **Pin** notes to keep them on top; filter by kind; one search over notes
   and facts.
 - Put a fact on the right person later with *About a record…*.
+- **Edit any fact**, including ones from Notion: the change goes back to
+  your Notion page on the next sync.
+- A note that names someone before they're in LifeOS links to them as soon
+  as you add them.
 - Ask "what do I know about Dad?" or say "write a note: …" in the Dump box.

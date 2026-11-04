@@ -298,6 +298,12 @@ export class NotionClient {
     return made;
   }
 
+  /** New words for a bullet (a Notion Fact edited in LifeOS; R7f). */
+  async updateBlockText(id: string, type: string, textValue: string): Promise<void> {
+    this.assertWritable(id, 'block');
+    await this.request('PATCH', `/blocks/${dashed(id)}`, { [type]: { rich_text: [{ type: 'text', text: { content: textValue.slice(0, 2000) } }] } });
+  }
+
   async deleteBlock(id: string): Promise<void> {
     this.assertWritable(id, 'block');
     await this.request('DELETE', `/blocks/${dashed(id)}`);

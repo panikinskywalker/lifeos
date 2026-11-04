@@ -578,17 +578,21 @@ function FactsCard({ entity }: { entity: ObjectRecord }) {
   const t = useTheme();
   const facts = useLive((o) => o.facts.list({ subjectId: entity.id, limit: 50 }), [entity.id]);
   const [text, setText] = useState('');
+  // Tap a fact to change its words (R7f: any fact, Notion's too); the composer edits it.
+  const [editing, setEditing] = useState<string | null>(null);
   const send = () => {
     if (!text.trim()) return;
-    os.facts.add({ text: text.trim(), subjectId: entity.id, source: 'user' });
+    if (editing) os.facts.edit(editing, text.trim());
+    else os.facts.add({ text: text.trim(), subjectId: entity.id, source: 'user' });
     setText('');
+    setEditing(null);
   };
   const who = (s: string) => (s === 'user' ? 'You' : s === 'talk' || s === 'dump' ? 'Agent' : s === 'automation' ? 'Automation' : s === 'notification' ? 'A message' : s === 'correction' ? 'A correction' : s === 'notion' ? 'Notion' : 'A note');
   return (
     <Card icon="sparkle" tint="memory" title="Facts" meta={facts.length ? `${facts.length}` : undefined}>
       <View style={{ gap: 12 }}>
         {facts.map((f) => (
-          <Pressable key={f.id} accessibilityHint="Long-press to forget" onLongPress={() => os.facts.forget(f.id)} style={{ gap: 2 }}>
+          <Pressable key={f.id} accessibilityHint="Tap to edit, long-press to forget" onPress={() => { setEditing(f.id); setText(f.text); }} onLongPress={() => os.facts.forget(f.id)} style={{ gap: 2, opacity: editing && editing !== f.id ? 0.5 : 1 }}>
             <Text variant="body" selectable style={{ lineHeight: 21 }}>
               {f.text.replace(/\[\[|\]\]/g, '')}
             </Text>
@@ -599,9 +603,9 @@ function FactsCard({ entity }: { entity: ObjectRecord }) {
         ))}
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
           <View style={{ flex: 1 }}>
-            <TextField value={text} onChange={setText} placeholder="Add a fact about this…" multiline compact />
+            <TextField value={text} onChange={(v) => { setText(v); if (!v) setEditing(null); }} placeholder="Add a fact about this…" multiline compact />
           </View>
-          <IconButton icon="arrow-up" accessibilityLabel="Add fact" filled={text.trim() ? t.c.accent.mustard : true} color={text.trim() ? t.c.accent.mustardInk : t.c.fg.tertiary} disabled={!text.trim()} onPress={send} />
+          <IconButton icon={editing ? 'check' : 'arrow-up'} accessibilityLabel={editing ? 'Save fact' : 'Add fact'} filled={text.trim() ? t.c.accent.mustard : true} color={text.trim() ? t.c.accent.mustardInk : t.c.fg.tertiary} disabled={!text.trim()} onPress={send} />
         </View>
       </View>
     </Card>

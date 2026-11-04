@@ -46,6 +46,7 @@ export function useFactMenu(ctx: LifeOSContext) {
   const toast = useToast();
   const [active, setActive] = useState<Fact | null>(null);
   const [moving, setMoving] = useState<Fact | null>(null);
+  const [editing, setEditing] = useState<Fact | null>(null);
   const forget = (f: Fact) => {
     ctx.facts.forget(f.id);
     toast.show({ message: 'Forgotten', icon: 'trash', undo: () => ctx.facts.restore(f.id) });
@@ -61,12 +62,14 @@ export function useFactMenu(ctx: LifeOSContext) {
           active
             ? [
                 ...(subject ? [{ label: `Open ${subject.title}`, icon: 'chevron-right' as const, onPress: () => router.push(`/entity/${subject.object}/${subject.id}` as never) }] : []),
+                { label: 'Edit', icon: 'edit' as const, onPress: () => setEditing(active) },
                 { label: subject ? 'About something else…' : 'About a record…', icon: 'link' as const, onPress: () => setMoving(active) },
                 { label: 'Forget this', icon: 'trash' as const, destructive: true, onPress: () => forget(active) },
               ]
             : []
         }
       />
+      <EditFactSheet fact={editing} onClose={() => setEditing(null)} />
       <EntityPicker
         visible={!!moving}
         onClose={() => setMoving(null)}
@@ -136,6 +139,35 @@ export function FactsList({ ctx, onAdd }: { ctx: LifeOSContext; onAdd: () => voi
       ) : null}
       {menu.sheets}
     </View>
+  );
+}
+
+/** Change a fact's words (any fact; one from Notion goes back to its bullet on the next sync). */
+export function EditFactSheet({ fact, onClose }: { fact: Fact | null; onClose: () => void }) {
+  const os = useOS();
+  const toast = useToast();
+  const [text, setText] = useState('');
+  const [for_, setFor] = useState<string | null>(null);
+  if (fact && for_ !== fact.id) {
+    setFor(fact.id);
+    setText(fact.text);
+  }
+  const save = () => {
+    if (!fact) return;
+    const was = fact.text;
+    os.facts.edit(fact.id, text);
+    onClose();
+    toast.show({ message: fact.source === 'notion' ? 'Changed here and in Notion' : 'Changed', icon: 'check', undo: () => void os.facts.edit(fact.id, was) });
+  };
+  return (
+    <Sheet visible={!!fact} onClose={onClose} title="Edit fact" footer={<Button title="Save" icon="check" block disabled={text.trim().length < 3 || text.trim() === fact?.text} onPress={save} />}>
+      <TextField label="What" value={text} onChange={setText} multiline />
+      {fact?.source === 'notion' ? (
+        <Text variant="caption" color="tertiary">
+          From Notion: the bullet there changes too on the next sync.
+        </Text>
+      ) : null}
+    </Sheet>
   );
 }
 

@@ -117,6 +117,18 @@ export class FactRepo {
     return next;
   }
 
+  /** Change a fact's words in place (same id, source and subject); any fact, Notion's included (R7f). */
+  edit(id: string, text: string): Fact | null {
+    const f = this.get(id);
+    const t = text.trim();
+    if (!f || !t || t === f.text) return f;
+    this.db.run(`UPDATE facts SET text=?, updated_at=?, version=version+1 WHERE id=?`, [t, Date.now(), id]);
+    this.changes.record('facts', id, 'update', 1);
+    if (f.active) this.indexFact(id, t, f.subjectId);
+    bus.emit('data.changed', { table: 'facts', id });
+    return this.get(id);
+  }
+
   /** What a fact is about: a record, or a name that is not a record yet (R7f). Lands on the record's timeline. */
   setSubject(id: string, about: { subjectId: string | null; subjectKey?: string | null }): void {
     const f = this.get(id);

@@ -2,7 +2,7 @@ import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import type { Fact } from '@core/repo/factRepo';
 import type { Alias } from '@core/repo/aliasRepo';
-import { backlinks, parseLinks, resolveLink } from '@core/links';
+import { backlinks, parseLinks, resolveLink, syncMentions } from '@core/links';
 import type { NoteData } from './types';
 
 /**
@@ -91,4 +91,19 @@ export function whatIKnow(os: LifeOSContext, about: string): Known {
   const named = os.facts.list({ limit: 5000 }).filter((f) => f.subjectKey === key);
   const said = named.length ? named : os.facts.search(a, 20);
   return { record: null, name: a, facts: said, notes: notes(os, { q: a, limit: 20 }), aliases: [] };
+}
+
+const lower = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * A record made (or renamed) after notes already named it: those notes' [[Name]] link to it now.
+ * Returns how many notes were looked at. Notes stay as they are when the name is still ambiguous.
+ */
+export function relinkNotesNaming(os: LifeOSContext, record: ObjectRecord): number {
+  if (record.object === 'note' || record.title.trim().length < 2) return 0;
+  const name = lower(record.title);
+  const hits = os.records.search.search(record.title, { types: ['note'], limit: 200 }).map((h) => os.records.get(h.id));
+  const naming = hits.filter((n): n is ObjectRecord => !!n && parseLinks(String((n.data as { body?: string }).body ?? '')).some((t) => lower(t) === name));
+  for (const n of naming) syncMentions(os, n, 'system');
+  return naming.length;
 }

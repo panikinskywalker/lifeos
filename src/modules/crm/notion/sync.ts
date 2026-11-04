@@ -58,8 +58,8 @@ export interface NotionSnap {
   v: Partial<Record<Key, string>>;
   /** Last Update? as last agreed. */
   update?: string;
-  /** Blocks known: block id → the Fact it is and the section it sat in. */
-  bullets?: Record<string, { f: string; s: string }>;
+  /** Blocks known: block id → the Fact it is, the section it sat in, and its text as both sides last agreed (R7f). */
+  bullets?: Record<string, { f: string; s: string; t?: string }>;
   /** LifeOS Facts already written under Life Updates. */
   sent?: string[];
   /** LifeOS log lines already written. */
@@ -228,7 +228,8 @@ export function listenForNotion(os: LifeOSContext): () => void {
       if (table === 'record_tags' && isPerson(os, id)) queuePerson(os, id);
       if (table === 'facts') {
         const f = os.facts.get(id);
-        if (f && f.active && f.source !== 'notion' && isPerson(os, f.subjectId)) queuePerson(os, f.subjectId!);
+        // Any Fact on a Person, Notion's too (edited here); the sync's own writes are not queued (fromNotion).
+        if (f && f.active && isPerson(os, f.subjectId)) queuePerson(os, f.subjectId!);
       }
     }),
   ];
@@ -264,8 +265,20 @@ function fileConflict(ctx: Ctx, person: ObjectRecord<PersonData>, page: NotionPa
 
 const factBySourceRef = (os: LifeOSContext, ref: string) => os.db.get<{ id: string }>(`SELECT id FROM facts WHERE source_ref=? AND deleted_at IS NULL LIMIT 1`, [ref])?.id ?? null;
 
-/** Text of the bullets of the sections that are Facts (not Likes, not the LifeOS log): each one a Fact, once. */
-function readFacts(ctx: Ctx, person: ObjectRecord<PersonData>, body: Section[], snap: NotionSnap): void {
+/** A Notion Fact edited in LifeOS, to be written back to its bullet (R7f: Facts are editable anywhere). */
+interface BulletEdit {
+  k: string;
+  block: NotionBlock;
+  text: string;
+}
+
+/**
+ * Text of the bullets of the sections that are Facts (not Likes, not the LifeOS log): each one a Fact, once.
+ * A bullet's text as both sides last agreed is kept: changed in Notion, Notion's text wins; changed only in
+ * LifeOS, the edit is returned to be written back.
+ */
+function readFacts(ctx: Ctx, person: ObjectRecord<PersonData>, body: Section[], snap: NotionSnap): BulletEdit[] {
+  const edits: BulletEdit[] = [];
   const { os } = ctx;
   const known = (snap.bullets ??= {});
   for (const s of body) {
@@ -278,25 +291,31 @@ function readFacts(ctx: Ctx, person: ObjectRecord<PersonData>, body: Section[], 
       const k = normId(b.id);
       const seen = known[k];
       if (seen) {
-        // Changed in Notion: the newer text replaces the Fact (one LifeOS wrote stays as written).
+        // One LifeOS wrote stays as written in Notion; Notion's own bullets follow whichever side changed.
         const f = os.facts.get(seen.f);
-        if (f && f.active && f.source === 'notion' && f.text !== t) {
-          const next = os.facts.supersede(f.id, t, { source: 'notion', sourceRef: `notion:${b.id}`, subjectId: person.id });
-          known[k] = { f: next.id, s: s.title };
+        if (f && f.active && f.source === 'notion') {
+          // Snaps from before R7f have no text: LifeOS could not edit then, so the Fact's text is the agreed one.
+          const agreed = seen.t ?? f.text;
+          if (t !== agreed) {
+            const next = f.text === t ? f : os.facts.supersede(f.id, t, { source: 'notion', sourceRef: `notion:${b.id}`, subjectId: person.id });
+            known[k] = { f: next.id, s: s.title, t };
+          } else if (f.text !== agreed) edits.push({ k, block: b, text: f.text });
+          else seen.t = t;
         }
         continue;
       }
       const same = factBySourceRef(os, `notion:${b.id}`) ?? os.facts.findSame(t, person.id)?.id ?? (key === sectionKey(LIFE_UPDATES) ? os.facts.findSame(stripDay(t), person.id)?.id : null) ?? null;
       if (same) {
-        known[k] = { f: same, s: s.title };
+        known[k] = { f: same, s: s.title, t };
         continue;
       }
       const at = Date.parse(b.created_time ?? '') || ctx.now;
       const f = os.facts.add({ text: t, subjectId: person.id, source: 'notion', sourceRef: `notion:${b.id}`, statedAt: at });
-      known[k] = { f: f.id, s: s.title };
+      known[k] = { f: f.id, s: s.title, t };
       ctx.out.facts++;
     }
   }
+  return edits;
 }
 
 /** Where a new section goes: before the LifeOS log (it stays last), else at the end. */
@@ -403,7 +422,7 @@ async function reconcile(ctx: Ctx, personId: string, page: NotionPage, push: boo
     snap.update = nUpdate;
   } else if (!nUpdate) snap.update = '';
   // The page's bullets as Facts (never twice); a Fact LifeOS already has is matched, not written back.
-  fromNotion(() => readFacts(ctx, os.records.get<PersonData>(personId)!, body, snap));
+  const edits = fromNotion(() => readFacts(ctx, os.records.get<PersonData>(personId)!, body, snap));
   const sent = new Set(snap.sent ?? []);
   const onPage = new Set(Object.values(snap.bullets ?? {}).map((b) => b.f));
   const unsent = os.facts
@@ -429,7 +448,7 @@ async function reconcile(ctx: Ctx, personId: string, page: NotionPage, push: boo
   const logged = new Set(snap.log ?? []);
   const newLogs = logs.filter((x) => !logged.has(x.key));
 
-  const pushNeeded = Object.keys(toPush).length > 0 || pushLast || pushUpdate || unsent.length > 0 || lifeosIdWrong || balanceWrong || newLogs.length > 0;
+  const pushNeeded = Object.keys(toPush).length > 0 || pushLast || pushUpdate || unsent.length > 0 || edits.length > 0 || lifeosIdWrong || balanceWrong || newLogs.length > 0;
   snap.edited = page.last_edited_time;
   if (!push || !pushNeeded) {
     saveSnap(os, personId, snap);
@@ -465,6 +484,12 @@ async function reconcile(ctx: Ctx, personId: string, page: NotionPage, push: boo
       await client.appendChildren(page.id, [heading2('Likes'), divider(), ...items.map(bullet)], beforeLog(blocks, body));
     }
     snap.v.likes = norm('likes', toPush.likes);
+  }
+
+  // Notion's Facts edited in LifeOS: the bullet takes the new words.
+  for (const e of edits) {
+    await client.updateBlockText(e.block.id, e.block.type, e.text);
+    snap.bullets![e.k]!.t = e.text;
   }
 
   // Facts said in LifeOS: under Life Updates, dated.

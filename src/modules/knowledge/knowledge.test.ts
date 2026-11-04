@@ -39,6 +39,18 @@ describe('Note', () => {
     expect(os.records.update<NoteData>(named.id, { data: { body: 'another line' } }).title).toBe('Reading list');
   });
 
+  it('links to a record made (or renamed) after it named it', () => {
+    const n = note('Ask [[Kenji]] about the sushi place');
+    expect(os.links.targets(n.id, 'mention')).toEqual([]);
+    const kenji = person('Kenji');
+    expect(os.links.targets(n.id, 'mention')).toEqual([kenji.id]);
+    const m = note('Lunch with [[Suresh]]');
+    const s = person('Suresh K');
+    expect(os.links.targets(m.id, 'mention')).toEqual([]);
+    os.records.update(s.id, { title: 'Suresh' });
+    expect(os.links.targets(m.id, 'mention')).toEqual([s.id]);
+  });
+
   it('links its [[mentions]] and names the unknown ones', () => {
     const karan = person('Karan Mehta');
     const n = note('Dinner with [[Karan Mehta]] and [[Zoya]]');
@@ -83,6 +95,16 @@ describe('the Second Brain', () => {
     // A name that is not a record: the facts kept under it.
     os.facts.add({ text: 'Suresh collects rent on the 5th', subjectKey: 'name:suresh', source: 'talk' });
     expect(whatIKnow(os, 'Suresh')).toMatchObject({ record: null, facts: [expect.objectContaining({ text: 'Suresh collects rent on the 5th' })] });
+  });
+});
+
+describe('editing a fact', () => {
+  it('changes its words in place: same fact, found by its new words', () => {
+    const dad = person('Dad');
+    const f = os.facts.add({ text: 'Dad likes cricket', subjectId: dad.id, source: 'notion', sourceRef: 'notion:abc' });
+    expect(os.facts.edit(f.id, 'Dad likes cricket and chess')).toMatchObject({ id: f.id, source: 'notion', sourceRef: 'notion:abc', subjectId: dad.id, text: 'Dad likes cricket and chess' });
+    expect(searchBrain(os, 'chess').facts.map((x) => x.id)).toEqual([f.id]);
+    expect(os.facts.list({ subjectId: dad.id })).toHaveLength(1);
   });
 });
 

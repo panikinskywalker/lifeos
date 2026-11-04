@@ -289,16 +289,21 @@ R7f): your Notes, the Facts, and the names Talk learned, in one place. Memory
 **Mentions.** A `[[Name]]` in a Note's body is a Link with the word *mention*
 (note → record), kept equal to the text on every save (core's `syncMentions`):
 matched on the record's exact title, then a name learned in Talk; an unknown or
-ambiguous name links nothing, shows faded, and a tap searches for it. The
-record mentioned lists the Note under *Mentioned in*. The editor's *Mention*
+ambiguous name links nothing, shows faded, and a tap searches for it; when a
+record with that name is made (or one is renamed to it) later, the notes that
+already named it link to it on their own (4 Nov). The record mentioned lists the Note under *Mentioned in*. The editor's *Mention*
 picks a record and writes `[[its title]]`. A Fact's first `[[Name]]` says what
 it is about.
 
 **Facts, per record and in one place.** Fact stays a core Object (layer 3). On
-a record: the Facts card (add, long-press to forget). In one place: the
-*Facts* half of the Second Brain, grouped by what each is about (a record, a
-name that is not a record yet, *About you*), searchable; add one, forget with
-Undo, or put one *about* a record. Below them, **What you call things**: the
+a record: the Facts card (add, tap to edit, long-press to forget). In one
+place: the *Facts* half of the Second Brain, grouped by what each is about (a
+record, a name that is not a record yet, *About you*), searchable; add one,
+edit it, forget with Undo, or put one *about* a record. **Every Fact is
+editable anywhere** (decided 4 Nov), Notion's too: an edit made in LifeOS goes
+back to its bullet on your Notion page on the next sync, and one made in
+Notion comes back; when both changed since they last agreed, Notion's words
+win (crm keeps each bullet's last agreed text). Below them, **What you call things**: the
 names Talk learned ("the car" → Creta), each forgettable. `/memory` opens it.
 
 **The fold** (once, on first open after R7f; nothing is deleted, no migration):
@@ -316,6 +321,34 @@ Browse's search stays the whole app's, and a Fact there opens the Facts half.
 named back), `find_notes` (text, kind), `what_i_know` (about a name or record:
 its Facts, the Notes that mention it, what you call it). Core keeps
 `remember_fact`, `recall`, `forget_fact` and `remember_alias`.
+
+**What a Second Brain is, and where LifeOS goes next (proposed 4 Nov; not
+built).** Built so far, the Second Brain is a store you read: notes, facts,
+links. The idea it is named after (Tiago Forte's *Building a Second Brain*,
+and apps like Obsidian, Logseq and Capacities) is a loop: you keep what
+strikes you so your head does not have to, and it comes back when you need it.
+Forte's loop is **CODE**: Capture, Organize, Distill, Express; *Organize* is
+**PARA**, by how actionable a thing is, not by topic: Projects (now, with an
+end), Areas (ongoing: health, money, people, home), Resources (reference),
+Archive. How it maps onto LifeOS, mostly from parts that exist:
+- **Capture**: the Dump box is the inbox. A long dump, a shared link or
+  article becomes a Note (a link keeps its source and the page's title);
+  everything else is filed as today.
+- **Organize, without folders**: Projects are `projects`' Projects (a Note
+  links to one); Areas are the modules (a Note that mentions Dad sits with
+  People, one that mentions the Creta with Things); Resources are reference,
+  recipe and book Notes; Archive is archived. Notes that link to nothing and
+  have no kind are the **Inbox**, shown first until each is placed.
+- **Distill**: on a long Note, *Summarise* asks Claude for its few key
+  lines, kept on top of the Note (the body is untouched); you can mark lines
+  yourself.
+- **Express**: Talk and the Dump box answer from it (`what_i_know`,
+  `find_notes`); a Project's page lists its Notes; *Draft from these* writes
+  a first version from the Notes you pick.
+- **It comes back to you**: the brain (layer 8) offers Notes and Facts at the
+  right moment (the Notes about Priya before her birthday dinner, the Japan
+  ideas when the Trip nears), and a weekly review empties the Inbox.
+- **A daily note**: Journal notes are one per day, opened from Today.
 
 ### Places (module `places`; Objects and Fields agreed 22 Oct, R3)
 | Object | Meaning | Key fields | Filed by |
@@ -853,7 +886,7 @@ what they are, each opening the thing itself. Then two sections:
   are boards too but sit in the bottom bar, so they are not repeated here.
 - **Modules** — the twelve, in their tints, each opening its Overview → Lists →
   Records (as the grid is today).
-Then **everything else lives here too**: Memory (facts), Recent, Tags, Reminders,
+Then **everything else lives here too**: Facts (the Second Brain's, R7f), Recent, Tags, Reminders,
 To check history, Data sources status, the component gallery (dev). If it is a
 screen and not a tab, Browse reaches it. Any board can also be pinned to Today as a
 tile, and opened by name from the Dump box ("open turf"). A new board is one
@@ -884,8 +917,8 @@ Component gallery (dev).
   rules over messages, payments, records, metrics, habits.
 - **Tags**: tag chips on every Record and List; a Tags page from Browse › Recent;
   one page per tag listing its records across modules.
-- **Memory**: the Facts list, a row in Browse (by who they are about; edit, forget).
-  Stays until the Second Brain work decides what replaces it.
+- **Memory** is replaced by the **Second Brain** (R7f, layer 2): Notes and Facts
+  in one place, a board in Browse › Boards; Browse's *Facts* row opens its Facts half.
 - **Reminders**: its own screen listing one-off Cycles (reminders) by time, from
   Today and You › Notifications. Upkeep shows them too; this is the focused list.
 - **Spend**: its own screen from Today's spend tile and the Money overview:
@@ -1107,13 +1140,15 @@ screens checked on the phone → overrides only where the default is wrong)
   known about a record or a name. **The fold** (once): name facts onto the record that now has the
   name, a deleted record's facts keep its name, every Note's mentions linked again. **Tools**:
   `write_note`, `find_notes`, `what_i_know` (the last two on the Dump box's question path too).
-  **Core, small**: `facts.setSubject`, `aliases.all`, a record section's `fields` (the Details card
+  **4 Nov**: every Fact editable anywhere (Notion's go back to their bullet), and a record made or
+  renamed later links the notes that already named it.
+  **Core, small**: `facts.setSubject`, `facts.edit`, `aliases.all`, a record section's `fields` (the Details card
   leaves them out), the two read tools in `READ_ONLY_TOOLS`. **Board** (a first pass from the kit
   until the `NR-Knowledge-*` artboards; `docs/design/KNOWLEDGE-BRIEF.md`): the Second Brain in
   Browse › Boards (search, Notes · Facts, What you call things; `/memory` opens its Facts half), the
   Note page with its mentions as links (unknown ones faded, a tap searches), the Note form with
-  Mention. 495 tests green; the web export builds. *Not in R7f*: `[[` suggestions while typing;
-  layer 5's Memory line, which the merge updates. **Phone check pending.**
+  Mention. 498 tests green; the web export builds. *Not in R7f*: `[[` suggestions while typing; the
+  Second Brain loop (Capture, Organize, Distill, Express) proposed in layer 2. **Phone check pending.**
 
 ### Boards and automations
 - [ ] **R8 Today and Time** — Today tiles re-hung on module tools and core queries only; Time
