@@ -98,3 +98,37 @@ first pass from the kit until the *NR-Assets* artboards are drawn.
 - New AI tools: what's under warranty, what's due for service, the clothes by
   state.
 - Add an Asset, a vehicle or clothes from the quick actions.
+
+## Follow-up, 4 Nov (from your answers)
+
+Branch `claude/r7a-assets` continued from `m1-design-system` at 665aec9
+(v0.0.28), since R7a was merged as v0.0.12.
+
+- **Insurance and PUC are Documents** about the vehicle (kind insurance; PUC a
+  certificate), each with the Renew Cycle Documents already have. The car's
+  page reads the insurance from its Document (tap opens it, or *Add* when
+  there is none), and a paper running out shows in its attention card with
+  *Open*, since renewing is a new expiry date on the Document. Demo data: the
+  policy and a PUC certificate, no Cycle on the car.
+- **A packed thing tapped on Home goes in the wash**, as travel's *Back home*
+  does (it came back from the trip worn).
+- **The form shows only the chosen category's Fields**: core's
+  `Field.showFor` and `fieldShown` (`src/core/domain/fields.ts`), used by the
+  form (`src/ui/screens/FormScreen.tsx`). A shirt's form has no Registration,
+  Odometer, Service or Warranty; an appliance's has Service by months and
+  Warranty; a vehicle's has all of them. The record page already showed only
+  Fields with a value.
+- Kept as they were: vehicles in Upkeep's Things chip; vendor → Organisation
+  (you have no old vendor links); km is the only meter.
+- Checks: typecheck clean; 631 tests, 630 green. The one red is in
+  deliveries (`coming up, urgent with an OTP…`) and fails on the base
+  without these changes, so it is not from this work. The web export builds;
+  the clothing form and the Creta page were checked with the demo data.
+
+**Patch notes for the merge**
+- A car's insurance and PUC are its Documents now, each with an expiry; the
+  car's page shows the insurance from there.
+- The Asset form shows only what fits the category: no registration on a
+  shirt, no warranty on clothes.
+- On Home, a packed thing tapped goes in the wash, as when you're back from
+  a trip.

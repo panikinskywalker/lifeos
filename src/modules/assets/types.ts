@@ -23,6 +23,12 @@ export const ASSET_CATEGORIES: FieldOption[] = [
   { value: 'other', label: 'Other', icon: 'box' },
 ];
 
+/** Which category's Fields the form shows (Field.showFor): a shirt's form has no Registration or Service. */
+const VEHICLE = { field: 'category', values: ['vehicle'] };
+const CLOTHING = { field: 'category', values: ['clothing'] };
+const SERVICED = { field: 'category', values: ['vehicle', 'device', 'appliance', 'property', 'other'] };
+const WARRANTIED = { field: 'category', values: ASSET_CATEGORIES.map((c) => c.value).filter((v) => v !== 'clothing') };
+
 export type ClothesState = 'clean' | 'wash' | 'packed';
 export const CLOTHES_STATES: Array<FieldOption & { value: ClothesState }> = [
   { value: 'clean', label: 'Clean' },
@@ -109,20 +115,20 @@ export const assetType: ObjectDef<AssetData> = {
     { key: 'purchasePrice', label: 'Price', type: 'money' },
     { key: 'currentValue', label: 'Current value', type: 'money' },
     { key: 'purchaseDate', label: 'Bought on', type: 'date' },
-    { key: 'warrantyUntil', label: 'Warranty until', type: 'date', summary: true },
+    { key: 'warrantyUntil', label: 'Warranty until', type: 'date', summary: true, showFor: WARRANTIED },
     { key: 'vendorId', label: 'Vendor', type: 'link', linkTo: 'org', linkWord: 'vendor' },
     { key: 'serial', label: 'Serial / model', type: 'text', section: 'Details' },
     { key: 'placeId', label: 'Where', type: 'link', linkTo: 'place', linkWord: 'at', section: 'Details' },
     { key: 'location', label: 'Where (typed)', type: 'text', section: 'Details' },
     { key: 'spaceId', label: 'Kept in', type: 'link', linkTo: 'space', linkWord: 'kept_in', section: 'Details', description: 'A space in Home; clothing goes to Clothes' },
-    { key: 'state', label: 'State', type: 'select', options: CLOTHES_STATES, section: 'Clothing' },
-    { key: 'serviceEveryMonths', label: 'Service every', type: 'number', unit: 'months', section: 'Service', description: 'A vehicle’s default is 6 months' },
-    { key: 'serviceEveryKm', label: 'Service every (km)', type: 'number', unit: 'km', section: 'Service', description: 'Vehicles: default 10,000; whichever comes first' },
-    { key: 'nextServiceDate', label: 'Next service', type: 'date', section: 'Service' },
-    { key: 'nextServiceKm', label: 'Next service at', type: 'number', unit: 'km', section: 'Service' },
-    { key: 'plate', label: 'Registration', type: 'text', section: 'Vehicle' },
-    { key: 'odometerKm', label: 'Odometer', type: 'number', unit: 'km', section: 'Vehicle' },
-    { key: 'fuel', label: 'Fuel', type: 'select', options: FUELS, section: 'Vehicle' },
+    { key: 'state', label: 'State', type: 'select', options: CLOTHES_STATES, section: 'Clothing', showFor: CLOTHING },
+    { key: 'serviceEveryMonths', label: 'Service every', type: 'number', unit: 'months', section: 'Service', description: 'A vehicle’s default is 6 months', showFor: SERVICED },
+    { key: 'serviceEveryKm', label: 'Service every (km)', type: 'number', unit: 'km', section: 'Service', description: 'Default 10,000; whichever comes first', showFor: VEHICLE },
+    { key: 'nextServiceDate', label: 'Next service', type: 'date', section: 'Service', showFor: SERVICED },
+    { key: 'nextServiceKm', label: 'Next service at', type: 'number', unit: 'km', section: 'Service', showFor: VEHICLE },
+    { key: 'plate', label: 'Registration', type: 'text', section: 'Vehicle', showFor: VEHICLE },
+    { key: 'odometerKm', label: 'Odometer', type: 'number', unit: 'km', section: 'Vehicle', showFor: VEHICLE },
+    { key: 'fuel', label: 'Fuel', type: 'select', options: FUELS, section: 'Vehicle', showFor: VEHICLE },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   indexed: ['category', 'spaceId', 'state'],

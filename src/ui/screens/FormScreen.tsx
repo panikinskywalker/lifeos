@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { ObjectRecord, ObjectDef, Field } from '@core/domain/types';
+import { fieldShown } from '@core/domain/fields';
 import { ZodError } from 'zod';
 import { useTheme } from '../theme/ThemeProvider';
 import { Button, FormField, FilterChip, Screen, Section, Text, TextField } from '../kit';
@@ -47,12 +48,13 @@ function GenericForm({ type, id, initial, onSaved, linkTo }: FormProps) {
     const all: Field[] = [...def.fields, ...customFields.map((c) => ({ key: `custom_${c.key}`, label: c.label, type: c.fieldType, options: c.options.options, section: 'Custom fields' }))];
     const map = new Map<string, Field[]>();
     for (const f of all) {
+      if (!fieldShown(f, data)) continue;
       const s = f.section ?? '';
       if (!map.has(s)) map.set(s, []);
       map.get(s)!.push(f);
     }
     return [...map.entries()];
-  }, [def.fields, customFields]);
+  }, [def.fields, customFields, data]);
 
   const close = () => (router.canGoBack() ? router.back() : router.replace(`/entity/${type}`));
 

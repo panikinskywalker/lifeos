@@ -95,8 +95,8 @@ export function clothesByState(os: LifeOSContext, spaceId?: string): Record<Clot
   return out;
 }
 
-/** A tap on Home: clean → in the wash → clean; a packed one comes back clean. */
-export const nextClothesState = (s: ClothesState): ClothesState => (s === 'clean' ? 'wash' : 'clean');
+/** A tap on Home: clean → in the wash → clean; a packed one is back from the trip, so in the wash (as travel's Back home). */
+export const nextClothesState = (s: ClothesState): ClothesState => (s === 'wash' ? 'clean' : 'wash');
 
 /** Set a clothing Asset's state; returns its Undo. */
 export function setClothesState(os: LifeOSContext, id: string, state: ClothesState): () => void {

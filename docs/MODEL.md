@@ -178,8 +178,9 @@ renaming one keeps everything in it.
 Spaces are hidden from Browse's record lists; Home draws them.
 
 **Asset** (module `assets`, Object id `asset`; Fields agreed 31 Oct with
-R7a). The old `vehicle` Object folds into it (see *Retired*). Fields that
-belong to one category sit in their own section of the form.
+R7a). The old `vehicle` Object folds into it (see *Retired*). The form
+shows only the chosen category's Fields (a Field's `showFor`, 4 Nov): a shirt's
+form has no Registration or Service.
 | Field | Type | Notes |
 |---|---|---|
 | Name | text (the title) | "Hyundai Creta", "MacBook Pro 14", "Blue linen shirt" |
@@ -192,7 +193,7 @@ belong to one category sit in their own section of the form.
 | Serial | text | serial or model number |
 | Where | link → Place, word *at*, **and** the typed text | the link when a Place is picked; the text (`location`) stays as the fallback, as Person's Lives in |
 | Kept in | link → Space, word *kept in* | a Space in Home (layer 2, Space); clothing goes to Clothes |
-| State | select, clothing | clean · in the wash · packed (default clean); on Home a tap cycles clean → in the wash → clean, a packed one comes back clean; packing for a trip (R7d) sets packed |
+| State | select, clothing | clean · in the wash · packed (default clean); on Home a tap cycles clean → in the wash → clean, a packed one goes in the wash (back from the trip, as travel's Back home); packing for a trip (R7d) sets packed |
 | Service every | number (months) | drives the **Service** Cycle; a vehicle's default is 6 months |
 | Service every (km) | number, vehicle | default 10,000; with months, whichever comes first |
 | Next service | date and km | written back by the Service Cycle |
@@ -202,9 +203,10 @@ belong to one category sit in their own section of the form.
 | Notes | long text | |
 
 Statuses: owned · sold · lost / broken. **Cycles**: Warranty, Service (by
-months, by km, or either). A folded vehicle keeps its **Insurance** and
-**PUC** renewals as Cycles on the Asset, as they were; whether they become
-Documents (R7c) is open.
+months, by km, or either). A vehicle's **insurance** and **PUC** are
+**Documents** about it (word *asset*; decided 4 Nov), each with its Renew Cycle
+from Expires; the vehicle's page reads them from there. (A vehicle from before
+R7a would have kept them as Cycles; there were none.)
 
 **Document** (module `documents`; Fields agreed 2 Nov with R7c). LifeOS does not
 keep its own copy of your papers: **you pick folders on the phone once**
@@ -1304,10 +1306,12 @@ screens checked on the phone → overrides only where the default is wrong)
   vehicle's odometer, insurance, spend and service on both clocks, clothing's state and space; the
   Overview (due for service, warranty ending, in the wash); quick actions Asset · Vehicle · Clothes.
   **Home**: the Clothes space shows clothing Assets as pills in clean · in the wash · packed (tap
-  cycles clean → in the wash → clean, a packed one comes back clean; hold for the rest), and its tile
+  cycles clean → in the wash → clean, a packed one goes in the wash; hold for the rest), and its tile
   counts them. `docs/design/ASSETS-BRIEF.md` asks for `NR-Assets-*`, with the packing picker R7d
-  uses. 431 tests green; the web export builds. *Not in R7a*: a form that shows only a category's
-  Fields (the form shows every section); the packing picker itself (R7d). **Phone check pending.**
+  uses. 431 tests green; the web export builds. *Not in R7a*: the packing picker itself (R7d).
+  **4 Nov**: the form shows only the chosen category's Fields (core's `Field.showFor`); a car's
+  insurance and PUC are Documents about it, read by its page; a packed thing tapped on Home goes
+  in the wash, as travel's Back home. **Phone check pending.**
 - [x] **R7b deliveries**: built 2 Nov 2026 (branch `claude/r7b-deliveries`; no migration). Delivery as agreed
   (layer 2, *Things*): shop → Organisation (word *vendor*; made once, kind shop, if you have none) with the
   typed text kept, order → Transaction (word *bought in*), the tracking link a url. **Filing**: the parcel
@@ -1336,8 +1340,8 @@ screens checked on the phone → overrides only where the default is wrong)
   (expo-file-system, access kept), `listFolder` in the device module (one query per folder, five
   deep), the phone's own viewer to open. **Board**: Your folders (Add folder, Rescan now, New in your
   folders with Filed), the file card on a Document (Open, Filed, missing), New in your folders on the
-  Overview. *Not in R7c*: the text of photos (no OCR), shared files saved into a folder, Insurance and
-  PUC as Documents (still open). **Phone check pending.**
+  Overview. *Not in R7c*: the text of photos (no OCR), shared files saved into a folder. Insurance and
+  PUC are Documents about the vehicle (decided 4 Nov, R7a). **Phone check pending.**
 - [x] **R7d travel**: built 2 Nov 2026 (branch `claude/r7d-travel`; no migration), with layer 8's travel slice.
   Trip's Fields as written in layer 2 (*Agenda*): the destination is linked *to* its Place (matched by name, a
   city, area or country first, else made as a city; once on first open for the trips you had, `travel.foldedR7d`,

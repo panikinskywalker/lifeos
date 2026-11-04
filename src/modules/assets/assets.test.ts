@@ -7,13 +7,14 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectDef } from '@core/domain/types';
 import { bus } from '@core/events/bus';
 import { dateField } from '@core/cycles/schedule';
+import { fieldShown } from '@core/domain/fields';
 import { logDone, upkeep } from '@core/cycles/upkeep';
 import { clearMatch, resolveCandidates } from '@core/ai/lifeTools';
 import { crmModule } from '../crm';
 import { placesModule } from '../places';
 import { financeModule } from '../finance';
 import { inventoryModule, spaceNamed } from '../inventory';
-import { assetsAiTools, assetsModule, clothes, clothesByState, dueForService, foldClothes, foldVehicles, nextClothesState, services, setClothesState, underWarranty, type AssetData } from '.';
+import { assetType, assetsAiTools, assetsModule, clothes, clothesByState, dueForService, foldClothes, foldVehicles, nextClothesState, services, setClothesState, underWarranty, type AssetData } from '.';
 
 const DAY = 86_400_000;
 const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
@@ -135,8 +136,19 @@ describe('warranty and service', () => {
   });
 });
 
+describe('the form', () => {
+  it('shows only the chosen category’s Fields', () => {
+    const shown = (category: string) => assetType.fields.filter((f) => fieldShown(f, { category })).map((f) => f.key);
+    expect(shown('clothing')).toEqual(expect.arrayContaining(['state', 'spaceId']));
+    expect(shown('clothing').some((k) => ['plate', 'odometerKm', 'serviceEveryMonths', 'warrantyUntil'].includes(k))).toBe(false);
+    expect(shown('vehicle')).toEqual(expect.arrayContaining(['plate', 'odometerKm', 'fuel', 'serviceEveryKm', 'nextServiceKm', 'warrantyUntil']));
+    expect(shown('appliance')).toEqual(expect.arrayContaining(['serviceEveryMonths', 'warrantyUntil']));
+    expect(shown('appliance').some((k) => ['plate', 'serviceEveryKm', 'state'].includes(k))).toBe(false);
+  });
+});
+
 describe('clothes', () => {
-  it('kept in a space by Link; by state; a tap cycles clean → in the wash → clean, packed comes back clean', () => {
+  it('kept in a space by Link; by state; a tap cycles clean → in the wash → clean, packed comes back in the wash', () => {
     const sp = clothesSpace();
     const shirt = asset('Blue linen shirt', { category: 'clothing', spaceId: sp.id });
     const jeans = asset('Black jeans', { category: 'clothing', spaceId: sp.id, state: 'wash' });
@@ -145,7 +157,7 @@ describe('clothes', () => {
     expect(os.records.get(shirt.id)!.subtitle).toBe('Clean');
     const by = clothesByState(os, sp.id);
     expect([by.clean, by.wash, by.packed].map((l) => l.map((a) => a.title))).toEqual([['Blue linen shirt'], ['Black jeans'], ['Turf kit']]);
-    expect([nextClothesState('clean'), nextClothesState('wash'), nextClothesState('packed')]).toEqual(['wash', 'clean', 'clean']);
+    expect([nextClothesState('clean'), nextClothesState('wash'), nextClothesState('packed')]).toEqual(['wash', 'clean', 'wash']);
     const undo = setClothesState(os, shirt.id, 'wash');
     expect(os.records.get<AssetData>(shirt.id)!.data.state).toBe('wash');
     undo();

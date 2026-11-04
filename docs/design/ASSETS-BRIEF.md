@@ -19,7 +19,7 @@ Design **Assets** for LifeOS, my personal life-OS app for Android (390 × 844, e
 **The data (design to these, nothing more).**
 - **Asset**: name, **category** (vehicle · device · appliance · clothing · furniture · jewellery · property · other), bought on, price, current value, vendor (a shop, an Organisation), **warranty until**, serial, where (a Place), **kept in** (a Space in Home), status (owned · sold · lost / broken), notes.
 - **Service**: every N months (any Asset; the AC every 6 months), and every N km for a vehicle (default 6 months or 10,000 km, whichever first); next service date and km; a log of services with cost.
-- **Vehicle**: registration, **odometer** readings (km, with history), fuel; its Insurance and PUC renewals are cycles too.
+- **Vehicle**: registration, **odometer** readings (km, with history), fuel; its insurance and PUC are **Documents** about it, each with an expiry, shown on its page.
 - **Clothing**: **state**: clean · in the wash · packed; kept in Clothes (or another space that holds clothes).
 - Nudges the brain will raise later (layer 8): *service due* ("Creta: 600 km to service"), *warranty ending* ("Fridge: warranty ends 12 Nov; anything to claim?"), *laundry* ("6 in the wash since Sunday").
 
@@ -50,7 +50,7 @@ Design **Assets** for LifeOS, my personal life-OS app for Android (390 × 844, e
 4. **The Clothes space** (in Home; HOME-BRIEF screen 2's second example, drawn in full here)
    - Pills in three groups: **Clean**, **In the wash**, **Packed** (for a trip, with the trip's name when there is one).
    - Design the **clothes pill** in its three states, distinct from the stock pill: clean (lime), in the wash (with a drop), packed (outlined, with a bag).
-   - **Tap** cycles clean → in the wash → clean; a packed one taps back to clean. **Long-press**: a small sheet with the other states and Open.
+   - **Tap** cycles clean → in the wash → clean; a packed one taps to in the wash (it's back from the trip). **Long-press**: a small sheet with the other states and Open.
    - Header: "Clothes", "11 things · 3 in the wash · 2 packed", + to add clothes.
    - Empty: "Clothes are Assets: add a shirt, your jeans, the turf kit."
 

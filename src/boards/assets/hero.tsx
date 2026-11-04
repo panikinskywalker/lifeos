@@ -131,6 +131,19 @@ function ClothingCard({ entity }: { entity: ObjectRecord<AssetData> }) {
   );
 }
 
+/** Documents about this Asset (word `asset`) and their Renew cycles: a car's insurance and PUC are Documents, not Cycles on the car. */
+function usePapers(entity: ObjectRecord<AssetData>): Array<UpkeepItem & { kind: string }> {
+  return useLive(
+    (o) =>
+      o.registry.objects.has('document')
+        ? o.records.query<{ kind: string }>('document', { filter: { and: [{ field: 'relation.asset', op: 'relatedTo', value: entity.id }] } }, { limit: 50 }).flatMap((doc) =>
+            o.cycles.forEntity(doc.id).map((cycle) => ({ cycle: { ...cycle, name: doc.title }, entity: doc, def: o.registry.objects.get('document'), status: o.cycles.status(cycle), kind: doc.data.kind })),
+          )
+        : [],
+    [entity.id],
+  );
+}
+
 /**
  * Vehicle (Stitch "Record · Vehicle"): odometer / insurance / spend trio,
  * service cadence on both clocks (km and months), what needs attention,
@@ -153,15 +166,19 @@ function VehicleHero({ entity, ctx }: { entity: ObjectRecord<AssetData>; ctx: Li
   const before = readings.find((r) => r.readAt < monthStart)?.value ?? null;
   const thisMonth = latest != null && before != null ? latest - before : null;
   const service = items.find((i) => i.cycle.template === 'asset.service') ?? null;
-  const insurance = items.find((i) => i.cycle.template === 'vehicle.insurance' || /insurance/i.test(i.cycle.name)) ?? null;
-  const urgent = mostUrgent(items, 30, ['asset.service']) ?? (service && (service.status.state === 'overdue' || service.status.state === 'soon') ? service : null);
+  const papers = usePapers(entity);
+  const insurance = papers.find((p) => p.kind === 'insurance') ?? null;
+  const newDoc = (params: Record<string, string>) => router.push({ pathname: '/entity/[type]/new', params: { type: 'document', assetId: entity.id, ...params } } as never);
+  const urgent = mostUrgent([...items, ...papers], 30, ['asset.service']) ?? (service && (service.status.state === 'overdue' || service.status.state === 'soon') ? service : null);
 
   return (
     <View style={{ gap: 16 }}>
       <StatTrio
         stats={[
           { label: 'Odometer', value: latest != null ? km(latest) : '–', unit: latest != null ? 'km' : undefined, caption: thisMonth ? `+${km(thisMonth)} this month` : latest == null ? 'Tap to log' : `read ${format(readings[0]!.readAt, 'd MMM')}`, tone: thisMonth ? 'ok' : undefined, onPress: () => setMeter(true) },
-          insurance ? { label: 'Insurance', value: insurance.status.daysLeft != null ? String(Math.max(0, insurance.status.daysLeft)) : '–', unit: 'days', caption: insurance.cycle.nextDueAt ? `Exp ${format(insurance.cycle.nextDueAt, 'd MMM')}` : undefined, tone: insurance.status.daysLeft != null && insurance.status.daysLeft <= 30 ? 'alert' : undefined } : { label: 'Cycles', value: String(items.length), caption: 'tracked' },
+          insurance
+            ? { label: 'Insurance', value: insurance.status.daysLeft != null ? String(Math.max(0, insurance.status.daysLeft)) : '–', unit: 'days', caption: insurance.cycle.nextDueAt ? `Exp ${format(insurance.cycle.nextDueAt, 'd MMM')}` : undefined, tone: insurance.status.daysLeft != null && insurance.status.daysLeft <= 30 ? 'alert' : undefined, onPress: () => router.push(`/entity/document/${insurance.entity.id}` as never) }
+            : { label: 'Insurance', value: 'Add', caption: 'the policy', onPress: () => newDoc({ kind: 'insurance', title: `${entity.title} insurance` }) },
           { label: `${year} spend`, value: ctx.format.currency(spend['sum_data.amount'] ?? 0), caption: `YTD · ${spend.count}`, onPress: () => router.push('/entity/transaction') },
         ]}
       />
@@ -208,7 +225,11 @@ function VehicleHero({ entity, ctx }: { entity: ObjectRecord<AssetData>; ctx: Li
           title={urgent.cycle.name}
           meta={whenText(urgent)}
           estimate={urgent.cycle.costEstimate ? ctx.format.currency(urgent.cycle.costEstimate) : undefined}
-          primary={{ label: urgent.cycle.template === 'asset.service' ? 'Serviced' : urgent.cycle.template === 'asset.warranty' ? 'Noted' : 'Renewed', icon: 'check', onPress: () => setCostFor(urgent) }}
+          primary={
+            urgent.entity.object === 'document'
+              ? { label: 'Open', icon: 'arrow-right', onPress: () => router.push(`/entity/document/${urgent.entity.id}` as never) } // renewing a paper is a new expiry date on it
+              : { label: urgent.cycle.template === 'asset.service' ? 'Serviced' : urgent.cycle.template === 'asset.warranty' ? 'Noted' : 'Renewed', icon: 'check', onPress: () => setCostFor(urgent) }
+          }
           secondary={{
             label: 'Snooze',
             icon: 'clock',
@@ -226,7 +247,7 @@ function VehicleHero({ entity, ctx }: { entity: ObjectRecord<AssetData>; ctx: Li
           { label: 'Log odometer', icon: 'gauge', onPress: () => setMeter(true) },
           ...(service ? [{ label: 'Record service', icon: 'wrench' as const, onPress: () => setCostFor(service) }] : []),
           { label: 'Add expense', icon: 'receipt', onPress: () => router.push('/entity/transaction/new') },
-          { label: 'Add document', icon: 'file', onPress: () => router.push('/entity/document/new') },
+          { label: 'Add document', icon: 'file', onPress: () => newDoc({}) },
         ]}
       />
 

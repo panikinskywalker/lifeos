@@ -74,6 +74,13 @@ export interface Field {
   pattern?: RegExp;
   /** The line for a value that doesn't match `pattern`; `{item}` is what was typed (“{item}” needs an @ and a bank handle). */
   patternHint?: string;
+  /** Show it in the form only while another Field has one of these values (an Asset's Registration, for category vehicle; R7a). */
+  showFor?: { field: string; values: string[] };
+}
+
+/** Whether a Field belongs in the form for this data (see `Field.showFor`). */
+export function fieldShown(field: Pick<Field, 'showFor'>, data: Record<string, unknown>): boolean {
+  return !field.showFor || field.showFor.values.includes(String(data[field.showFor.field] ?? ''));
 }
 
 /** The line for a text value (or one list item) that doesn't match its Field's `pattern`, or null. */

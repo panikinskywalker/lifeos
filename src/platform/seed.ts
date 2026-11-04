@@ -105,8 +105,9 @@ export function seedDemoData(os: LifeOSContext) {
     os.records.create({ object: 'subscription', data: { name: 'Cult.fit', amount: 14000, rrule: 'FREQ=YEARLY;INTERVAL=1', nextBillingAt: daysAhead(140), category: 'health', accountId: card.id }, status: 'active' });
 
     const car = os.records.create({ object: 'asset', title: '2022 Hyundai Creta', data: { category: 'vehicle', purchaseDate: '2022-03-12', purchasePrice: 1450000, plate: 'KA 05 MZ 1234', odometerKm: 28400, fuel: 'petrol', nextServiceKm: 30000 }, status: 'owned' });
-    os.cycles.create({ entityId: car.id, name: 'Insurance renewal', kind: 'fixed', everyN: 1, everyUnit: 'year', nextDueAt: new Date(`${daysAhead(9)}T09:00:00`).getTime(), leadDays: 30 }, 'system');
+    // Insurance and PUC are Documents about the car, each with its Renew cycle.
     os.records.create({ object: 'document', title: 'Car insurance policy', data: { kind: 'insurance', issuer: 'ICICI Lombard', expiresOn: daysAhead(9), assetId: car.id } });
+    os.records.create({ object: 'document', title: 'PUC certificate', data: { kind: 'certificate', expiresOn: daysAhead(70), assetId: car.id } });
     os.records.create({ object: 'document', title: 'Passport', data: { kind: 'id', number: 'P•••••12', expiresOn: '2031-06-10' } });
     os.records.create({ object: 'asset', title: 'MacBook Pro 14"', data: { category: 'device', purchaseDate: daysAgo(400), purchasePrice: 240000, currentValue: 170000, warrantyUntil: daysAhead(330) }, status: 'owned' });
 

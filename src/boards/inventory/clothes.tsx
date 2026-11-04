@@ -14,7 +14,7 @@ import { HomeEmpty, PillCloud, SectionHead } from './parts';
  * The Clothes space (R7a; HOME-BRIEF screen 2's second example, a first pass
  * until NR-Home-Space and NR-Assets-Clothes): clothing Assets kept here, as
  * pills in clean · in the wash · packed. Tap cycles clean → in the wash →
- * clean (a packed one comes back clean); hold for every state or the page.
+ * clean (a packed one is back from a trip: in the wash); hold for every state or the page.
  * Clothes are Assets (the assets module), reached through the Link *kept in*.
  */
 
@@ -68,7 +68,7 @@ export function ClothesSpace({ ctx, space, onBack }: { ctx: LifeOSContext; space
           {CLOTHES_STATES.map(({ value, label }) =>
             by[value].length ? (
               <View key={value} style={{ gap: 10 }}>
-                <SectionHead title={label} sub={value === 'packed' ? 'For a trip; tap when it’s back' : null} />
+                <SectionHead title={label} sub={value === 'packed' ? 'In the bag for a trip; tap when you’re back to put it in the wash' : null} />
                 <PillCloud>
                   {by[value].map((a) => (
                     <ClothesPill key={a.id} title={a.title} state={value} onPress={() => set(a, nextClothesState(clothesStateOf(a.data)))} onLongPress={() => setMenu(a)} />
