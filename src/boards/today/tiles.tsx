@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import { upkeep, type Upkeep } from '@core/cycles/upkeep';
+import { logDone, undoLoggedDone, upkeep, type Upkeep } from '@core/cycles/upkeep';
 import { formatMetric, metricSeries, screenTopApps, upcoming } from '@core/dashboard/metrics';
 import { doneToday, myDay, progress, setGoal, type DayItem, type GoalId, type Progress } from '@core/dashboard/day';
 import type { LifeOSContext } from '@core/registry/context';
@@ -12,9 +12,12 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import type { IconName } from '@ui/icons';
 import type { TintKey } from '@ui/theme/tokens';
 import { tintForModule } from '@ui/theme/moduleTint';
-import { Button, DeltaChip, Icon, MiniBars, NumberField, Ring, RowItem, RowList, Sheet, Stat, Text, Tile } from '@ui/kit';
+import { subtitleFor } from '@ui/components/cycles';
+import { Button, Card, Checkbox, Chip, DeltaChip, Icon, IconButton, MiniBars, NumberField, Ring, RowItem, RowList, Sheet, Stat, Text, Tile, useToast } from '@ui/kit';
+import { completeTask, undoComplete } from '@modules/projects/lib';
 import { NeedsSource } from '../../screens/NeedsSource';
 import { homeAreas } from '../../screens/homeLayout';
+import { clock, DayStrip, daySentence, Face, MetricsGrid, SectionHead } from './parts';
 
 /**
  * Today's own tiles (docs/MODEL.md layer 5): the ones over core (the day,
@@ -22,6 +25,7 @@ import { homeAreas } from '../../screens/homeLayout';
  * Each reads core queries only; Today lays them out.
  */
 
+const DAY = 86_400_000;
 const fmtHours = (h: number) => `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}m`;
 
 /** One upkeep pass per data change for every tile that needs it (Upcoming, Overdue, My day). */
@@ -45,7 +49,7 @@ function ScreenTile() {
       {has ? (
         <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-end' }}>
           <View style={{ flex: 1, gap: 6 }}>
-            <Stat value={s.value != null ? formatMetric('screen', s.value, os.format.currency) : '—'} size="count" />
+            <Stat value={s.value != null ? formatMetric('screen', s.value, os.format.currency) : 'No data'} size="count" />
             <DeltaChip change={s.change} better="down" vs="vs yesterday" />
             {apps.map((a) => (
               <Text key={a.package} variant="caption" color="secondary" numberOfLines={1}>
@@ -64,22 +68,42 @@ function ScreenTile() {
   );
 }
 
+/** The next two weeks as row cards under a section header (NR-Today · Upkeep): a late one gets the coral pill, the rest their day. */
 function UpcomingTile() {
   const router = useRouter();
   const u = useUpkeep();
-  const items = useLive((o) => upcoming(o, 5, Date.now(), 14, u), [u]);
+  const all = useLive((o) => upcoming(o, 50, Date.now(), 14, u), [u]);
+  const late = all.filter((i) => i.overdue).length;
+  const week = all.filter((i) => !i.overdue && i.at < Date.now() + 7 * DAY).length;
+  const line = [late ? `${late} late` : null, week ? `${week} this week` : null].filter(Boolean).join(' · ');
+  const subOf = (i: (typeof all)[number]) => {
+    const cycle = i.kind === 'due' ? u.items.find((x) => x.cycle.id === i.id) : null;
+    return cycle ? subtitleFor(cycle) : i.kind === 'event' ? format(i.at, 'EEE d MMM') : i.kind === 'delivery' ? 'Delivery' : null;
+  };
   return (
-    <Tile size="2x1" tint="upkeep" icon="calendar" label="Upcoming" meta="next 2 weeks" onPress={() => router.navigate('/upkeep')}>
-      {items.length ? (
+    <View style={{ gap: 8 }}>
+      <SectionHead title="Upcoming" line={line || undefined} action="See all" onAction={() => router.navigate('/upkeep')} />
+      {all.length ? (
         <RowList>
-          {items.map((i) => (
-            <RowItem key={i.id} icon={i.kind === 'event' ? 'calendar' : i.kind === 'delivery' ? 'box' : 'repeat'} tint={i.kind === 'event' ? 'tasks' : 'upkeep'} title={i.title} value={i.overdue ? 'Late' : relDay(i.at)} valueTone={i.overdue ? 'alert' : 'secondary'} onPress={() => router.push(`/entity/${i.type}/${i.entityId}` as never)} />
+          {all.slice(0, 3).map((i) => (
+            <RowItem
+              key={i.id}
+              icon={i.kind === 'event' ? 'calendar' : i.kind === 'delivery' ? 'box' : 'repeat'}
+              tint={i.kind === 'event' ? 'tasks' : 'upkeep'}
+              title={i.title}
+              subtitle={subOf(i)}
+              meta={i.overdue ? null : relDay(i.at)}
+              trailing={i.overdue ? <View><Chip small tone="alert" label={`${Math.max(1, Math.round((Date.now() - i.at) / DAY))} d late`} /></View> : undefined}
+              onPress={() => router.push(`/entity/${i.type}/${i.entityId}` as never)}
+            />
           ))}
         </RowList>
       ) : (
-        <Text variant="caption" color="secondary">Nothing due or planned in the next two weeks.</Text>
+        <Card>
+          <Text variant="caption" color="secondary">Nothing due or planned in the next two weeks.</Text>
+        </Card>
       )}
-    </Tile>
+    </View>
   );
 }
 
@@ -101,9 +125,64 @@ function relDay(at: number): string {
 
 const DAY_ICON: Record<DayItem['kind'], IconName> = { event: 'calendar', task: 'check-circle', due: 'repeat', delivery: 'box', reminder: 'bell', bill: 'receipt' };
 
-/** Today in time order: all-day things first, then the timed ones, a line at now. */
-function MyDayTile() {
+/** One line of the checklist (NR-Today): a 26 tick, title over where, then one thing on the right. */
+function DayRow({ item: i, now }: { item: DayItem; now: number }) {
+  const os = useOS();
+  const t = useTheme();
   const router = useRouter();
+  const toast = useToast();
+  const record = i.entityId ? os.records.get<{ completedAt?: number; phone?: string }>(i.entityId) : null;
+  const cycleId = i.kind === 'due' ? i.id.replace(/^cycle:/, '') : null;
+  const tick = () => {
+    if (cycleId) {
+      const d = logDone(os, cycleId);
+      toast.show({ message: `${i.title} done`, icon: 'check', undo: () => undoLoggedDone(os, d) });
+    } else if (record) {
+      const r = completeTask(os, record as never, now);
+      toast.show({ message: `${i.title} done`, icon: 'check', undo: () => undoComplete(os, record.id, r) });
+    }
+  };
+  const undo = () => undoComplete(os, i.entityId!, { repeated: false });
+  const doneAt = i.done && i.kind === 'task' ? record?.data.completedAt : undefined;
+  const sub = doneAt ? `Done ${clock(doneAt)}` : i.sub;
+  const person = !i.done && record && i.type === 'person';
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 48 }}>
+      {i.kind === 'task' || i.kind === 'due' ? (
+        <Checkbox checked={i.done} onChange={i.done ? undo : tick} accessibilityLabel={`Done: ${i.title}`} />
+      ) : i.done ? (
+        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="check" size={15} strokeWidth={3} color={t.c.accent.mustardInk} />
+        </View>
+      ) : (
+        <View style={{ width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: i.late ? t.c.alert.coral : `${t.c.fg.primary}38`, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={DAY_ICON[i.kind]} size={13} color={i.late ? t.c.alert.coralText : t.c.fg.tertiary} />
+        </View>
+      )}
+      <Pressable accessibilityRole="button" disabled={!i.entityId} onPress={() => router.push(`/entity/${i.type}/${i.entityId}` as never)} style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center', gap: 2, opacity: i.done ? 0.4 : 1 }}>
+        <Text variant="rowTitle" numberOfLines={1} style={i.done ? { textDecorationLine: 'line-through' } : undefined}>{i.title}</Text>
+        {sub ? <Text variant="caption" color={i.late ? t.c.alert.coralText : 'secondary'} numberOfLines={1}>{sub}</Text> : null}
+      </Pressable>
+      {person ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Face id={record.id} name={record.title} />
+          {record.data.phone ? <IconButton icon="phone" size={36} filled accessibilityLabel={`Call ${record.title}`} onPress={() => void Linking.openURL(`tel:${record.data.phone}`)} /> : null}
+        </View>
+      ) : doneAt ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`Undo: ${i.title}`} hitSlop={14} onPress={undo}>
+          <Text variant="caption" color={t.c.accent.mustard} style={{ fontWeight: '700' }}>Undo</Text>
+        </Pressable>
+      ) : i.late ? (
+        <View><Chip small tone="alert" label="late" /></View>
+      ) : !i.allDay && !i.done ? (
+        <View><Chip small tone="muted" label={clock(i.at)} /></View>
+      ) : null}
+    </View>
+  );
+}
+
+/** Today in time order: the day in a sentence over its ticks, then the checklist, all-day things first, a line at now. */
+function MyDayTile() {
   const t = useTheme();
   const u = useUpkeep();
   const items = useLive((o) => myDay(o, Date.now(), u), [u]);
@@ -111,88 +190,58 @@ function MyDayTile() {
   const firstLater = items.findIndex((i) => !i.allDay && i.at > now);
   const shown = items.slice(0, 9);
   return (
-    <Tile size="2x1" tint="tasks" icon="calendar" label="My day" meta={items.length ? `${items.filter((i) => !i.done).length} left` : undefined}>
+    <View style={{ gap: 12 }}>
+      <Card style={{ padding: 18, paddingVertical: 18, gap: 14 }}>
+        <Text accessibilityRole="header" style={{ fontSize: 24, lineHeight: 30, fontWeight: '600', letterSpacing: -0.4 }} color={`${t.c.fg.primary}80`}>
+          {daySentence(items).map(([words, bright], k) => (
+            <Text key={k} style={{ fontSize: 24, lineHeight: 30, fontWeight: '600', letterSpacing: -0.4 }} color={bright ? 'primary' : `${t.c.fg.primary}80`}>{words}</Text>
+          ))}
+        </Text>
+        {items.length ? <DayStrip items={items} now={now} /> : null}
+      </Card>
       {shown.length ? (
-        <View style={{ gap: 2 }}>
+        <Card style={{ borderRadius: t.radius.card, padding: 14, paddingVertical: 14, gap: 8 }}>
           {shown.map((i, k) => (
             <React.Fragment key={i.id}>
               {k === firstLater ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.c.alert.coral }} />
                   <View style={{ flex: 1, height: 1.5, backgroundColor: t.c.alert.coral }} />
-                  <Text variant="labelMicro" color={t.c.alert.coralText}>{format(now, 'h:mm a')}</Text>
+                  <Text variant="labelMicro" color={t.c.alert.coralText}>{clock(now)}</Text>
                 </View>
+              ) : k ? (
+                <View style={{ height: 1, backgroundColor: t.c.line }} />
               ) : null}
-              {t.dark ? (
-                // Noir checklist (NR-Today): a 26 tick, title 16/600 over where, the time as a quiet pill; hairlines between.
-                <Pressable accessibilityRole="button" disabled={!i.entityId} onPress={() => i.entityId && router.push(`/entity/${i.type}/${i.entityId}` as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 8, borderTopWidth: k === 0 || k === firstLater ? 0 : 1, borderTopColor: t.c.line }}>
-                  {i.done ? (
-                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: t.c.ok.sage, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name="check" size={15} strokeWidth={3} color={t.c.ok.sageInk} />
-                    </View>
-                  ) : (
-                    <View style={{ width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: i.late ? t.c.alert.coral : '#F5F5F738', alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={DAY_ICON[i.kind]} size={13} color={i.late ? t.c.alert.coralText : t.c.fg.tertiary} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1, minWidth: 0, gap: 2, opacity: i.done ? 0.4 : 1 }}>
-                    <Text variant="rowTitle" numberOfLines={1}>{i.title}</Text>
-                    {i.sub ? <Text variant="caption" color={i.late ? t.c.alert.coralText : 'secondary'} numberOfLines={1}>{i.sub}</Text> : null}
-                  </View>
-                  <View style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: i.late ? t.c.alert.coralFill : t.c.bg.dim }}>
-                    <Text variant="labelMicro" color={i.late ? t.c.alert.coralText : 'secondary'} style={{ fontVariant: ['tabular-nums'] }}>{i.late ? 'late' : i.allDay ? 'today' : format(i.at, 'h:mm a')}</Text>
-                  </View>
-                </Pressable>
-              ) : (
-                <Pressable accessibilityRole="button" disabled={!i.entityId} onPress={() => i.entityId && router.push(`/entity/${i.type}/${i.entityId}` as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, opacity: i.done ? 0.5 : 1 }}>
-                  <Text variant="caption" color="secondary" style={{ width: 54, fontVariant: ['tabular-nums'] }}>{i.allDay ? 'Today' : format(i.at, 'h:mm a')}</Text>
-                  <Icon name={DAY_ICON[i.kind]} size={16} color={i.late ? t.c.alert.coralText : t.c.fg.secondary} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text variant="label" numberOfLines={1} style={i.done ? { textDecorationLine: 'line-through' } : undefined}>{i.title}</Text>
-                    {i.sub ? <Text variant="caption" color={i.late ? t.c.alert.coralText : 'secondary'} numberOfLines={1}>{i.sub}</Text> : null}
-                  </View>
-                </Pressable>
-              )}
+              <DayRow item={i} now={now} />
             </React.Fragment>
           ))}
           {items.length > shown.length ? <Text variant="caption" color="secondary">+ {items.length - shown.length} more</Text> : null}
-        </View>
-      ) : (
-        <Text variant="caption" color="secondary">Nothing on today: no events, tasks or things due.</Text>
-      )}
-    </Tile>
+        </Card>
+      ) : null}
+    </View>
   );
 }
 
-/** What you've done so far today: money, body, habits, tasks, upkeep, dumps. */
+/** What you've done so far today, as the metrics row: money, body, habits, tasks, upkeep, dumps. */
 function DoneTile() {
   const os = useOS();
-  const t = useTheme();
   const d = useLive((o) => doneToday(o), []);
-  const parts: Array<[IconName, string, string]> = [
-    ['wallet', os.format.currency(d.spent), d.payments ? `spent · ${d.payments} payment${d.payments === 1 ? '' : 's'}` : 'spent'],
-    ...(d.received ? ([['cash', os.format.currency(d.received), 'came in']] as Array<[IconName, string, string]>) : []),
-    ...(d.steps != null ? ([['shoe', Math.round(d.steps).toLocaleString('en-IN'), 'steps']] as Array<[IconName, string, string]>) : []),
-    ...(d.workouts ? ([['activity', `${d.workouts}`, `workout${d.workouts === 1 ? '' : 's'} · ${Math.round(d.workoutMin)} min`]] as Array<[IconName, string, string]>) : []),
-    ...(d.habitsDone ? ([['flame', `${d.habitsDone}`, `habit${d.habitsDone === 1 ? '' : 's'} ticked`]] as Array<[IconName, string, string]>) : []),
-    ...(d.tasksDone ? ([['check-circle', `${d.tasksDone}`, `task${d.tasksDone === 1 ? '' : 's'} done`]] as Array<[IconName, string, string]>) : []),
-    ...(d.upkeepDone ? ([['repeat', `${d.upkeepDone}`, 'upkeep done']] as Array<[IconName, string, string]>) : []),
-    ...(d.dumps ? ([['brain', `${d.dumps}`, `dump${d.dumps === 1 ? '' : 's'}`]] as Array<[IconName, string, string]>) : []),
-  ];
+  const slept = useLive((o) => (o.registry.objects.has('measurement') ? metricSeries(o, 'sleep', 'day').value : null), []);
+  const count = (label: string, n: number, unit?: string) => (n ? [{ label, value: String(n), unit }] : []);
   return (
-    <Tile size="2x1" tint="upkeep" icon="check" label="Done today">
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 12, columnGap: 10 }}>
-        {parts.map(([icon, value, label]) => (
-          <View key={label} style={{ flexBasis: '46%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Icon name={icon} size={16} color={t.c.fg.secondary} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="rowTitle" numberOfLines={1}>{value}</Text>
-              <Text variant="caption" color="secondary" numberOfLines={1}>{label}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    </Tile>
+    <MetricsGrid
+      stats={[
+        { label: 'Spent', value: os.format.currency(d.spent) },
+        ...(d.steps != null ? [{ label: 'Steps', value: Math.round(d.steps).toLocaleString('en-IN') }] : []),
+        ...(slept != null ? [{ label: 'Slept', value: fmtHours(slept) }] : []),
+        ...(d.received ? [{ label: 'Came in', value: os.format.currency(d.received) }] : []),
+        ...count('Workouts', d.workouts, d.workoutMin ? `${Math.round(d.workoutMin)} min` : undefined),
+        ...count('Habits', d.habitsDone),
+        ...count('Tasks', d.tasksDone),
+        ...count('Upkeep', d.upkeepDone),
+        ...count('Dumps', d.dumps),
+      ]}
+    />
   );
 }
 
@@ -233,7 +282,7 @@ function ProgressTile({ config }: TileProps) {
                 <Ring progress={Math.min(1, p.ratio ?? 0)} size={68} stroke={8} color={color}>
                   <Icon name={look.icon} size={18} color={color} />
                 </Ring>
-                <Text variant="label" numberOfLines={1}>{p.value != null ? fmt(p, p.value) : '—'}</Text>
+                <Text variant="label" numberOfLines={1}>{p.value != null ? fmt(p, p.value) : 'No data'}</Text>
                 <Text variant="caption" color="secondary" numberOfLines={1}>{p.label === 'Tasks this week' ? 'Tasks' : p.label === 'Spend this month' ? 'Spend' : p.label}</Text>
               </Pressable>
             );
@@ -245,7 +294,7 @@ function ProgressTile({ config }: TileProps) {
             const look = RING_LOOK[p.id] ?? { icon: 'target', tint: 'tasks' as TintKey };
             const bad = p.better === 'down' && (p.ratio ?? 0) > 1;
             const color = bad ? t.c.alert.coral : t.tints[look.tint].ink;
-            const of = p.label === 'Tasks this week' ? `of ${p.target} tasks` : p.label === 'Habits' ? `of ${p.target} habits` : `of ${p.target != null ? fmt(p, p.target) : '—'}`;
+            const of = p.label === 'Tasks this week' ? `of ${p.target} tasks` : p.label === 'Habits' ? `of ${p.target} habits` : p.target != null ? `of ${fmt(p, p.target)}` : 'no goal yet';
             return (
               <Pressable
                 key={p.id}
@@ -260,7 +309,7 @@ function ProgressTile({ config }: TileProps) {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="caption" color="secondary" numberOfLines={1}>{p.label}</Text>
                   <Text variant="rowTitle" numberOfLines={1}>
-                    {p.value != null ? fmt(p, p.value) : '—'} <Text variant="caption" color="secondary">{of}</Text>
+                    {p.value != null ? fmt(p, p.value) : 'No data'} <Text variant="caption" color="secondary">{of}</Text>
                   </Text>
                 </View>
                 {p.week.some((v) => v != null && v > 0) ? (
@@ -310,12 +359,12 @@ function AreasTile() {
       {cards.map((c) => {
         const tint = tintForModule(c.id);
         return (
-          <Pressable key={c.id} accessibilityRole="button" accessibilityLabel={`${c.name}: ${c.card.headline}`} onPress={() => router.push(`/module/${c.id}` as never)} style={({ pressed }) => ({ flexBasis: '46%', flexGrow: 1, borderRadius: t.radius.tile, backgroundColor: t.tints[tint].fill, padding: 14, gap: 6, opacity: pressed ? 0.85 : 1 })}>
+          <Pressable key={c.id} accessibilityRole="button" accessibilityLabel={`${c.name}: ${c.card.headline}`} onPress={() => router.push(`/module/${c.id}` as never)} style={({ pressed }) => ({ flexBasis: '46%', flexGrow: 1, borderRadius: t.radius.tile, backgroundColor: t.c.bg.tile, padding: 16, gap: 6, opacity: pressed ? 0.85 : 1 })}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Icon name={c.icon} size={14} color={t.tints[tint].ink} />
-              <Text variant="labelCaps" color={t.tints[tint].ink} numberOfLines={1} style={{ letterSpacing: 0, flex: 1 }}>{c.name}</Text>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.tints[tint].ink }} />
+              <Text variant="labelCaps" color="secondary" numberOfLines={1} style={{ flex: 1, textTransform: 'uppercase' }}>{c.name}</Text>
             </View>
-            <Text variant="rowTitle" numberOfLines={1} color={c.card.alert ? t.c.alert.coralText : 'primary'}>{c.card.headline}</Text>
+            <Text variant="stat" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} color={c.card.alert ? t.c.alert.coralText : 'primary'} style={{ fontSize: 22, lineHeight: 26, letterSpacing: -0.5 }}>{c.card.headline}</Text>
             {c.card.sub ? <Text variant="caption" color="secondary" numberOfLines={2}>{c.card.sub}</Text> : null}
             {c.card.series?.some((v) => v != null && v > 0) ? <MiniBars values={c.card.series} height={28} color={t.tints[tint].ink} accessibilityLabel={`${c.name} trend`} /> : null}
           </Pressable>
