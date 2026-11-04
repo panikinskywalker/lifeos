@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.30 · 5 Nov 2026
+
+**The app now looks like its design files.** Money, Habits, Health, Deliveries,
+Documents, Travel, Journal, Projects, Assets, Home, Automations, the brain's
+screens, Today and Browse are rebuilt from their v3 Noir artboards: the plain
+rows of the first passes are gone. A module now opens on its own board instead
+of a generic page. Browse says Money and Journal. Demo data is remade each new
+day, so "today" always has something in it.
+
 ## v0.0.29 · 4 Nov 2026
 
 **The Morning brief says what each line is about.** Every line now has its

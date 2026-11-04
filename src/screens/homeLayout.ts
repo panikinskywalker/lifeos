@@ -8,7 +8,7 @@ import type { TileDef } from '@core/registry/types';
  */
 
 /** The default order; a tile a board adds later goes at the end. Ids are the tiles' `type`. */
-export const TILE_ORDER = ['myday', 'turf', 'progress', 'activity', 'habits', 'steps', 'sleep', 'spend', 'done', 'areas', 'upcoming', 'screen', 'people', 'home', 'overdue', 'onthisday'];
+export const TILE_ORDER = ['myday', 'turf', 'progress', 'activity', 'spend', 'sleep', 'done', 'upcoming', 'people', 'onthisday', 'journal.onthisday', 'habits', 'steps', 'home', 'travel', 'deliveries', 'projects', 'assets', 'documents', 'journal', 'automations', 'automation.run', 'areas', 'screen', 'overdue'];
 
 export interface TileSetting {
   id: string;
