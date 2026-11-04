@@ -10,22 +10,23 @@ import { goingOffCandidates, runningOutCandidates, stockState, type StockData } 
 import { StockPill } from './parts';
 
 /**
- * Home on Today (HOME-BRIEF screen 7; a first pass until NR-Home-Today): the
- * small 2 × 2 and the wide 4 × 2. What to use soon (the wide one shows the
- * three most urgent as pills), and the count running low. Opens Home.
+ * Home on Today (NR-Home-Today; empty from NR-Home-States): the small 2 × 2 and
+ * the wide 4 × 2. How many to use soon (the wide one shows the three most
+ * urgent as pills), and the count running low. Opens Home. With nothing to use
+ * soon but things past their life, it says those instead of "All fresh".
  */
 export function HomeTodayTile({ wide }: { wide?: boolean } = {}) {
   const t = useTheme();
   const router = useRouter();
   const d = useLive((os) => {
     if (!os.registry.objects.has('stock')) return null;
-    const soon = goingOffCandidates(os);
+    const off = goingOffCandidates(os).map((n) => ({ n, s: os.records.get<StockData>(n.stockId)! }));
+    const soon = off.filter(({ s }) => stockState(s.data).state === 'use soon');
     const low = runningOutCandidates(os);
-    const top = soon.slice(0, wide ? 3 : 1).map((n) => ({ n, s: os.records.get<StockData>(n.stockId)! }));
-    return { soon: soon.length, low: low.length, top, count: os.records.query<StockData>('stock', {}, { limit: 5000 }).filter((s) => s.data.quantity > 0).length };
-  }, [wide]);
+    return { soon: soon.length, gone: off.length - soon.length, low: low.length, top: soon.slice(0, 3), count: os.records.query<StockData>('stock', {}, { limit: 5000 }).filter((s) => s.data.quantity > 0).length };
+  }, []);
   if (!d) return null;
-  const headline = d.soon ? `${d.soon} to use soon` : d.count ? 'All fresh' : 'Nothing yet';
+  const headline = d.soon ? `${d.soon} to use soon` : d.gone ? `${d.gone} probably gone` : d.count ? 'All fresh' : 'Nothing yet';
   const lowLine = d.low ? `${d.low} running low` : d.count ? 'Nothing running low' : 'Share a Blinkit invoice';
   return (
     <Pressable
@@ -38,7 +39,7 @@ export function HomeTodayTile({ wide }: { wide?: boolean } = {}) {
         <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '600', letterSpacing: 0.9, color: t.c.fg.secondary }}>HOME</Text>
         <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: gradients.upkeep[0] }} />
       </View>
-      <Text numberOfLines={wide ? 1 : 2} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 30, lineHeight: 32, fontWeight: '700', letterSpacing: -0.5, color: t.c.fg.primary }}>{headline}</Text>
+      <Text numberOfLines={wide ? 1 : 3} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 30, lineHeight: 32, fontWeight: '700', letterSpacing: -0.5, color: t.c.fg.primary }}>{headline}</Text>
       {wide && d.top.length ? (
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', maxHeight: 32, overflow: 'hidden' }}>
           {d.top.map(({ n, s }) => (

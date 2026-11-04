@@ -6,14 +6,13 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
-import { ActionSheet, Button, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
+import { ActionSheet, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
 import { CLOTHES_STATES, clothesByState, clothesStateLabel, clothesStateOf, nextClothesState, setClothesState, type AssetData, type ClothesState } from '@modules/assets';
-import { HomeEmpty, PillCloud, SectionHead } from './parts';
+import { HomeEmpty, Note, PillButton, PillCloud, SectionHead } from './parts';
 
 /**
- * The Clothes space (R7a; HOME-BRIEF screen 2's second example, a first pass
- * until NR-Home-Space and NR-Assets-Clothes): clothing Assets kept here, as
- * pills in clean · in the wash · packed. Tap cycles clean → in the wash →
+ * The Clothes space (R7a; NR-Home-Clothes): clothing Assets kept here, as
+ * pills in clean · in the wash · packed, under the line that says why. Tap cycles clean → in the wash →
  * clean (a packed one comes back clean); hold for every state or the page.
  * Clothes are Assets (the assets module), reached through the Link *kept in*.
  */
@@ -65,6 +64,10 @@ export function ClothesSpace({ ctx, space, onBack }: { ctx: LifeOSContext; space
     <Screen title={space.title} subtitle={subtitle} onBack={onBack} right={right} contentStyle={{ gap: 18 }}>
       {all ? (
         <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 20, backgroundColor: t.c.bg.tile }}>
+            <Icon name="shirt" size={16} color={t.c.fg.secondary} />
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, color: t.c.fg.secondary }}>Clothes are Assets: they don’t run out, so they’re clean, in the wash or packed.</Text>
+          </View>
           {CLOTHES_STATES.map(({ value, label }) =>
             by[value].length ? (
               <View key={value} style={{ gap: 10 }}>
@@ -77,11 +80,11 @@ export function ClothesSpace({ ctx, space, onBack }: { ctx: LifeOSContext; space
               </View>
             ) : null,
           )}
-          <Text style={{ fontSize: 12, lineHeight: 16, color: t.c.fg.tertiary }}>Tap: clean or in the wash · hold for packed, or to open it.</Text>
+          <Note>Tap: clean or in the wash · hold for packed, or to open it.</Note>
         </>
       ) : (
         <HomeEmpty icon="shirt" title={`Nothing in ${space.title.toLowerCase()} yet`} line="Clothes are Assets: add a shirt, your jeans, the turf kit. They don't run out, so they're clean, in the wash or packed.">
-          <Button title="Add clothes" size="sm" onPress={add} />
+          <PillButton title="Add clothes" height={44} onPress={add} />
         </HomeEmpty>
       )}
       <ActionSheet
