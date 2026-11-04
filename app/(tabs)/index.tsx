@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import type { TileDef } from '@core/registry/types';
 import { useLive, useOS } from '@ui/hooks';
-import { BentoGrid, Icon, IconButton, Screen, Text } from '@ui/kit';
+import { useTheme } from '@ui/theme/ThemeProvider';
+import { BentoGrid, Icon, Screen, Text } from '@ui/kit';
 import { ToCheckBell } from '../../src/screens/ToCheckBell';
 import { homeLayout, tileConfig } from '../../src/screens/homeLayout';
 import { MorningBrief } from '../../src/screens/MorningBrief';
@@ -16,13 +17,15 @@ function greeting(d = new Date()) {
 }
 
 /**
- * Today (docs/MODEL.md layer 5, *What Today is made of*): the Morning brief,
- * then the tiles boards register, in your order (You › Home screen). Today
- * lays them out and reads nothing else: each tile reads its own data.
+ * Today (docs/MODEL.md layer 5, *What Today is made of*; NR-Today): the header,
+ * the Morning brief, then the tiles boards register, in your order
+ * (You › Home screen). Today lays them out and reads nothing else: each tile
+ * reads its own data.
  */
 export default function TodayTab() {
   const router = useRouter();
   const os = useOS();
+  const t = useTheme();
   // Your layout; re-read whenever settings change.
   const layout = useLive((o) => homeLayout(o), []);
   // Cold start: the first screenful now, the rest once it's on screen.
@@ -42,18 +45,21 @@ export default function TodayTab() {
   }
 
   return (
-    <Screen
-      tab
-      compact
-      title={greeting()}
-      subtitle={format(new Date(), 'EEEE d MMM')}
-      right={
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <ToCheckBell />
-          <IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} />
+    <Screen tab>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="You" onPress={() => router.navigate('/you')} style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+          <Icon name="user" size={20} color={t.c.accent.mustardInk} />
+        </Pressable>
+        <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+          <Text variant="caption" color="secondary" numberOfLines={1}>
+            {format(new Date(), 'EEEE, d MMMM')}
+          </Text>
+          <Text variant="title" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header">
+            {greeting()}
+          </Text>
         </View>
-      }
-    >
+        <ToCheckBell />
+      </View>
       <DemoNote />
       <MorningBrief />
       {(rest ? rows : rows.slice(0, 3)).map((r) =>
@@ -67,7 +73,7 @@ export default function TodayTab() {
           <TodayTile key={r[0]!.type} def={r[0]!} alone />
         ),
       )}
-      <Pressable accessibilityRole="button" onPress={() => router.push('/settings/home' as never)} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10 }}>
+      <Pressable accessibilityRole="button" onPress={() => router.push('/settings/home' as never)} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 10 }}>
         <Icon name="edit" size={14} />
         <Text variant="caption" color="secondary">Choose what’s on Today</Text>
       </Pressable>
