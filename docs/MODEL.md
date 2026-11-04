@@ -1825,8 +1825,9 @@ A trip filed from booking mail already knows the days, the place and why.
 Today keeps its tiles and gains a **Morning brief** section on top: the
 morning pass's nudges in a few lines (what's going off, what's due, what's
 coming up, the one dish to cook), each line opening its record or its To
-check card. The evening pass updates it. The tiles stay below, as R8 has
-them.
+check card. Every line says its category above it, in that category's colour,
+and an urgent one says when on the right (Late, Today, Tomorrow). The evening
+pass updates it. The tiles stay below, as R8 has them.
 
 ### Words (to add to layer 1)
 - **Stock** (agreed 24 Oct) — the Object for something kept at home that

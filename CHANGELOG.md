@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.29 · 4 Nov 2026
+
+**The Morning brief says what each line is about.** Every line now has its
+category above it (Home, Upkeep, Deliveries, People, Tasks), in that category's
+colour, and an urgent one says when on the right: Late, Today or Tomorrow.
+Before, urgent lines all turned the same red dot and hid where they came from.
+
 ## v0.0.28 · 4 Nov 2026
 
 **Demo data, as a switch** (You › Demo data). On: LifeOS restarts with fresh

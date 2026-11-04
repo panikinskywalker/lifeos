@@ -13,6 +13,8 @@ export interface BriefLine {
   text: string;
   module: string;
   urgent: boolean;
+  /** When an urgent line wants you ("Late", "Today"); null when it is not urgent. */
+  when: string | null;
   /** Where the line goes: the record, a screen, or To check. */
   route: string;
   /** You already answered its card (shown quieter). */
@@ -25,6 +27,14 @@ export interface Brief {
   pass: { at: number; pass: PassName } | null;
 }
 
+/** The word beside an urgent line, read from its words (code's or Claude's). */
+export function urgentWhen(line: string): string {
+  if (/\b(late|overdue)\b/i.test(line)) return 'Late';
+  if (/\btomorrow\b/i.test(line)) return 'Tomorrow';
+  if (/\b(today|tonight|out for delivery)\b/i.test(line)) return 'Today';
+  return 'Soon';
+}
+
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function brief(os: LifeOSContext, now = Date.now(), max = 6): Brief {
@@ -32,7 +42,8 @@ export function brief(os: LifeOSContext, now = Date.now(), max = 6): Brief {
   for (const n of os.brain.nudges.since(startOfDay(now))) {
     if (n.state === 'no' || n.state === 'undone') continue;
     const rec = n.recordId ? os.records.get(n.recordId) : undefined;
-    lines.push({ id: n.id, text: n.line, module: n.module, urgent: n.urgent, route: n.route ?? (rec ? `/entity/${rec.object}/${rec.id}` : '/check'), answered: n.state !== 'open' });
+    // A routine is Upkeep's, whichever module keeps it.
+    lines.push({ id: n.id, text: n.line, module: rec?.object === 'routine' ? 'upkeep' : n.module, urgent: n.urgent, when: n.urgent ? urgentWhen(n.line) : null, route: n.route ?? (rec ? `/entity/${rec.object}/${rec.id}` : '/check'), answered: n.state !== 'open' });
   }
   lines.sort((a, b) => Number(b.urgent) - Number(a.urgent) || Number(a.answered) - Number(b.answered));
   const out = lines.slice(0, max);
@@ -47,7 +58,7 @@ export function brief(os: LifeOSContext, now = Date.now(), max = 6): Brief {
       if (!a.brief) continue;
       const v = os.brain.learned.get<string | string[]>(a.key);
       if (!v) continue;
-      out.push({ id: a.key, text: `${cap(a.slot)}: ${Array.isArray(v) ? v.join(', ') : v}`, module: b.module, urgent: false, route: a.route ?? '/check', answered: false });
+      out.push({ id: a.key, text: `${cap(a.slot)}: ${Array.isArray(v) ? v.join(', ') : v}`, module: b.module, urgent: false, when: null, route: a.route ?? '/check', answered: false });
     }
   }
   return { lines: out, pass: lastPassToday(os, now) };
