@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, Platform, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, Card, Chip, EmptyState, FormField, FilterChip, NumberField, RowItem, RowList, Section, Segmented, Sheet, Text, useToast } from '@ui/kit';
+import { Button, Card, EmptyState, FormField, FilterChip, Icon, RowItem, RowList, Section, Sheet, Text, useToast } from '@ui/kit';
 import { EntityPicker } from '@ui/components/fields';
+import { Disc, Hairline, IconDisc, SectionHead, Seg, SmallPill, StatusPill } from './parts';
 import { applySplit, balanceWith, balances, clearSplit, settleUp, splitAmounts, undoSettle, type DebtData, type Party, type SplitMethod, type SplitRecord } from '@modules/finance/split';
 
 const METHODS: Array<{ value: SplitMethod; label: string }> = [
@@ -25,40 +26,73 @@ function confirm(title: string, body: string, ok: string, fn: () => void) {
 
 const nameOf = (os: LifeOSContext, party: Party) => (party === 'me' ? 'You' : (os.records.get(party)?.title ?? 'Someone'));
 
-/** Transaction › Split: who paid, who's in, how it's divided — and what that leaves owed. */
-export function SplitSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) {
+/** A person in a split: 60-high row, their disc, what they owe. */
+function ShareRow({ party, name, line, amount, tone, onPress }: { party: Party; name: string; line: string | null; amount: string; tone?: string; onPress?: () => void }) {
+  const t = useTheme();
+  const inner = (
+    <>
+      {party === 'me' ? <IconDisc icon="user" color={t.c.fg.primary} /> : <Disc name={name} colorKey={party} />}
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text variant="rowTitle" numberOfLines={1}>{name}</Text>
+        {line ? <Text variant="caption" color="secondary" numberOfLines={1}>{line}</Text> : null}
+      </View>
+      <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', fontVariant: ['tabular-nums'], color: tone }}>{amount}</Text>
+    </>
+  );
+  const row = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 14, minHeight: 60 };
+  return onPress ? <Pressable accessibilityRole="button" accessibilityLabel={`${name}, ${amount}`} onPress={onPress} style={row}>{inner}</Pressable> : <View style={row}>{inner}</View>;
+}
+
+const METHOD_WORD: Record<SplitMethod, string> = { equal: 'Equally', exact: 'By amount', percent: 'By percent', shares: 'By shares' };
+
+/** Transaction › Split (NR-Money-Transaction): who paid, who's in, how it's divided, what that leaves owed. */
+export function SplitBlock({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const t = useTheme();
   const toast = useToast();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const split = (entity.data as { split?: SplitRecord }).split;
   if ((entity.data as { kind?: string }).kind !== 'expense') return null;
   return (
-    <Section title="Split" action={split ? 'Change' : undefined} onAction={() => setOpen(true)}>
+    <View style={{ gap: 10 }}>
+      <SectionHead title="Split" sub={split ? `${METHOD_WORD[split.method]} · ${split.payer === 'me' ? 'you paid' : `${nameOf(ctx, split.payer)} paid`}` : undefined} action={split ? 'Change' : undefined} lime onAction={() => setOpen(true)} />
       {split ? (
-        <RowList>
-          {split.shares.map((s) => (
-            <RowItem key={s.party} icon={s.party === 'me' ? 'user' : 'people'} tint="people" title={nameOf(ctx, s.party)} subtitle={s.party === split.payer ? 'Paid' : split.payer === 'me' ? 'Owes you' : s.party === 'me' ? `You owe ${nameOf(ctx, split.payer)}` : null} value={ctx.format.currency(s.amount)} strong />
+        <View style={{ paddingTop: 6, paddingBottom: 14, paddingHorizontal: 14, borderRadius: 24, backgroundColor: t.c.bg.tile }}>
+          {split.shares.map((s, i) => (
+            <React.Fragment key={s.party}>
+              {i ? <Hairline /> : null}
+              <ShareRow
+                party={s.party}
+                name={nameOf(ctx, s.party)}
+                line={s.party === split.payer ? 'Paid' : split.payer === 'me' ? 'Owes you' : s.party === 'me' ? `You owe ${nameOf(ctx, split.payer)}` : null}
+                amount={ctx.format.currency(s.amount)}
+                tone={s.party !== split.payer && split.payer === 'me' ? t.c.accent.gold : undefined}
+                onPress={s.party === 'me' ? undefined : () => router.push(`/entity/person/${s.party}` as never)}
+              />
+            </React.Fragment>
           ))}
-          <Button
-            title="Remove split"
-            icon="trash"
-            size="sm"
-            variant="secondary"
-            onPress={() => {
-              const prev = split;
-              clearSplit(ctx, entity.id);
-              toast.show({ message: 'Split removed', icon: 'trash', undo: () => void applySplit(ctx, entity.id, prev) });
-            }}
-          />
-        </RowList>
+          <View style={{ marginTop: 8 }}>
+            <SmallPill
+              title="Remove split"
+              icon="trash"
+              onPress={() => {
+                const prev = split;
+                clearSplit(ctx, entity.id);
+                toast.show({ message: 'Split removed', icon: 'trash', undo: () => void applySplit(ctx, entity.id, prev) });
+              }}
+            />
+          </View>
+        </View>
       ) : (
         <Button title="Split this expense" icon="people" variant="secondary" block onPress={() => setOpen(true)} />
       )}
       <SplitSheet visible={open} onClose={() => setOpen(false)} tx={entity} />
-    </Section>
+    </View>
   );
 }
 
-function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () => void; tx: ObjectRecord<any> }) {
+/** Split a payment (NR-Money-Split). */
+function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () => void; tx: ObjectRecord<any> }) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const os = useOS();
   const t = useTheme();
   const toast = useToast();
@@ -94,10 +128,11 @@ function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () =>
     if (on) setPeople(os.groups.members(on).map((m) => m.memberId));
     if (on && method === 'shares') setValues(Object.fromEntries(os.groups.members(on).map((m) => [m.memberId, m.defaultShare])));
   };
+  const mine = preview.shares.find((s) => s.party === 'me')?.amount ?? 0;
+  const owedLine = payer === 'me' ? `${os.format.currency(total - mine)} to you` : `you owe ${os.format.currency(mine)}`;
   const save = () => {
     applySplit(os, tx.id, { payer, method, parts, groupId });
     onClose();
-    const mine = preview.shares.find((s) => s.party === 'me')?.amount ?? 0;
     toast.show({
       message: payer === 'me' ? `Split · ${os.format.currency(total - mine)} owed to you` : `Split · you owe ${nameOf(os, payer)} ${os.format.currency(mine)}`,
       icon: 'people',
@@ -118,9 +153,16 @@ function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () =>
       <FormField label="With">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {people.map((p) => (
-            <Chip key={p} label={nameOf(os, p)} icon="x" onPress={() => setPeople(people.filter((x) => x !== p))} />
+            <Pressable key={p} accessibilityRole="button" accessibilityLabel={`Remove ${nameOf(os, p)}`} hitSlop={4} onPress={() => setPeople(people.filter((x) => x !== p))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingLeft: 4, paddingRight: 12, borderRadius: 999, backgroundColor: t.c.bg.tileRaised }}>
+              <Disc name={nameOf(os, p)} colorKey={p} size={32} />
+              <Text variant="label" numberOfLines={1}>{nameOf(os, p)}</Text>
+              <Icon name="x" size={14} color={t.c.fg.secondary} />
+            </Pressable>
           ))}
-          <Chip label="Add person" icon="plus" tone="accent" onPress={() => setPicking(true)} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Add person" hitSlop={4} onPress={() => setPicking(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 16, borderRadius: 999, backgroundColor: t.c.accent.mustardSoft }}>
+            <Icon name="plus" size={14} color={t.c.accent.gold} />
+            <Text variant="label" color={t.c.accent.gold}>Add person</Text>
+          </Pressable>
         </View>
       </FormField>
       <FormField label="Paid by">
@@ -131,30 +173,40 @@ function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () =>
         </View>
       </FormField>
       <FormField label="Divide">
-        <Segmented value={method} onChange={setMethod} options={METHODS} />
+        <Seg value={method} onChange={setMethod} options={METHODS} />
       </FormField>
-      <RowList>
-        {parties.map((p) => {
+      <View style={{ paddingVertical: 4, paddingHorizontal: 14, borderRadius: 20, backgroundColor: t.c.bg.tileRaised }}>
+        {parties.map((p, i) => {
           const share = preview.shares.find((s) => s.party === p)?.amount;
-          return method === 'equal' ? (
-            <RowItem key={p} icon={p === 'me' ? 'user' : 'people'} tint="people" title={nameOf(os, p)} value={share != null ? os.format.currency(share) : '—'} />
-          ) : (
-            <View key={p} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <NumberField label={nameOf(os, p)} value={values[p]} onChange={(v) => setValues({ ...values, [p]: v })} unit={method === 'percent' ? '%' : method === 'shares' ? '×' : '₹'} placeholder={method === 'shares' ? '1' : '0'} />
+          return (
+            <React.Fragment key={p}>
+              {i ? <Hairline /> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 }}>
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '600' }}>{nameOf(os, p)}</Text>
+                {method === 'equal' ? (
+                  payer === p ? <Text variant="caption" color="secondary">paid</Text> : null
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 10, borderRadius: 12, backgroundColor: t.c.bg.tile }}>
+                    <TextInput accessibilityLabel={`${nameOf(os, p)}, ${method}`} keyboardType="decimal-pad" value={values[p] != null ? String(values[p]) : ''} onChangeText={(s) => setValues({ ...values, [p]: s.trim() === '' ? undefined : Number(s.replace(/[^0-9.]/g, '')) })} placeholder={method === 'shares' ? '1' : '0'} placeholderTextColor={t.c.fg.tertiary} selectionColor={t.c.accent.mustard} style={{ width: 52, color: t.c.fg.primary, fontSize: 14, textAlign: 'right', fontVariant: ['tabular-nums'], paddingVertical: 0 }} />
+                    <Text variant="caption" color="secondary">{method === 'percent' ? '%' : method === 'shares' ? '×' : '₹'}</Text>
+                  </View>
+                )}
+                <Text style={{ minWidth: 64, textAlign: 'right', fontSize: 16, lineHeight: 21, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{share != null ? os.format.currency(share) : '-'}</Text>
               </View>
-              <Text variant="rowTitle" style={{ width: 96, textAlign: 'right', paddingBottom: 14 }}>
-                {share != null ? os.format.currency(share) : '—'}
-              </Text>
-            </View>
+            </React.Fragment>
           );
         })}
-      </RowList>
+      </View>
       {preview.error && people.length ? (
         <Text variant="caption" color={t.c.alert.coralText}>
           {preview.error}
         </Text>
-      ) : null}
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
+          <Text variant="caption" color="secondary" style={{ flex: 1 }}>Each one is a Debt on their page, settled from there.</Text>
+          {people.length ? <StatusPill lime={payer === 'me'} coral={payer !== 'me'} label={owedLine} /> : null}
+        </View>
+      )}
       <EntityPicker visible={picking} onClose={() => setPicking(false)} types={['person']} selected={people} exclude={people} title="Split with" onSelect={(id) => setPeople([...new Set([...people, id])])} />
     </Sheet>
   );
@@ -236,7 +288,7 @@ export function GroupBalanceSection({ entity, ctx }: { entity: ObjectRecord<any>
         </RowList>
       )}
       <Text variant="caption" color="secondary" style={{ paddingHorizontal: 4 }}>
-        Only what’s between you and each member — like a personal ledger.
+        Only what’s between you and each member, like a personal ledger.
       </Text>
     </Section>
   );

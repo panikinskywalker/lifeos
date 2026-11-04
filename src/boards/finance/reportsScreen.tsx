@@ -9,10 +9,11 @@ import { Card, Chip, ColumnChart, EmptyState, IconButton, LineChart, ProgressBar
 import { categoryOf } from '@modules/finance/types';
 import { monthReport, netWorthSeries, subscriptionRunRate } from '@modules/finance/reports';
 import { netWorth } from '@modules/finance/lib';
+import { NoSubscriptions } from './screens';
 
 type Tab = 'month' | 'subs' | 'worth';
 
-/** "₹1.2L", "₹48k", "₹900" — axis labels. */
+/** "₹1.2L", "₹48k", "₹900": axis labels. */
 const short = (n: number) => {
   const a = Math.abs(n);
   const s = n < 0 ? '−' : '';
@@ -22,12 +23,12 @@ const short = (n: number) => {
   return `${s}₹${Math.round(a)}`;
 };
 
-/** Finance › Reports (M2): Month view, Subscriptions run-rate, Net worth over time — Stitch charts. */
+/** Money › Reports (M2): Month view, Subscriptions run-rate, Net worth over time. */
 export function ReportsScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<string, string> }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>((params.tab as Tab) || 'month');
   return (
-    <Screen title="Reports" subtitle="Finance" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}>
+    <Screen title="Reports" subtitle="Money" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}>
       <Segmented value={tab} onChange={setTab} options={[{ value: 'month', label: 'Month' }, { value: 'subs', label: 'Subscriptions' }, { value: 'worth', label: 'Net worth' }]} />
       {tab === 'month' ? <MonthView ctx={ctx} /> : tab === 'subs' ? <SubsView ctx={ctx} /> : <WorthView ctx={ctx} />}
     </Screen>
@@ -82,7 +83,7 @@ function SubsView({ ctx }: { ctx: LifeOSContext }) {
   const t = useTheme();
   const router = useRouter();
   const r = useLive((o) => subscriptionRunRate(o), []);
-  if (!r.rows.length) return <EmptyState icon="repeat" tint="finance" line="No active subscriptions." action="Add a subscription" onAction={() => router.push('/entity/subscription/new')} bare />;
+  if (!r.rows.length) return <NoSubscriptions />;
   const top = r.rows[0]!.perMonth;
   return (
     <>
