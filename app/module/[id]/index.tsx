@@ -27,8 +27,8 @@ export default function ModuleRoute() {
       </Screen>
     );
   }
-  // Health is its metrics (R6): the board's home, one card per metric, not a list of record types.
-  const home = m.id === "health" ? screens.find((s) => s.key === "index") : undefined;
+  // A module with a board home opens on it (the NR-* artboards), not on a list of record types.
+  const home = screens.find((s) => s.key === "index");
   if (home) return <home.component ctx={os} params={{}} />;
   const tint = tintForModule(m.id);
   const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
