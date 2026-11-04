@@ -1,27 +1,32 @@
 import type { BoardManifest } from '@core/registry/types';
 import { notesOverview } from './overview';
-import { FactsScreen, SecondBrain } from './home';
-import { NoteBody, NoteForm } from './note';
+import { JournalHome } from './home';
+import { EntriesScreen } from './entries';
+import { FactsScreen } from './facts';
+import { NotePage } from './note';
+import { NoteForm } from './form';
+import { journalTiles } from './tile';
 
 /**
- * The Second Brain (the knowledge module's board; docs/MODEL.md layer 2 *The
- * Second Brain*, R7f): a board in Browse › Boards. Notes and Facts with one
- * search (Memory opens its Facts half), the Note page with its [[mentions]]
- * as links, and the Note form with Mention. A first pass from the kit; the
- * NR-Knowledge-* artboards replace it.
+ * Journal, the knowledge module's board (the Second Brain in docs/MODEL.md
+ * layer 2), drawn to the NR-Journal-* artboards (v3 Noir): the home, Entries
+ * by month, Facts, the Note page with its Links, the Note form with [[ to
+ * link, the Today tiles. The Links screen is the shared /links.
  */
 export const knowledgeBoard: BoardManifest = {
   id: 'knowledge',
   module: 'knowledge',
-  name: 'Second Brain',
-  icon: 'brain',
+  name: 'Journal',
+  icon: 'notebook',
   color: 'purple',
   placement: 'browse',
   overview: notesOverview,
+  tiles: journalTiles,
   screens: [
-    { key: 'index', title: 'Second Brain', component: SecondBrain },
+    { key: 'index', title: 'Journal', component: JournalHome },
+    { key: 'entries', title: 'Entries', component: EntriesScreen },
     { key: 'facts', title: 'Facts', component: FactsScreen },
   ],
-  overrides: [{ object: 'note', form: NoteForm, record: [{ entityType: 'note', key: 'knowledge.body', title: 'Note', component: NoteBody, order: 0, placement: 'top', fields: ['body'] }] }],
+  overrides: [{ object: 'note', form: NoteForm, record: [{ entityType: 'note', key: 'knowledge.note', title: 'Note', component: NotePage, order: 0, placement: 'page', ownLinks: true, fields: ['body'] }] }],
   quickActions: [{ id: 'knowledge.addNote', label: 'Note', icon: 'note.text', route: '/entity/note/new', global: true }],
 };
