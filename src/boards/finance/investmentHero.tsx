@@ -24,7 +24,7 @@ export function InvestmentHero({ entity, ctx }: { entity: ObjectRecord<any>; ctx
         stats={[
           { label: 'Invested', value: money(d.invested) },
           { label: 'Now', value: money(value), caption: d.currentValue == null ? 'no value yet' : undefined },
-          { label: 'Gain', value: gain == null ? '—' : `${gain >= 0 ? '+' : '−'}${money(Math.abs(gain))}`, caption: gain != null && d.invested ? `${((gain / d.invested) * 100).toFixed(1)}%` : undefined, tone: gain == null ? undefined : gain >= 0 ? 'ok' : 'alert' },
+          { label: 'Gain', value: gain == null ? '-' : `${gain >= 0 ? '+' : '−'}${money(Math.abs(gain))}`, caption: gain != null && d.invested ? `${((gain / d.invested) * 100).toFixed(1)}%` : undefined, tone: gain == null ? undefined : gain >= 0 ? 'ok' : 'alert' },
         ]}
       />
       {history.length > 1 ? (

@@ -10,7 +10,7 @@ import { categoryOf } from '@modules/finance/types';
 export function financeOverview(os: LifeOSContext, now = Date.now(), opts: { cardOnly?: boolean } = {}): ModuleOverview {
   const money = os.format.currency;
   if (opts.cardOnly) {
-    // Today's card: this month, your usual month, the last 7 days — nothing else.
+    // Today's card: this month, your usual month, the last 7 days, nothing else.
     // One query for four months of daily totals; everything else is arithmetic.
     const months = lastMonths(4, now);
     const byDay = daily(os, 'spend', months[0]!.start, isoOf(now));
