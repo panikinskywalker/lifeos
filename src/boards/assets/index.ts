@@ -1,8 +1,16 @@
 import type { BoardManifest } from '@core/registry/types';
 import { assetsOverview } from './overview';
-import { AssetHero } from './hero';
+import { AssetsHome } from './home';
+import { AssetsList } from './list';
+import { AssetPage } from './page';
+import { AssetForm } from './form';
+import { assetsTiles } from './tile';
+import { QUICK_ADD } from './parts';
 
-/** Companion board of the assets module: its Overview, quick actions and the Asset page's sections (R7a). */
+/**
+ * Companion board of the assets module (NR-Assets-*): its home and All Assets,
+ * the Asset and Vehicle page, the form, the Today tile, the Overview.
+ */
 export const assetsBoard: BoardManifest = {
   id: 'assets',
   module: 'assets',
@@ -11,10 +19,11 @@ export const assetsBoard: BoardManifest = {
   color: 'brown',
   placement: 'module',
   overview: assetsOverview,
-  quickActions: [
-    { id: 'assets.add', label: 'Asset', icon: 'cube.box', route: '/entity/asset/new' },
-    { id: 'assets.addVehicle', label: 'Vehicle', icon: 'car', route: '/entity/asset/new?category=vehicle' },
-    { id: 'assets.addClothes', label: 'Clothes', icon: 'shirt', route: '/entity/asset/new?category=clothing' },
+  tiles: assetsTiles,
+  screens: [
+    { key: 'index', title: 'Assets', component: AssetsHome },
+    { key: 'list', title: 'All Assets', component: AssetsList },
   ],
-  overrides: [{ object: 'asset', record: [{ entityType: 'asset', key: 'assets.asset', title: 'Asset', component: AssetHero, order: 10, placement: 'top' }] }],
+  quickActions: QUICK_ADD,
+  overrides: [{ object: 'asset', form: AssetForm, record: [{ entityType: 'asset', key: 'assets.asset', title: 'Asset', component: AssetPage, order: 0, placement: 'page' }] }],
 };
