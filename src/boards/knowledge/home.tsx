@@ -1,146 +1,217 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { ObjectRecord } from '@core/domain/types';
+import { format } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { ChipRow, EmptyState, FilterChip, IconButton, RowItem, RowList, Screen, Section, Segmented, Text, TextField } from '@ui/kit';
-import { factGroups, noteSnippet, notes, NOTE_KINDS, searchBrain, type NoteData } from '@modules/knowledge';
-import { AddFactSheet, FactRow, FactsList, useFactMenu } from './facts';
+import { blocks } from '@ui/theme/tokens';
+import { Icon, Screen, Text } from '@ui/kit';
+import { notes, NOTE_KINDS, noteTitle, searchBrain } from '@modules/knowledge';
+import { ToCheckBell } from '../../screens/ToCheckBell';
+import { FactLine, useFactMenu } from './facts';
+import { DotChip, FaceStack, Hairline, JOURNAL_COLOR, kindLook, KindPill, Label, LockLine, MetricsCard, MonthBars, NoteRow, PillButton, RoundButton, RowCard, SearchBox, SectionHead, SideScroll, TopBar } from './parts';
+import { factGuesses, firstName, kindLabel, linkedTo, monthCounts, newestFirst, noteAt, onThisDayNote, quoteOf, type Note } from './read';
 
 /**
- * The Second Brain (the knowledge board's home; R7f, a first pass from the kit
- * until the NR-Knowledge-* artboards, laid out as
- * docs/design/KNOWLEDGE-BRIEF.md screen 1): one search over Notes and Facts,
- * then Notes (pinned first, by kind) or Facts (by what they are about, and
- * what you call things). Memory opens the Facts half.
+ * Journal's home (NR-Journal-Home; NR-Journal-Empty with no notes): one search
+ * over notes and facts, the kinds, notes written by month, On this day, the
+ * latest, facts. Pinned notes (MODEL.md, not on the artboard) get a block of
+ * their own above Latest when there are any.
  */
 
-export const KIND_ICON: Record<string, string> = { idea: 'bulb', journal: 'pen-line', meeting: 'people', reference: 'library', recipe: 'food', book: 'book' };
+const entries = (filter: string) => ({ pathname: '/board/[id]/[page]', params: { id: 'knowledge', page: 'entries', filter } }) as never;
 
-type Tab = 'notes' | 'facts';
+const QUOTE = { fontSize: 20, lineHeight: 26, fontWeight: '600', letterSpacing: -0.4 } as const;
 
-export function NoteRow({ note }: { note: ObjectRecord<NoteData>; ctx?: LifeOSContext }) {
+function OnThisDay({ note, ago }: { note: Note; ago: string }) {
+  const t = useTheme();
   const router = useRouter();
+  const ink = t.c.fg.onAccent;
+  const links = useLive((os) => linkedTo(os, note.id), [note.id]);
+  const line = [links.people.map((p) => firstName(p.name)).join(', '), ...links.places].filter(Boolean).join(' · ');
+  const at = noteAt(note);
+  const named = note.title !== noteTitle(note.data.body);
   return (
-    <RowItem
-      icon={KIND_ICON[note.data.kind ?? ''] ?? 'notebook'}
-      tint="memory"
-      title={note.title}
-      subtitle={noteSnippet(note.data.body) || null}
-      value={note.starred ? 'pinned' : null}
-      valueTone="secondary"
-      onPress={() => router.push(`/entity/note/${note.id}` as never)}
-    />
+    <View style={{ gap: 10 }}>
+      <SectionHead title="On this day" sub={`${format(at, 'd MMM yyyy')} · ${ago}`} />
+      <Pressable accessibilityRole="button" accessibilityLabel={`On this day, ${ago}: ${note.title}`} onPress={() => router.push(`/entity/note/${note.id}` as never)} style={({ pressed }) => ({ padding: 18, gap: 12, borderRadius: 28, backgroundColor: blocks.lilac, opacity: pressed ? 0.9 : 1 })}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Label color={ink} style={{ flex: 1 }}>{`${kindLabel(note.data.kind)} · ${named ? note.title : format(at, 'yyyy')}`}</Label>
+          <Icon name="chevron-right" size={18} color={ink} />
+        </View>
+        <Text numberOfLines={4} style={[QUOTE, { color: `${ink}99` }]}>
+          <Text style={[QUOTE, { color: ink }]}>“</Text>
+          {quoteOf(note.data.body).split(/\[\[|\]\]/).map((p, i) => (i % 2 ? <Text key={i} style={[QUOTE, { color: ink }]}>{p}</Text> : p))}
+          <Text style={[QUOTE, { color: ink }]}>”</Text>
+        </Text>
+        {line ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {links.people.length ? <FaceStack people={links.people} size={26} ground={blocks.lilac} /> : null}
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '600', color: `${ink}B8` }}>{line}</Text>
+          </View>
+        ) : null}
+      </Pressable>
+    </View>
   );
 }
 
-export function SecondBrain({ ctx, params }: { ctx: LifeOSContext; params: Record<string, string> }) {
+/** NR-Journal-Empty's card and kinds; real users start here. */
+function EmptyHome({ onWrite, onDump }: { onWrite: () => void; onDump: () => void }) {
+  const t = useTheme();
+  return (
+    <>
+      <View style={{ paddingVertical: 34, paddingHorizontal: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="notebook" size={26} color={JOURNAL_COLOR} />
+        </View>
+        <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '600', letterSpacing: -0.2, color: t.c.fg.primary, textAlign: 'center' }}>No notes yet.</Text>
+        <Text style={{ maxWidth: 270, fontSize: 13, lineHeight: 18, color: t.c.fg.secondary, textAlign: 'center' }}>Write one here, or tell the Dump about your day and it files the entry, with its people and places linked.</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+          <PillButton primary title="Write a note" onPress={onWrite} />
+          <PillButton title="Dump" icon="mic" onPress={onDump} />
+        </View>
+      </View>
+      <View style={{ gap: 10 }}>
+        <Label style={{ paddingHorizontal: 4 }}>Kinds you can keep</Label>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {['journal', 'idea', 'meeting', 'reference', 'recipe', 'book'].map((k) => (
+            <DotChip key={k} label={kindLabel(k)} color={kindLook(k).color} />
+          ))}
+        </View>
+      </View>
+    </>
+  );
+}
+
+export function JournalHome({ ctx, params }: { ctx: LifeOSContext; params: Record<string, string> }) {
   const router = useRouter();
   const t = useTheme();
-  const [tab, setTab] = useState<Tab>(params.tab === 'facts' ? 'facts' : 'notes');
   const [q, setQ] = useState(params.q ?? '');
   const [kind, setKind] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const counts = useLive((os) => ({ notes: os.records.query('note', {}, { limit: 100000 }).filter((n) => !n.archived).length, facts: os.facts.list({ limit: 100000 }).length }), []);
-  const list = useLive((os) => notes(os, { kind: kind ?? undefined }), [kind]);
-  const kinds = useLive((os) => [...new Set(notes(os).map((n) => n.data.kind).filter((k): k is string => !!k))], []);
+  const now = Date.now();
+  const all = useLive((os) => notes(os, { limit: 5000 }), []);
+  const facts = useLive((os) => ({ total: os.facts.list({ limit: 100000 }).length, latest: os.facts.list({ limit: 4 }), guesses: factGuesses(os) }), []);
   const found = useLive((os) => searchBrain(os, q), [q]);
   const menu = useFactMenu(ctx);
   const query = q.trim();
+  const months = monthCounts(all, now);
+  const month = months.at(-1)?.value ?? 0;
+  const day = onThisDayNote(all, now);
+  const pinned = newestFirst(all.filter((n) => n.starred));
+  const latest = newestFirst(all.filter((n) => !n.starred && (!kind || n.data.kind === kind))).slice(0, 5);
+  const write = () => router.push('/entity/note/new' as never);
+  const newNote = <RoundButton icon="plus" label="New note" lime onPress={write} />;
 
-  const add = () => (tab === 'facts' ? setAdding(true) : router.push('/entity/note/new' as never));
-  const header = {
-    title: 'Second Brain',
-    subtitle: `${counts.notes} ${counts.notes === 1 ? 'note' : 'notes'} · ${counts.facts} ${counts.facts === 1 ? 'fact' : 'facts'}`,
-    onBack: () => (router.canGoBack() ? router.back() : router.replace('/browse' as never)),
-    right: <IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.fg.onAccent} accessibilityLabel={tab === 'facts' ? 'Remember something' : 'New note'} onPress={add} />,
-  };
+  const factsBlock = facts.total ? (
+    <View style={{ gap: 10 }}>
+      <SectionHead title="Facts" sub="One line each, by who they are about" action={`All ${facts.total}`} onAction={() => router.push('/board/knowledge/facts' as never)} />
+      <RowCard>
+        {facts.latest.map((f) => (
+          <FactLine key={f.id} fact={f} ctx={ctx} guesses={facts.guesses} menu={menu} />
+        ))}
+      </RowCard>
+    </View>
+  ) : null;
 
-  const pinned = list.filter((n) => n.starred);
-  const rest = list.filter((n) => !n.starred);
+  if (!all.length) {
+    return (
+      <Screen contentStyle={{ gap: 24 }}>
+        <TopBar dot caption="0 notes" title="Journal" right={newNote} />
+        <MetricsCard notes={0} month={0} quiet />
+        <EmptyHome onWrite={write} onDump={() => router.push('/dump' as never)} />
+        {factsBlock}
+        <LockLine>What you write stays on this phone.</LockLine>
+        {menu.sheets}
+      </Screen>
+    );
+  }
+
   return (
-    <Screen {...header} contentStyle={{ gap: 18 }}>
-      <TextField value={q} onChange={setQ} leading="search" placeholder="Search notes and facts" autoCorrect={false} returnKeyType="search" />
+    <Screen contentStyle={{ gap: 24 }}>
+      <TopBar
+        dot
+        caption={`${all.length} ${all.length === 1 ? 'note' : 'notes'} · ${month} this month`}
+        title="Journal"
+        right={
+          <>
+            <ToCheckBell />
+            {newNote}
+          </>
+        }
+      />
+      <SearchBox value={q} onChange={setQ} placeholder="Words, people or places" />
       {query ? (
         found.notes.length || found.facts.length ? (
           <>
             {found.notes.length ? (
-              <Section title="Notes" meta={String(found.notes.length)}>
-                <RowList>
+              <View style={{ gap: 10 }}>
+                <SectionHead title="Notes" sub={`${found.notes.length} found`} />
+                <RowCard>
                   {found.notes.map((n) => (
-                    <NoteRow key={n.id} note={n} ctx={ctx} />
+                    <NoteRow key={n.id} note={n} now={now} />
                   ))}
-                </RowList>
-              </Section>
+                </RowCard>
+              </View>
             ) : null}
             {found.facts.length ? (
-              <Section title="Facts" meta={String(found.facts.length)}>
-                <View style={{ gap: 8 }}>
-                  {factGroups(ctx, found.facts).flatMap((g) => g.facts.map((f) => <FactRow key={f.id} fact={f} ctx={ctx} about={g.key === 'you' ? null : g.title} onMenu={menu.open} />))}
-                </View>
-              </Section>
+              <View style={{ gap: 10 }}>
+                <SectionHead title="Facts" sub={`${found.facts.length} found`} />
+                <RowCard>
+                  {found.facts.map((f) => (
+                    <FactLine key={f.id} fact={f} ctx={ctx} guesses={facts.guesses} menu={menu} />
+                  ))}
+                </RowCard>
+              </View>
             ) : null}
           </>
         ) : (
-          <EmptyState icon="search" tint="memory" line={`Nothing about “${query}” in your notes or facts.`} bare />
+          <Text style={{ fontSize: 13, lineHeight: 17, color: t.c.fg.secondary, paddingHorizontal: 4 }}>{`Nothing about “${query}” in your notes or facts.`}</Text>
         )
       ) : (
         <>
-          <Segmented<Tab>
-            options={[
-              { value: 'notes', label: `Notes · ${counts.notes}` },
-              { value: 'facts', label: `Facts · ${counts.facts}` },
-            ]}
-            value={tab}
-            onChange={setTab}
-          />
-          {tab === 'facts' ? (
-            <FactsList ctx={ctx} onAdd={() => setAdding(true)} />
-          ) : counts.notes === 0 ? (
-            <EmptyState icon="notebook" tint="memory" title="No notes yet" line="Ideas, a journal, meeting notes, recipes. Put [[Name]] around a person, place or thing and the note shows up on their page." action="Write one" onAction={add} />
-          ) : (
-            <>
-              {kinds.length > 1 ? (
-                <ChipRow>
-                  <FilterChip label="All" selected={!kind} onPress={() => setKind(null)} />
-                  {NOTE_KINDS.filter((k) => kinds.includes(k.value)).map((k) => (
-                    <FilterChip key={k.value} label={k.label} icon={KIND_ICON[k.value]} selected={kind === k.value} onPress={() => setKind(kind === k.value ? null : k.value)} />
-                  ))}
-                </ChipRow>
-              ) : null}
-              {pinned.length ? (
-                <Section title="Pinned" meta={String(pinned.length)}>
-                  <RowList>
-                    {pinned.map((n) => (
-                      <NoteRow key={n.id} note={n} ctx={ctx} />
-                    ))}
-                  </RowList>
-                </Section>
-              ) : null}
-              <Section title={kind ? (NOTE_KINDS.find((k) => k.value === kind)?.label ?? 'Notes') : 'Latest'} meta={String(rest.length)}>
-                {rest.length ? (
-                  <RowList>
-                    {rest.map((n) => (
-                      <NoteRow key={n.id} note={n} ctx={ctx} />
-                    ))}
-                  </RowList>
-                ) : (
-                  <Text color="tertiary">Everything here is pinned.</Text>
-                )}
-              </Section>
-            </>
-          )}
+          <SideScroll>
+            <KindPill label="All" selected={!kind} onPress={() => setKind(null)} />
+            {NOTE_KINDS.map((k) => (
+              <KindPill key={k.value} label={k.value === 'idea' ? 'Ideas' : k.label} color={kindLook(k.value).color} selected={kind === k.value} onPress={() => (k.value === 'journal' ? router.push(entries('journal')) : setKind(kind === k.value ? null : k.value))} />
+            ))}
+          </SideScroll>
+          <MetricsCard notes={all.length} month={month}>
+            <Hairline />
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+              <Text style={{ fontSize: 15, lineHeight: 19, fontWeight: '600', color: t.c.fg.primary }}>Written by month</Text>
+              <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '500', color: t.c.fg.secondary }}>last 6 months</Text>
+            </View>
+            <MonthBars data={months} />
+          </MetricsCard>
+          {day ? <OnThisDay note={day.note} ago={day.ago} /> : null}
+          {pinned.length ? (
+            <View style={{ gap: 10 }}>
+              <SectionHead title="Pinned" sub={`${pinned.length} kept on top`} />
+              <RowCard>
+                {pinned.map((n) => (
+                  <NoteRow key={n.id} note={n} now={now} />
+                ))}
+              </RowCard>
+            </View>
+          ) : null}
+          <View style={{ gap: 10 }}>
+            <SectionHead title="Latest" sub={kind ? `${kindLabel(kind)}, newest first` : 'Every kind, newest first'} action="All notes" onAction={() => router.push(entries('all'))} />
+            {latest.length ? (
+              <RowCard>
+                {latest.map((n) => (
+                  <NoteRow key={n.id} note={n} now={now} />
+                ))}
+              </RowCard>
+            ) : (
+              <Text style={{ fontSize: 13, lineHeight: 17, color: t.c.fg.secondary, paddingHorizontal: 4 }}>{kind ? `No ${kindLabel(kind).toLowerCase()} notes yet.` : 'Everything here is pinned.'}</Text>
+            )}
+          </View>
+          {factsBlock}
         </>
       )}
-      <AddFactSheet visible={adding} onClose={() => setAdding(false)} />
+      <LockLine>Notes and facts live on this phone. Search runs here too.</LockLine>
       {menu.sheets}
     </Screen>
   );
-}
-
-/** /board/knowledge/facts (and /memory): the Second Brain open on its Facts half. */
-export function FactsScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<string, string> }) {
-  return <SecondBrain ctx={ctx} params={{ ...params, tab: 'facts' }} />;
 }
