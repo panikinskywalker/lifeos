@@ -22,6 +22,7 @@ export function habitsOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
     const done = new Set([...byDay.entries()].filter(([, set]) => set.has(id)).map(([d]) => d));
     return streakOf(h, done, now).count;
   };
+  const unit = (id: string) => (byId.get(id)?.frequency === 'weekly' ? 'wk' : 'd');
   const streaks = habits.map((h) => ({ h, s: streak(h.id) })).sort((a, b) => b.s - a.s);
   const heat = Array.from({ length: 84 }, (_, i) => {
     const day = isoOf(now - (83 - i) * DAY_MS);
@@ -30,7 +31,7 @@ export function habitsOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
   const monday = now - ((new Date(now).getDay() + 6) % 7) * DAY_MS;
   const weekDays = Array.from({ length: 7 }, (_, i) => isoOf(monday + i * DAY_MS)).filter((d) => d <= today);
   const blocks: OverviewBlock[] = [
-    { kind: 'stats', items: [{ label: 'Done today', value: `${doneToday}/${habits.length}`, tone: habits.length && doneToday === habits.length ? 'ok' : undefined }, { label: 'Best streak', value: streaks[0] ? `${streaks[0].s} d` : '—', sub: streaks[0]?.h.title ?? null }] },
+    { kind: 'stats', items: [{ label: 'Done today', value: `${doneToday}/${habits.length}`, tone: habits.length && doneToday === habits.length ? 'ok' : undefined }, { label: 'Best streak', value: streaks[0] ? `${streaks[0].s} ${unit(streaks[0].h.id)}` : '0 d', sub: streaks[0]?.h.title ?? null }] },
     { kind: 'heat', title: 'Last 12 weeks', days: heat },
   ];
   if (habits.length)
@@ -40,8 +41,8 @@ export function habitsOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
       items: habits.map((h) => {
         const n = weekDays.filter((d) => byDay.get(d)?.has(h.id)).length;
         const target = h.data.targetPerWeek ?? (h.data.frequency === 'weekdays' ? 5 : h.data.frequency === 'weekly' ? 1 : 7);
-        return { label: h.title, ratio: n / target, sub: `${n} of ${target} · streak ${streak(h.id)} d`, entityId: h.id, type: 'habit' };
+        return { label: h.title, ratio: n / target, sub: `${n} of ${target} · streak ${streak(h.id)} ${unit(h.id)}`, entityId: h.id, type: 'habit' };
       }),
     });
-  return { card: { headline: habits.length ? `${doneToday}/${habits.length} today` : 'No habits yet', sub: streaks[0]?.s ? `best streak ${streaks[0].s} d · ${streaks[0].h.title}` : null, series: heat.slice(-7).map((d) => d.value), seriesFormat: 'percent' }, blocks };
+  return { card: { headline: habits.length ? `${doneToday}/${habits.length} today` : 'No habits yet', sub: streaks[0]?.s ? `best streak ${streaks[0].s} ${unit(streaks[0].h.id)} · ${streaks[0].h.title}` : null, series: heat.slice(-7).map((d) => d.value), seriesFormat: 'percent' }, blocks };
 }
