@@ -17,27 +17,39 @@ afterEach(() => os.db.close());
 const found = (q: string) => os.records.search.search(q, { types: ['dump'] }).map((h) => h.id);
 
 describe('retention (MODEL layer 6, R15)', () => {
-  it('dumps: filed ones leave the Dump list and search after 15 days; the row and its provenance stay; unfiled ones stay', () => {
+  it('dumps: filed ones go after 15 days unless a Fact or a Note came from them; unfiled ones stay', () => {
     const now = Date.now();
     const old = os.dumps.add({ body: 'paid the plumber 800', createdAt: now - 16 * DAY });
     const skipped = os.dumps.add({ body: 'plumber thoughts, nothing to file', createdAt: now - 20 * DAY });
     const waiting = os.dumps.add({ body: 'plumber again, waiting on a model', createdAt: now - 30 * DAY });
     const fresh = os.dumps.add({ body: 'plumber comes Tuesday', createdAt: now - 14 * DAY });
-    os.filings.add({ dumpId: old.id, kind: 'task', entityId: 'e1', label: 'Pay the plumber' });
-    os.dumps.setStatus(old.id, 'done');
+    const fact = os.dumps.add({ body: 'the plumber is called Ramesh', createdAt: now - 40 * DAY });
+    const note = os.dumps.add({ body: 'plumber tips for the monsoon', createdAt: now - 40 * DAY });
+    const undoneFact = os.dumps.add({ body: 'plumber lives in Thane', createdAt: now - 40 * DAY });
+    const task = os.filings.add({ dumpId: old.id, kind: 'task', entityId: 'e1', label: 'Pay the plumber' });
+    const f = os.facts.add({ text: 'The plumber is Ramesh', source: 'dump', sourceRef: fact.id });
+    os.filings.add({ dumpId: fact.id, kind: 'fact', factId: f.id, label: 'The plumber is Ramesh' });
+    os.filings.add({ dumpId: note.id, kind: 'note', entityId: 'n1', label: 'Monsoon tips' });
+    os.filings.markUndone(os.filings.add({ dumpId: undoneFact.id, kind: 'fact', factId: 'f-gone', label: 'Thane' }).id);
+    for (const d of [old, fresh, fact, note, undoneFact]) os.dumps.setStatus(d.id, 'done');
     os.dumps.setStatus(skipped.id, 'skipped');
-    os.dumps.setStatus(fresh.id, 'done');
 
-    expect(os.dumps.clearOld(15, now)).toBe(2);
-    expect(found('plumber').sort()).toEqual([waiting.id, fresh.id].sort());
+    expect(os.dumps.deleteOld(15, now)).toBe(3);
+    expect([old, skipped, undoneFact].map((d) => os.dumps.get(d.id))).toEqual([null, null, null]);
+    expect([waiting, fresh, fact, note].every((d) => os.dumps.get(d.id))).toBe(true);
+    expect(found('plumber').sort()).toEqual([waiting.id, fresh.id, fact.id, note.id].sort());
+    // What it filed stays, without the link to the dump.
+    expect(os.filings.get(task.id)).toMatchObject({ dumpId: null, label: 'Pay the plumber', entityId: 'e1' });
+    // The Dump list: the last 15 days and anything not filed yet.
     expect(os.dumps.recent({ days: 15, now }).map((d) => d.id)).toEqual([fresh.id, waiting.id]);
-    // Kept as provenance: the row, and "Dumps that mention it" on the record.
-    expect(os.dumps.get(old.id)?.body).toBe('paid the plumber 800');
-    expect(os.dumps.forEntity('e1').map((d) => d.id)).toEqual([old.id]);
-    // Running again clears nothing new; an index rebuild doesn't bring them back.
-    expect(os.dumps.clearOld(15, now)).toBe(0);
-    os.dumps.reindex(now);
-    expect(found('plumber').sort()).toEqual([waiting.id, fresh.id].sort());
+    expect(os.dumps.deleteOld(15, now)).toBe(0);
+  });
+
+  it('the database still refuses deleting a dump not filed yet or younger than 15 days', () => {
+    const young = os.dumps.add({ body: 'filed today' });
+    os.dumps.setStatus(young.id, 'done');
+    const unfiled = os.dumps.add({ body: 'not filed', createdAt: Date.now() - 30 * DAY });
+    for (const d of [young, unfiled]) expect(() => os.db.run(`DELETE FROM dumps WHERE id=?`, [d.id])).toThrow(/kept until it is filed/);
   });
 
   it('runs the three jobs once a day, counts each and keeps the last 30 runs', () => {
@@ -48,10 +60,10 @@ describe('retention (MODEL layer 6, R15)', () => {
     os.db.run(`UPDATE filings SET created_at=? WHERE id=?`, [now - 20 * DAY, f.id]);
 
     const first = pruneIfDue(os, now);
-    expect(first).toMatchObject({ at: now, toCheckApproved: 1, dumpsCleared: 1, ignoredMessages: 0, rawTexts: 0 });
+    expect(first).toMatchObject({ at: now, toCheckApproved: 1, dumpsDeleted: 1, ignoredMessages: 0, rawTexts: 0 });
     expect(os.filings.get(f.id)).toMatchObject({ checked: true, undone: false });
     expect(pruneIfDue(os, now + DAY - 1)).toBeNull();
-    expect(pruneIfDue(os, now + DAY)).toMatchObject({ toCheckApproved: 0, dumpsCleared: 0 });
+    expect(pruneIfDue(os, now + DAY)).toMatchObject({ toCheckApproved: 0, dumpsDeleted: 0 });
     expect(retentionLog(os).map((r) => r.at)).toEqual([now + DAY, now]);
 
     for (let i = 0; i < 40; i++) runRetention(os, now + (i + 2) * DAY);

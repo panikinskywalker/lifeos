@@ -1215,7 +1215,7 @@ screens checked on the phone → overrides only where the default is wrong)
 - [x] **R15 Build and ship** — standalone dev / preview build with OTA updates
   (ADHOC), app lock, database encryption; retention jobs (dumps 15 days, raw
   texts 60 days, To check auto-approve 15 days). Built 2 Nov 2026 (branch
-  `claude/r15-ship`; no migration; `docs/handover/r15-ship.md`). Encryption
+  `claude/r15-ship`; migration v17; `docs/handover/r15-ship.md`). Encryption
   needs the new APK. *Phone check pending.*
   - [x] **Standalone build and OTA** (v0.0.15 to v0.0.17): EAS preview APK,
     updates on the `preview` channel, the fingerprint leaves out app.json's
@@ -1246,13 +1246,14 @@ screens checked on the phone → overrides only where the default is wrong)
     filing run: app open, return to the app, the background task), each part
     counted in a log (the last 30 runs, `retention.log` in settings; the last
     run shown in You › Lock & backup). *To check*: what you haven't ticked or
-    undone in 15 days is ticked as filed; nothing is removed. *Dumps*: a dump
-    filed (or with nothing to file) more than 15 days ago leaves the Dump list
-    and search, so the model is not shown it either; its row stays, as the
-    provenance behind "Dumps that mention it" and the record timelines, which
-    keep the sentence. Waiting or failed dumps stay until filed. (Deleting the
-    rows needs a migration, since the database refuses it by design; not
-    done.) *Raw texts* (60 days, from M4.2c): ignored messages deleted, the
+    undone in 15 days is ticked as filed; nothing is removed. *Dumps* (revised 4 Nov, your call): a
+    dump filed (or with nothing to file) more than 15 days ago is deleted,
+    unless it holds Second Brain: a Fact or a Note filed from it and not
+    undone. What it filed stays (records, links, its sentence on their
+    timelines; its filings keep their label). The Dump list shows the last 15
+    days plus anything not filed yet; waiting or failed dumps are never
+    deleted. Migration v17 swaps the "kept forever" guard for "kept until
+    filed and 15 days old", so a bug still can't lose them early. *Raw texts* (60 days, from M4.2c): ignored messages deleted, the
     wording of filed messages and of the transaction's Original text cleared,
     the per-app screen time and ended synced calendar events removed.
 - [ ] **R16 Docs** — `ARCHITECTURE.md`, `GRAPH.md` and SCOPE §C retired into

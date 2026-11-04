@@ -860,4 +860,18 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_brain_sent_at ON brain_sent(at)`,
     ],
   },
+  {
+    version: 17,
+    name: 'dumps-retention',
+    // docs/MODEL.md layer 6 (R15): a dump is deleted 15 days after filing
+    // unless it holds Second Brain (a Fact or a Note). The guard that refused
+    // every delete now refuses only deleting a dump not filed yet or younger
+    // than 15 days, so a bug still can't lose your words early.
+    up: [
+      `DROP TRIGGER IF EXISTS dumps_never_deleted`,
+      `CREATE TRIGGER IF NOT EXISTS dumps_kept_until_filed BEFORE DELETE ON dumps
+        WHEN OLD.status NOT IN ('done', 'skipped') OR OLD.created_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000 - 15 * 86400000
+        BEGIN SELECT RAISE(ABORT, 'a dump is kept until it is filed and 15 days old'); END`,
+    ],
+  },
 ];

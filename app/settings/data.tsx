@@ -179,7 +179,7 @@ export default function DataSettingsRoute() {
         {dbState.setAside ? <Text variant="caption" color="alert">An encrypted database whose key was missing was kept aside as {dbState.setAside}; restore a backup file to bring your data back.</Text> : null}
         {lastClean ? (
           <Text variant="caption" color="secondary">
-            Clean-up, {os.format.date(lastClean.at, 'relative')}: {lastClean.toCheckApproved} To check ticked, {lastClean.dumpsCleared} dumps cleared, {lastClean.rawTexts} texts’ wording and {lastClean.ignoredMessages} ignored messages removed.
+            Clean-up, {os.format.date(lastClean.at, 'relative')}: {lastClean.toCheckApproved} To check ticked, {lastClean.dumpsDeleted} old dumps deleted, {lastClean.rawTexts} texts’ wording and {lastClean.ignoredMessages} ignored messages removed.
           </Text>
         ) : null}
       </Section>

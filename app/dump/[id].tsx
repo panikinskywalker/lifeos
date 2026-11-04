@@ -16,11 +16,11 @@ export default function DumpScreen() {
         <View style={{ gap: 12 }}>
           <DumpCard dump={dump} os={os} full />
           <Text variant="caption" color="secondary" style={{ paddingHorizontal: 4 }}>
-            Dumps are kept exactly as written and can’t be edited or deleted. Undo removes what was filed from them, not the dump.
+            Dumps are kept exactly as written and can’t be edited. 15 days after filing a dump is deleted, unless a fact or a note came from it; what it filed stays. Undo removes what was filed from it, not the dump.
           </Text>
         </View>
       ) : (
-        <EmptyState icon="brain" line="This dump isn’t here." />
+        <EmptyState icon="brain" line="This dump isn’t here: dumps go 15 days after filing; what they filed stays." />
       )}
     </Screen>
   );

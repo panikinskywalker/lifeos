@@ -1,8 +1,8 @@
 # Handover: R15 Build and ship (branch `claude/r15-ship`)
 
 Built 2 Nov 2026 from `m1-design-system` at 0c3a9b3 (v0.0.17). MODEL.md layer 6,
-R15. No version bump, no CHANGELOG edit, no PR, **no migration**.
-`npm run typecheck`, `npm test` (61 files, 501 tests) and
+R15. No version bump, no CHANGELOG edit, no PR. **One migration, v17** (dumps;
+see Retention). `npm run typecheck`, `npm test` (61 files, 502 tests) and
 `npx expo export --platform web` pass. Nothing has been run on the phone.
 
 ## What was built
@@ -55,19 +55,31 @@ version). Marked done in MODEL.md; removed from `docs/ADHOC.md`.
   half-made copy started again, key missing (set aside, plain opened or a new
   database), wrong key, encrypted file on a no-cipher build, try on a copy.
 
-**Retention** (`src/core/sources/retention.ts`, `DumpRepo.recent / clearOld`):
+**Retention** (`src/core/sources/retention.ts`, `DumpRepo.recent / deleteOld`):
 - `runRetention` runs the three jobs, counts each, and logs the run in
   settings `retention.log` (last 30, newest first); `pruneIfDue` runs it once
   a day from the filing run (app open, return to the app, the background
   task). The To check auto-approve moved from every filing run into it.
 - *To check*: unticked, not undone, older than 15 days → ticked.
-- *Dumps*: filed or skipped, older than 15 days → out of `records_fts` (so
-  out of search, the model's context and Browse); the Dump list (OneBox) now
-  shows the last 15 days plus any dump not yet filed (`dumps.recent`), and a
-  search-index rebuild leaves cleared ones out. Rows stay (see decision 2).
+- *Dumps* (revised 4 Nov, your call): filed or skipped, older than 15 days
+  → **deleted**, unless it holds Second Brain: a Fact or a Note filed from it
+  and not undone (a filing with a fact, kind `fact` or `note`, or an active
+  Fact whose source is the dump). What it filed stays; its filings keep their
+  label with `dump_id` set to null (the foreign key needs it); its search
+  entry goes; a `delete` goes in the change log. Pending or failed dumps are
+  never deleted. The Dump list (OneBox) shows the last 15 days plus any dump
+  not yet filed (`dumps.recent`). The dump page says why a dump is gone.
+- **Migration v17** `dumps-retention`: drops the `dumps_never_deleted` trigger
+  (v6) and adds `dumps_kept_until_filed`, which refuses deleting a dump not
+  filed yet or younger than 15 days, so a bug still can't lose words early.
+  Its hash is added to the migrations test. If another branch also adds a
+  v17, renumber one at the merge (and its hash).
 - *Raw texts 60 days*: the existing M4.2c clean-up, unchanged.
 - The last run shows in You › Lock & backup.
-- Tests: `src/core/retention.test.ts` (3).
+- Tests: `src/core/retention.test.ts` (4). **One existing test line changed**:
+  `src/core/dumps.test.ts` expected a delete to fail with "forever"; a fresh
+  dump is still refused, with the new message, so only the regex changed
+  (the requirement changed, not to get green).
 
 **App lock**, checked end to end (`LockGate`, `platform/lock.ts`,
 `settings/data.tsx`). Fixed:
@@ -90,11 +102,12 @@ brings USE_BIOMETRIC).
 1. **Encrypting your existing database is a button, not automatic.** A new
    install is encrypted from the start; your phone's database moves only when
    you tap *Encrypt the database*, after *Try on a copy* if you like.
-2. **Dumps are cleared from the Dump list and search, not deleted.** The
-   database refuses deleting a dump by design (trigger `dumps_never_deleted`,
-   migration v6), and deleting would also empty On this day's dumps on Time
-   and the "Dumps that mention it" card. Deleting the rows (or blanking their
-   text) needs a migration that replaces that trigger; say if you want it.
+2. **Old dumps are deleted** (your call, 4 Nov) unless a Fact or a Note came
+   from them. Side effects: On this day on Time no longer shows dumps older
+   than 15 days, "Dumps that mention it" on a record lists only kept ones,
+   and a record's timeline keeps the first 160 characters of the sentence.
+   The first daily run on the new build deletes all the old ones at once:
+   the backup in phone check 1 holds them.
 3. **The key is not behind the fingerprint**, so filing and syncs in the
    background can open the database. The lock guards the screen; the key
    guards the file.
@@ -103,8 +116,8 @@ brings USE_BIOMETRIC).
    encrypted file without its key: LifeOS sets it aside and starts empty, and
    your LifeOS backup file is how to bring data across. Before this, Google
    backup may have carried the plain database silently.
-5. **Cleared dumps stay out of search after a restore** (`reindex` skips
-   them), to keep "cleared" true.
+5. Restoring an old backup brings its old dumps back; the next daily run
+   deletes them again under the same rule.
 6. The retention log lives in settings (no table, no migration).
 
 ## What needs the new APK
@@ -141,13 +154,17 @@ reach it anyway.
    happens); cancel the prompt (stays covered, Unlock asks again); the PIN
    works from the prompt. Set *After 1 min*: back within a minute stays open.
 8. Clean-up: the next day (or after any open 24 h after the last), You › Lock
-   & backup shows *Clean-up, …* with its counts; dumps older than 15 days are
-   gone from the Dump tab and search but still on their records' pages.
+   & backup shows *Clean-up, …* with its counts (the first run: every old
+   dump without a fact or note). Dumps older than 15 days are gone; ones that
+   gave a Fact or a Note are still found by search; what any of them filed is
+   still on the records.
 
 ## Shared core edits (for the merge)
 
-- `src/core/repo/dumpRepo.ts`: `DUMP_DAYS`, `recent()`, `clearOld()`;
-  `reindex(now)` skips cleared dumps.
+- `src/core/repo/dumpRepo.ts`: `DUMP_DAYS`, `recent()`, `deleteOld()`.
+- `src/core/db/migrations.ts`: **v17** `dumps-retention` (+ its hash in
+  `migrations.test.ts`); `src/core/dumps.test.ts` regex (see above).
+- `app/dump/[id].tsx`: the caption and the "isn't here" line.
 - `src/core/sources/retention.ts`: `runRetention`, `retentionLog`,
   `RetentionRun`; `pruneIfDue` now runs all three and returns the run.
 - New `src/core/db/encryption.ts`.
@@ -167,8 +184,9 @@ reach it anyway.
   backup: keep making backup files to move to a new phone. New installs start
   encrypted.
 - **The daily clean-up**: To check items you haven't touched in 15 days are
-  ticked; dumps filed more than 15 days ago leave the Dump tab and search
-  (still on their records); texts' wording goes after 60 days as before. The
+  ticked; dumps filed more than 15 days ago are deleted, unless a fact or a
+  note came from them (what they filed stays); texts' wording goes after 60
+  days as before. The
   last run is shown in You › Lock & backup.
 - **App lock fixes**: removing the phone's screen lock no longer locks you out
   of LifeOS; Back does nothing while locked; the lock can be turned off even

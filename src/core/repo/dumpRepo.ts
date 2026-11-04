@@ -5,7 +5,7 @@ import type { ChangeLog } from '../sync/changeLog';
 
 export type DumpSource = 'typed' | 'voice' | 'share';
 
-/** Dumps are cleared from the Dump list and search after this many days (docs/MODEL.md layer 4). */
+/** The Dump list shows this many days; filed dumps older than this are deleted unless they hold a Fact or a Note (docs/MODEL.md layer 6, R15). */
 export const DUMP_DAYS = 15;
 const FINISHED = `('done','skipped')`;
 export type DumpStatus = 'pending' | 'done' | 'failed' | 'skipped';
@@ -53,7 +53,9 @@ const toDump = (r: Row): Dump => ({
 
 /**
  * Brain dumps (PRODUCT v4 §1.3). The body is stored verbatim and can never be
- * edited or deleted (the database refuses); only the extraction status moves.
+ * edited; only the extraction status moves. The database refuses deleting a
+ * dump until it is filed and 15 days old (v17); retention deletes it then,
+ * unless it holds a Fact or a Note.
  * Dumps sit in the search index as type 'dump' next to records and facts.
  */
 export class DumpRepo {
@@ -151,19 +153,30 @@ export class DumpRepo {
 
   /**
    * Retention (docs/MODEL.md layer 6, R15): a dump filed (or with nothing to
-   * file) more than `days` days ago leaves search, and with it the Dump list
-   * and what the model is shown. The row stays as provenance; the database
-   * refuses deleting it. Returns how many left search now.
+   * file) more than `days` days ago is deleted, unless it holds Second Brain:
+   * a Fact or a Note filed from it and not undone. What it filed stays; its
+   * filings keep their label and lose the link to it. Returns how many went.
    */
-  clearOld(days = DUMP_DAYS, now = Date.now()): number {
-    const old = `SELECT id FROM dumps WHERE status IN ${FINISHED} AND created_at < ?`;
-    const cutoff = now - days * 86_400_000;
-    const n = this.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records_fts WHERE object='dump' AND id IN (${old})`, [cutoff])?.n ?? 0;
-    if (n) {
-      this.db.run(`DELETE FROM records_fts WHERE object='dump' AND id IN (${old})`, [cutoff]);
-      bus.emit('data.changed', { table: 'dumps', id: 'retention' });
-    }
-    return n;
+  deleteOld(days = DUMP_DAYS, now = Date.now()): number {
+    const ids = this.db
+      .all<{ id: string }>(
+        `SELECT d.id FROM dumps d WHERE d.status IN ${FINISHED} AND d.created_at < ?
+           AND NOT EXISTS (SELECT 1 FROM filings f WHERE f.dump_id = d.id AND f.undone = 0 AND (f.fact_id IS NOT NULL OR f.kind IN ('fact', 'note')))
+           AND NOT EXISTS (SELECT 1 FROM facts x WHERE x.source = 'dump' AND x.source_ref = d.id AND x.active = 1 AND x.deleted_at IS NULL)`,
+        [now - days * 86_400_000],
+      )
+      .map((r) => r.id);
+    if (!ids.length) return 0;
+    this.db.transaction(() => {
+      for (const id of ids) {
+        this.db.run(`UPDATE filings SET dump_id = NULL WHERE dump_id = ?`, [id]);
+        this.db.run(`DELETE FROM records_fts WHERE id = ?`, [id]);
+        this.db.run(`DELETE FROM dumps WHERE id = ?`, [id]);
+        this.changes.record('dumps', id, 'delete', 1);
+      }
+    });
+    bus.emit('data.changed', { table: 'dumps', id: 'retention' });
+    return ids.length;
   }
 
   /** Dumps that produced or touched a record (for "Dumps that mention it" on its page). */
@@ -174,10 +187,9 @@ export class DumpRepo {
   }
 
 
-  /** Put every dump not cleared by retention back in the search index (after a full rebuild). */
-  reindex(now = Date.now()): void {
-    const rows = this.db.all<{ id: string; body: string }>(`SELECT id, body FROM dumps WHERE created_at >= ? OR status NOT IN ${FINISHED}`, [now - DUMP_DAYS * 86_400_000]);
-    for (const r of rows) this.index(r.id, r.body);
+  /** Put every dump back in the search index (after a full rebuild). */
+  reindex(): void {
+    for (const r of this.db.all<{ id: string; body: string }>(`SELECT id, body FROM dumps`)) this.index(r.id, r.body);
   }
 
   private index(id: string, body: string) {

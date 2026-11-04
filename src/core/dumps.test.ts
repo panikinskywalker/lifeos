@@ -18,7 +18,7 @@ describe('dumps (PRODUCT v4 §1.3)', () => {
     const d = os.dumps.add({ body, source: 'voice' });
     expect(os.dumps.get(d.id)).toMatchObject({ body, source: 'voice', status: 'pending', attempts: 0 });
     expect(() => os.db.run(`UPDATE dumps SET body='edited' WHERE id=?`, [d.id])).toThrow(/immutable/);
-    expect(() => os.db.run(`DELETE FROM dumps WHERE id=?`, [d.id])).toThrow(/forever/);
+    expect(() => os.db.run(`DELETE FROM dumps WHERE id=?`, [d.id])).toThrow(/kept until it is filed and 15 days old/);
     expect(() => os.dumps.add({ body: '   ' })).toThrow();
   });
 

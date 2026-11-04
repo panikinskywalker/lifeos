@@ -4,8 +4,9 @@ import { DUMP_DAYS } from '../repo/dumpRepo';
 
 /**
  * Retention (docs/MODEL.md layer 6, R15): once a day, To check items untouched
- * for 15 days are ticked, dumps filed more than 15 days ago leave the Dump
- * list and search, and the 60-day clean-up below runs; each run is logged.
+ * for 15 days are ticked, dumps filed more than 15 days ago are deleted
+ * unless they hold a Fact or a Note, and the 60-day clean-up below runs;
+ * each run is logged.
  *
  * The 60-day clean-up (M4.2c, Rutvij's choice): keeps the phone light
  * without losing anything that matters.
@@ -68,8 +69,8 @@ export interface RetentionRun extends PruneResult {
   at: number;
   /** To check items untouched for 15 days, ticked as filed. */
   toCheckApproved: number;
-  /** Dumps filed more than 15 days ago, cleared from the Dump list and search. */
-  dumpsCleared: number;
+  /** Dumps filed more than 15 days ago and holding no Fact or Note, deleted. */
+  dumpsDeleted: number;
 }
 
 const LOG_KEY = 'retention.log';
@@ -80,7 +81,7 @@ export function runRetention(os: LifeOSContext, now = Date.now()): RetentionRun 
   const run: RetentionRun = {
     at: now,
     toCheckApproved: os.filings.autoApprove(15, now),
-    dumpsCleared: os.dumps.clearOld(DUMP_DAYS, now),
+    dumpsDeleted: os.dumps.deleteOld(DUMP_DAYS, now),
     ...pruneOldData(os, { now }),
   };
   os.settings.set(LOG_KEY, [run, ...retentionLog(os)].slice(0, LOG_KEEP));
