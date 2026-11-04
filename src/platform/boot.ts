@@ -9,7 +9,9 @@ import { getProviderKey, setProviderKey } from './keys';
 import { notifications } from './notifications';
 import { syncReminderNotifications } from './notifySync';
 export { syncReminderNotifications };
-import { openDatabase } from './openDatabase';
+import { openDatabase, openDemoDatabase } from './openDatabase';
+import { demoIsFresh, isDemo, markDemoOpened } from './demo';
+import { demoFolders, seedDemo } from './seed';
 import { deviceBridge } from './sources';
 import { brainModel, runBrainPass } from './brain';
 import { runFiling } from './filing';
@@ -28,7 +30,8 @@ export function setNavigator(fn: (path: string) => void) {
  */
 export async function bootLifeOS(): Promise<LifeOSContext> {
   if (instance) return instance;
-  const db = await openDatabase();
+  const demo = isDemo();
+  const db = demo ? await openDemoDatabase(demoIsFresh()) : await openDatabase();
 
   const os = await createLifeOS({
     db,
@@ -36,6 +39,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     boards: installedBoards,
     navigate: (p) => navigateRef(p),
     notify: async (n) => {
+      if (demo) return null;
       const Notifications = notifications();
       if (!Notifications) return null;
       try {
@@ -56,9 +60,16 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     },
   });
   // The brain's Claude for boards (Snap the fridge, Another idea): the saved key, passes one at a time.
-  os.device = { ...deviceBridge(os), brain: { model: () => brainModel(os), pass: (why) => runBrainPass(os, 'manual', why) } };
+  const brain = { model: () => brainModel(os), pass: (why?: string) => runBrainPass(os, 'manual', why) };
+  // The demo reads nothing from the phone, and with no secrets Turf web and Notion stay switched off.
+  os.device = demo ? { folders: demoFolders, brain } : { ...deviceBridge(os), brain };
   // The automations' Ask Claude step: the brain's key and model (R10).
   os.automation.modelProvider = () => brainModel(os);
+
+  if (demo) {
+    await seedDemo(os).catch((e) => console.warn('demo seed failed', e));
+    markDemoOpened();
+  }
 
   // Settings: DB → zustand, and zustand → DB on change.
   const stored = os.settings.all();
@@ -76,6 +87,12 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     onboarded: !!stored.onboarded,
   });
   bindSettingsPersistence((k, v) => os.settings.set(k, v));
+
+  // The demo stops here: no notifications, no phone data, no background work.
+  if (demo) {
+    instance = os;
+    return os;
+  }
 
   // Reminders → local notifications. Reschedule all pending on boot (cheap,
   // guarantees the OS notification queue matches the DB after reinstalls).

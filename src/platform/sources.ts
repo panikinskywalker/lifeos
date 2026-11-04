@@ -9,6 +9,7 @@ import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
 import { syncMail } from './email';
 import { foldersBridge } from './folders';
+import { isDemo } from './demo';
 import { calendarBridge, calendarGranted, callLogBridge, callLogGranted, contactsBridge, contactsGranted, requestCalendar, requestCallLog } from './phoneSources';
 
 /**
@@ -189,7 +190,7 @@ function withLimit<T>(name: string, ms: number, work: () => Promise<T>): Promise
  * the next sync.
  */
 export function syncSources(os: LifeOSContext): Promise<void> {
-  if (Platform.OS === 'web') return Promise.resolve();
+  if (Platform.OS === 'web' || isDemo()) return Promise.resolve();
   // A run older than 5 minutes is stuck: start afresh.
   if (running && Date.now() - running.at < 5 * 60_000) return running.p;
   const p = (async () => {

@@ -1,11 +1,13 @@
 import { setCategoryTarget } from '@modules/finance/categories';
 import { applyTurfSync } from '@modules/games';
 import { sampleSync } from '@modules/games/fixtures/sampleSync';
-import type { LifeOSContext } from '@core/registry/context';
+import type { DeviceBridge, FolderFile, LifeOSContext } from '@core/registry/context';
 import { fileMessage } from '@core/filing/messages';
 import { BLINKIT_APP, buy, ensureSpaces, halfLeft, setLife, spaceNamed, useOne } from '@modules/inventory';
 import { saveHealthDays } from '@modules/health';
 import { saveUsageDays } from '@core/sources/deviceData';
+import { runPass } from '@core/brain';
+import { addFolder } from '@modules/documents';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const daysAgo = (n: number) => {
@@ -14,6 +16,24 @@ const daysAgo = (n: number) => {
   return iso(d);
 };
 const daysAhead = (n: number) => daysAgo(-n);
+/** The nth of this month, or today if that hasn't come yet. */
+const thisMonth = (n: number) => daysAgo(Math.max(0, new Date().getDate() - n));
+
+const DEMO_FOLDER = { uri: 'demo://Documents', name: 'Documents' };
+const demoFile = (name: string, kb: number, ago: number, path = ''): FolderFile => ({ uri: `demo://Documents/${encodeURIComponent(name)}`, name, mime: name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg', size: kb * 1024, modified: Date.now() - ago * 86_400_000, path });
+const DEMO_FILES = [demoFile('Form16_FY25-26.pdf', 310, 40, 'Tax'), demoFile('Rental agreement Flat 4B.pdf', 1240, 90), demoFile('Aadhaar front.jpg', 820, 300, 'IDs'), demoFile('Boarding pass BLR-PNQ.pdf', 96, 2, 'Trips'), demoFile('Lab report Oct.pdf', 410, 12), demoFile('IMG_2041.jpg', 2300, 5)];
+
+/** The demo's one "folder on the phone": Your folders works with no real file behind it. */
+export const demoFolders: NonNullable<DeviceBridge['folders']> = { pick: async () => DEMO_FOLDER, list: async () => DEMO_FILES, open: async () => undefined };
+
+/** The demo database's first start (You › Demo): the sample records, its folder, and a morning's nudges in code's own words. */
+export async function seedDemo(os: LifeOSContext) {
+  if (os.settings.get('demoSeeded', false)) return;
+  seedDemoData(os);
+  os.settings.set('onboarded', true);
+  await addFolder(os);
+  await runPass(os, { pass: 'morning', model: null, why: 'demo' });
+}
 
 /** Realistic, interconnected sample data so every widget and link has something to show. */
 export function seedDemoData(os: LifeOSContext) {
@@ -24,12 +44,13 @@ export function seedDemoData(os: LifeOSContext) {
     const cash = os.records.create({ object: 'account', title: 'Cash', data: { kind: 'cash', openingBalance: 4000, includeInNetWorth: true } });
     os.records.create({ object: 'account', title: 'Zerodha', data: { kind: 'investment', openingBalance: 640000, institution: 'Zerodha', includeInNetWorth: true } });
 
-    const priya = os.records.create({ object: 'person', title: 'Priya Sharma', data: { relationship: 'friend', city: 'Bengaluru', contactEvery: 14, lastContactAt: daysAgo(20), birthday: '1994-11-02' } });
+    const priya = os.records.create({ object: 'person', title: 'Priya Sharma', data: { relationship: 'friend', city: 'Bengaluru', contactEvery: 14, lastContactAt: daysAgo(20), birthday: `1994-${daysAhead(3).slice(5)}` } });
     const dad = os.records.create({ object: 'person', title: 'Dad', data: { relationship: 'family', contactEvery: 7, lastContactAt: daysAgo(3) } });
     const arjun = os.records.create({ object: 'person', title: 'Arjun Mehta', data: { relationship: 'colleague', company: 'UnifyApps', role: 'Engineering', contactEvery: 30 } });
     const landlord = os.records.create({ object: 'person', title: 'Mr. Rao (landlord)', data: { relationship: 'vendor', phone: '+91 98450 00000' } });
 
-    const japan = os.records.create({ object: 'trip', data: { destination: 'Japan', startDate: '2026-12-20', endDate: '2027-01-04', budget: 350000, purpose: 'leisure', currency: 'JPY', personIds: [priya.id] }, status: 'planning' });
+    const japan = os.records.create({ object: 'trip', data: { destination: 'Japan', startDate: daysAhead(46), endDate: daysAhead(61), budget: 350000, purpose: 'leisure', currency: 'JPY', personIds: [priya.id] }, status: 'planning' });
+    os.records.create({ object: 'trip', data: { destination: 'Pune', startDate: daysAhead(10), endDate: daysAhead(12), budget: 25000, purpose: 'leisure', personIds: [priya.id] }, status: 'booked' });
     const goa = os.records.create({ object: 'trip', data: { destination: 'Goa', startDate: daysAgo(40), endDate: daysAgo(36), budget: 30000, purpose: 'leisure' }, status: 'done' });
 
     const lifeos = os.records.create({ object: 'project', title: 'Build LifeOS', data: { description: 'A personal operating system replacing a dozen apps.', dueDate: daysAhead(60), area: 'side' }, status: 'active' });
@@ -50,9 +71,9 @@ export function seedDemoData(os: LifeOSContext) {
     for (const [title, status, due, priority, projectId] of tasks) os.records.create({ object: 'task', title, status, data: { priority, dueDate: due, projectId } });
 
     const txns: Array<[number, string, string, string, string, string?, string?]> = [
-      [125000, 'income', 'salary', 'UnifyApps salary', daysAgo(12), hdfc.id],
-      [32000, 'expense', 'housing', 'Rent', daysAgo(11), hdfc.id],
-      [1899, 'expense', 'utilities', 'Airtel fiber', daysAgo(10), card.id],
+      [125000, 'income', 'salary', 'UnifyApps salary', thisMonth(1), hdfc.id],
+      [32000, 'expense', 'housing', 'Rent', thisMonth(2), hdfc.id],
+      [1899, 'expense', 'utilities', 'Airtel fiber', thisMonth(3), card.id],
       [450, 'expense', 'food', 'Blue Tokai', daysAgo(9), card.id],
       [3200, 'expense', 'groceries', 'BigBasket', daysAgo(8), card.id],
       [1200, 'expense', 'transport', 'Petrol', daysAgo(7), card.id],
@@ -64,8 +85,8 @@ export function seedDemoData(os: LifeOSContext) {
       [560, 'expense', 'food', 'Lunch', daysAgo(1), cash.id],
       [24000, 'expense', 'travel', 'Taj Goa', daysAgo(38), card.id],
       [4200, 'expense', 'food', 'Goa dinners', daysAgo(37), cash.id],
-      [118000, 'income', 'salary', 'UnifyApps salary', daysAgo(42), hdfc.id],
-      [32000, 'expense', 'housing', 'Rent', daysAgo(41), hdfc.id],
+      [118000, 'income', 'salary', 'UnifyApps salary', daysAgo(32), hdfc.id],
+      [32000, 'expense', 'housing', 'Rent', daysAgo(31), hdfc.id],
       [9800, 'expense', 'shopping', 'Amazon', daysAgo(30), card.id],
       [2300, 'expense', 'entertainment', 'PVR', daysAgo(25), card.id],
     ];
@@ -91,7 +112,7 @@ export function seedDemoData(os: LifeOSContext) {
 
     for (const [title, freq] of [['Morning run', 'daily'], ['Read 20 pages', 'daily'], ['No sugar', 'weekdays']] as const) {
       const h = os.records.create({ object: 'habit', title, data: { frequency: freq }, status: 'active' });
-      for (let i = 1; i <= 21; i++) if ((i + title.length) % 3 !== 0) os.records.create({ object: 'habit_log', data: { habitId: h.id, date: daysAgo(i) } });
+      for (let i = title === 'No sugar' ? 1 : 0; i <= 60; i++) if ((i + title.length) % 9 !== 0) os.records.create({ object: 'habit_log', data: { habitId: h.id, date: daysAgo(i) } });
     }
     for (let i = 0; i < 6; i++) os.records.create({ object: 'workout', data: { kind: i % 2 ? 'strength' : 'run', durationMin: 30 + i * 5, date: daysAgo(i * 2 + 1), distanceKm: i % 2 ? undefined : 5 + i * 0.5 } });
     for (let i = 0; i < 8; i++) os.records.create({ object: 'measurement', data: { metric: 'weight', value: 76.4 - i * 0.2, unit: 'kg', date: daysAgo(i * 3) } });
@@ -108,6 +129,12 @@ export function seedDemoData(os: LifeOSContext) {
     os.records.create({ object: 'note', title: 'Japan itinerary ideas', data: { body: 'Tokyo 5 nights → Hakone 1 → Kyoto 4 → Osaka 3. Book teamLab early. Try the 7-day JR pass math vs. point-to-point.\n- Ask [[Priya Sharma]] about the ryokan\n- [[Kenji]] knows a sushi place in Osaka', kind: 'idea' }, });
     const meeting = os.records.create({ object: 'note', title: 'Weekly sync with Arjun', data: { body: 'Discussed plugin loading strategy with [[Arjun Mehta]]. Decision: manifests stay plain objects; lazy-load screens.', kind: 'meeting', projectId: lifeos.id, personIds: [arjun.id] } });
     os.links.link(meeting.id, lifeos.id, 'project');
+    for (const [d, title, body] of [
+      [1, 'A long Sunday', 'Slept in, then football with [[Arjun Mehta]]. Called [[Dad]] after, he sounded well. Should do this more often.'],
+      [9, 'Thinking about the move', 'Flat 4B is fine but the commute is not. [[Priya Sharma]] says Indiranagar rents have settled. Look again in January.'],
+      [34, 'Goa, last evening', 'Best sunset of the trip. Remember the shack near the north end, not the one by the hotel.'],
+      [61, 'What I want from this year', 'Run the half. Keep the emergency fund going. Fewer apps, one place for everything.'],
+    ] as const) os.records.create({ object: 'note', title, createdAt: Date.now() - d * 86_400_000, data: { body, kind: 'journal' } });
     // Places (R3): a city in its country, areas in the city, places in the areas; events at them.
     const india = os.records.create({ object: 'place', title: 'India', data: { kind: 'country' } });
     const blr = os.records.create({ object: 'place', title: 'Bengaluru', data: { kind: 'city', parentId: india.id } });
@@ -123,7 +150,7 @@ export function seedDemoData(os: LifeOSContext) {
       os.links.link(e.id, at.id, 'at');
     }
     os.records.create({ object: 'event', title: 'Dentist', data: { startAt: Date.now() + 2 * 86400000, location: 'Indiranagar' } });
-    os.records.create({ object: 'event', title: 'Priya\'s birthday dinner', data: { startAt: Date.now() + 9 * 86400000, personIds: [priya.id] } });
+    os.records.create({ object: 'event', title: 'Priya\'s birthday dinner', data: { startAt: Date.now() + 3 * 86400000, personIds: [priya.id] } });
     seedHome(os);
 
     // Money between people (M2): a household group and an IOU.

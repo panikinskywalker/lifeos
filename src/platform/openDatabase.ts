@@ -14,6 +14,7 @@ import { isDbKey, keyToHex, openDatabaseFiles, trialMove, type CopyReport, type 
  */
 
 const KEY_NAME = 'lifeos.db.key';
+const DEMO_DB = 'lifeos-demo.db';
 const PRAGMAS = ['PRAGMA journal_mode = WAL', 'PRAGMA foreign_keys = ON', 'PRAGMA busy_timeout = 3000'];
 
 const dir = String(defaultDatabaseDirectory).replace(/\/+$/, '');
@@ -89,6 +90,12 @@ let state: DatabaseState = { encrypted: false, cipher: false, keySaved: false };
 
 /** How the database was opened at this start (for You › Lock & backup). */
 export const databaseState = (): DatabaseState => state;
+
+/** The demo's own database (You › Demo): sample data only, so plain; `fresh` starts it over. */
+export async function openDemoDatabase(fresh: boolean): Promise<DatabaseAdapter> {
+  if (fresh) store.remove(DEMO_DB);
+  return store.open(DEMO_DB, null);
+}
 
 export async function openDatabase(): Promise<DatabaseAdapter> {
   const cipher = hasCipher();

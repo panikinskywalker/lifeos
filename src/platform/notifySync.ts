@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '@core/registry/context';
 import { notificationPlan } from '@core/notify/plan';
 import { notifications } from './notifications';
+import { isDemo } from './demo';
 
 /**
  * Put the notification plan on the phone: reminders, upkeep nudges and the
@@ -10,7 +11,7 @@ import { notifications } from './notifications';
  */
 export async function syncReminderNotifications(os: LifeOSContext) {
   const Notifications = notifications();
-  if (!Notifications) return;
+  if (!Notifications || isDemo()) return;
   try {
     const perm = await Notifications.getPermissionsAsync();
     if (!perm.granted) return;

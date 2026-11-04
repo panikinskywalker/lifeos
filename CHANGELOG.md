@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.28 · 4 Nov 2026
+
+**Demo data, as a switch** (You › Demo data). On: LifeOS restarts with fresh
+sample data on every board, in its own database, with the morning brief filled
+and files in Your folders. Off: LifeOS restarts with your own data, ready to
+link your accounts. The two never mix: while the demo is on nothing is read
+from the phone, nothing goes to Turf web or Notion, and no notification is
+scheduled. A line on Today and on Data sources says when you are looking at the
+sample. It replaces *Load demo data*, which added sample records to your own.
+
 ## v0.0.27 · 2 Nov 2026
 
 **The brain, more of it** (MODEL.md layer 8, slices 4 and 6), built in its

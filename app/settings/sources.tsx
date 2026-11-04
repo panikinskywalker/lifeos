@@ -10,6 +10,7 @@ import { Button, Card, Chip, Icon, Screen, Text, useToast } from '@ui/kit';
 import { SOURCES, access, importSmsHistory, requestAccess, syncSources, type Access, type SourceId } from '../../src/platform/sources';
 import { deviceAvailable } from '../../modules/lifeos-device';
 import { mailAccounts, mailAvailable } from '../../src/platform/email';
+import { DemoNote } from '../../src/screens/DemoNote';
 
 /**
  * You › Data sources (M4.2): what feeds LifeOS automatically — bank SMS,
@@ -91,6 +92,7 @@ export default function SourcesScreen() {
       }
     >
       <View style={{ gap: 14 }}>
+        <DemoNote line="Demo data is on, so nothing here reads your phone. Tap to switch it off, then link your accounts." />
         {!deviceAvailable ? (
           <Card icon="info" tint="documents" title="Needs the LifeOS build">
             <Text variant="body" color="secondary">

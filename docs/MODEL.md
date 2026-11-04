@@ -1070,6 +1070,7 @@ quiet hours · Backup and restore · App lock · Appearance · Locale and curren
 Component gallery (dev).
 
 ### Also in the app (kept — 4 Oct)
+- **Demo data switch** (You › Demo data, 4 Nov): sample data in its own database, fresh each time it is turned on, your own never touched. While on, nothing is read from the phone, nothing goes to Turf web or Notion, no notification is scheduled.
 - **Links** (the code calls it Graph view; renamed 4 Oct because "graph" means a
   chart): a sixth generic screen and an important one. From any Record (its
   Links card) and from Browse: the network around the record — Karan in the

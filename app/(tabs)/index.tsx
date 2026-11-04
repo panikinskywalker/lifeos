@@ -8,6 +8,7 @@ import { BentoGrid, Icon, IconButton, Screen, Text } from '@ui/kit';
 import { ToCheckBell } from '../../src/screens/ToCheckBell';
 import { homeLayout, tileConfig } from '../../src/screens/homeLayout';
 import { MorningBrief } from '../../src/screens/MorningBrief';
+import { DemoNote } from '../../src/screens/DemoNote';
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -53,6 +54,7 @@ export default function TodayTab() {
         </View>
       }
     >
+      <DemoNote />
       <MorningBrief />
       {(rest ? rows : rows.slice(0, 3)).map((r) =>
         r.length === 2 ? (

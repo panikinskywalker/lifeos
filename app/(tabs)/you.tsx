@@ -5,7 +5,7 @@ import { useLive, useOS, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Icon, IconBox, RowItem, RowList, Screen, Section, Segmented, Sheet, SwitchField, Text, useToast } from '@ui/kit';
 import Constants from 'expo-constants';
-import { seedDemoData } from '../../src/platform/seed';
+import { isDemo, setDemoMode } from '../../src/platform/demo';
 import { PROVIDER_PRESETS } from '@core/ai/providers';
 
 const APPEARANCE = { system: 'System', light: 'Light', dark: 'Dark' } as const;
@@ -22,6 +22,7 @@ export default function YouTab() {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const modules = useLive((o) => o.modules.installed(), []).filter((m) => m.id !== 'core');
   const confirm = (title: string, body: string, fn: () => void) => (Platform.OS === 'web' ? fn() : Alert.alert(title, body, [{ text: 'Cancel', style: 'cancel' }, { text: 'Continue', onPress: fn }]));
+  const demo = isDemo();
   const schema = os.db.get<{ v: number }>('SELECT MAX(version) v FROM _migrations')?.v;
   return (
     <Screen tab title="You">
@@ -39,6 +40,22 @@ export default function YouTab() {
         </View>
       </View>
 
+      <Section title="Demo">
+        <RowList>
+          <SwitchField
+            icon="sparkle"
+            label="Demo data"
+            hint={demo ? 'Showing sample data. Yours is safe.' : 'Sample data on every board. Yours stays apart.'}
+            value={demo}
+            onChange={(on) =>
+              confirm(on ? 'Turn on demo data?' : 'Back to your own data?', on ? 'LifeOS restarts with fresh sample data. Your own data stays as it is, and nothing is read from the phone or sent out while this is on.' : 'LifeOS restarts with your own data. What you changed in the demo is dropped.', () =>
+                setDemoMode(on, () => toast.show({ message: 'Close LifeOS fully and open it again', icon: 'info' })),
+              )
+            }
+          />
+        </RowList>
+      </Section>
+
       <Section title="Setup">
         <RowList>
           <RowItem icon="grid" tint="tasks" title="Modules" subtitle={`${modules.length} on · ${modules.map((m) => os.registry.modules.get(m.id)?.name).filter(Boolean).slice(0, 3).join(', ')}…`} onPress={() => router.push('/browse')} />
@@ -55,25 +72,13 @@ export default function YouTab() {
         <RowList>
           <RowItem icon="moon" tint="memory" title="Appearance" subtitle={APPEARANCE[s.appearance]} onPress={() => setAppearanceOpen(true)} />
           <SwitchField icon="activity" label="Haptics" hint="A light tap on buttons and toggles" value={s.hapticsEnabled} onChange={(v) => s.set('hapticsEnabled', v)} />
-          <RowItem icon="share" tint="health" title="Lock & backup" subtitle="Fingerprint lock, encrypted backup and restore" onPress={() => router.push('/settings/data')} />
+          {demo ? null : <RowItem icon="share" tint="health" title="Lock & backup" subtitle="Fingerprint lock, encrypted backup and restore" onPress={() => router.push('/settings/data')} />}
           <RowItem icon="info" tint="documents" title="About" subtitle={`LifeOS ${Constants.expoConfig?.version ?? ''} · on this phone only · schema v${schema}`} chevron={false} />
         </RowList>
       </Section>
 
       <Section title="Data">
         <RowList>
-          <RowItem
-            icon="sparkle"
-            title="Load demo data"
-            subtitle="Sample accounts, transactions, tasks, people, a trip"
-            chevron={false}
-            onPress={() =>
-              confirm('Load demo data?', 'This adds sample records you can delete later.', () => {
-                seedDemoData(os);
-                toast.show({ message: 'Demo data added', icon: 'check' });
-              })
-            }
-          />
           <RowItem
             icon="refresh"
             title="Rebuild search index"

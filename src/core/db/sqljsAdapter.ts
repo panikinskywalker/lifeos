@@ -45,6 +45,17 @@ async function idbPut(key: string, value: Uint8Array): Promise<void> {
   });
 }
 
+/** Forget a saved database (the demo's, when it starts over). */
+export async function deleteSqlJsDatabase(name: string): Promise<void> {
+  const db = await idb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(name);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function createSqlJsAdapter(opts: { name?: string; wasmUrl: string }): Promise<DatabaseAdapter> {
   const name = opts.name ?? 'lifeos.db';
   // eslint-disable-next-line @typescript-eslint/no-require-imports
