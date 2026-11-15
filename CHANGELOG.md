@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.66 · 15 Nov 2026
+
+**Turf: take anyone off a match.** Editing a match refused anyone who had money
+on it, even credit Turf moved there by itself. Like Turf web (its v0.0.70),
+their money now goes with them, onto their latest other match, where it pays
+what they owe or waits as credit; the edit screen says so before you save, and
+the next sync shows it. It's refused only when they have no other match to keep
+it on, and the message names them.
+
 ## v0.0.65 · 15 Nov 2026
 
 **Cards owe what the bank says.** A card used to add up every spend since its

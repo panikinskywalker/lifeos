@@ -6,6 +6,7 @@ import type { AppearanceData, GameData, PlayerProfileData, VenueData } from './t
 import { dropPending, recountPaid, refreshTurfDebts } from './sync';
 import { advanceFor, clampStat, expectedFor, followedAfterEdit, followedScore, needsFronter, splitShare } from './rules';
 import { DEFAULT_KITS, kitOf, validFormation } from './kits';
+import { rupees } from './messages';
 
 /**
  * Changes made in LifeOS for Turf web (docs/MODEL.md layer 4, *Turf web*;
@@ -395,8 +396,10 @@ export function createMatch(os: LifeOSContext, m: MatchInput): { gameId: string;
 /**
  * An edited match: the day, venue, cost, terms or squad. Shares are split
  * again; everyone kept keeps their team, stats and payments; a share is paid
- * once its entries cover it, and whoever fronted counts as paid. Taking off
- * someone who has paid needs a refund first (Turf web refuses it too).
+ * once its entries cover it, and whoever fronted counts as paid. Someone taken
+ * off takes their money with them: Turf web (v0.0.70) moves it onto their latest
+ * other match, and the next sync brings that here. It's refused only when there
+ * is no such match (none that isn't tentative or one they fronted).
  */
 export function editMatch(os: LifeOSContext, gameId: string, m: MatchInput) {
   const { g, id } = game(os, gameId);
@@ -405,8 +408,8 @@ export function editMatch(os: LifeOSContext, gameId: string, m: MatchInput) {
   const turfIds = c.players.map((p) => turfPlayerId(p.data)!);
   const keyOf = (pid: string) => `turf:game_players:${id}:${pid}`;
   const keep = new Set(turfIds.map(keyOf));
-  const held = apps.filter((a) => !a.archived && !keep.has(a.data.sourceKey ?? '') && (a.data.amountPaid ?? 0) !== 0);
-  if (held.length) throw new Error(`${held.map((a) => os.records.get(a.data.personId)?.title ?? 'Someone').join(', ')} paid towards this match — refund them before taking them off`);
+  const stuck = apps.find((a) => !a.archived && !keep.has(a.data.sourceKey ?? '') && (a.data.amountPaid ?? 0) !== 0 && ((a.data.amountPaid ?? 0) < 0 || !otherMatchOf(os, a.data.personId, g.id)));
+  if (stuck) throw new Error(`${os.records.get(stuck.data.personId)?.title ?? 'Someone'} has ${rupees(Math.abs(stuck.data.amountPaid ?? 0) * 100)} on this match and no other match to move it to: record a refund first`);
   const shareEach = splitShare(m.totalCost, m.playerIds.length);
   const today = new Date().toISOString().slice(0, 10);
   let item!: OutboxItem<TurfAction>;
@@ -429,6 +432,16 @@ export function editMatch(os: LifeOSContext, gameId: string, m: MatchInput) {
     item = queueTurf(os, { label: `Match edited · ${shortDay(m.date)} · ${c.venue.data.name}`, recordId: g.id, action: { method: 'PUT', body: { ...matchBody(os, m, c), id }, undo } });
   });
   return item;
+}
+
+/** Where money goes when its owner is taken off a match (as Turf web picks it): any other match of theirs that isn't tentative or one they fronted. */
+function otherMatchOf(os: LifeOSContext, personId: string, gameId: string) {
+  return os.records.query<AppearanceData>('appearance', { filter: { and: [{ field: 'data.personId', op: 'eq', value: personId }] } }, { limit: 500 })
+    .some((a) => {
+      if (a.data.gameId === gameId) return false;
+      const other = os.records.get<GameData>(a.data.gameId);
+      return !!other && other.data.paymentTerms !== 'tentative' && other.data.frontedById !== personId;
+    });
 }
 
 /** The form's starting point for an edit. */

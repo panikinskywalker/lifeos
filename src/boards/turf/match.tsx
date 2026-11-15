@@ -98,6 +98,9 @@ export function TurfMatchForm({ ctx, params }: Props) {
       .filter((p) => !q || p.data.name.toLowerCase().includes(q) || (p.data.position ?? '').toLowerCase().includes(q))
       .filter((p) => (filter === 'available' ? p.data.availability === 'AVL' : filter === 'regulars' ? !p.data.guest && p.data.availabilityMode !== 'window_only' : filter === 'guests' ? !!p.data.guest : true));
   }, [squad, search, filter, meProfile]);
+  // Taking off someone with money here: it goes with them (to their latest other match), so say so before saving.
+  const paidHere = useLive((o) => (editing ? o.records.query<AppearanceData>('appearance', { filter: { and: [{ field: 'data.gameId', op: 'eq', value: editing }] } }, { limit: 500 }) : []).filter((a) => (a.data.amountPaid ?? 0) > 0), [editing]);
+  const leaving = paidHere.map((a) => ({ a, p: squad.find((x) => x.data.personId === a.data.personId) })).filter(({ p }) => p && !m.playerIds.includes(p.id));
   const each = splitShare(m.totalCost || 0, m.playerIds.length);
   const expected = m.expectedPlayers ?? (m.sideSize ? m.sideSize * 2 : m.playerIds.length);
   const f = ctx.format.currency;
@@ -361,9 +364,12 @@ export function TurfMatchForm({ ctx, params }: Props) {
         )
       ) : null}
 
+      {leaving.map(({ a, p }) => (
+        <Text key={a.id} variant="caption" color="secondary">{`${p!.data.name}’s ${f(a.data.amountPaid ?? 0)} here goes with them, as credit on their latest other match.`}</Text>
+      ))}
       <Button title={editing ? 'Save match' : 'Create match'} icon="check" block disabled={!m.venueId || !m.playerIds.length} onPress={save} />
       <Text variant="caption" color="tertiary">
-        {editing ? 'Everyone kept keeps their team, stats and payments; shares are split again. Someone who has paid needs a refund before they can be taken off.' : 'Saved to Turf web when you tap Create; offline it waits in order.'}
+        {editing ? 'Everyone kept keeps their team, stats and payments; shares are split again. Anyone taken off takes their money with them.' : 'Saved to Turf web when you tap Create; offline it waits in order.'}
       </Text>
     </Screen>
   );

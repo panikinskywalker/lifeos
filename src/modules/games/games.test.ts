@@ -481,10 +481,11 @@ describe('matches changed in LifeOS (R9c.3)', () => {
     expect(turfChanges(os).refused.map((i) => i.error)).toEqual(['The match it belongs to wasn’t made in Turf web', 'Complete the game and select its players.']);
   });
 
-  it('an edit splits the shares again, keeps who stays as they were, adds and takes off; someone who paid needs a refund first', () => {
+  it('an edit splits the shares again, keeps who stays as they were, adds and takes off; money with nowhere to go needs a refund first', () => {
     const sat = game('2026-10-17');
     const base = { date: '2026-10-17', time: '20:00', venueId: venue('Playground Arena'), totalCost: 1800, paymentTerms: 'postpaid' as const, sideSize: 6, frontedById: profile('Rutvij') };
-    expect(() => editMatch(os, sat.id, { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Priya')] })).toThrow(/Arjun paid towards this match/);
+    // Arjun paid here and has no other match for it to go to.
+    expect(() => editMatch(os, sat.id, { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Priya')] })).toThrow(/Arjun has ₹200 on this match and no other match/);
 
     const item = editMatch(os, sat.id, { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Priya'), profile('Arjun'), profile('Neel (guest)')] });
     expect(item.payload).toMatchObject({ method: 'PUT', body: { action: 'game', id: 'g_sat', playerIds: ['p_rutvij', 'p_karan', 'p_priya', 'p_arjun', 'p_guest'] } });
@@ -493,6 +494,19 @@ describe('matches changed in LifeOS (R9c.3)', () => {
     expect(appearance('Neel (guest)', '2026-10-17').data).toMatchObject({ share: 360, paid: false, sourceKey: 'turf:game_players:g_sat:p_guest' });
     // Not set by hand, so like Turf web the score follows the goals logged after an edit (2 + 4 for A, 1 for B).
     expect(game('2026-10-17').data).toMatchObject({ scoreA: 6, scoreB: 1 });
+  });
+
+  it('someone who paid can be taken off when they have another match: Turf web moves their money there', () => {
+    const sat = game('2026-10-17');
+    const base = { date: '2026-10-17', time: '20:00', venueId: venue('Playground Arena'), totalCost: 1800, paymentTerms: 'postpaid' as const, sideSize: 6, frontedById: profile('Rutvij') };
+    // Priya fronted 14 Oct and 24 Oct is tentative, so at first her ₹450 has nowhere to go.
+    const edit = { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Arjun')] };
+    expect(() => editMatch(os, sat.id, edit)).toThrow(/Priya has ₹450/);
+    const later = game('2026-10-24');
+    os.records.update(later.id, { data: { ...later.data, paymentTerms: 'postpaid' } });
+    const item = editMatch(os, sat.id, edit);
+    expect(item.payload).toMatchObject({ method: 'PUT', body: { playerIds: ['p_rutvij', 'p_karan', 'p_arjun'] } });
+    expect(appearance('Priya', '2026-10-17').archived).toBe(true);
   });
 });
 
