@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.52 · 15 Nov 2026
+
+**SIP questions never go dead.** "Read my texts again" replaces payments it
+filed itself; a "A SIP?" question on one of those was left behind with buttons
+that did nothing. Now reading again closes questions on the payments it
+replaces (the new payment asks again, and Undo brings the old ones back), and
+an old question whose payment is gone closes when you tap it, saying why.
+
 ## v0.0.51 · 15 Nov 2026
 
 **One Turf.** Browse had Turf twice: a tile under Boards that opened the Turf

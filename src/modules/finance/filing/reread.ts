@@ -21,6 +21,8 @@ export interface Reread {
   filed: string[];
   /** Payments kept because you changed them. */
   kept: number;
+  /** Open questions about the payments taken out (a SIP? on an old NACH payment), closed; Undo opens them again. */
+  closed?: string[];
 }
 
 const touchedByYou = (os: LifeOSContext, id: string) => !!os.db.get(`SELECT 1 AS x FROM events WHERE record_id=? AND actor='user' LIMIT 1`, [id]);
@@ -53,6 +55,11 @@ export function rereadTexts(os: LifeOSContext): Reread {
         out.removed.push(rec.id);
       }
     }
+    // A question about a payment that just went would have nothing to answer: it closes (the new payment asks again).
+    out.closed = out.removed.length
+      ? os.db.all<{ id: string }>(`SELECT id FROM filings WHERE checked=0 AND undone=0 AND record_id IN (${out.removed.map(() => '?').join(',')})`, out.removed).map((f) => f.id)
+      : [];
+    if (out.closed.length) os.filings.setChecked(out.closed);
     for (const r of again) {
       const res = refileMessage(os, r.id, PARSER);
       out.read++;
@@ -72,6 +79,7 @@ export function undoReread(os: LifeOSContext): boolean {
   os.db.transaction(() => {
     for (const id of r.filed) if (os.records.get(id)) os.records.delete(id, 'user');
     for (const id of r.removed) os.records.restore(id, 'user');
+    if (r.closed?.length) os.filings.setChecked(r.closed, false);
   });
   os.settings.set(REREAD_KEY, null);
   return true;

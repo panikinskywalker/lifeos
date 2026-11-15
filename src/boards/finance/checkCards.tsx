@@ -45,6 +45,7 @@ function NachSipCard({ filing }: { filing: Filing }) {
   const answer = (pick: string, message: string) => {
     const a = answerSip(os, filing.id, pick);
     if (a) toast.show({ message, icon: 'check', undo: () => undoSip(os, a) });
+    else toast.show({ message: 'That payment was read again, so this old question is closed', icon: 'check' });
   };
   const amount = tx ? os.format.currency(tx.data.amount) : '';
   return (

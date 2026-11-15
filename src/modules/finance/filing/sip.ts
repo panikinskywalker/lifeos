@@ -51,7 +51,12 @@ export interface SipAnswer {
 export function answerSip(os: LifeOSContext, filingId: string, pick: string | 'new' | 'no'): SipAnswer | null {
   const f = os.filings.get(filingId);
   const tx = f?.entityId ? os.records.get<TransactionData>(f.entityId) : undefined;
-  if (!f || !tx) return null;
+  if (!f) return null;
+  // Its payment is gone (read again, deleted): nothing to answer, so the question closes.
+  if (!tx) {
+    os.filings.setChecked(filingId);
+    return null;
+  }
   const out: SipAnswer = { filingId, txId: tx.id };
   const d = tx.data;
   os.db.transaction(() => {

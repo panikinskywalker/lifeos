@@ -66,6 +66,23 @@ describe('NACH to SIP', () => {
     answerSip(os, ask.id, 'new');
     expect(os.records.query('investment')[0]!).toMatchObject({ title: 'SIP on the 6th', data: { sip: 1000, sipDay: 6, invested: 1000 } });
   });
+
+  it('read again: the question moves to the new payment and its buttons work; Undo brings the old one back; a question whose payment is gone closes when tapped', async () => {
+    const { rereadTexts, undoReread } = await import('./reread');
+    nach('2,000.00', '05/10/26', '2026-10-05');
+    const old = os.filings.ofKind(NACH_SIP, { open: true })[0]!;
+    const r = rereadTexts(os);
+    expect(r.closed).toContain(old.id); // with the old payment's own entry
+    const open = os.filings.ofKind(NACH_SIP, { open: true });
+    expect(open).toHaveLength(1);
+    expect(open[0]!.entityId).not.toBe(old.entityId);
+    undoReread(os);
+    expect(os.filings.ofKind(NACH_SIP, { open: true }).map((f) => f.id)).toContain(old.id);
+    // An old question left on a deleted payment: tapping closes it instead of doing nothing.
+    os.records.delete(old.entityId!, 'system');
+    expect(answerSip(os, old.id, 'no')).toBeNull();
+    expect(os.filings.ofKind(NACH_SIP, { open: true }).map((f) => f.id)).not.toContain(old.id);
+  });
 });
 
 const subs = () => os.records.query<{ name: string; amount: number; nextBillingAt: string; priceHistory?: Array<{ amount: number; from: string }>; foreign?: { amount: number; currency: string } }>('subscription');
