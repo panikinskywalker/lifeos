@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.86 · 16 Nov 2026
+
+**Screenshots upload and read.** Upload a statement now tells what a file
+really is from its first bytes, so a screenshot the picker turned into a JPEG
+is no longer sent as a PNG (Claude refused those). A screenshot too big to send
+says so and asks for a crop, and when Claude can't read something the reason
+is shown.
+
 ## v0.0.85 · 16 Nov 2026
 
 **The card wheel opens on your main account on Android too.** It had started

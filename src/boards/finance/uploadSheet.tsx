@@ -14,6 +14,17 @@ type Phase = { at: 'pick' } | { at: 'reading' } | { at: 'review'; proposals: Pro
 
 /** About 9 MB of base64: a long PDF statement still fits one request. */
 const MAX_BASE64 = 9_000_000;
+/** The API takes an image of at most 5 MB. */
+const MAX_IMAGE_BASE64 = 6_900_000;
+
+/** What a file really is, from its first bytes. */
+function typeOf(base64: string): BrainImage['mediaType'] | null {
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('iVBOR')) return 'image/png';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  if (base64.startsWith('JVBER')) return 'application/pdf';
+  return null;
+}
 const WHY: Record<string, string> = {
   'no key': 'Reading a statement needs your Claude key in You › Agent › Brain.',
   'over budget': 'Today’s budget for Claude is used up. Try again tomorrow, or raise it in You › Agent › Brain.',
@@ -39,7 +50,6 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
   };
 
   const read = async (file: { uri: string; mimeType?: string | null; base64?: string | null }) => {
-    const mediaType: BrainImage['mediaType'] = file.mimeType === 'application/pdf' ? 'application/pdf' : file.mimeType === 'image/png' || file.mimeType === 'image/webp' ? file.mimeType : 'image/jpeg';
     setPhase({ at: 'reading' });
     let data = file.base64 ?? null;
     try {
@@ -47,10 +57,13 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
     } catch {
       return setPhase({ at: 'failed', why: 'LifeOS couldn’t open that file.' });
     }
-    if (data.length > MAX_BASE64) return setPhase({ at: 'failed', why: 'That file is too big to send. Try the statement for one month, or a screenshot.' });
+    // The type comes from the file's own first bytes: a picker can say PNG for a screenshot it has turned into JPEG.
+    const mediaType = typeOf(data) ?? (file.mimeType === 'application/pdf' ? 'application/pdf' : 'image/jpeg');
+    const limit = mediaType === 'application/pdf' ? MAX_BASE64 : MAX_IMAGE_BASE64;
+    if (data.length > limit) return setPhase({ at: 'failed', why: mediaType === 'application/pdf' ? 'That PDF is too big to send. Try the statement for one month.' : 'That image is too big to send. Crop it to the part with the balances, or take a smaller screenshot.' });
     const model = (await os.device?.brain?.model()) ?? null;
     const res = await askWithPhoto(os, model, { ...statementAsk(), image: { mediaType, data } });
-    if (!res.ok) return setPhase({ at: 'failed', why: WHY[res.note] ?? WHY.error! });
+    if (!res.ok) return setPhase({ at: 'failed', why: `${WHY[res.note] ?? WHY.error!}${res.note === 'error' && res.error ? ` (${res.error.slice(0, 160)})` : ''}` });
     const proposals = proposeChanges(os, readStatement(res.answer));
     if (!proposals.length) return setPhase({ at: 'failed', why: 'Nothing to update from that: no balance, card bill or holding could be read.' });
     setPhase({ at: 'review', proposals, on: Object.fromEntries(proposals.map((p) => [p.id, true])) });
@@ -63,7 +76,7 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
   const fromPhotos = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return setPhase({ at: 'failed', why: 'LifeOS needs your photos for this. Allow it in Android’s settings.' });
-    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, base64: true, exif: false });
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true, exif: false });
     const a = r.canceled ? null : r.assets[0];
     if (a) await read({ uri: a.uri, mimeType: a.mimeType, base64: a.base64 });
   };
