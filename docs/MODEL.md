@@ -1054,7 +1054,10 @@ what they are, each opening the thing itself. Then two sections:
   later; a grid of tiles, yours first, pinned before the rest. Today and Upkeep
   are boards too but sit in the bottom bar, so they are not repeated here.
 - **Modules** — the twelve, in their tints, each opening its Overview → Lists →
-  Records (as the grid is today).
+  Records (as the grid is today). A module whose board already sits under
+  Boards is not listed again (games is Turf, inventory is Home; 15 Nov), and
+  its name is the board's wherever modules are named (the Links legend says
+  Turf, not Games).
 Then **everything else lives here too**: Links, Facts (the Second Brain's), Recent, Tags, Reminders,
 To check history, Data sources status, the component gallery (dev). If it is a
 screen and not a tab, Browse reaches it. Any board can also be pinned to Today as a

@@ -36,6 +36,7 @@ const MODULE_SHORT: Record<string, string> = {
   assets: 'Things',
   inventory: 'Home',
   places: 'Places',
+  games: 'Turf',
 };
 
 export function shortNameForModule(moduleId: string, fallback: string): string {

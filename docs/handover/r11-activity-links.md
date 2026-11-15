@@ -220,3 +220,29 @@ Not changed: Football's Debts still list on the group (money owed, each "Priya
 Patch notes:
 - Links show each thing once: a game is one game, not also each player's
   appearance and share; a player profile is the person, a venue is the place.
+
+## Follow-up 3, 15 Nov: Turf, not "Games" and "Turf"
+
+Rutvij meant the module and the board: Links' colour legend said "Games" for
+what the app calls Turf, and Browse listed a Games module beside the Turf
+board (Home had the same double: a Home board and a Home module).
+
+- `src/boards/turf/index.ts`: `module: 'games'` (Turf is the games module's
+  board), so `/module/games` opens Turf home.
+- `src/ui/theme/moduleTint.ts`: games' short name is "Turf" (the Links legend,
+  Browse, anywhere modules are named).
+- `app/(tabs)/browse.tsx`: a module whose board is placed under Boards (Turf,
+  Home) is not listed again under Modules.
+- MODEL.md layer 5 *Browse* says so.
+
+Typecheck green; tests as before (634 of 635, the base's deliveries failure);
+web export builds; checked in the browser: Browse lists Turf and Home once
+(under Boards), Priya's Links legend reads Turf · People · Places, and Games
+opens Turf.
+
+Phone check: Browse has no Games or Home tile under Modules; the Links legend
+says Turf.
+
+Patch notes:
+- Turf and Home show once in Browse, under Boards; Links calls Turf's colour
+  Turf, not Games.
