@@ -7,6 +7,7 @@ import { spendQuery, type SpendKind, type SpendPeriod } from './spend';
 import type { InvestmentData } from './types';
 import { applySplit, balanceWith, balances, clearSplit, settleUp, undoSettle } from './split';
 import { answerMoney, readMoneyQuestion, type MoneyQuestion } from './answers';
+import { BLOCKS, PERIODS, runQuery, type MoneyQuery } from './ask';
 
 /** Finance tools for the agent (no React Native — unit-tested). */
 export const financeAiTools: AiToolDef[] = [
@@ -21,6 +22,50 @@ export const financeAiTools: AiToolDef[] = [
         const { answer, card } = answerMoney(os, q);
         return withExtras({ answer }, { card });
       },
+    },
+    {
+      name: 'money_query',
+      description: 'Work out one money figure on the phone: what to count (spent, came_in, or bills due before payday), the period (month = this month so far, last_month, 3_months, year, all), optionally split by day, week, month, category or payee, only some categories (category values), a payee name, or categories to leave out. Returns the total, the groups and the payments behind it (payee, amount, date, category).',
+      input: z.object({
+        measure: z.enum(['spent', 'came_in', 'bills']),
+        period: z.enum(PERIODS as [SpendPeriod, ...SpendPeriod[]]).default('month'),
+        by: z.enum(['day', 'week', 'month', 'category', 'payee']).optional(),
+        only: z.array(z.string()).optional(),
+        payee: z.string().optional(),
+        leaveOut: z.array(z.string()).optional(),
+        sort: z.enum(['newest', 'largest']).optional(),
+      }),
+      run: async (input, os) => {
+        const f = runQuery(os, input as MoneyQuery);
+        return {
+          label: f.label,
+          total: Math.round(f.total),
+          sameDaysBefore: f.before != null ? Math.round(f.before) : null,
+          groups: f.groups.slice(0, 15).map((g) => ({ label: g.label, value: Math.round(g.value) })),
+          count: f.rows.length || f.bills.length,
+          payments: f.rows.slice(0, 30).map((t) => ({ payee: t.data.merchant ?? t.title, amount: t.data.amount, date: t.data.date, category: t.data.category })),
+          due: f.bills.map((b) => ({ title: b.title, amount: b.amount, due: b.due })),
+        };
+      },
+    },
+    {
+      name: 'money_show',
+      description: 'End every Money answer with this, once: one or two plain sentences, the block to show (number, bars, line, calendar, list) with a short title, and the money query behind it (same fields as money_query). The phone works the figures out and shows the payments behind them.',
+      input: z.object({
+        sentence: z.string(),
+        block: z.enum(BLOCKS as [string, ...string[]]),
+        title: z.string(),
+        query: z.object({
+          measure: z.enum(['spent', 'came_in', 'bills']),
+          period: z.enum(PERIODS as [SpendPeriod, ...SpendPeriod[]]).default('month'),
+          by: z.enum(['day', 'week', 'month', 'category', 'payee']).optional(),
+          only: z.array(z.string()).optional(),
+          payee: z.string().optional(),
+          leaveOut: z.array(z.string()).optional(),
+          sort: z.enum(['newest', 'largest']).optional(),
+        }),
+      }),
+      run: async () => ({ shown: true }),
     },
     {
       name: 'split_transaction',

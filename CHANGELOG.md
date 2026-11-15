@@ -7,6 +7,30 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.32 · 15 Nov 2026
+
+**Ask Money.** An ask box on top of Money home opens it.
+- Five starting questions answered on the phone, each with a live line: where
+  the money went, what is due before payday, anything wrong, can I afford it, a
+  chart of my spending.
+- Every answer is a sentence, one block (a number, bars, a line, a calendar or a
+  list) and *See the payments*, which adds up to the figure. Follow-ups (compare
+  with last month, only one category, by week, leave out rent) are worked out on
+  the phone.
+- A typed question goes to the model in You › Agent with only payee, amount,
+  date and category; the phone works out every figure. It is logged in Sent to
+  Claude, and waits for a model when none is free.
+- *Keep on Money home* keeps a view (the question, not the numbers) under Your
+  views.
+- *Anything wrong*: charged twice, a new fee and price changes, with Both are
+  real, One is wrong (with Undo), That is fine and Keep it. Double charges and
+  new fees also come to the morning brief.
+
+**You choose what the morning brief shows**: You › Notifications has a switch
+per module. Off keeps it out of the brief; its cards still come to To check.
+
+**OpenRouter's free model is now Nemotron 3 Ultra** (the old free Llama is gone).
+
 ## v0.0.31 · 15 Nov 2026
 
 **Money counts what you actually spent, and keeps itself up to date.**

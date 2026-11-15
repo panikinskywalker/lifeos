@@ -4,6 +4,7 @@ import { FinanceHome } from './screens';
 import { AccountPage } from './accountPage';
 import { DebtPage } from './debtPage';
 import { DebtsScreen, SubscriptionsScreen } from './lists';
+import { AskScreen, ProofScreen } from './ask';
 import { GroupBalanceSection, PersonBalanceSection } from './splitScreens';
 import { ReportsScreen } from './reportsScreen';
 import { SubscriptionPage } from './subscriptionPage';
@@ -24,7 +25,7 @@ export const financeBoard: BoardManifest = {
   placement: 'module',
   overview: financeOverview,
   tiles: financeTiles,
-  screens: [{ key: 'index', title: 'Money', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }, { key: 'subscriptions', title: 'Subscriptions', component: SubscriptionsScreen }, { key: 'debts', title: 'Who owes whom', component: DebtsScreen }],
+  screens: [{ key: 'index', title: 'Money', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }, { key: 'subscriptions', title: 'Subscriptions', component: SubscriptionsScreen }, { key: 'debts', title: 'Who owes whom', component: DebtsScreen }, { key: 'ask', title: 'Ask Money', component: AskScreen }, { key: 'proof', title: 'The payments behind it', component: ProofScreen }],
   quickActions: [
     { id: 'finance.addTransaction', label: 'Transaction', icon: 'arrow.up.arrow.down', route: '/entity/transaction/new', global: true },
     { id: 'finance.addAccount', label: 'Account', icon: 'creditcard', route: '/entity/account/new' },

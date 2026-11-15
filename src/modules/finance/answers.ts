@@ -9,7 +9,7 @@ import { spendQuery, type SpendKind, type SpendPeriod } from './spend';
 import { comingUp, nextPayday } from './home';
 
 export { nextPayday };
-import { CATEGORIES, type InvestmentData, type SubscriptionData, type TransactionData } from './types';
+import { CATEGORIES, type InvestmentData, type TransactionData } from './types';
 
 /**
  * Everyday money questions, answered on the phone (docs/MODEL.md layer 5): code
@@ -62,7 +62,7 @@ function categoryLabel(os: LifeOSContext, value: string): string {
 }
 
 /** "food" → the category it names, by its label's words ("rent" is Housing & Rent). */
-function categoryNamed(os: LifeOSContext, words: string): string | null {
+export function categoryNamed(os: LifeOSContext, words: string): string | null {
   const all = [...CATEGORIES.map((c) => ({ value: c.value, label: c.label })), ...customCategories(os).map((c) => ({ value: c.value, label: c.label }))];
   const w = words.toLowerCase();
   return all.find((c) => c.label.toLowerCase() === w || c.label.toLowerCase().split(/[^a-z]+/).includes(w))?.value ?? null;

@@ -12,6 +12,7 @@ export { syncReminderNotifications };
 import { openDatabase, openDemoDatabase } from './openDatabase';
 import { demoIsFresh, isDemo, markDemoOpened } from './demo';
 import { demoFolders, seedDemo } from './seed';
+import { buildAgentFromSettings } from './agentProvider';
 import { deviceBridge } from './sources';
 import { brainModel, runBrainPass } from './brain';
 import { runFiling } from './filing';
@@ -62,7 +63,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   // The brain's Claude for boards (Snap the fridge, Another idea): the saved key, passes one at a time.
   const brain = { model: () => brainModel(os), pass: (why?: string) => runBrainPass(os, 'manual', why) };
   // The demo reads nothing from the phone, and with no secrets Turf web and Notion stay switched off.
-  os.device = demo ? { folders: demoFolders, brain } : { ...deviceBridge(os), brain };
+  os.device = demo ? { folders: demoFolders, brain } : { ...deviceBridge(os), brain, agent: () => buildAgentFromSettings(os) };
   // The automations' Ask Claude step: the brain's key and model (R10).
   os.automation.modelProvider = () => brainModel(os);
 

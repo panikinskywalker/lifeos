@@ -10,7 +10,7 @@ import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ChipRow, FilterChip, HourTicks, Icon, IconButton, ScreenHeader, Text, TrackColumns } from '@ui/kit';
-import { Caps, Hairline, Rows, SmallPill, SplitBar, StatusPill, TxRow, catColor, day, kindWord, shortMoney, splitOf } from './parts';
+import { Caps, Rows, SmallPill, SplitBar, TxRow, catColor, day, kindWord, shortMoney, splitOf } from './parts';
 
 const PERIODS: Array<[SpendPeriod, string]> = [['month', 'This month'], ['last_month', 'Last month'], ['3_months', '3 months'], ['year', 'This year'], ['all', 'All time']];
 const KINDS: Array<[SpendKind, string]> = [['spending', 'Spending'], ['income', 'Income'], ['investments', 'Investments'], ['all', 'Everything']];

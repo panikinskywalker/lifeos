@@ -1207,6 +1207,28 @@ Sources. Read-only, always.
   Everyday questions stay on the phone with no model (`money_answer`).
 - **When**: after Money counts your share (splits, Turf, paybacks), so its answers
   rest on numbers that are right.
+- **Built 15 Nov (phase E)**, as recommended and agreed:
+  - **The money query**: one closed shape for every figure: what to count (spent,
+    came in, bills), the period, how to split it (day, week, month, category,
+    payee), only these categories or a payee, leave out these. The phone works it
+    out and lists the payments behind it, which add up to it.
+  - **The Ask screen** (Money › Ask, from an ask box on top of Money home): Start
+    here with live lines, then a thread. An answer is a sentence, one block
+    (number, bars, line, calendar, list) and *See the payments*. Follow-up chips
+    (compare with last month, only the top category, by week, leave out rent) are
+    worked out on the phone; only typed questions go to a model.
+  - **A typed question** goes to the agent chain with Money's read-only tools and
+    must end with one *show* call (a sentence, a block, the money query); the
+    phone computes the figures, the model's own numbers are never shown. Under it:
+    "Claude saw 8 payments: payee, amount, date, category", in the Sent to Claude
+    log. No model free: it says so, and answers there when one is.
+  - **Keep** stores the view (its money query and block) under *Your views* on
+    Money home, right after Coming up, and on the Ask screen.
+  - **Anything wrong**: charged twice (same payee and amount within a day), a new
+    fee (Fees & Charges, to a payee not paid in the last 6 months), price changes.
+    *Both are real* / *That is fine* / *Keep it* are remembered; *One is wrong*
+    deletes the later payment, with Undo. Charged twice and new fees also come to
+    the morning brief.
 - **Open**: the cost per question (not measured); bank statement PDFs to backfill
   history; India's Account Aggregator framework (not checked whether an individual
   can use it).
@@ -1992,6 +2014,11 @@ to pack for Friday's flight, what you can cook tonight from what is left. It
 uses the Claude API (you have it now) as the brain, and keeps everything it
 learns on the phone.
 
+- **OpenRouter's free model** (15 Nov, Rutvij's pick): `nvidia/nemotron-3-ultra-550b-a55b:free`
+  (free, tool calling, 1M context) for main and side jobs; the old
+  `llama-3.3-70b-instruct:free` is no longer offered. A model you typed in You ›
+  Agent is kept.
+
 ### How it works: code notices, Claude judges
 - **Candidates, in code.** Each module offers what might need you, cheaply,
   from its own records: Turf (Thursday has 3 in of 10), People (9 days since
@@ -2103,6 +2130,11 @@ coming up, the one dish to cook), each line opening its record or its To
 check card. Every line says its category above it, in that category's colour,
 and an urgent one says when on the right (Late, Today, Tomorrow). The evening
 pass updates it. The tiles stay below, as R8 has them.
+**What the brief shows** (15 Nov): You › Notifications has one switch per module
+that speaks in the brief (Upkeep, Money, Home, Deliveries, People, Turf, Health…).
+Off leaves that module out of the brief on Today and out of the morning
+notification (Health's sleep and steps, Money's spending line); its cards still
+come to To check.
 
 ### Words (to add to layer 1)
 - **Stock** (agreed 24 Oct) — the Object for something kept at home that

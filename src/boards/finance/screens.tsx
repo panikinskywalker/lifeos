@@ -13,9 +13,10 @@ import { subscriptionRunRate } from '@modules/finance/reports';
 import { comingUp, monthClose, pace, type MonthClose, type Pace } from '@modules/finance/home';
 import { balances } from '@modules/finance/split';
 import { PAYEE_WHO } from '@modules/finance/filing/payee';
-import { categoryOf, INSTRUMENTS, type AccountData, type TransactionData } from '@modules/finance/types';
+import { categoryOf, INSTRUMENTS, type TransactionData } from '@modules/finance/types';
 import { ToCheckBell } from '../../screens/ToCheckBell';
 import { PayeeGuess } from './payeeGuess';
+import { AskBox, YourViews } from './ask';
 import { Caps, Disc, KIND_WORD, SectionHead, Hairline, IconDisc, Rows, Spark, TxRow, accountIcon, catColor, shortMoney, day, kindWord, relDay, splitOf } from './parts';
 
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
@@ -86,6 +87,8 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
     <ScrollView ref={scroll} style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: t.layout.gutter, paddingBottom: insets.bottom + 32, gap: 24 }}>
       {header(`${monthName} · ${data.monthCount} transaction${data.monthCount === 1 ? '' : 's'}`, <><ToCheckBell />{add}</>)}
 
+      <AskBox />
+
       <ChipRow>
         <NavChip label="Spend" icon="pie" onPress={() => router.push('/spend' as never)} />
         <NavChip label="Transactions" icon="arrow.up.arrow.down" onPress={() => router.push({ pathname: '/spend', params: { period: 'all', kind: 'all' } } as never)} />
@@ -104,6 +107,8 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
       {data.owes.length ? <WhoOwes owes={data.owes} /> : null}
 
       {data.coming.items.length ? <ComingUp coming={data.coming} /> : null}
+
+      <YourViews />
 
       <SummaryTiles subs={data.subs} nw={data.nw} onNetWorth={() => goAnchor('accounts')} />
 
