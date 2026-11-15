@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.39 · 15 Nov 2026
+
+**Turf moves like Turf web.** Recent games slide and flip in 3D when you open
+one (and flip back with ×); the next match's dot pulses; the Leaders podium
+rises in; a player's tick pops when you add them to a match.
+
 ## v0.0.38 · 15 Nov 2026
 
 **Browse's module stack moves.** Tap a module's strip and it springs open in

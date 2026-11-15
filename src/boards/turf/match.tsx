@@ -31,6 +31,7 @@ import { fonts } from '@ui/theme/tokens';
 import { Button, DateField, EmptyState, FilterChip, Icon, NumberField, RowItem, RowList, Screen, Segmented, Sheet, StatTrio, SwitchField, Text, TextField, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Face, SyncPill } from './teams';
+import { Pop } from './motion';
 
 /**
  * The Turf board's match screens (docs/MODEL.md layer 3, *Match*; R9c.3):
@@ -289,9 +290,9 @@ export function TurfMatchForm({ ctx, params }: Props) {
               <React.Fragment key={p.id}>
                 {divider}
                 <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={p.data.name} onPress={() => togglePlayer(p.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: on ? LIME : 'transparent', borderWidth: on ? 0 : 1.5, borderColor: 'rgba(245,245,247,0.22)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Pop on={on} style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: on ? LIME : 'transparent', borderWidth: on ? 0 : 1.5, borderColor: 'rgba(245,245,247,0.22)', alignItems: 'center', justifyContent: 'center' }}>
                     {on ? <Icon name="check" size={15} color={INK} /> : null}
-                  </View>
+                  </Pop>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="rowTitle" numberOfLines={1}>
                       {p.id === meProfile ? `${p.data.name} (you)` : p.data.name}

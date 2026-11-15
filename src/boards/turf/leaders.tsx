@@ -10,6 +10,7 @@ import { usePull } from './useTurfSync';
 import { Face, SyncPill } from './teams';
 import { Switcher, useCopyShare } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
+import { RiseIn } from './motion';
 
 /**
  * Turf · Noir 5b Players · Leaders (TF-Leaders): Turf web's thirteen tables
@@ -172,6 +173,7 @@ export function TurfLeaders(_props: Props) {
     const r = d.sorted[i];
     if (!r) return <View style={{ flex: 1 }} />;
     return (
+      <RiseIn delay={i * 120} style={{ flex: 1 }}>
       <Tap label={label(r, i)} onPress={() => open(r)} style={{ flex: 1, padding: 14, gap: 8, borderRadius: 24, backgroundColor: bg }}>
         <OnBlock>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -194,6 +196,7 @@ export function TurfLeaders(_props: Props) {
           </View>
         </OnBlock>
       </Tap>
+      </RiseIn>
     );
   };
 
