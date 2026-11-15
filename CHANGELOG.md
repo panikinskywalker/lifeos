@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.78 · 16 Nov 2026
+
+**Accounts and cards is a wheel.** Your accounts and cards sit on a wheel like
+the iPhone's time picker: the one in front full size, the others stacked behind
+it, their names above and their amounts below, smaller and tilted away the
+further they are. Scroll to turn it; it snaps card by card with a small tick.
+Tap a card behind to bring it forward, tap the front one to open it. A card
+whose bill is late is coral.
+
 ## v0.0.77 · 16 Nov 2026
 
 **Accounts and cards shows your main account in full.** Your bank account with

@@ -1400,7 +1400,11 @@ references).** Each screen takes the direction that suits it:
   whom, then Recent. A grid button opens the other Money screens.
 - **Accounts and cards** (new screen, direction B): what is in your accounts,
   the cards owed, net worth, the accounts and cards as a stacked wallet, Came in
-  and Spent, investments.
+  and Spent, investments. 16 Nov (Rutvij's reference): the wallet is a **card
+  wheel** (kit `CardWheel`): the card in focus full size, the rest stacked
+  behind, tops above and amounts below, smaller and tilted away like the iOS
+  time picker; it snaps card by card with a haptic tick; tap a card behind to
+  bring it forward, the front one to open it.
 - **An account's or card's page** (direction A): the account drawn as its card
   (balance or what you owe on it), then round-icon buttons Add · Transfer · Set
   balance (Set owed) · Edit.

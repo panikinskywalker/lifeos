@@ -8,7 +8,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
-import { Icon, IconButton, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
+import { CardWheel, Icon, IconButton, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
 import { incomeInRange, monthRange, netWorth, spendInRange } from '@modules/finance/lib';
 import { INSTRUMENTS, type AccountData } from '@modules/finance/types';
 import { KIND_WORD, Rows, SectionHead, Spark, day } from './parts';
@@ -54,18 +54,29 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
       </View>
 
       {cards.length ? (
-        <View>
-          {[cards[0]!, ...rest].map((r, i) => (
-            <View key={r.account.id} style={{ zIndex: 100 - i, elevation: 100 - i }}>
-              <WalletCard account={r.account} balance={r.balance} front={i === 0} first={i === 0} money={money} />
-            </View>
-          ))}
-        </View>
+        <CardWheel
+          cards={[cards[0]!, ...rest].map(({ account: acc, balance }) => {
+            const d = acc.data;
+            const card = d.kind === 'credit';
+            const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
+            return {
+              key: acc.id,
+              color: late ? '#FF8A7A' : CARD[d.kind] ?? blocks.sky,
+              title: acc.title.replace(/\s*[•·]+\s*\d{3,4}$/, ''),
+              corner: card ? 'You owe' : KIND_WORD[d.kind],
+              amount: card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
+              tail: d.last4 ? `•••• ${d.last4}` : undefined,
+              note: typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
+            };
+          })}
+          onOpen={(id) => router.push(`/entity/account/${id}` as never)}
+        />
       ) : (
         <Pressable accessibilityRole="button" accessibilityLabel="Add an account" onPress={() => router.push('/entity/account/new' as never)} style={{ height: 120, borderRadius: 28, borderWidth: 1, borderStyle: 'dashed', borderColor: t.c.line, alignItems: 'center', justifyContent: 'center' }}>
           <Text variant="label">Add an account or card</Text>
         </Pressable>
       )}
+      <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, textAlign: 'center', marginTop: -12 }}>Scroll the cards; tap the front one to open it</Text>
 
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <MoneyTile icon="download" label="came in" value={money(data.income)} onPress={() => router.push('/module/finance/reports' as never)} />

@@ -6,6 +6,7 @@ export { BentoGrid, Tile, Stat, StatTile, type TileProps, type TileSize } from '
 export { StackedBar, type StackedBarPart } from './StackedBar';
 export { Ring } from './Ring';
 export { RingBadges, type RingPart } from './RingBadges';
+export { CardWheel, type WheelCard } from './CardWheel';
 export { ArcTicks, Dial, Donut, DotNumber, HourTicks, InstrumentCard, Ruler, TrackColumns } from './KitCharts';
 export { RowItem, RowList, Checkbox, type RowItemProps, type ValueTone } from './RowItem';
 export { Chip, FilterChip, ChipRow, type ChipTone } from './Chip';
