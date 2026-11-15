@@ -204,7 +204,7 @@ export const appearanceObject: ObjectDef<AppearanceData> = {
   computeSubtitle: (d, { formatCurrency }) => [formatCurrency(d.share), d.paid ? 'paid' : 'unpaid', d.goals ? `${d.goals} goal${d.goals === 1 ? '' : 's'}` : null].filter(Boolean).join(' · '),
   indexed: ['gameId', 'personId', 'paid', 'gameDate', 'sourceKey'],
   // In Links an Appearance is Priya playing in a game, not a record of its own (MODEL.md layer 5).
-  linkRole: { joins: ['personId', 'gameId'], words: { personId: 'Players' } },
+  linkRole: { joins: ['personId', 'gameId'], words: { personId: 'players' } },
 };
 
 /* ------------------------------------------------------------------ */

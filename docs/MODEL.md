@@ -1082,19 +1082,20 @@ Component gallery (dev).
   Link records only, so every module gets it without writing anything. Not to
   be confused with the tiles on Today, which are charts and open Metric.
   Decided with R11 (2 Nov), the logic sharpened 15 Nov:
-  - **How a Link reads.** Most Links are made by a link Field (a Task's
-    Project, a Game's captain, an Appearance's player), so the Field says what
-    the Link means. From the record holding the Field it reads as the Field's
-    label ("Project", "Venue", "Captain, team B"). From the record it points
-    at, it is one of the other Object's records: the Project has "Tasks", Priya
-    has "Appearances" and "Debts", never the Field's word read backwards
-    ("Player", "Person"). When one Object points here through several Fields,
-    each is named: "Games · captain", "Games · fronted by", "Transactions · to
-    account". Links no Field made use the Object's declared words (a Place:
-    "Been here"), then core's words (*with*: "Was at"; *works at*: "People
-    here"), then the other Object's name. Between two records of one Object
-    only the direction tells (Koramangala "In" Bengaluru; Bengaluru
-    "Contains").
+  - **How a Link reads** (the *Links · Noir* artboards L1 to L7 on the design
+    canvas, 15 Nov). Words are lower case, as the record would say them:
+    Karan *works at* Zomato, was *with* the dinner, *paid* ₹1,240, is *member
+    of* Saturday football, *played in* a game, *captain of* another. Most
+    Links are made by a link Field, so the Field says what the Link means:
+    from the record holding it, the Field's label ("project", "venue"); from
+    the record it points at, a verb where the Field names a part someone
+    plays (*with*, *paid*, *member of*, *captain of*, *fronted*), else the
+    other Object's records ("tasks", "transactions", "debts"), never the
+    Field's word read backwards. Links no Field made use the Object's
+    declared words (a Place: "been here"), then core's words, then the other
+    Object's name. Between two records of one Object only the direction tells
+    (Koramangala "in" Bengaluru; Bengaluru "contains"). A line on the map
+    says its card's word, one record in the singular ("task").
   - **One thing once** (15 Nov). Some records are another face of a thing, or
     the meeting of two, and Links shows the thing, not each record. An Object
     says which with `linkRole`. A **face** folds into the record in a Field: a
@@ -1108,34 +1109,50 @@ Component gallery (dev).
     holding a game row offers *Open the appearance*, and it is removed from the
     game, not from the card. Today: games' Appearance (join), Player profile
     and Venue (faces).
-  - **The Links card** is on every record: the generic page draws it, and a
-    board that draws the whole page gets it below its page unless it draws its
-    own (Person's, from NR-People). It shows a small map when two or more
-    things are linked, then the groups, each row tinted by the other record's
-    module, dated things newest first, payments with their sum. A row says
-    what the record joins up ("Sat, 17 Oct · Playground Arena · ₹450 · unpaid"
-    on an Appearance) and marks a guessed Link. Groups of hidden Objects (a
-    habit's check-ins) come last. Four rows a group, then *N more* (opens
-    Links). Tap opens the record; long-press offers Open · Show in Links ·
-    **Remove link** (with Undo). Mentions are not here (Mentioned in has them).
-  - **Adding and removing keep Fields in step.** A Link a Field made is taken
-    out of the Field when removed (else the next edit would bring it back);
-    **Link** offers this record's own link Fields (Project, People, Venue),
-    which fill the Field and pick only from the Objects it takes, then
-    *related* or your own word, which pick from anything.
-  - **The Links screen** (`/links/<id>`): the network (direct links or two
-    steps out), a legend of the modules on it in their tints, and under it the
-    centre's Links card in full, so adding and removing work here too;
-    re-centring shows *Back to* the start. Ring two is ranked by how many of
-    ring one each record shares (Karan, at two of Priya's games, first), at
-    most four of one Object, forty records in all. Records of hidden Objects
-    (check-ins, readings) stay off it, the centre apart. Each line carries its
-    word, read from the nearer record ("venue"; "captain" and "player" for the
-    role the near record plays).
+  - **The Links card** (L4) is on every record: the generic page draws it,
+    and a board that draws the whole page gets it below its page unless it
+    draws its own (Person's, from NR-People, which reads the same groups). A
+    small map of what is around it (*Open Links*), then every link grouped by
+    its word in a left column, each row a disc in its module's colour, what
+    it joins up under it ("₹450 · paid · 1 goal · Owes you ₹450"); a guessed
+    one says *to check*. Groups of hidden Objects (a habit's check-ins) come
+    last. Four rows a group, then *N more* (opens Links). Tap opens the
+    record; **hold** opens the link (L3). Mentions are not here (Mentioned in
+    has them).
+  - **A link, tapped** (L3; hold a row, or tap a word on the map): the two
+    records and the word, since when and whether still true, where it came
+    from (a dump with its sentence while the dump is kept, a message, the
+    agent, a Field, you), how sure it is (under 70% it is dashed with a "?";
+    *Right* confirms it), its word to change (not a Field's: that is changed
+    on the record), *Open* the other end, **Remove this link** with Undo. A
+    link through a meeting (Priya in a game) opens that record instead.
+  - **Adding a link** (L5): find the record or start a new one (linked once
+    saved), pick the word (this record's own link Fields, which fill the
+    Field, then knows · family of · works with · with · at · part of · owns ·
+    paid for · about, or your own), since when if you know, Link. Saved as
+    yours (source manual), so it never lands in To check. Removing a Link a
+    Field made takes it out of the Field, else the next edit brings it back.
+    Faces and meetings (a Player profile, a Venue, an Appearance) are not
+    offered: you link the thing itself.
+  - **The Links screen** (L1, L2; `/links/<id>`): *1 hop · 2 hops*, the count
+    and how many are to check, module chips to filter, then the map: the
+    record in the middle with a lime ring, the first ring round it in module
+    colours with "+3" for links further out, the word on a pill along each
+    line (dashed with "?" when guessed); two hops pull the first ring in and
+    add a smaller, dotted second ring whose words show when a line is tapped
+    (a tapped line goes lime, the rest drop to 20%). Ring two is ranked by how
+    many of ring one each record shares (Karan, at two of Priya's games,
+    first), at most four of one Object, thirty records in all; records of
+    hidden Objects and details of a meeting stay off it, the centre apart.
+    Tap a record to centre on it, hold to open it. Under the map, the centre's
+    card (*Open record*, the hop switch, *Back to* the start) and its Links
+    in full. Still: no pulse or halo, and no motion yet (the artboards' draw
+    out and glide are left for later).
   - **From Browse** (`/links`): the records that join up the most, by breadth
     (each kind of linked record counts up to five, so 40 payments on a card
     don't outrank a person linked to games, debts, a group and a trip), then
-    modules reached; hidden Objects neither count nor appear.
+    modules reached; hidden Objects neither count nor appear. L6 (everything
+    as clusters, a time-lapse) is the design's backlog, not built.
 - **Automations**: a tile in the Browse grid. The list of your automations with
   last run and state; the editor (trigger → conditions → steps, outputs passed
   along); templates; run log per run and per step; run now. Manual-run

@@ -5,6 +5,7 @@ import { resolveCandidates, clearMatch } from '../ai/lifeTools';
 import { edgeLabel } from './edges';
 import { humanise } from './words';
 import { aspectsOf, isDetail, viewLinks, type ViewLink } from './view';
+import type { LinkRef } from '../links';
 
 /**
  * Reading the life graph (docs/GRAPH.md §4): a record's neighbours with the
@@ -91,6 +92,12 @@ export interface GraphEdge {
   kind: string;
   /** The word on the line, read from the nearer record ("played in", "venue"). */
   word?: string;
+  /** Filing only guessed it: drawn dashed with a "?". */
+  guessed?: boolean;
+  /** The stored Link (tap a line for where it came from); null for a join (Priya in a game). */
+  ref?: LinkRef | null;
+  /** The record the line passes through (her Appearance), when it is a join. */
+  via?: { id: string; object: string; title: string } | null;
 }
 
 /**
@@ -151,7 +158,7 @@ export function egoGraph(os: LifeOSContext, centreId: string, opts: { hops?: num
       if (!nodes.has(v.other.id)) continue;
       // One line per pair, with the first word found (from the nearer record).
       const pair = [near, v.other.id].sort().join('|');
-      if (!edges.has(pair)) edges.set(pair, { from: near, to: v.other.id, kind: v.kind, word: v.line });
+      if (!edges.has(pair)) edges.set(pair, { from: near, to: v.other.id, kind: v.kind, word: v.line, guessed: v.guessed, ref: v.ref, via: v.via });
     }
     frontier = next;
   }
@@ -228,13 +235,9 @@ export function linkGroups(os: LifeOSContext, id: string): LinkGroup[] {
   const selfLabel = os.registry.objects.get(self.object)?.label.toLowerCase();
   const views = viewLinks(os, id);
   const me = new Set([id, ...aspectsOf(os, id)]);
-  // One Object pointing here in several ways (two Fields, or a Field beside a join): name each but the plain one.
+  // One Object pointing here through two Fields that read alike ("transactions" for account and to account): name each but the plain one.
   const ways = new Map<string, Set<string>>();
-  const way = (object: string, how: string) => ways.set(object, (ways.get(object) ?? new Set()).add(how));
-  for (const v of views) {
-    if (v.viaField) way(v.viaField.object, v.viaField.kind);
-    else if (!v.ref) way(v.other.object, '(join)');
-  }
+  for (const v of views) if (v.viaField) ways.set(v.viaField.object, (ways.get(v.viaField.object) ?? new Set()).add(v.viaField.kind));
   const groups = new Map<string, LinkItem[]>();
   for (const v of views) {
     const f = v.viaField;
@@ -258,7 +261,7 @@ export function linkGroups(os: LifeOSContext, id: string): LinkGroup[] {
       module: def?.module ?? null,
       at: DATED.has(v.other.object) ? eventTime(os, v.other.id) : null,
       amount,
-      context: v.details.length ? v.details.join(' · ') : f ? fieldContext(os, v.via?.id ?? v.other.id, me) : null,
+      context: v.details.length ? v.details.join(' · ') : v.direction === 'in' ? fieldContext(os, v.via?.id ?? v.other.id, me) : null,
       subtitle: rec?.subtitle && rec.subtitle !== v.other.title ? rec.subtitle : null,
       guessed: v.guessed,
       hidden: !!def?.hidden,

@@ -129,7 +129,8 @@ export function viewLinks(os: LifeOSContext, id: string): ViewLink[] {
           push({
             key: `join:${o.id}`,
             other: { id: e.id, object: e.object, title: e.title },
-            word: role.words?.[theirs[0]] ?? os.registry.objects.get(e.object)?.labelPlural ?? e.object,
+            // From Priya, the game reads by its Field's word ("played in"); from the game, Priya by the join's word for her ("players").
+            word: (role.words?.[theirs[0]] ?? humanise(jdef?.fields.find((f) => f.key === theirs[0])?.linkWord ?? theirs[0])).toLowerCase(),
             line: humanise(jdef?.fields.find((f) => f.key === theirs[0])?.linkWord ?? theirs[0]),
             ref: null,
             via: { id: j.id, object: j.object, title: j.title },

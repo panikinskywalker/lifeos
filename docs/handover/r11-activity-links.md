@@ -246,3 +246,71 @@ says Turf.
 Patch notes:
 - Turf and Home show once in Browse, under Boards; Links calls Turf's colour
   Turf, not Games.
+
+## Follow-up 4, 15 Nov: Links built to the Links · Noir artboards; Activity designed
+
+The canvas already had the Links design (page *Links · Noir*, artboards
+`L-Links`, `L-Links2`, `L-LinkDetail`, `L-RecordLinks`, `L-AddLink`,
+`L-Everything`, `L-Parts`); Rutvij asked to build to it, using the design's
+link words where they read well, and to add Activity to that page.
+
+App:
+- **Words** (`src/core/graph/words.ts`): lower case verbs as the record says
+  them (*works at*, *with*, *paid*, *member of*, *captain of*, *fronted*,
+  *played in*), the Field's label from its holder, the other Object's records
+  ("tasks", "transactions") where no verb fits. A map line says its card's
+  word, one record in the singular. MODEL.md layer 5 says so. Decided here
+  (the design was silent): *with* also for a Task's or Trip's People;
+  *transfers in* for a transfer's to account; *player of the match*.
+- **The card** (`src/ui/components/LinksCard.tsx`, L4): small map with Open
+  Links, word column, module-coloured discs, *to check* for guesses, hold for
+  the link sheet. The column is 84 wide, not 66, so ORGANISATIONS stays whole.
+- **The map** (`src/ui/components/LinkMap.tsx`, L1, L2, L7): rings round a
+  lime-ringed centre, module colours, word pills along bent lines, "+N",
+  dashed "?" for guesses, dotted quieter second ring, a tapped line lime with
+  the rest at 20%. Replaces the force layout (`LinksView.tsx` removed;
+  `d3-force` and `@types/d3-force` in package.json are now unused: left for
+  the merge to drop, since removing them changes the lockfile).
+- **The link sheet** (`src/ui/components/LinkSheets.tsx`, L3): since / still
+  true, where it came from (`linkInfo` in `src/core/links.ts`: dump sentence
+  while kept, message, agent, Field, you), confidence with *Right*, change the
+  word (`changeLinkWord`, keeps provenance; not for a Field's link), Open,
+  Remove with Undo; a link through a meeting opens that record.
+- **Add a link** (same file, L5): search, *New record "…"* (opens that
+  Object's form, linked on save), words (own link Fields, then knows · family
+  of · works with · with · at · part of · owns · paid for · about, or your
+  own), since, Link; faces and meetings are not offered. Not built from L5:
+  *Both ways?* (core already stores symmetric words once).
+- **The screen** (`app/links/[id].tsx`, L1, L2): hop switch, counts, module
+  chips, the map full width, the centre card, the full card below.
+- Not built: L6 (backlog in the design), the motion in L7 (lines drawing out,
+  the glide on re-centre), *Set dates* in L3, pinch and pan in L2.
+
+Canvas (the same page, a second row titled *Activity · Noir*): `A-Home`
+(A1: every tracker's grid, done today, On Today with toggles and reorder),
+`A-Tracker` (A2: 26 weeks, this week / month / streak, *what made a day
+count* for a tapped day, the rules), `A-Edit` (A3: name, icon, colour, rules,
+the seven kinds, a habit picked), `A-Tile` (A4: the Today tile one at a time
+and all of them). The app's Activity board is not yet rebuilt to them; A2's
+*what made a day count* needs a core reader that lists a day's matches.
+
+Tests: `src/core/linkGroups.test.ts` now 8 (the word expectations follow the
+new rule; a new one for `linkInfo`, `changeLinkWord` and since). 635 of 636
+pass; the one failure is the base's deliveries test, as before. Typecheck
+green; the web export builds; Priya's Links (one and two hops, a line's
+sheet), Toit's card and the add sheet checked in the browser, no console
+errors.
+
+Phone checks: the Links screen on a person (rings, words, +N, chips, tap to
+re-centre, hold to open, tap a word for its sheet, Back to); a record's card
+(map, word column, hold a row: Right / change word / Remove with Undo); Link
+on a record (search, a Field word fills the Field, New record links on save).
+
+Patch notes:
+- Links are drawn as in the design: the record in the middle, what it links
+  to round it in module colours, the link word on each line; one or two hops,
+  filter by module.
+- Every record's Links card groups by the words you would say (works at,
+  with, paid, played in); hold a link to see where it came from, confirm a
+  guess, change its word or remove it.
+- Adding a link searches records, can start a new one, and takes a since date.

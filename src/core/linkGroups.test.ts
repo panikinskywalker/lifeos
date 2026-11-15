@@ -5,7 +5,7 @@ import { Registry } from './registry/registry';
 import type { LifeOSContext } from './registry/context';
 import { bus } from './events/bus';
 import { egoGraph, linkGroups, mostLinked } from './graph/read';
-import { addLink, removeLink } from './links';
+import { addLink, changeLinkWord, linkInfo, removeLink } from './links';
 import { orgType, placeType } from '../modules/places/types';
 import { personType } from '../modules/crm/types';
 import { eventType, projectType, taskType } from '../modules/projects/types';
@@ -49,17 +49,17 @@ describe('the Links card (R11)', () => {
 
     const g = linkGroups(os, karan.id);
     expect(g.map((x) => [x.word, x.items.map((i) => i.title)])).toEqual([
-      ['Was at', ['Lunch', 'Dinner']],
-      ['Works at', ['Acme']],
+      ['with', ['Lunch', 'Dinner']],
+      ['works at', ['Acme']],
     ]);
     expect(g[0]!.items[0]).toMatchObject({ module: 'projects', type: 'event', direction: 'in', kind: 'with' });
     expect(g[1]!.items[0]).toMatchObject({ module: 'places', direction: 'out', fromId: karan.id, toId: acme.id });
 
     // Person's Works at Field, seen from the Organisation: its People, not "Works at" read backwards.
-    expect(linkGroups(os, acme.id).map((x) => x.word)).toEqual(['People']);
+    expect(linkGroups(os, acme.id).map((x) => x.word)).toEqual(['people']);
     // Place declares *at* as "Been here"; a Place in a Place reads by direction.
-    expect(linkGroups(os, toit.id).map((x) => x.word)).toEqual(['Been here', 'In']);
-    expect(linkGroups(os, bengaluru.id).map((x) => x.word)).toEqual(['Contains']);
+    expect(linkGroups(os, toit.id).map((x) => x.word)).toEqual(['been here', 'in']);
+    expect(linkGroups(os, bengaluru.id).map((x) => x.word)).toEqual(['contains']);
   });
 
   it('carries payments signed, and a removed Link comes back the same way round', () => {
@@ -98,15 +98,15 @@ describe('the Links card (R11)', () => {
     const nike = os.records.create({ object: 'transaction', title: 'Nike', data: { amount: 15000, kind: 'expense', date: '2026-10-28', accountId: amex.id } });
     const pay = os.records.create({ object: 'transaction', title: 'Card payment', data: { amount: 50000, kind: 'transfer', date: '2026-10-30', accountId: hdfc.id, toAccountId: amex.id } });
     expect(linkGroups(os, amex.id).map((g) => [g.word, g.items.map((i) => i.title)])).toEqual([
-      ['Transactions', ['Nike', 'Toit']],
-      ['Transactions · to account', ['Card payment']],
+      ['transactions', ['Nike', 'Toit']],
+      ['transfers in', ['Card payment']],
     ]);
-    expect(linkGroups(os, pay.id).map((g) => g.word)).toEqual(['Account', 'To account (transfers)']);
+    expect(linkGroups(os, pay.id).map((g) => g.word)).toEqual(['account', 'to account']);
     // A record that joins things up says what else it points at.
     expect(linkGroups(os, amex.id)[1]!.items[0]!.context).toBe('HDFC');
     const ship = os.records.create({ object: 'project', title: 'Ship LifeOS', data: {} });
     os.records.create({ object: 'task', title: 'Test on Android', data: { projectId: ship.id } });
-    expect(linkGroups(os, ship.id).map((g) => g.word)).toEqual(['Tasks']);
+    expect(linkGroups(os, ship.id).map((g) => g.word)).toEqual(['tasks']);
     void nike; void toit;
   });
 
@@ -124,12 +124,12 @@ describe('the Links card (R11)', () => {
     const priya = os.records.create({ object: 'person', title: 'Priya', data: {} });
     const undoAdd = addLink(os, task.id, priya.id, 'person');
     expect((os.records.get(task.id)!.data as { personIds?: string[] }).personIds).toEqual([priya.id]);
-    expect(linkGroups(os, priya.id).map((g) => g.word)).toEqual(['Tasks']);
+    expect(linkGroups(os, priya.id).map((g) => g.word)).toEqual(['with']);
     undoAdd();
     expect(linkGroups(os, priya.id)).toEqual([]);
     // A word no Field has is a plain Link.
     addLink(os, task.id, priya.id, 'gift for');
-    expect(linkGroups(os, task.id).find((g) => g.word === 'Gift for')?.items[0]?.title).toBe('Priya');
+    expect(linkGroups(os, task.id).find((g) => g.word === 'gift for')?.items[0]?.title).toBe('Priya');
   });
 
   it('keeps hidden Objects out of the network and Most linked, and ranks by breadth', () => {
@@ -178,25 +178,25 @@ describe('the Links card (R11)', () => {
 
     const words = (id: string) => linkGroups(os, id).map((g) => [g.word, g.items.map((i) => i.title)]);
     expect(words(priya.id)).toEqual([
-      ['Games', ['Sat, 17 Oct · Playground Arena']],
-      ['Games · captain', ['Sat, 17 Oct · Playground Arena']],
+      ['captain of', ['Sat, 17 Oct · Playground Arena']],
+      ['played in', ['Sat, 17 Oct · Playground Arena']],
     ]);
-    const played = linkGroups(os, priya.id)[0]!.items[0]!;
+    const played = linkGroups(os, priya.id).find((g) => g.word === 'played in')!.items[0]!;
     expect(played).toMatchObject({ removable: false, via: { id: ap.id, type: 'appearance' } });
     expect(played.context).toContain('Owes you ₹450'); // the Debt folded into her share
     // What you owe Priya for Karan's share (she fronted) folds into her row for that game too.
     const kap = linkGroups(os, game.id)[0]!.items.find((i) => i.title === 'Karan')!.via!;
     const owe = os.records.create({ object: 'debt', title: 'Turf · Playground Arena · 2026-10-17', data: { personId: priya.id, direction: 'i_owe', amount: 450, date: '2026-10-17', kind: 'split' } });
     os.links.link(owe.id, kap.id, 'for');
-    expect(linkGroups(os, priya.id).map((g) => g.word)).toEqual(['Games', 'Games · captain']);
-    expect(linkGroups(os, priya.id)[0]!.items[0]!.context).toContain('You owe ₹450');
+    expect(linkGroups(os, priya.id).map((g) => g.word)).toEqual(['captain of', 'played in']);
+    expect(linkGroups(os, priya.id).find((g) => g.word === 'played in')!.items[0]!.context).toContain('You owe ₹450');
     expect(words(game.id)).toEqual([
-      ['Players', ['Karan', 'Priya']],
-      ['Captain, team B', ['Priya']],
-      ['Venue', ['Playground Arena']],
+      ['players', ['Karan', 'Priya']],
+      ['captain', ['Priya']],
+      ['venue', ['Playground Arena']],
     ]);
-    expect(linkGroups(os, game.id).find((g) => g.word === 'Venue')!.items[0]).toMatchObject({ type: 'place', removable: true, via: { id: venue.id } });
-    expect(words(arena.id)).toEqual([['Games', ['Sat, 17 Oct · Playground Arena']]]);
+    expect(linkGroups(os, game.id).find((g) => g.word === 'venue')!.items[0]).toMatchObject({ type: 'place', removable: true, via: { id: venue.id } });
+    expect(words(arena.id)).toEqual([['games', ['Sat, 17 Oct · Playground Arena']]]);
 
     const g = egoGraph(os, priya.id);
     expect(g.nodes.map((n) => `${n.hop}:${n.title}`).sort()).toEqual(['0:Priya', '1:Sat, 17 Oct · Playground Arena', '2:Karan', '2:Playground Arena']);
@@ -205,5 +205,28 @@ describe('the Links card (R11)', () => {
     expect(mostLinked(os).map((r) => r.type)).not.toContain('appearance');
     expect(mostLinked(os).map((r) => r.type)).not.toContain('venue');
     expect(mostLinked(os).map((r) => r.type)).not.toContain('player');
+  });
+
+  it('says where a link came from, changes its word keeping that, and keeps a since date (L3, L5)', () => {
+    const karan = os.records.create({ object: 'person', title: 'Karan', data: {} });
+    const gym = os.records.create({ object: 'place', title: 'Cult Gym', data: {} });
+    const d = os.dumps.add({ body: 'made a new friend today, Karan, met at the gym' });
+    const l = os.links.link(karan.id, gym.id, 'at', {}, 'assistant', { source: 'dump', sourceId: d.id, confidence: 0.6 });
+    expect(linkInfo(os, l.id)).toMatchObject({ confidence: 0.6, field: null, origin: { by: 'dump', quote: 'made a new friend today, Karan, met at the gym' } });
+    const undo = changeLinkWord(os, l.id, 'knows');
+    const now = os.links.forEntity(karan.id)[0]!.relation;
+    expect(now).toMatchObject({ kind: 'knows', source: 'dump', sourceId: d.id, confidence: 0.6 });
+    undo();
+    expect(os.links.forEntity(karan.id).map((x) => x.relation.kind)).toEqual(['at']);
+
+    const ship = os.records.create({ object: 'project', title: 'Ship', data: {} });
+    const task = os.records.create({ object: 'task', title: 'Test', data: { projectId: ship.id } });
+    const made = os.links.forEntity(task.id).find((x) => x.relation.kind === 'project')!.relation;
+    expect(linkInfo(os, made.id)).toMatchObject({ field: 'Project', origin: { by: 'field' } });
+
+    const since = Date.parse('2025-03-14T00:00:00');
+    addLink(os, karan.id, ship.id, 'works_with', 'user', since);
+    const hand = os.links.forEntity(karan.id).find((x) => x.relation.kind === 'works_with')!.relation;
+    expect(linkInfo(os, hand.id)).toMatchObject({ since, confidence: 1, origin: { by: 'you' } });
   });
 });
