@@ -391,7 +391,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
   );
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
       <ScrollView ref={scroll} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: 24, gap: 18 }} keyboardShouldPersistTaps="handled">
         <ScreenHeader title="Ask Money" subtitle="Your money guru · it cannot move money" onBack={() => (router.canGoBack() ? router.back() : router.replace('/module/finance/index' as never))} />
 
@@ -500,7 +500,7 @@ function AgentTurnView({ a, onFollow }: { a: AgentTurn; onFollow: (item: { quest
         </View>
       ) : null}
       {a.texts.map((x) => (
-        <Text key={x.id} style={{ fontSize: 15, lineHeight: 22, paddingHorizontal: 4 }}>{x.text}</Text>
+        <Prose key={x.id} text={x.text} />
       ))}
       {a.shows.map((sh, i) => (
         <AnswerView key={i} a={sh} onFollow={onFollow} />
@@ -526,6 +526,36 @@ function AgentTurnView({ a, onFollow }: { a: AgentTurn; onFollow: (item: { quest
         </View>
       ) : null}
       {!a.done && !a.confirm ? <Text color="secondary" style={{ fontSize: 15, lineHeight: 22, paddingHorizontal: 4 }}>{a.texts.length || a.shows.length ? 'Still working…' : 'Thinking…'}</Text> : null}
+    </View>
+  );
+}
+
+/** The agent's words: paragraphs, bullet lines and **bold**, drawn as the app's text (no raw symbols). */
+function Prose({ text }: { text: string }) {
+  const t = useTheme();
+  const inline = (line: string) => line.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, i) => (part.startsWith('**') && part.endsWith('**') ? <Text key={i} style={{ fontSize: 15, lineHeight: 22, fontWeight: '700' }}>{part.slice(2, -2)}</Text> : part.replace(/\*/g, '')));
+  const blocks = text.replace(/^#+\s*/gm, '').split(/\n{2,}/);
+  return (
+    <View style={{ gap: 10, paddingHorizontal: 4 }}>
+      {blocks.map((b, i) => {
+        const lines = b.split('\n').filter((l) => l.trim());
+        const bullet = (l: string) => /^\s*([-*•]|\d+\.)\s+/.test(l);
+        if (!lines.some(bullet)) return <Text key={i} style={{ fontSize: 15, lineHeight: 22 }}>{inline(lines.join(' '))}</Text>;
+        return (
+          <View key={i} style={{ gap: 6 }}>
+            {lines.map((l, j) =>
+              bullet(l) ? (
+                <View key={j} style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.c.accent.mustard, marginTop: 8 }} />
+                  <Text style={{ flex: 1, fontSize: 15, lineHeight: 22 }}>{inline(l.replace(/^\s*([-*•]|\d+\.)\s+/, ''))}</Text>
+                </View>
+              ) : (
+                <Text key={j} style={{ fontSize: 15, lineHeight: 22, fontWeight: /:\s*$/.test(l) ? '700' : '400' }}>{inline(l)}</Text>
+              ),
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }

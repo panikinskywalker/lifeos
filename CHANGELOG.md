@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.83 · 16 Nov 2026
+
+**Ask Money reads well and the keyboard no longer hides your typing.** The
+agent's answers show as real text: bold where it means bold, bullet points as
+bullets, its "What to do:" lines as headings, never raw asterisks or dashes.
+When the keyboard opens, the box you type in rises above it.
+
 ## v0.0.82 · 16 Nov 2026
 
 **Ask Money's agent answers everything you type.** With a Claude key, a typed
