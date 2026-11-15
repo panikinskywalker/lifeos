@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Linking, Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, Ellipse, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
@@ -10,6 +10,7 @@ import { Button, EmptyState, Icon, Screen, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { NotConnectedCard, SyncBanners, TurfSyncPill, useTurfStatus } from './states';
 import { shortDay, useBack, type Props } from './common';
+import { SearchBox, found } from './dues';
 
 /**
  * Turf · Noir 7 Venues (TF-Venues): your turfs with their defaults — a card
@@ -163,6 +164,8 @@ export function TurfVenues({ ctx }: Props) {
       .sort((x, y) => y.games - x.games || x.v.title.localeCompare(y.v.title));
   }, []);
   const open = (id?: string) => router.push((id ? `/board/turf/venue?venue=${id}` : '/board/turf/venue') as never);
+  const [q, setQ] = useState('');
+  const shown = venues.filter((row) => found(q, row.v.title, row.area));
   return (
     <Screen title="Turf" subtitle="Browse" onBack={back} right={<TurfSyncPill busy={busy} />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <SyncBanners onRetry={() => void pull()} />
@@ -171,7 +174,10 @@ export function TurfVenues({ ctx }: Props) {
       ) : !venues.length ? (
         <EmptyState icon="location" line="No venues yet. Add the turfs you play at, with their usual format, cost and kick-off." />
       ) : (
-        venues.map((row) => <VenueCard key={row.v.id} row={row} money={ctx.format.currency} onOpen={() => open(row.v.id)} />)
+        <>
+          {venues.length > 4 ? <SearchBox value={q} onChange={setQ} placeholder="Search venues" /> : null}
+          {shown.map((row) => <VenueCard key={row.v.id} row={row} money={ctx.format.currency} onOpen={() => open(row.v.id)} />)}
+        </>
       )}
       <Button title="Add venue" icon="plus" variant="secondary" block style={{ height: 48 }} onPress={() => open()} />
     </Screen>

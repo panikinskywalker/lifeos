@@ -11,6 +11,7 @@ import { Face, SyncPill } from './teams';
 import { useCopyShare } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
 import { RiseIn } from './motion';
+import { SearchBox, found } from './dues';
 
 /**
  * Turf · Noir 5b Players · Leaders (TF-Leaders): Turf web's thirteen tables
@@ -128,6 +129,7 @@ export function TurfLeaders(_props: Props) {
   const [pos, setPos] = useState<LeaderPosition>('all');
   const [period, setPeriod] = useState<Period>('season');
   const [picking, setPicking] = useState(false);
+  const [q, setQ] = useState('');
   const cat = LEADER_CATEGORIES.find((x) => x.key === c)!;
   const per = PERIODS.find((p) => p.key === period)!;
 
@@ -230,50 +232,52 @@ export function TurfLeaders(_props: Props) {
             <FilterChip label={per.label} icon="chevron-down" onPress={() => setPicking(true)} />
           </View>
 
+          <SearchBox value={q} onChange={setQ} placeholder="Search players" />
           {top ? (
             <>
+              {!q ? (
               <Tap label={label(top, 0)} onPress={() => open(top)} style={{ padding: 16, gap: 12, borderRadius: 28, backgroundColor: blocks.lime }}>
-                <OnBlock>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Bebas size={18} lh={16}>{`#${d.places[0]}`}</Bebas>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 11, borderRadius: 999, backgroundColor: '#F5F5F7' }}>
-                      <Icon name="star" size={13} color="#0B0B0D" />
-                      <Text variant="labelMicro" color="#0B0B0D">
-                        {BADGE[c]}
-                      </Text>
+                  <OnBlock>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Bebas size={18} lh={16}>{`#${d.places[0]}`}</Bebas>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 11, borderRadius: 999, backgroundColor: '#F5F5F7' }}>
+                        <Icon name="star" size={13} color="#0B0B0D" />
+                        <Text variant="labelMicro" color="#0B0B0D">
+                          {BADGE[c]}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                    <Face id={top.player.id} name={top.player.name} size={60} />
-                    <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-                      <Bebas size={30} lh={27} lines={1}>
-                        {nameOf(top)}
-                      </Bebas>
-                      <Text variant="caption" color="#0B0B0DA6" numberOfLines={1}>
-                        {lineOf(top, c, 'per game')}
-                      </Text>
-                      <FormSquares form={formOf(top)} size={10} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                      <Face id={top.player.id} name={top.player.name} size={60} />
+                      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                        <Bebas size={30} lh={27} lines={1}>
+                          {nameOf(top)}
+                        </Bebas>
+                        <Text variant="caption" color="#0B0B0DA6" numberOfLines={1}>
+                          {lineOf(top, c, 'per game')}
+                        </Text>
+                        <FormSquares form={formOf(top)} size={10} />
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Bebas size={64} lh={56}>
+                          {shown(top, c)}
+                        </Bebas>
+                        <Bebas size={14} lh={13} color={INK_60}>
+                          {cat.unit}
+                        </Bebas>
+                      </View>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Bebas size={64} lh={56}>
-                        {shown(top, c)}
-                      </Bebas>
-                      <Bebas size={14} lh={13} color={INK_60}>
-                        {cat.unit}
-                      </Bebas>
-                    </View>
-                  </View>
-                </OnBlock>
-              </Tap>
-              {d.sorted.length > 1 ? (
+                  </OnBlock>
+                </Tap>
+              ) : null}
+              {!q && d.sorted.length > 1 ? (
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   {podium(1, blocks.sky)}
                   {podium(2, blocks.pink)}
                 </View>
               ) : null}
               <View style={{ padding: 8, gap: 8, borderRadius: 24, backgroundColor: t.c.bg.tile }}>
-                {d.sorted.slice(3).map((r, k) => {
-                  const i = k + 3;
+                {d.sorted.map((r, i) => ({ r, i })).filter(({ r, i }) => (q ? found(q, r.player.name) : i >= 3)).map(({ r, i }) => {
                   const mine = r.player.id === d.me;
                   return (
                     <Tap key={r.player.id} label={label(r, i)} onPress={() => open(r)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, backgroundColor: mine ? '#D7F55C14' : 'transparent' }}>
@@ -323,7 +327,7 @@ export function TurfLeaders(_props: Props) {
                   {keeperTable(c) ? `${plural(d.needed, 'game')} in goal to rank` : `${plural(d.needed, 'match', 'matches')} to rank`}
                 </Text>
               </View>
-              {d.developing.map((r) => {
+              {d.developing.filter((r) => found(q, r.player.name)).map((r) => {
                 const have = keeperTable(c) ? r.keeperApps : r.apps;
                 return (
                   <Tap key={r.player.id} label={`${r.player.name}, ${have} of ${d.needed}`} onPress={() => open(r)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 4 }}>

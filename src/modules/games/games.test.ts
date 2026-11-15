@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, fetchTurfInbox, decideTurf, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, fetchTurfInbox, decideTurf, payPart, owedOn, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -36,6 +36,7 @@ afterEach(() => {
 const first = (): TurfSyncPage => JSON.parse(JSON.stringify(sampleSync)) as TurfSyncPage;
 /** A later page: only what changed after `since`. */
 const delta = (since: number, rev: number, tables: TurfSyncPage['tables'], deleted: TurfSyncPage['deleted'] = []): TurfSyncPage => ({ since, rev, tables, deleted });
+type AppearanceLike = { personId: string; gameDate: string; share: number; paid: boolean; amountPaid?: number };
 const q = <T = Record<string, unknown>>(object: string) => os.records.query<T>(object, { includeArchived: true }, { limit: 1000 });
 const live = <T = Record<string, unknown>>(object: string) => q<T>(object).filter((r) => !r.archived);
 const person = (name: string) => q<{ phone?: string; upi?: string; email?: string }>('person').find((p) => p.title === name)!;
@@ -319,6 +320,17 @@ describe('payments recorded in LifeOS (R9c.2)', () => {
     expect(debt('Karan', '2026-10-17').data.amount).toBe(250);
     expect(whoOwes(os).find((o) => o.name === 'Karan')!.amount).toBe(750);
     expect(turfChanges(os).sending).toHaveLength(1);
+  });
+
+  it('a part payment fills the oldest open share first; anything over waits on the last as credit', () => {
+    const open = q<AppearanceLike>('appearance').filter((a) => a.data.personId === person('Karan').id && owedOn(a.data as never) > 0).sort((a, b) => a.data.gameDate.localeCompare(b.data.gameDate));
+    expect(open.length).toBeGreaterThan(1);
+    const first = owedOn(open[0]!.data as never);
+    const items = payPart(os, open.map((a) => a.id), first + 100);
+    expect(items.map((i) => i.payload.body.amount)).toEqual([first, 100]);
+    expect(() => payPart(os, [open[0]!.id], 0)).toThrow(/above ₹0/);
+    const over = payPart(os, [open[1]!.id], 10_000);
+    expect(over.map((i) => i.payload.body.amount)).toEqual([10_000]);
   });
 
   it('sent before the sync; the entry Turf web confirms (same action id) replaces the sending one', async () => {

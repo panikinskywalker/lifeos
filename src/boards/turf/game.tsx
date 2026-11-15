@@ -379,9 +379,11 @@ function PayRow({ l, f, me, fronted, open, reminder, onToggle, onSettle, onPay }
   const owed = owedOn(a);
   const paid = a.amountPaid ?? 0;
   const partial = owed > 0 && paid > 0;
+  // Credit moved in from another match, as Turf web words it ("₹28 from credit").
+  const credit = useLive((o) => o.records.timeline.forEntity(l.appearance.id, 200).filter((e) => e.kind === 'payment' && (e.body ?? '').startsWith('Credit from')).reduce((sum, e) => sum + Number(e.meta.amount ?? 0), 0), [l.appearance.id]);
   const first = firstName(l.name);
   const attendance = a.attendance === 'confirmed' ? 'played' : ATTENDANCE_WORDS[a.attendance];
-  const sub = [partial ? `${f(paid)} of ${f(a.share)}` : f(a.share), attendance, l.sending ? 'sending…' : null].filter(Boolean).join(' · ');
+  const sub = [partial ? `${f(paid)} of ${f(a.share)}` : f(a.share), credit > 0 ? `${f(credit)} from credit` : null, attendance, l.sending ? 'sending…' : null].filter(Boolean).join(' · ');
   const remind = (size: number, iconSize: number) =>
     reminder ? (
       <View style={{ flexDirection: 'row', gap: 6 }}>

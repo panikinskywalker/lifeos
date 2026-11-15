@@ -7,6 +7,19 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.68 · 15 Nov 2026
+
+**Turf catches up with Turf web on money and lists.**
+- **Part payments from Dues:** open a person, type what came in and tap
+  Record. It pays their oldest games first; anything over waits as credit.
+  Undo is on the toast.
+- **Credit shows on the match:** a share paid partly from credit says so ("₹28
+  from credit"), as Turf web does.
+- **Search** on Dues, Venues and Leaders; on Leaders a player keeps their place
+  and the podium steps aside while you search.
+- **10 and 11-a-side:** formations for both, and venues take any size from 5 to
+  11 (it was 5, 6, 7 and "8+").
+
 ## v0.0.67 · 15 Nov 2026
 
 **Turf has the bell.** Turf's Home has Turf web's bell, with a count of what

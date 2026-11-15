@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
-import { allAppearances, allPlayers, auditLog, duesTexts, isSending, markPaid, owedOn, recordPayment, rupees, turfDues, youPersonId, type AuditEntry, type DueGame, type DuePerson, type Dues } from '@modules/games';
+import { allAppearances, allPlayers, auditLog, duesTexts, isSending, markPaid, owedOn, payPart, recordPayment, rupees, turfDues, youPersonId, type AuditEntry, type DueGame, type DuePerson, type Dues } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { monoFonts } from '@ui/theme/tokens';
-import { ChipRow, FilterChip, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
+import { fonts, monoFonts } from '@ui/theme/tokens';
+import { ChipRow, FilterChip, Icon, IconButton, NumberField, Screen, Text, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Face, Mono, SyncPill } from './teams';
 import { useCopyShare } from './switcher';
@@ -133,6 +133,21 @@ export function Tick({ on, size = 26, onPress, label, busy }: { on: boolean; siz
 }
 
 /** A charcoal card (r24, p14). */
+/** A list's search box (as the Games list has it); `found` matches a query against any of a row's words. */
+export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingHorizontal: 18, borderRadius: 16, backgroundColor: t.c.bg.tile, borderWidth: 1, borderColor: t.c.line }}>
+      <Icon name="search" size={18} color={t.c.fg.tertiary} />
+      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={t.c.fg.tertiary} style={{ flex: 1, height: 48, color: t.c.fg.primary, fontFamily: fonts[500], fontSize: 15 }} accessibilityLabel={placeholder} returnKeyType="search" />
+    </View>
+  );
+}
+export const found = (query: string, ...texts: Array<string | null | undefined>) => {
+  const q = query.trim().toLowerCase();
+  return !q || texts.some((x) => x?.toLowerCase().includes(q));
+};
+
 export function TurfCard({ children, gap = 10, padding = 14, radius = 24, style }: { children: React.ReactNode; gap?: number; padding?: number; radius?: number; style?: StyleProp<ViewStyle> }) {
   const t = useTheme();
   return <View style={[{ padding, gap, borderRadius: radius, backgroundColor: t.c.bg.tile }, style]}>{children}</View>;
@@ -180,6 +195,7 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
   const { copy, share } = useCopyShare();
   const [open, setOpen] = useState<string | null>(null);
   const [paid, setPaid] = useState<JustPaid[]>([]);
+  const [part, setPart] = useState<number | undefined>(undefined);
   const live = useLive((o) => ({ you: youPersonId(o), sending: new Set(paid.filter((x) => isSending(o, x.appearanceId)).map((x) => x.appearanceId)), reminders: duesTexts(o) }), [paid]);
 
   const settle = (p: DuePerson, gameIds?: string[]) => {
@@ -203,6 +219,28 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
       undo: () => {
         for (const [id, amount] of owed) recordPayment(os, id, { amount: -amount, kind: 'correction', note: 'Mark paid undone' });
         setPaid((prev) => prev.filter((x) => !owed.has(x.appearanceId)));
+        void pull(true);
+      },
+    });
+    void pull(true);
+  };
+
+  // Part of what they owe, oldest games first; anything over waits as credit.
+  const payDown = (p: DuePerson, amount: number) => {
+    const apps = sharesOf(os, p).filter((a) => owedOn(a.data) > 0).sort((a, b) => a.data.gameDate.localeCompare(b.data.gameDate));
+    let items;
+    try {
+      items = payPart(os, apps.map((a) => a.id), amount);
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+      return;
+    }
+    setPart(undefined);
+    toast.show({
+      message: `${firstName(p.name)} paid ${os.format.currency(amount)}`,
+      icon: 'check',
+      undo: () => {
+        for (const it of items) recordPayment(os, it.recordId!, { amount: -Number(it.payload.body.amount), kind: 'correction', note: 'Part payment undone' });
         void pull(true);
       },
     });
@@ -233,7 +271,7 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
     const games = [...r.ticked.map((x) => ({ g: x.game, ticked: true, sending: live.sending.has(x.appearanceId) })), ...r.open.map((g) => ({ g, ticked: false, sending: false }))].sort((a, b) => a.g.date.localeCompare(b.g.date));
     items.push(
       <View key={r.key} style={{ gap: 8 }}>
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityLabel={`${p.name}, ${rupees(done ? doneTotal : total)}`} onPress={() => setOpen(isOpen ? null : r.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityLabel={`${p.name}, ${rupees(done ? doneTotal : total)}`} onPress={() => (setOpen(isOpen ? null : r.key), setPart(undefined))} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
           <Face id={p.playerId} name={p.name} size={36} />
           <View style={{ flex: 1, minWidth: 0, gap: 1, opacity: done ? 0.55 : 1 }}>
             <Text variant="tileTitle" numberOfLines={1} style={{ lineHeight: 20 }}>
@@ -284,6 +322,14 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
                 </View>
               ))}
             </View>
+            {!youOwe && !done ? (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginLeft: 48 }}>
+                <View style={{ flex: 1 }}>
+                  <NumberField label="Part payment" value={part} onChange={setPart} unit="₹" />
+                </View>
+                <PillButton title="Record" height={44} disabled={!(part && part > 0)} onPress={() => part && payDown(p, part)} />
+              </View>
+            ) : null}
             {!youOwe && !done ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                 <PillButton title="Settle up" height={36} onPress={() => settle(p)} />
@@ -372,6 +418,7 @@ export function TurfDues(_props: Props) {
   const back = useBack();
   const { busy, pull } = usePull();
   const [filter, setFilter] = useState<DuesFilter>('all');
+  const [q, setQ] = useState('');
   const data = useLive((o) => {
     if (!allPlayers(o).length) return null;
     const today = todayIso();
@@ -384,9 +431,9 @@ export function TurfDues(_props: Props) {
   else {
     const { d } = data;
     const youOwe = d.people.filter((p) => p.direction === 'you_owe');
-    const shown = filter === 'settled' ? [] : filter === 'all' ? d.people : d.people.filter((p) => p.direction === filter);
+    const shown = (filter === 'settled' ? [] : filter === 'all' ? d.people : d.people.filter((p) => p.direction === filter)).filter((p) => found(q, p.name, p.creditorName));
     const oldestFirst = [...shown].sort((a, b) => a.since.localeCompare(b.since) || b.totalCents - a.totalCents);
-    const settled = filter === 'all' || filter === 'settled' ? d.settled : [];
+    const settled = (filter === 'all' || filter === 'settled' ? d.settled : []).filter((x) => found(q, x.name));
     const empty = filter === 'you_owe' ? 'You don’t owe anyone.' : filter === 'settled' ? 'Nobody has settled in the last 30 days.' : 'Nothing open. Every share is paid.';
     body = (
       <>
@@ -413,8 +460,9 @@ export function TurfDues(_props: Props) {
             <FilterChip key={f.key} label={f.label} selected={filter === f.key} onPress={() => setFilter(f.key)} />
           ))}
         </View>
+        <SearchBox value={q} onChange={setQ} placeholder="Search people" />
         <Text variant="caption" color="tertiary">
-          Oldest first · the checkbox marks every game paid · tap a row for one game at a time
+          Oldest first · the checkbox marks every game paid · tap a row for one game at a time or a part payment
         </Text>
         <TurfCard gap={8}>
           {oldestFirst.length || settled.length ? (
