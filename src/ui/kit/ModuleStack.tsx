@@ -40,7 +40,7 @@ function Gradient({ id, from, to, width, height }: { id: string; from: string; t
 }
 
 /** One card: it springs down when a card above it opens, squeezes a little under the finger, and fades its dots in when it opens. */
-function Card({ it, i, open, isOpen, width, onPress }: { it: StackItem; i: number; open: number; isOpen: boolean; width: number; onPress: () => void }) {
+function Card({ it, i, open, isOpen, last, width, onPress }: { it: StackItem; i: number; open: number; isOpen: boolean; last: boolean; width: number; onPress: () => void }) {
   const t = useTheme();
   const shift = useRef(new Animated.Value(i > open ? CARD - STRIP : 0)).current;
   const press = useRef(new Animated.Value(1)).current;
@@ -95,7 +95,8 @@ function Card({ it, i, open, isOpen, width, onPress }: { it: StackItem; i: numbe
 /**
  * Noir module stack (Browse, NR-KitComponents): each module a gradient card,
  * 28 corners, overlapping so each shows a 54 strip with its name. One card is
- * open, showing its line and a headline in dot numerals. Tap a strip and it
+ * open, showing its line and a headline in dot numerals (the last card, never
+ * covered, always shows them). Tap a strip and it
  * springs open in place (the cards below slide down); tap the open card to go in.
  */
 export function ModuleStack({ items }: { items: StackItem[] }) {
@@ -117,6 +118,7 @@ export function ModuleStack({ items }: { items: StackItem[] }) {
           i={i}
           open={at}
           isOpen={i === at}
+          last={i === items.length - 1}
           width={width}
           onPress={() => {
             if (i === at) return it.onPress();
