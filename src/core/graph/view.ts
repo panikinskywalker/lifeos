@@ -37,6 +37,9 @@ type Role = NonNullable<NonNullable<ReturnType<LifeOSContext['registry']['object
 const roleOf = (os: LifeOSContext, object: string): Role | undefined => os.registry.objects.get(object)?.linkRole;
 const isJoin = (r: Role | undefined): r is { joins: [string, string]; words?: Record<string, string> } => !!r && 'joins' in r;
 const isAspect = (r: Role | undefined): r is { aspectOf: string } => !!r && 'aspectOf' in r;
+const isTrail = (r: Role | undefined) => !!r && 'trail' in r;
+/** A record that is an Event on what it touches, not a Link (a payment). */
+export const isTrailObject = (os: LifeOSContext, object: string) => isTrail(roleOf(os, object));
 const val = (data: unknown, key: string) => {
   const v = (data as Record<string, unknown> | undefined)?.[key];
   return v == null || v === '' ? null : String(v);
@@ -99,6 +102,7 @@ export function viewLinks(os: LifeOSContext, id: string): ViewLink[] {
   const centre = os.records.get(id);
   if (!centre) return [];
   const centreIsJoin = isJoin(roleOf(os, centre.object));
+  const centreIsTrail = isTrail(roleOf(os, centre.object));
   const sources = new Set([id, ...aspectsOf(os, id)]);
   const out: ViewLink[] = [];
   const keys = new Set<string>();
@@ -115,6 +119,8 @@ export function viewLinks(os: LifeOSContext, id: string): ViewLink[] {
       if (r.relation.kind === 'mention' || sources.has(r.other.id)) continue;
       const o = r.other;
       const role = roleOf(os, o.object);
+      // A payment is on the record's timeline (its audit trail), not in its Links; skipped before anything else is read.
+      if (!centreIsTrail && isTrail(role)) continue;
       const guessed = (r.relation.confidence ?? 1) < 1;
       // A join with this record at one end: the record at the other end.
       if (isJoin(role) && !centreIsJoin) {
@@ -209,5 +215,36 @@ export function viewLinks(os: LifeOSContext, id: string): ViewLink[] {
 export function isDetail(os: LifeOSContext, id: string): boolean {
   const r = os.records.get(id);
   if (!r) return false;
-  return isJoin(roleOf(os, r.object)) || !!joinOfPart(os, id);
+  return isJoin(roleOf(os, r.object)) || isTrail(roleOf(os, r.object)) || !!joinOfPart(os, id);
+}
+
+/** One payment on a record's audit trail. */
+export interface TrailItem {
+  id: string;
+  object: string;
+  title: string;
+  /** When it happened (ms). */
+  at: number;
+  /** Signed: money in +, out −. */
+  amount: number | null;
+  /** Its own line ("Subscriptions · Amex Platinum"). */
+  line: string | null;
+}
+
+/**
+ * The audit trail of a record (MODEL.md layer 5): the payments that touch it
+ * (its card, its payee, the people on it), newest first, as Events on its
+ * timeline rather than Links.
+ */
+export function trailOf(os: LifeOSContext, id: string, limit = 200): TrailItem[] {
+  const trail = [...os.registry.objects.values()].filter((d) => isTrail(d.linkRole)).map((d) => d.id);
+  if (!trail.length) return [];
+  const rows = os.db.all<{ id: string; object: string; title: string; subtitle: string | null; at: number; amount: number | null; kind: string | null }>(
+    `SELECT DISTINCT r.id, r.object, r.title, r.subtitle, COALESCE(r.occurred_at, r.created_at) AS at, json_extract(r.data,'$.amount') AS amount, json_extract(r.data,'$.kind') AS kind
+     FROM links l JOIN records r ON r.id = CASE WHEN l.from_id = ? THEN l.to_id ELSE l.from_id END
+     WHERE l.deleted_at IS NULL AND (l.from_id = ? OR l.to_id = ?) AND r.deleted_at IS NULL AND r.object IN (${trail.map(() => '?').join(',')})
+     ORDER BY at DESC LIMIT ?`,
+    [id, id, id, ...trail, limit],
+  );
+  return rows.map((r) => ({ id: r.id, object: r.object, title: r.title, at: r.at, amount: r.amount == null ? null : r.kind === 'income' ? r.amount : r.kind === 'expense' ? -r.amount : r.amount, line: r.subtitle }));
 }

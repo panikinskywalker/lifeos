@@ -85,8 +85,11 @@ export interface ObjectDef<TData = Record<string, unknown>> {
    * person in a game): Links shows it as one link between them, and records
    * about it (the Debt for that share) fold into that link. `words` names a
    * side as seen from the other ("Players" for the person, seen from a game).
+   * A `trail` record (a payment) is not a Link at all: it is an Event on the
+   * records it touches, their audit trail, so a monthly Claude charge does not
+   * add a line and a row every month.
    */
-  linkRole?: { aspectOf: string } | { joins: [string, string]; words?: Record<string, string> };
+  linkRole?: { aspectOf: string } | { joins: [string, string]; words?: Record<string, string> } | { trail: true };
   /** Meters the record tracks (a vehicle's odometer), mirrored into a data field; cycles read the latest reading. */
   meters?: Array<{ meter: string; field: string; label: string; unit: string }>;
   /** Template cycle → data fields it writes back after done/skip/set (keeps "Next billing date" true). Dates as yyyy-MM-dd. */

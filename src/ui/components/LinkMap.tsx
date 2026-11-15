@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, Pressable, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Path, Pattern, Rect } from 'react-native-svg';
 import { Image } from 'expo-image';
 import { Icon } from '../icons';
@@ -15,7 +17,12 @@ import { linkColorForModule } from '../theme/moduleTint';
  * colour, the link word on a pill along its line. Two hops: the first ring
  * moves in and shrinks, the second ring is smaller and quieter, its words
  * shown only when a line is tapped. A guessed link is dashed with a "?".
- * Still by default (no pulse, no halo).
+ * Still by default (no pulse, no halo). Motion (L7): when the map opens the
+ * lines draw out from the centre once (300 ms); re-centred, the tapped record
+ * glides to the middle (420 ms), the old centre becomes a first-hop record and
+ * the new links draw out; reduced motion skips both. Two fingers pinch to zoom
+ * and drag to pan (one finger still scrolls the page and taps records);
+ * double-tap or Reset zooms back.
  */
 
 export interface MapNode {
@@ -186,7 +193,95 @@ export function LinkMap({
   onTapLine?: (l: MapLine) => void;
 }) {
   const t = useTheme();
-  const placed = useMemo(() => layout(width, height, centre, nodes, lines, mini), [width, height, centre, nodes, lines, mini]);
+  const target = useMemo(() => layout(width, height, centre, nodes, lines, mini), [width, height, centre, nodes, lines, mini]);
+  // Motion: every record moves from where it was drawn last (new ones from the centre) to where it belongs.
+  const shown = useRef(new Map<string, { x: number; y: number }>());
+  const from = useRef(new Map<string, { x: number; y: number }>());
+  const lastCentre = useRef<string | null>(null);
+  const reduce = useRef(false);
+  const [k, setK] = useState(mini ? 1 : 0);
+  const sig = `${centre.id}|${nodes.map((n) => n.id).join(',')}|${width}x${height}`;
+  useEffect(() => {
+    void AccessibilityInfo.isReduceMotionEnabled().then((r) => (reduce.current = r)).catch(() => {});
+  }, []);
+  // Where everything was drawn, captured in the render where the layout changes (an effect would be one frame late).
+  const sigSeen = useRef<string | null>(null);
+  const glideRef = useRef(false);
+  let kk = k;
+  if (sigSeen.current !== sig) {
+    from.current = new Map(shown.current);
+    glideRef.current = lastCentre.current !== null && lastCentre.current !== centre.id;
+    lastCentre.current = centre.id;
+    sigSeen.current = sig;
+    if (!mini) kk = 0;
+  }
+  useEffect(() => {
+    if (mini) return;
+    const glide = glideRef.current;
+    if (reduce.current) return setK(1);
+    const dur = glide ? 420 : 300;
+    const t0 = Date.now();
+    let raf = 0;
+    const step = () => {
+      const p = Math.min(1, (Date.now() - t0) / dur);
+      setK(p);
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    setK(0);
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [sig]); // eslint-disable-line react-hooks/exhaustive-deps
+  const e = 1 - (1 - kk) ** 3;
+  const c0 = target.get(centre.id)!;
+  const placed = new Map<string, Placed>();
+  for (const [id, p] of target) {
+    const a = from.current.get(id) ?? { x: c0.x, y: c0.y };
+    placed.set(id, kk >= 1 ? p : { ...p, x: a.x + (p.x - a.x) * e, y: a.y + (p.y - a.y) * e });
+  }
+  shown.current = new Map([...placed].map(([id, p]) => [id, { x: p.x, y: p.y }]));
+  const settled = kk >= 1;
+  // Pinch to zoom, two fingers to pan.
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const savedX = useSharedValue(0);
+  const savedY = useSharedValue(0);
+  const [zoomed, setZoomed] = useState(false);
+  const reset = () => {
+    scale.value = withTiming(1);
+    savedScale.value = 1;
+    tx.value = withTiming(0);
+    ty.value = withTiming(0);
+    savedX.value = 0;
+    savedY.value = 0;
+    setZoomed(false);
+  };
+  const pinch = Gesture.Pinch()
+    .onUpdate((g) => {
+      scale.value = Math.min(3, Math.max(1, savedScale.value * g.scale));
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      runOnJS(setZoomed)(scale.value > 1.02);
+    });
+  const pan = Gesture.Pan()
+    .minPointers(2)
+    .onUpdate((g) => {
+      tx.value = savedX.value + g.translationX;
+      ty.value = savedY.value + g.translationY;
+    })
+    .onEnd(() => {
+      savedX.value = tx.value;
+      savedY.value = ty.value;
+    });
+  const twice = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      runOnJS(reset)();
+    });
+  const gesture = Gesture.Simultaneous(pinch, pan, twice);
+  const zoomStyle = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }] }));
   const drawn = lines
     .map((l) => {
       const a = placed.get(l.from);
@@ -199,7 +294,7 @@ export function LinkMap({
     .filter((x): x is NonNullable<typeof x> => !!x);
   const dim = (key: string) => (selected && selected !== key ? 0.2 : 1);
   const label = (p: Placed) => {
-    if (mini || p.node.hop === 0) return null;
+    if (mini || p.node.hop === 0 || !settled) return null;
     const above = p.y < height / 2 - 10 && p.node.hop === 1;
     const style = { position: 'absolute' as const, left: p.x - 50, width: 100, alignItems: 'center' as const, ...(above ? { top: p.y - p.size / 2 - 32 } : { top: p.y + p.size / 2 + 6 }) };
     return (
@@ -215,8 +310,8 @@ export function LinkMap({
       </View>
     );
   };
-  return (
-    <View style={{ width, height, overflow: 'hidden' }} accessibilityLabel={`Links around ${centre.title}: ${nodes.length} records`}>
+  const body = (
+    <View style={{ width, height }}>
       <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }}>
         {mini ? null : (
           <>
@@ -250,7 +345,7 @@ export function LinkMap({
       {mini
         ? null
         : drawn
-            .filter(({ l, hop }) => l.word && (hop === 1 || selected === l.key))
+            .filter(({ l, hop }) => settled && l.word && (hop === 1 || selected === l.key))
             .map(({ l, c }) => (
               <Pressable
                 key={`w${l.key}`}
@@ -302,6 +397,19 @@ export function LinkMap({
           </Pressable>
         );
       })}
+    </View>
+  );
+  if (mini) return <View style={{ width, height, overflow: 'hidden' }} accessibilityLabel={`Links around ${centre.title}: ${nodes.length} records`}>{body}</View>;
+  return (
+    <View style={{ width, height, overflow: 'hidden' }} accessibilityLabel={`Links around ${centre.title}: ${nodes.length} records. Pinch to zoom.`}>
+      <GestureDetector gesture={gesture}>
+        <Animated.View style={[{ width, height }, zoomStyle]}>{body}</Animated.View>
+      </GestureDetector>
+      {zoomed ? (
+        <Pressable onPress={reset} accessibilityRole="button" style={{ position: 'absolute', right: 12, top: 12, height: 28, paddingHorizontal: 11, borderRadius: 999, backgroundColor: t.c.bg.tileRaised, justifyContent: 'center' }}>
+          <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.c.fg.primary }}>Reset zoom</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

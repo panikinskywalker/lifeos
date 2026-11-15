@@ -5,7 +5,9 @@ import { Registry } from './registry/registry';
 import type { LifeOSContext } from './registry/context';
 import { bus } from './events/bus';
 import { egoGraph, linkGroups, mostLinked } from './graph/read';
-import { addLink, changeLinkWord, linkInfo, removeLink } from './links';
+import { addLink, changeLinkWord, linkInfo, removeLink, setLinkDates } from './links';
+import { linkOverview } from './graph/overview';
+import { trailOf } from './graph/view';
 import { orgType, placeType } from '../modules/places/types';
 import { personType } from '../modules/crm/types';
 import { eventType, projectType, taskType } from '../modules/projects/types';
@@ -62,16 +64,21 @@ describe('the Links card (R11)', () => {
     expect(linkGroups(os, bengaluru.id).map((x) => x.word)).toEqual(['contains']);
   });
 
-  it('carries payments signed, and a removed Link comes back the same way round', () => {
+  it('a payment is on the record\'s audit trail, signed, not in its Links; a removed Link comes back the same way round', () => {
     const karan = os.records.create({ object: 'person', title: 'Karan', data: {} });
+    const priya = os.records.create({ object: 'person', title: 'Priya', data: {} });
     const pay = os.records.create({ object: 'transaction', title: 'Dinner split', data: { amount: 900, kind: 'income', date: '2026-10-21' } });
     os.links.link(pay.id, karan.id, 'payee');
+    expect(linkGroups(os, karan.id)).toEqual([]);
+    expect(trailOf(os, karan.id)).toMatchObject([{ id: pay.id, title: 'Dinner split', amount: 900 }]);
+    // The payment's own page still shows who it was with.
+    expect(linkGroups(os, pay.id)[0]!.items[0]).toMatchObject({ id: karan.id, direction: 'out' });
+    os.links.link(karan.id, priya.id, 'knows');
     const item = linkGroups(os, karan.id)[0]!.items[0]!;
-    expect(item).toMatchObject({ amount: 900, module: 'finance' });
     os.links.remove(item.linkId);
     expect(linkGroups(os, karan.id)).toEqual([]);
     os.links.link(item.fromId, item.toId, item.kind);
-    expect(linkGroups(os, pay.id)[0]!.items[0]).toMatchObject({ id: karan.id, direction: 'out' });
+    expect(linkGroups(os, priya.id)[0]!.items[0]).toMatchObject({ id: karan.id });
   });
 
   it('lists the most linked records for Browse, mentions and deleted records left out', () => {
@@ -97,13 +104,15 @@ describe('the Links card (R11)', () => {
     const toit = os.records.create({ object: 'transaction', title: 'Toit', data: { amount: 2600, kind: 'expense', date: '2026-10-27', accountId: amex.id } });
     const nike = os.records.create({ object: 'transaction', title: 'Nike', data: { amount: 15000, kind: 'expense', date: '2026-10-28', accountId: amex.id } });
     const pay = os.records.create({ object: 'transaction', title: 'Card payment', data: { amount: 50000, kind: 'transfer', date: '2026-10-30', accountId: hdfc.id, toAccountId: amex.id } });
-    expect(linkGroups(os, amex.id).map((g) => [g.word, g.items.map((i) => i.title)])).toEqual([
-      ['transactions', ['Nike', 'Toit']],
-      ['transfers in', ['Card payment']],
+    // A card's payments are its audit trail, newest first, not Links.
+    expect(linkGroups(os, amex.id)).toEqual([]);
+    expect(trailOf(os, amex.id).map((x) => [x.title, x.amount])).toEqual([
+      ['Card payment', 50000],
+      ['Nike', -15000],
+      ['Toit', -2600],
     ]);
+    // From the payment itself, its Fields read as they are.
     expect(linkGroups(os, pay.id).map((g) => g.word)).toEqual(['account', 'to account']);
-    // A record that joins things up says what else it points at.
-    expect(linkGroups(os, amex.id)[1]!.items[0]!.context).toBe('HDFC');
     const ship = os.records.create({ object: 'project', title: 'Ship LifeOS', data: {} });
     os.records.create({ object: 'task', title: 'Test on Android', data: { projectId: ship.id } });
     expect(linkGroups(os, ship.id).map((g) => g.word)).toEqual(['tasks']);
@@ -147,10 +156,11 @@ describe('the Links card (R11)', () => {
     os.records.create({ object: 'transaction', title: 'Lunch', data: { amount: 400, kind: 'expense', date: '2026-10-02', personIds: [priya.id] } });
 
     const top = mostLinked(os, 3);
-    expect(top[0]).toMatchObject({ title: 'Priya', links: 8, modules: 3 }) // places (Acme, Pune), projects, finance;
+    expect(top[0]).toMatchObject({ title: 'Priya', links: 7, modules: 2 }); // places (Acme, Pune), projects; her lunch is a payment, on her trail
     expect(top.map((r) => r.title)).not.toContain('Morning run');
-    // Amex has more links (9) but all payments, so breadth 5; Priya's 8 reach five kinds of record.
-    expect(top.map((r) => r.title).slice(0, 2)).toEqual(['Priya', 'Amex']);
+    // Amex's nine payments are its audit trail, not links: it is not in the list at all.
+    expect(top.map((r) => r.title)).not.toContain('Amex');
+    expect(top.map((r) => r.title).slice(0, 2)).toEqual(['Priya', 'Ship']);
     // The habit's check-ins stay off its network (its card lists them, last); a check-in as the centre still shows its habit.
     expect(egoGraph(os, run.id).nodes).toHaveLength(1);
     expect(linkGroups(os, run.id).at(-1)!.items.every((i) => i.hidden)).toBe(true);
@@ -228,5 +238,32 @@ describe('the Links card (R11)', () => {
     addLink(os, karan.id, ship.id, 'works_with', 'user', since);
     const hand = os.links.forEntity(karan.id).find((x) => x.relation.kind === 'works_with')!.relation;
     expect(linkInfo(os, hand.id)).toMatchObject({ since, confidence: 1, origin: { by: 'you' } });
+  });
+
+  it('sets a link\'s dates with Undo, links both ways once, and sums up everything linked (L3, L5, L6)', () => {
+    const karan = os.records.create({ object: 'person', title: 'Karan', data: {} });
+    const priya = os.records.create({ object: 'person', title: 'Priya', data: {} });
+    const zomato = os.records.create({ object: 'org', title: 'Zomato', data: {} });
+    os.records.update(karan.id, { data: { worksAtId: zomato.id } });
+    const l = os.links.forEntity(karan.id)[0]!.relation;
+    const undo = setLinkDates(os, l.id, Date.parse('2025-03-01'), null);
+    expect(linkInfo(os, l.id)).toMatchObject({ since: Date.parse('2025-03-01'), until: null });
+    undo();
+    expect(linkInfo(os, l.id)!.since).toBeNull();
+
+    const undoBoth = addLink(os, karan.id, priya.id, 'works_with', 'user', null, true);
+    expect(linkGroups(os, priya.id).find((g) => g.word === 'works with')!.items.map((i) => i.title)).toEqual(['Karan']);
+    expect(os.links.forEntity(priya.id).filter((x) => x.relation.kind === 'works_with')).toHaveLength(2);
+    undoBoth();
+    expect(os.links.forEntity(priya.id).filter((x) => x.relation.kind === 'works_with')).toHaveLength(0);
+    addLink(os, karan.id, priya.id, 'knows', 'user', null, true); // knows is stored once either way
+    expect(os.links.forEntity(priya.id).filter((x) => x.relation.kind === 'knows')).toHaveLength(1);
+
+    const o = linkOverview(os);
+    expect(o).toMatchObject({ records: 3, links: 2 });
+    expect(o.modules.map((m) => [m.module, m.records])).toEqual([['crm', 2], ['places', 1]]);
+    expect(o.modules[0]!.top[0]).toMatchObject({ title: 'Karan', links: 2 });
+    expect(o.recordTimes).toHaveLength(3);
+    expect(o.edges).toHaveLength(2);
   });
 });

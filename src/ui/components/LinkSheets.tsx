@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { ObjectRecord } from '@core/domain/types';
-import { addLink, changeLinkWord, linkInfo, removeLink, type LinkRef } from '@core/links';
-import { Button, DateField, FilterChip, Sheet, Text, TextField, useToast } from '../kit';
+import { addLink, changeLinkWord, linkInfo, removeLink, setLinkDates, type LinkRef } from '@core/links';
+import { SYMMETRIC_EDGES } from '@core/graph/edges';
+import { Button, DateField, FilterChip, Sheet, SwitchField, Text, TextField, useToast } from '../kit';
 import { useLive, useOS } from '../hooks';
 import { useTheme } from '../theme/ThemeProvider';
 import { monoFonts } from '../theme/tokens';
@@ -87,6 +88,10 @@ export function LinkDetailSheet({ held, onClose }: { held: HeldLink | null; onCl
   const router = useRouter();
   const toast = useToast();
   const info = useLive((o) => (held?.ref?.linkId ? linkInfo(o, held.ref.linkId) : null), [held?.ref?.linkId]);
+  const [dating, setDating] = useState(false);
+  const [since, setSince] = useState<string | number | undefined>(undefined);
+  const [until, setUntil] = useState<string | number | undefined>(undefined);
+  const ms = (v: string | number | undefined) => (v == null || v === '' ? null : typeof v === 'number' ? v : Number.isFinite(Date.parse(String(v))) ? Date.parse(String(v)) : null);
   const a = held ? refOf(os, held.fromId) : null;
   const b = held ? refOf(os, held.otherId) : null;
   if (!held || !a || !b) return <Sheet visible={false} onClose={onClose}>{null}</Sheet>;
@@ -132,16 +137,42 @@ export function LinkDetailSheet({ held, onClose }: { held: HeldLink | null; onCl
         ) : null}
         {info ? (
           <>
-            <View style={{ flexDirection: 'row', gap: 24 }}>
+            <View style={{ flexDirection: 'row', gap: 24, alignItems: 'flex-end' }}>
               <View style={{ gap: 4 }}>
                 <Caps>Since</Caps>
                 <Text variant="body">{month(info.since ?? info.createdAt)}</Text>
               </View>
-              <View style={{ gap: 4 }}>
+              <View style={{ gap: 4, flex: 1 }}>
                 <Caps>{info.until ? 'Until' : 'Now'}</Caps>
                 <Text variant="body">{info.until ? month(info.until) : 'still true'}</Text>
               </View>
+              <Button
+                title={dating ? 'Cancel' : 'Set dates'}
+                size="sm"
+                variant="secondary"
+                onPress={() => {
+                  setSince(info.since ?? undefined);
+                  setUntil(info.until ?? undefined);
+                  setDating(!dating);
+                }}
+              />
             </View>
+            {dating ? (
+              <View style={{ gap: 10 }}>
+                <DateField label="Since" value={since} onChange={setSince} quick={false} />
+                <DateField label="Until" hint="leave empty while it is still true" value={until} onChange={setUntil} quick={false} />
+                <Button
+                  title="Save dates"
+                  icon="check"
+                  size="sm"
+                  onPress={() => {
+                    const undo = setLinkDates(os, info.id, ms(since), ms(until));
+                    setDating(false);
+                    toast.show({ message: 'Dates saved', icon: 'calendar', undo });
+                  }}
+                />
+              </View>
+            ) : null}
             <View style={{ gap: 6 }}>
               <Caps>Where it came from</Caps>
               <Text variant="body" style={{ fontWeight: '700' }}>{info.origin.line}</Text>
@@ -206,6 +237,7 @@ export function AddLinkSheet({ visible, onClose, entity }: { visible: boolean; o
   const [own, setOwn] = useState<string | null>(null);
   const [since, setSince] = useState<string | number | undefined>(undefined);
   const [making, setMaking] = useState(false);
+  const [both, setBoth] = useState(false);
   const def = os.registry.object(entity.object);
   const first = entity.title.trim().split(/\s+/)[0] ?? entity.title;
   const hits = useLive(
@@ -223,7 +255,9 @@ export function AddLinkSheet({ visible, onClose, entity }: { visible: boolean; o
   const words = [...new Map([...fieldWords, ...HAND_WORDS].map(([l, k]) => [k, l])).entries()];
   const finalKind = (own ?? '').trim() || kind;
   const label = (own ?? '').trim() || words.find(([k]) => k === kind)?.[1] || kind;
-  const reset = () => (setQ(''), setPicked(null), setKind('knows'), setOwn(null), setSince(undefined), setMaking(false));
+  const reset = () => (setQ(''), setPicked(null), setKind('knows'), setOwn(null), setSince(undefined), setMaking(false), setBoth(false));
+  // Both ways: a word no Field makes and core doesn't already keep for both (knows, family of), read from the other record too.
+  const canBoth = !own?.trim() ? !fieldWords.some(([, k]) => k === kind) && !SYMMETRIC_EDGES.has(kind) : true;
   const close = () => (reset(), onClose());
   const creatable = [...os.registry.objects.values()].filter((d) => !d.hidden && ['person', 'place', 'org', 'event', 'task', 'note'].includes(d.id));
   return (
@@ -240,7 +274,7 @@ export function AddLinkSheet({ visible, onClose, entity }: { visible: boolean; o
             disabled={!picked}
             onPress={() => {
               const at = since == null ? null : typeof since === 'number' ? since : Date.parse(String(since));
-              const undo = addLink(os, entity.id, picked!, finalKind, 'user', Number.isFinite(at as number) ? (at as number) : null);
+              const undo = addLink(os, entity.id, picked!, finalKind, 'user', Number.isFinite(at as number) ? (at as number) : null, both && canBoth);
               const name = target?.title ?? 'it';
               close();
               toast.show({ message: `Linked to ${name} as ${label}`, icon: 'link', undo });
@@ -309,6 +343,7 @@ export function AddLinkSheet({ visible, onClose, entity }: { visible: boolean; o
         </View>
         {target ? <Pair a={refOf(os, entity.id)!} b={target} word={label} /> : null}
         <DateField label="Since" hint="optional" value={since} onChange={setSince} quick={false} />
+        {canBoth ? <SwitchField label="Both ways?" hint={target ? `${target.title} ${label} ${entity.title} too` : 'The same word from the other record too'} value={both} onChange={setBoth} /> : null}
       </View>
     </Sheet>
   );

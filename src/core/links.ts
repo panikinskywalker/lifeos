@@ -2,6 +2,7 @@ import type { ObjectRecord } from './domain/types';
 import type { LifeOSContext } from './registry/context';
 import type { Actor } from './events/bus';
 import { holds, linkFields } from './graph/words';
+import { SYMMETRIC_EDGES } from './graph/edges';
 
 /** "[[Creta]] needs a wash, ask [[Priya Sharma]]" → ['Creta', 'Priya Sharma']. */
 export function parseLinks(text: string): string[] {
@@ -102,7 +103,7 @@ export function removeLink(os: LifeOSContext, l: LinkRef, actor: Actor = 'user')
  * record page and form agree with the Link; any other word is a plain Link.
  * Returns its Undo.
  */
-export function addLink(os: LifeOSContext, fromId: string, toId: string, kind: string, actor: Actor = 'user', since?: number | null): () => void {
+export function addLink(os: LifeOSContext, fromId: string, toId: string, kind: string, actor: Actor = 'user', since?: number | null, bothWays = false): () => void {
   const hit = fieldFor(os, fromId, toId, kind, false);
   if (hit) {
     const v = hit.data[hit.f.key];
@@ -112,8 +113,21 @@ export function addLink(os: LifeOSContext, fromId: string, toId: string, kind: s
     os.records.update(fromId, { data: { [hit.f.key]: list ? [...arr, toId] : toId } }, actor);
     return () => void os.records.update(fromId, { data: { [hit.f.key]: v } }, actor);
   }
-  const l = os.links.link(fromId, toId, kind, {}, actor, { source: 'manual', confidence: 1, validFrom: since ?? null });
-  return () => os.links.remove(l.id, actor);
+  const prov = { source: 'manual' as const, confidence: 1, validFrom: since ?? null };
+  const l = os.links.link(fromId, toId, kind, {}, actor, prov);
+  // Both ways (the L5 artboard): the same word read from the other record too ("works with" each other); words core keeps symmetric are stored once already.
+  const back = bothWays && !SYMMETRIC_EDGES.has(kind) ? os.links.link(toId, fromId, kind, {}, actor, prov) : null;
+  return () => {
+    os.links.remove(l.id, actor);
+    if (back) os.links.remove(back.id, actor);
+  };
+}
+
+/** Since when and until when a Link was true (the L3 artboard's Set dates). Returns its Undo. */
+export function setLinkDates(os: LifeOSContext, linkId: string, since: number | null, until: number | null): () => void {
+  const row = os.db.get<{ valid_from: number | null; valid_to: number | null }>(`SELECT valid_from, valid_to FROM links WHERE id=?`, [linkId]);
+  os.links.setValidity(linkId, since, until);
+  return () => os.links.setValidity(linkId, row?.valid_from ?? null, row?.valid_to ?? null);
 }
 
 /** Where a Link came from and how sure it is, for the Links screen's link sheet (the L3 artboard). */

@@ -718,11 +718,17 @@ new Object, that is a new module. It may add filing hints scoped to itself
   word, a payment, a record of an Object, a health number at a line, time in
   apps, a calendar event, a habit ticked). Core keeps the trackers and their
   sums (`src/core/activity`); the board draws them and defines no Objects.
-  Screens: **home** (every tracker: today's tick, the grid, this week · this
-  month · streak; New tracker; On Today: show, hide, reorder), **tracker**
-  (26 weeks, this week / month / streak, the rules), **edit** (name, icon,
-  colour, rules). Its **Activity tile** on Today shows one tracker at a time
-  (swipe) or all of them (You › Home).
+  Screens, drawn to the *Activity · Noir* artboards (A1 to A4, on the canvas's
+  *Links · Noir* page, 15 Nov): **home** (how many counted today, every
+  tracker as a card: today's tick, the grid, this week · this month · streak;
+  New tracker; On Today: show or hide each, hold to reorder), **tracker** (26
+  weeks with month names, this week / month / streak with the longest, a day
+  tappable for **what made it count**: each payment, message, event, workout,
+  health number, app time or habit that matched, opening its record; the
+  rules; Edit rules; Delete, asking first), **edit** (name, icon, colour from
+  the module colours, the rules and the seven kinds of rule). Its **Activity
+  tile** on Today shows one tracker at a time (swipe, page dots) or all of
+  them stacked small (You › Home).
 - Candidates: Trip planner (Agenda + Money + People + Places), Car (Things +
   Money + Documents), Household (chores + shared bills).
 
@@ -1109,6 +1115,16 @@ Component gallery (dev).
     holding a game row offers *Open the appearance*, and it is removed from the
     game, not from the card. Today: games' Appearance (join), Player profile
     and Venue (faces).
+  - **Payments are an audit trail, not Links** (decided 15 Nov). A payment
+    touches a card, a payee, people, a trip, and a monthly one (Claude) would
+    add a line and a row every month, crowd every card and map and slow them.
+    So a Transaction (`linkRole: { trail: true }`) is never shown as a Link:
+    it is an **Event on the timeline** of each record it touches (Recent on
+    the record page: its title, amount, when, its own line), newest first,
+    in place of the "Linked from" line. The Links stay stored (finance and
+    its boards read them, and a payment's own page still shows its card and
+    payee); only Links leaves them out: the card, the map, Browse › Links and
+    the add sheet. A Delivery shows its order's payment from its Order Field.
   - **The Links card** (L4) is on every record: the generic page draws it,
     and a board that draws the whole page gets it below its page unless it
     draws its own (Person's, from NR-People, which reads the same groups). A
@@ -1123,13 +1139,16 @@ Component gallery (dev).
     records and the word, since when and whether still true, where it came
     from (a dump with its sentence while the dump is kept, a message, the
     agent, a Field, you), how sure it is (under 70% it is dashed with a "?";
-    *Right* confirms it), its word to change (not a Field's: that is changed
-    on the record), *Open* the other end, **Remove this link** with Undo. A
-    link through a meeting (Priya in a game) opens that record instead.
+    *Right* confirms it), **Set dates** (since and until), its word to change
+    (not a Field's: that is changed on the record), *Open* the other end,
+    **Remove this link** with Undo. A link through a meeting (Priya in a game)
+    opens that record instead.
   - **Adding a link** (L5): find the record or start a new one (linked once
     saved), pick the word (this record's own link Fields, which fill the
     Field, then knows · family of · works with · with · at · part of · owns ·
-    paid for · about, or your own), since when if you know, Link. Saved as
+    paid for · about, or your own), since when if you know, **Both ways?**
+    (the same word from the other record too; not offered for words core
+    already keeps for both, like knows, or for a Field's word), Link. Saved as
     yours (source manual), so it never lands in To check. Removing a Link a
     Field made takes it out of the Field, else the next edit brings it back.
     Faces and meetings (a Player profile, a Venue, an Appearance) are not
@@ -1146,13 +1165,21 @@ Component gallery (dev).
     hidden Objects and details of a meeting stay off it, the centre apart.
     Tap a record to centre on it, hold to open it. Under the map, the centre's
     card (*Open record*, the hop switch, *Back to* the start) and its Links
-    in full. Still: no pulse or halo, and no motion yet (the artboards' draw
-    out and glide are left for later).
+    in full. Still by default (no pulse or halo); when the map opens the lines
+    draw out from the centre once (300 ms), and re-centred the tapped record
+    glides to the middle (420 ms) while the old centre moves out to the first
+    ring; reduced motion skips both. Two fingers pinch to zoom and drag to pan
+    (one finger still scrolls and taps); double-tap or *Reset zoom* goes back.
   - **From Browse** (`/links`): the records that join up the most, by breadth
     (each kind of linked record counts up to five, so 40 payments on a card
     don't outrank a person linked to games, debts, a group and a trip), then
-    modules reached; hidden Objects neither count nor appear. L6 (everything
-    as clusters, a time-lapse) is the design's backlog, not built.
+    modules reached; hidden Objects neither count nor appear. Above it,
+    **everything** (L6): find a record; *Clusters* (each module a cloud of its
+    records in its colour with how many, the best-linked record in the middle
+    with lines out to each cloud's best) or *Free* (every record placed with
+    the links between them); how many records and links; module chips; a
+    **time-lapse** (Play runs from the first record filed to today, or drag
+    the bar) showing them appear in the order they were filed.
 - **Automations**: a tile in the Browse grid. The list of your automations with
   last run and state; the editor (trigger → conditions → steps, outputs passed
   along); templates; run log per run and per step; run now. Manual-run

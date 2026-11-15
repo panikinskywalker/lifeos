@@ -314,3 +314,70 @@ Patch notes:
   with, paid, played in); hold a link to see where it came from, confirm a
   guess, change its word or remove it.
 - Adding a link searches records, can start a new one, and takes a since date.
+
+## Follow-up 5, 15 Nov: the rest of the design built; Activity to A1 to A4; payments are an audit trail
+
+Rutvij: build what was left (L6, the motion, Set dates, pinch and pan, Both
+ways) along with Activity; then, mid-way: payments should not be Links (cards,
+payees, people paid; a recurring Claude charge made many and slowed things),
+they should be Events on the record, an audit trail.
+
+Payments, an audit trail (MODEL.md layer 5):
+- `ObjectDef.linkRole` gains `{ trail: true }`; finance's Transaction declares
+  it (one line in `src/modules/finance/types.ts`). No data changes: the Links
+  stay stored (finance and its boards read them; a payment's own page shows
+  its card and payee).
+- `src/core/graph/view.ts`: `viewLinks` skips trail records before reading
+  anything (the cost the recurring charges caused); `isDetail` keeps them off
+  the map; Most linked and the overview already skip any `linkRole` Object;
+  the add sheet does not offer them. New `trailOf(os, id)`: the payments that
+  touch a record, newest first, signed.
+- `src/ui/screens/RecordScreen.tsx`: Recent shows each payment as an Event
+  (title, amount, when, its line) in place of its "Linked from" line.
+- `src/boards/deliveries/record.tsx`: the order's payment shown from the
+  delivery's Order Field (it came through `linkGroups` before). Shared edit.
+- Three of my Links tests changed with the rule (payments now on the trail;
+  Amex out of Most linked; Priya 7 links in 2 modules).
+
+Links, the rest of the design:
+- L6 (`app/links/index.tsx`, `src/ui/components/LinkCloud.tsx`, core
+  `src/core/graph/overview.ts` `linkOverview`): find a record, Clusters or
+  Free, counts, module chips, the time-lapse (Play, drag), Joins up the most.
+- Motion and zoom (`LinkMap.tsx`): lines draw out (300 ms), the glide on
+  re-centre (420 ms), reduced motion skips; pinch and two-finger pan, Reset
+  zoom, double-tap. One finger still scrolls and taps.
+- Set dates (L3): `setLinkDates` in `src/core/links.ts` over a new
+  `LinkRepo.setValidity` (`src/core/repo/sideRepos.ts`, shared edit; the
+  `valid_from` / `valid_to` columns already existed, no migration).
+- Both ways (L5): `addLink(..., bothWays)`; not offered for symmetric words
+  (knows) or a Field's word.
+
+Activity, A1 to A4 (`src/boards/activity`): `grid.tsx` (tracker colours in the
+Noir module colours over the stored tints, disc, tick, a tappable grid with
+month names, the card row and the stacked mini row), `home.tsx` (A1: done
+today, cards, On Today with toggles and hold-to-reorder via `SortableList`),
+`tracker.tsx` (A2: stats, 26 weeks, **what made a day count** from core's new
+`dayMatches` in `src/core/activity/trackers.ts`, rules, Edit, Delete),
+`edit.tsx` (A3 restyle, rule logic unchanged), `tile.tsx` (A4: the stacked
+style uses the mini rows).
+
+Tests: `src/core/linkGroups.test.ts` 9, `src/modules/activity.golden.test.ts`
+gains *what made a day count*. 637 of 638 pass; the failure is the base's
+deliveries test, as before. Typecheck green; web export builds; checked in the
+browser: Browse › Links (clusters, free, time-lapse), Priya's map (draw out,
+re-centre glide), Amex Platinum's card (subscriptions and institution only)
+and its Recent (payments as Events), the Activity home, tracker and edit, no
+console errors.
+
+Phone checks: pinch and two-finger pan on the Links map (web cannot); the
+glide; Set dates and Both ways; a card or payee's Recent shows its payments;
+hold-to-reorder in On Today; a tracker's day tapped shows its matches.
+
+Patch notes:
+- Payments no longer crowd Links: each is an event on the card, payee and
+  people it touches, so recurring ones stay out of the way.
+- Browse › Links shows everything you have linked, by module or freely, with
+  a time-lapse of it growing.
+- The Links map moves (lines draw out, records glide when you re-centre) and
+  zooms with two fingers; links take dates and can go both ways.
+- Activity is redrawn: tap any day of a tracker to see what made it count.
