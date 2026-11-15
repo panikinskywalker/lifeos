@@ -44,13 +44,15 @@ function Card({ it, i, open, isOpen, last, width, onPress }: { it: StackItem; i:
   const t = useTheme();
   const shift = useRef(new Animated.Value(i > open ? CARD - STRIP : 0)).current;
   const press = useRef(new Animated.Value(1)).current;
-  const reveal = useRef(new Animated.Value(isOpen ? 1 : 0)).current;
+  // The last card is never covered, so it always shows its line and number.
+  const shown = isOpen || last;
+  const reveal = useRef(new Animated.Value(shown ? 1 : 0)).current;
   useEffect(() => {
     Animated.spring(shift, { toValue: i > open ? CARD - STRIP : 0, ...SPRING }).start();
   }, [open, i, shift]);
   useEffect(() => {
-    Animated.timing(reveal, { toValue: isOpen ? 1 : 0, duration: isOpen ? 360 : 120, delay: isOpen ? 120 : 0, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [isOpen, reveal]);
+    Animated.timing(reveal, { toValue: shown ? 1 : 0, duration: shown ? 360 : 120, delay: shown ? 120 : 0, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [shown, reveal]);
   const squeeze = (to: number) => Animated.spring(press, { toValue: to, damping: 20, stiffness: 400, mass: 0.6, useNativeDriver: true }).start();
   const [from, to] = t.gradients[it.tint];
   const inner = width - 32;
