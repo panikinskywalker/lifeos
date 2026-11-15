@@ -16,12 +16,15 @@ import { mePersonId } from './lib';
  * - **sure** — a known sender in the Football group (a learned alias, one of
  *   their UPI ids, the Person finance linked the payment to, or a bank name
  *   whose first name is only one player's), the amount exactly what they owe
- *   (one share, or several paid oldest first), within 30 days after the game:
+ *   (one share, or several paid oldest first; up to ₹20 over is fine, the
+ *   extra stays money in), within 30 days after the game:
  *   recorded on its own (via 'sms'), the Transaction linked, the sender learned,
  *   and it shows in To check as filed, with Undo (15 Nov, Rutvij: a payment
  *   that comes in is marked paid right away);
- * - otherwise (a part payment, a name two players share), To check asks
- *   ("Priya paid her ₹147 for Sat 19 Sep?"); Yes records it and learns the sender.
+ * - otherwise (a part payment, more than ₹20 over, a name two players share),
+ *   To check asks ("Priya paid ₹147 of ₹200 for Sat 19 Sep?", "Vishwesh sent
+ *   ₹472, ₹202 more than the ₹270 for Fri 30 Oct?"); Yes records it and learns
+ *   the sender.
  * The SMS itself never leaves the phone: Turf web gets only the entry.
  */
 
@@ -116,19 +119,33 @@ function openShares(os: LifeOSContext, personId: string, txDate: string, anyDay 
     .sort((a, b) => a.data.gameDate.localeCompare(b.data.gameDate));
 }
 
-/** Shares an amount pays exactly: one share, or the oldest ones together. */
+/** A known friend may send a little more than they owe (rounding up): up to this much over is still a sure match, the rest stays money in (15 Nov, Rutvij). */
+const EXTRA_OK = 20;
+
+/** Shares an amount pays: one share, or the oldest ones together, exactly or up to ₹20 over. */
 function exactly(shares: Array<ObjectRecord<AppearanceData>>, amount: number): Array<ObjectRecord<AppearanceData>> | null {
-  const one = shares.find((a) => Math.abs(owedOn(a.data) - amount) < 0.5);
+  const fits = (owed: number) => amount >= owed - 0.5 && amount <= owed + EXTRA_OK + 0.5;
+  const one = shares.find((a) => Math.abs(owedOn(a.data) - amount) < 0.5) ?? shares.find((a) => fits(owedOn(a.data)));
   if (one) return [one];
   let sum = 0;
   const run: Array<ObjectRecord<AppearanceData>> = [];
   for (const a of shares) {
     sum += owedOn(a.data);
     run.push(a);
-    if (Math.abs(sum - amount) < 0.5) return run;
+    if (fits(sum)) return run;
     if (sum > amount) break;
   }
   return null;
+}
+
+/** The question in To check: a part payment, more than they owe, or the amount itself. */
+function askLabel(os: LifeOSContext, name: string, amount: number, target: Array<ObjectRecord<AppearanceData>>): string {
+  const owed = target.reduce((s, a) => s + owedOn(a.data), 0);
+  const money = os.format.currency(amount);
+  const days = target.map((a) => shortDay(a.data.gameDate)).join(', ');
+  if (amount < owed - 0.5) return `${firstName(name)} paid ${money} of ${os.format.currency(owed)} for ${days}?`;
+  if (amount > owed + 0.5) return `${firstName(name)} sent ${money}, ${os.format.currency(amount - owed)} more than the ${os.format.currency(owed)} for ${days}?`;
+  return `${firstName(name)} paid ${money} for ${days}?`;
 }
 
 /** Pay shares, oldest first, up to the amount (the last one may be part paid). */
@@ -183,7 +200,13 @@ function reaskOpen(os: LifeOSContext): number {
     }
     const who = whoSent(os, tx.data, tx.id);
     const exact = who.known && who.personId ? exactly(openShares(os, who.personId, tx.data.date), tx.data.amount) : null;
-    if (!exact || !recordSure(os, tx.id, tx.data, who.personId!, exact)) continue;
+    if (!exact || !recordSure(os, tx.id, tx.data, who.personId!, exact)) {
+      // Still a question: worded as today (what is open now, and how much more they sent).
+      const open = ask.appearanceIds.map((id) => os.records.get<AppearanceData>(id)).filter((a): a is ObjectRecord<AppearanceData> => !!a && owedOn(a.data) > 0);
+      const label = askLabel(os, os.records.get(ask.personId)?.title ?? 'Someone', tx.data.amount, open);
+      if (label !== f.label) os.filings.update(f.id, { label });
+      continue;
+    }
     os.filings.setChecked(f.id);
     n++;
   }
@@ -208,7 +231,6 @@ export function matchTransaction(os: LifeOSContext, txId: string): 'paid' | 'ask
   const money = os.format.currency(tx.data.amount);
   const target = exact ?? [shares[0]!];
   const owed = target.reduce((s, a) => s + owedOn(a.data), 0);
-  const part = tx.data.amount < owed - 0.5;
   const ask: SmsAsk = { txId, personId: who.personId, appearanceIds: target.map((a) => a.id), amount: Math.min(tx.data.amount, owed), sender: sender.key };
   os.filings.add({
     source: 'turf',
@@ -216,7 +238,7 @@ export function matchTransaction(os: LifeOSContext, txId: string): 'paid' | 'ask
     kind: SMS_ASK,
     action: 'logged',
     entityId: txId,
-    label: part ? `${firstName(name)} paid ${money} of ${os.format.currency(owed)} for ${shortDay(target[0]!.data.gameDate)}?` : `${firstName(name)} paid ${money} for ${target.map((a) => shortDay(a.data.gameDate)).join(', ')}?`,
+    label: askLabel(os, name, tx.data.amount, target),
     flag: `${money} in from ${sender.name ?? sender.vpa ?? name} · SMS · ${shortDay(tx.data.date)}`,
     before: ask as unknown as Record<string, unknown>,
   });

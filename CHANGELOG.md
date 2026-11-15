@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.44 · 15 Nov 2026
+
+**A little extra is fine.** When a friend you know sends up to ₹20 more than
+they owe, Turf marks the share paid on its own and the extra counts as money
+in. Anything more is still asked, and the question now says how much more:
+"Vishwesh sent ₹472, ₹402 more than the ₹70 for Fri, 30 Oct?". Questions
+already waiting are reworded the same way.
+
 ## v0.0.43 · 15 Nov 2026
 
 **Old Turf questions answer themselves.** Payments that came in before

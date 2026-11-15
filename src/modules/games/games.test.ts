@@ -764,6 +764,18 @@ describe('shares paid by SMS (R9c.6)', () => {
     expect(appearance('Arjun', '2026-10-17').data.amountPaid).toBe(arjunPaid); // not paid twice
   });
 
+  it('a known friend sending up to ₹20 more is paid on their own, the extra money in; more than that is asked, saying how much more (15 Nov)', () => {
+    // Karan owes ₹500 (Wed 14) and ₹450 (Sat 17).
+    const tx = sms(465, '2026-10-18', 'KARAN MEHTA', 'Rs.465.00 credited from VPA karan.m@okhdfc');
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹465 · Sat, 17 Oct/)]);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(450);
+    expect(os.records.get<{ share?: number }>(tx.id)!.data.share).toBe(15);
+    sms(650, '2026-10-19', 'KARAN MEHTA', 'Rs.650.00 credited from VPA karan.m@okhdfc');
+    expect(asks().map((f) => f.label)).toEqual(['Karan sent ₹650, ₹150 more than the ₹500 for Wed, 14 Oct?']);
+    expect(appearance('Karan', '2026-10-14').data.amountPaid ?? 0).toBe(0);
+  });
+
   it('one of several UPI ids on their Person is known at once (core identity)', () => {
     os.records.update(person('Karan').id, { data: { upi: 'karan@ybl, karan.m@okhdfc' } });
     sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited from VPA karan.m@okhdfc');
