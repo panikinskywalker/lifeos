@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.64 · 15 Nov 2026
+
+**Ask Money's box is clear of the bottom bar.** A screen with its own box at the
+bottom (Ask Money) shows no bottom bar. When more goes out than comes in, *Can I
+afford something?* says so instead of a minus sign, and the note under the
+starters says what the privacy gate sends.
+
 ## v0.0.63 · 15 Nov 2026
 
 **LifeOS no longer opens itself (the real cause).** The background sync of your

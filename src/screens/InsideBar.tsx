@@ -42,6 +42,7 @@ function InsideBar({ board, base }: { board: BoardManifest | undefined; base: st
   const keyboard = useKeyboardUp();
   if (keyboard) return null;
   const page = path.slice(base.length).replace(/^\//, '').split('/')[0] || 'index';
+  if (board?.screens?.find((x) => x.key === page)?.noBar) return null;
   const bar = board?.bar;
   if (!bar) return <BottomBar items={TABS} active="" onPress={(key) => router.dismissTo((key === 'index' ? '/' : `/${key}`) as never)} />;
   const items: BottomBarItem[] = bar.tabs.map((s) => ({ key: s.screen, label: s.label, icon: s.icon as IconName }));

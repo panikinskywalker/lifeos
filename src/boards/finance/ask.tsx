@@ -435,7 +435,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
           </View>
         ))}
 
-        {!items.length && !empty ? <Text color="secondary" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 4 }}>A question you type goes to the model in You › Agent with only the payments it needs: payee, amount, date and category. Never your texts.</Text> : null}
+        {!items.length && !empty ? <Text color="secondary" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 4 }}>A question you type goes to the model in You › Agent as a summary: rounded amounts, dates and categories, with people as placeholders. Never your texts.</Text> : null}
       </ScrollView>
 
       <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 12, paddingBottom: insets.bottom + 16 }}>

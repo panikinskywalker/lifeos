@@ -273,7 +273,7 @@ export function starters(os: LifeOSContext, now = new Date()): Starter[] {
     { question: 'Where did my money go this month?', line: `${money(spent)} so far`, icon: 'pie' },
     { question: 'What is due before payday?', line: due.items.length ? `${due.items.length} bill${due.items.length === 1 ? '' : 's'} by ${shortDay(due.until)}` : 'Nothing due yet', icon: 'calendar' },
     { question: 'Did anything look wrong?', line: odd ? `${odd} thing${odd === 1 ? '' : 's'} to check` : 'Nothing looks wrong', icon: 'alert', lime: odd > 0 },
-    { question: 'Can I afford something?', line: left != null ? `About ${money(left)} left a month` : 'Needs a month with income', icon: 'card' },
+    { question: 'Can I afford something?', line: left == null ? 'Needs a month with income' : left >= 0 ? `About ${money(left)} left a month` : `About ${money(-left)} more out than in, a month`, icon: 'card' },
     { question: 'Show me a chart of my spending', line: 'Keep it on Money home', icon: 'chart' },
   ];
 }

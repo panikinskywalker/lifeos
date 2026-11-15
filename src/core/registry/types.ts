@@ -167,6 +167,8 @@ export interface BoardScreen {
   key: string;
   title: string;
   component: ComponentType<{ ctx: LifeOSContext; params: Record<string, string> }>;
+  /** A screen with its own box at the bottom (Ask Money) shows no bottom bar. */
+  noBar?: boolean;
 }
 
 /** Per-Object overrides of the generic screens (List, Record, Form, Metric, Links). */

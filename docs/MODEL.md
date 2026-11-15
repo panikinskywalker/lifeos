@@ -1465,7 +1465,8 @@ the bar takes them, and its raised button does the board's main action in
 place of Dump: in **Turf**, Home · Games · **+** (New match) · Players ·
 Venues, which replaced Turf's switcher at the top. A section stays lit on its
 deeper pages (Players on Leaders and a player). The back button at the top
-leaves the board. Every other board and module page (Money for now) keeps the
+leaves the board. A screen with its own box at the bottom (Ask Money) shows no
+bar. Every other board and module page (Money for now) keeps the
 app's own bar, and its buttons lead back out to Today, Upkeep, Dump, Browse
 and You. A board declares its sections as `bar` (`docs/PLUGINS.md` contract:
 `BoardManifest.bar`).
