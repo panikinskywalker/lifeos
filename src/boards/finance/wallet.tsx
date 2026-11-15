@@ -37,8 +37,9 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
   const data = useLive((o) => ({ nw: netWorth(o), spent: spendInRange(o, m.start, m.end), income: incomeInRange(o, m.start, m.end) }), [m.start]);
   const money = (n: number, c?: string) => `${n < 0 ? '−' : ''}${os.format.currency(Math.round(Math.abs(n)), c)}`;
   const totals = walletTotals(data.nw);
-  // The account you use most sits in front; the rest show their edge above it.
-  const cards = data.nw.accounts.filter((r) => r.account.data.kind !== 'investment').sort((a, b) => Number(a.account.data.kind === 'bank') - Number(b.account.data.kind === 'bank') || Math.abs(a.balance) - Math.abs(b.balance));
+  // The bank account with the most in it is drawn in full on top; the rest tuck under it as their edges, cards first.
+  const cards = data.nw.accounts.filter((r) => r.account.data.kind !== 'investment').sort((a, b) => Number(b.account.data.kind === 'bank') - Number(a.account.data.kind === 'bank') || b.balance - a.balance);
+  const rest = cards.slice(1).sort((a, b) => Number(b.account.data.kind === 'credit') - Number(a.account.data.kind === 'credit') || Math.abs(b.balance) - Math.abs(a.balance));
   const back = () => (router.canGoBack() ? router.back() : router.replace('/module/finance' as never));
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 24 }}>
@@ -54,8 +55,10 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
 
       {cards.length ? (
         <View>
-          {cards.map((r, i) => (
-            <WalletCard key={r.account.id} account={r.account} balance={r.balance} front={i === cards.length - 1} first={i === 0} money={money} />
+          {[cards[0]!, ...rest].map((r, i) => (
+            <View key={r.account.id} style={{ zIndex: 100 - i, elevation: 100 - i }}>
+              <WalletCard account={r.account} balance={r.balance} front={i === 0} first={i === 0} money={money} />
+            </View>
           ))}
         </View>
       ) : (
@@ -96,7 +99,7 @@ function WalletCard({ account: a, balance, front, first, money, still }: { accou
       accessibilityLabel={`${a.title}${d.last4 ? ` ending ${d.last4}` : ''}, ${card ? 'you owe' : 'balance'} ${figure}${late ? ', bill late' : ''}`}
       disabled={still}
       onPress={() => router.push(`/entity/account/${a.id}` as never)}
-      style={({ pressed }) => ({ height: front ? 196 : 64, marginTop: first ? 0 : -16, borderRadius: 28, backgroundColor: bg, paddingHorizontal: 20, paddingTop: 16, paddingBottom: front ? 18 : 0, justifyContent: 'space-between', overflow: 'hidden', opacity: pressed ? 0.92 : 1, shadowColor: '#000', shadowOpacity: front ? 0.35 : 0, shadowRadius: 20, shadowOffset: { width: 0, height: -8 }, elevation: front ? 8 : 0 })}
+      style={({ pressed }) => ({ height: front ? 196 : 72, marginTop: first ? 0 : -24, borderRadius: 28, backgroundColor: bg, paddingHorizontal: 20, paddingTop: front ? 16 : 34, paddingBottom: front ? 18 : 0, justifyContent: 'space-between', overflow: 'hidden', opacity: pressed ? 0.92 : 1 })}
     >
       <View pointerEvents="none" style={{ position: 'absolute', right: -50, bottom: -80, width: 220, height: 220, borderRadius: 110, borderWidth: 28, borderColor: 'rgba(11,11,13,0.06)' }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>

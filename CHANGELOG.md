@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.77 · 16 Nov 2026
+
+**Accounts and cards shows your main account in full.** Your bank account with
+the most in it is drawn as a full card at the top, and your other accounts and
+cards tuck under it as their edges (cards first), instead of a long run of
+edges with the full card hidden at the bottom. Also: Ask Money's agent (v0.0.72)
+and the new + (v0.0.73) now reach the phone; those two updates had been built
+for a different app runtime and were skipped.
+
 ## v0.0.76 · 16 Nov 2026
 
 **Turf: Auto-pick and a searchable audit log.**
