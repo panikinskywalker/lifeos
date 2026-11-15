@@ -435,7 +435,7 @@ Person's company becomes a link to an Organisation (*works at*) in R2.
 | **Event** | Something that happened or will | kind (met / call / flight / stay / service / meeting / check-in / created / edited / cycle done …), start, end, roles → records, kind-specific fields | everything |
 | **Task** | Something to do | due, done, priority, project → Project, people | dumps, you, mail |
 | **Project** | A set of tasks and events with an aim | status, target date, spend (derived) | dumps, you |
-| **Trip** | Travel with dates, people and spend | destination → Place, dates, companions, budget, currency | dumps, mail, calendar |
+| **Trip** | Travel with dates, people and spend | destination → Place, dates, companions, group, budget each, currency, rate; its Stops and their Things to do (proposed 15 Nov) | dumps, mail, calendar |
 | **Habit** | Something you do on a rhythm, chores included | cadence (daily / weekdays / N per week / every N weeks / weekday), kind (habit / chore), minutes; check-ins are Events; streaks where cadence is daily-ish | dumps, you |
 
 **The module's name** (checked 31 Oct, R4): layer 3 and R4 call it `projects`
@@ -530,6 +530,143 @@ money-out Transactions linked to the trip through Links (word *trip* from the
 form, *part_of* from a booking mail), each counted once, against the budget,
 per day and what is left; **flights and stays**: Events linked to it the same
 way; **packed**: clothing Assets linked *packed for* it (a new core link word).
+
+### The trip template (proposed 15 Nov, from the *Trip template · Noir (Japan)* page)
+
+Every trip gets the same five sections, **Overview · Plan · Bookings · Money ·
+Prep**, before, during and after (the canvas page *Trip template · Noir
+(Japan)*, artboards `JP-*`; Japan, 17 Dec 2026 to 7 Jan 2027, is the example).
+What follows is what the data needs; the simplest choice is taken where the
+design does not say, and each is listed under *To decide*. No migration: all
+of it lives in record JSON and Links.
+
+**Two new Objects in `travel`**: a trip is a line of **Stops**, and a stop has
+**Things to do**. Moves, stays and flights stay Events; the checklist stays
+Tasks; papers stay Documents; spends, splits and paybacks stay finance's.
+
+**Trip, new Fields** (added to *Trip's Fields* above; keys new).
+| Field | Type | Notes |
+|---|---|---|
+| Group | link → Group, word *group* (`groupId`) | who is going, as a crm Group of kind trip; made once from Travelling with when the first shared spend is logged; splits and settle up on the trip use it |
+| Budget | money | **changed**: what each person means to spend (the cap, ₹2.5L each); spent is now your share (below) |
+| Daily allowance | money, in the local currency (`dailyAllowance`) | ¥8,000 a day: what the days still to come are estimated at |
+| Rate | number (`fxRate`) | ₹ for one of the local currency (¥1 = ₹0.6028); taken from the latest Transaction in that currency, yours to change |
+| Start from | link → Trip, word *copied from* (`fromTripId`) | hidden; a trip started from another copies its checklist (undated) and its packing list (Recap's *Keep for the next trip*) |
+
+**Stop** (Object id `stop`): one place on a trip's line, or a maybe.
+| Field | Type | Notes |
+|---|---|---|
+| Name | text (the title) | "Magome" |
+| Local name | text (`localName`) | "馬籠"; its first character is the stop's mark (東, 湖); without one, the name's first letter |
+| Trip | link → Trip, word *part_of* (`tripId`) | |
+| Kind | select | stop · idea (a maybe, not on the line: "Ideas, not on the line") · airport |
+| Order | number | its place on the line; ideas have none |
+| Arrives, Leaves | date (`arriveOn`, `leaveOn`) | nights are derived; a stop's dates come from its stay when one is filed |
+| Place | link → Place, word *at* (`placeId`) | the map pin and the address; matched by name or made, as a trip's destination is |
+| Colour | select | the line's colour for this stop: green · teal · lilac · orange · tan · pink · coral · sky · yellow |
+| About | long text | "Edo-era post town on the old Nakasendo road…" |
+
+Derived, not Fields: **nights**; **its stay** (the trip's stay Event checking in
+on its Arrives day); **the legs either side** (journeys *from* and *to* it);
+**its things to do**; **visited** (its Leaves day has passed: the stamp
+collected, the stamp book on Recap); **weather** (December normals per stop
+until a weather service is chosen, layer 8 still says *to choose*).
+
+**Thing to do** (Object id `outing`; "activity" is the Activity board's word):
+something to see, do or eat at a stop, or something on while you're there.
+| Field | Type | Notes |
+|---|---|---|
+| Name | text (the title) | "Nakasendo walk to Tsumago" |
+| Stop | link → Stop, word *at* (`stopId`) | |
+| Kind | select | see · do · eat · shop · event (on while you're there: Christmas illuminations, the Joya no Kane bells) |
+| Starts, Ends | date (`startOn`, `endOn`) | an event's days; a planned thing's day |
+| Cost each | money, in the local currency (`cost`) | empty or 0 is *Free* |
+| Takes | duration | "2.5–3 h" kept as minutes; a range keeps the longer |
+| Best time | text (`bestTime`) | "quietest after 15:00", as read or typed |
+| Maps link | contact (url) | Google Maps |
+| Notes | long text | |
+
+Statuses: idea · want to · planned · done. Planned things that cost count in
+the trip's *booked* money (below).
+
+**Event, new Fields for travel** (added to *Event's Fields*; in sections by
+kind, as an Asset's are by category; projects keeps the Object, travel files
+these kinds).
+| Field | Type | Kind | Notes |
+|---|---|---|---|
+| From, To | link → Stop, words *from* / *to* (`fromStopId`, `toStopId`) | journey | a move between stops; kind `journey` is new, beside flight and stay |
+| Fare each | money (`fare`) | journey, flight | per person, in its currency; flights keep each person's fare as their Transactions |
+| Seats open | datetime (`seatsOpenAt`) | journey | "open 26 Nov, 10:00 JST"; drives the deadline rail and a *coming up* nudge |
+| Last connection | text (`lastConnection`) | journey | "Nakatsugawa → Magome bus, 17:45 on Saturdays" |
+| Steps | long text (`steps`) | journey | one line each: "11:10 Nagano Dentetsu → Nagano · IC card works" |
+| To pay | money (`toPay`) | stay | what is left to pay there, in its currency, city tax included |
+| Paid | money (`paid`) | stay | what has been taken already |
+| How to pay | select (`payHow`) | stay | cash · card · online · prepaid |
+| Free cancel until | date (`cancelBy`) | stay | drives the deadline rail and a *coming up* nudge |
+| Check-in, Check-out | text (`checkIn`, `checkOut`) | stay | "15:00–19:00", "by 09:00"; empty is *check-in time missing* |
+| Reference | text (`reference`) | stay, flight | the booking reference; shown on a tap |
+| Booking link | contact (url) (`bookingUrl`) | stay | the booking page |
+
+The booking parsers fill what a mail says (check-in times, to pay, free
+cancellation); the copilot fills the rest only with your Save.
+
+**Task, one new Field and one used**: **Trip** (link → Trip, word *trip*,
+`tripId`; the word `plan_trip` already uses) and **Section** (text, an open
+list, `section`: documents · money & gear · trains & luggage · downloads ·
+during the trip). The trip's checklist is its Tasks; *before you fly* and
+*during the trip* are derived from Due against the trip's dates; *no date* is
+no Due. A note on the checklist is a Task with no Due.
+
+**Document**: unchanged (Trip is already a Field). The Docs shelf is the trip's
+Documents by kind beside its checklist Tasks in *documents* ("Japan visas ·
+pending"). The emergency numbers come from a small table by country in code.
+
+**Money on a trip, derived** (no new Fields beyond the trip's):
+- **Your share**: for a Transaction on the trip with a split, your share; else
+  its amount. *Spent* is the sum of your shares (R7d counted whole amounts).
+- **Levels**: *paid* (your shares) · *booked* (stays' To pay, journeys' Fare
+  each still unpaid, planned things that cost, each person's part) ·
+  *estimates* (the daily allowance times the days still to come). **Projected**
+  is the three, against the Budget each. *Scope* is you or one person of the
+  Group, from the same splits.
+- **Settle up**: who you are is you; each person's balance with you is
+  finance's Debts, as now. **The whole group's balances** (Rushikesh +₹94,712,
+  Parth −₹3,159) are computed from the splits of the trip's Transactions (each
+  split has its payer and everyone's share) and its paybacks.
+- **A payback** between you and someone is finance's settle up (a Debt of kind
+  payment). One between two others ("Parth paid Rushikesh") is a Transaction
+  of kind transfer on the trip with a split: the payer and the one paid, so it
+  moves the group's balances and never your spend.
+- **A receipt photo** read into items: the items go into the Transaction's
+  Note, the faces you tap become an exact split.
+
+**Stage, derived** (the stepper Plan · Book · Prep · Travel · Home): *plan*
+until the first booking; *book* until every stop on the line has a stay and
+the flights are in; *prep* until it starts; *travel* while away; *home* after.
+**Coming up / deadlines**: seats open, free cancel until, Task dues and the
+flight, in date order to the day you fly. **Today** (while away): the day's
+stop, its journey's leave-by, last connection and steps, what is to pay, the
+day's things to do and Tasks. **Recap**: nights, stops, moves, spent each by
+stop, steps walked (health's Measurements on those days), settled up, back home.
+
+Not in the data, on purpose: **offline copies** (LifeOS keeps everything on
+the phone already); **crowd data, live Booking.com and weather** (asked for
+when shown, not stored).
+
+**To decide** (the simplest was written above):
+1. **Sharing a trip** (contributors, a view-only link, shared ticks on the
+   departure-day check, "Rushikesh ticked 18:02") needs a host both phones and
+   your friends reach, as Turf web is for Turf. Until one is chosen, a trip is
+   yours only and the view-only screen is a preview of what a link would show.
+2. **Budget each** replaces R7d's whole-trip budget, and *spent* becomes your
+   share. Old trips keep their number, now read as yours.
+3. **A payback between two others** as a transfer Transaction with a split:
+   or keep the group view to what involves you?
+4. **The Japan touches** (station boards, eki stamps, the hanko, kanji marks)
+   come from Local name; a trip with none shows letters. Keep them for every
+   trip, or only where a stop has a local name?
+5. **Thing to do** as its own Object, or Tasks with a kind? It has a stop, a
+   cost, a best time and its own statuses, so an Object was picked.
 
 ### Games (module `games`, agreed 17 Oct, revised 20 Oct; feeds the Turf board)
 The football you already run in **Turf Ledger**, your web app
@@ -652,7 +789,8 @@ large OTP on Delivery).
 | reminders table | Cycles |
 
 Count: 19 domain Objects, down from 25 kinds plus two side tables; 23 with
-the four games Objects added 17 Oct; 25 with Stock and Space (R7e, 30 Oct).
+the four games Objects added 17 Oct; 25 with Stock and Space (R7e, 30 Oct);
+27 with Stop and Thing to do (the trip template, proposed 15 Nov).
 
 ## 3. Three tiers: core, modules, boards + automations — agreed 4 Oct
 
@@ -677,7 +815,7 @@ what a Person is).
 
 **The modules (decided 4 Oct: all twelve existing data modules stay):**
 `finance` (Account, Transaction, Debt, Subscription, Budget, Group) · `crm`
-(Person) · `projects` (Task, Project, Event; Goal dropped in R4) · `travel` (Trip) · `assets`
+(Person) · `projects` (Task, Project, Event; Goal dropped in R4) · `travel` (Trip; Stop and Thing to do proposed with the trip template) · `assets`
 (Asset; Routine until R5) · `inventory` (Stock, Space; shown as Home since R7e) · `documents` (Document) · `health`
 (Measurement, Workout) · `habits` (Habit, Habit log, Routine) · `knowledge`
 (Note) · `places` (Place, Organisation) · `deliveries` (Delivery). `dashboard`
@@ -1403,6 +1541,43 @@ screens checked on the phone → overrides only where the default is wrong)
   Layer 5's Memory line now says Facts (updated at the merge, v0.0.26). **Phone check pending.**
 
 ### Boards and automations
+- [ ] **R7g the trip template** (planned 15 Nov): every trip gets the five sections of the *Trip template ·
+  Noir (Japan)* page, on the Objects and Fields in layer 2 (*The trip template*). Seven slices, each usable on
+  the phone when done; no migration in any. Order: 1 → 2 → 3 and 5 (either first) → 4 → 6 → 7.
+  - [ ] **1. Stops and the line.** Stop; the fold (once): each trip's destination becomes its first stop, and
+    each stay already filed makes or finds the stop for its city and nights. Plan › Line (stops in order with
+    nights and stay, ideas with Add to the line), Plan › Days (the calendar, each night's stop, moving days,
+    Add to my calendar as .ics), Plan › Map (drawn from the stops' Place pins, as Places draws maps until a
+    provider is chosen), a stop's page, the edit form. A booking mail's stay now lands on its stop too.
+  - [ ] **2. Journeys, stays and Bookings.** Event's travel Fields; moves as `journey` Events between stops; a
+    day's page (Overview · Itinerary · Stay & pay · Travel: leave by, arrive, fare each, book ahead, last
+    connection, step by step); Bookings (the flights as a boarding pass with each person's fare, airport
+    cards, stays with what is left to pay and which miss a check-in time, Needs you); the stay page. The
+    parsers fill check-in times, to pay and free cancellation from the mail. Nudges (*coming up*): seats
+    open, free cancellation ends, check-in time missing.
+  - [ ] **3. Things to do.** Thing to do; a stop's things with All · Planned · Want to · Ideas · Free, the
+    best time, Google Maps; *On your route* (events) on the Overview and the stop.
+  - [ ] **4. Money on a trip.** The trip's Group, Budget each, Daily allowance and Rate; your share, the three
+    levels and Projected, scope by person, cost by day, where the money goes, the journeys table, the
+    insights in code ("a 7-day pass wouldn't pay off"); Log a spend (keypad, live ₹, paid by, split); Split a
+    receipt (the photo read through the brain's photo path, faces assign shares); Settle up with the
+    group's balances and who owes whom; Pay back (swipe to record; logged, never sent).
+  - [ ] **5. Prep.** The checklist as the trip's Tasks with Section, its filters and groups, Ready to fly;
+    Docs (the shelf from Documents and the documents Tasks, the viewer, the emergency card by country);
+    R7d's packing moved under Prep with the departure-day check (ticks are yours until sharing exists).
+  - [ ] **6. Overview, Today and Recap.** The stage stepper, Needs attention, Coming up with the deadline rail,
+    the journey card, stays as station boards, stamps, weather by stop (normals), Ready to fly and your
+    balance; Today in the morning (leave-by countdown, the next train, last connection, the day, show the
+    driver, cash with a quick add, the stamp collected) and the afternoon (the rest of today, bring and pack,
+    tomorrow); Recap (spent each by stop, steps, settled up, back home, Keep for the next trip, which fills
+    Start from on the next trip). The trip bar on every trip screen.
+  - [ ] **7. Search and the copilot.** The trip's search (its records, actions, views); ask chips per screen;
+    the trip copilot over the trip's records and your mail (the mail source finance reads), proposing
+    changes that are saved only on Save, with Undo; by voice through R12's chain. Booking.com stays a slot
+    until a connector is chosen.
+  *Not in R7g*: sharing (contributors, view-only links, shared ticks) until a host is chosen (layer 2, *To
+  decide* 1); live weather and crowd data; live Booking.com. The `JP-*` artboards are the design; the
+  board's v3 Noir rebuild (`NR-Travel-*`) stays the Travel home and all trips.
 - [x] **R8 Today and Time** — Today tiles re-hung on module tools and core queries only; Time
   board from On this day; the route moves from `app/almanac/time.tsx` to
   `app/time.tsx`.
