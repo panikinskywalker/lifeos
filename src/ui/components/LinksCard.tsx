@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { ObjectRecord } from '@core/domain/types';
 import { egoGraph, linkGroups, type LinkItem } from '@core/graph/read';
+import { addLink, removeLink } from '@core/links';
 import { ActionSheet, Button, FilterChip, FormField, RowItem, RowList, Section, Sheet, Text, TextField, useToast } from '../kit';
 import { useLive, useOS } from '../hooks';
 import { tintForModule } from '../theme/moduleTint';
@@ -29,8 +30,8 @@ export function LinksCard({ entity, full = false }: { entity: ObjectRecord; full
   const open = (i: LinkItem) => router.push(`/entity/${i.type}/${i.id}` as never);
   const openLinks = (id = entity.id) => router.push(`/links/${id}` as never);
   const remove = (i: LinkItem) => {
-    os.links.remove(i.linkId);
-    toast.show({ message: `Removed the link to ${i.title}`, icon: 'link', undo: () => void os.links.link(i.fromId, i.toId, i.kind) });
+    const undo = removeLink(os, i);
+    toast.show({ message: `Removed the link to ${i.title}`, icon: 'link', undo });
   };
   const money = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${os.format.currency(Math.abs(n))}`;
   return (
@@ -60,8 +61,9 @@ export function LinksCard({ entity, full = false }: { entity: ObjectRecord; full
                         key={i.linkId}
                         icon={def?.icon ?? 'link'}
                         tint={tintForModule(i.module ?? undefined)}
-                        title={i.title}
-                        subtitle={[def?.label, i.at ? os.format.date(i.at) : null].filter(Boolean).join(' · ')}
+                        title={i.guessed ? `${i.title}?` : i.title}
+                        subtitle={[i.context, i.subtitle ?? (i.context ? null : def?.label), i.at ? os.format.date(i.at) : null].filter(Boolean).join(' · ')}
+                        tag={i.guessed ? { label: 'guess', tone: 'alertText' } : undefined}
                         value={i.amount != null ? money(i.amount) : undefined}
                         onPress={() => open(i)}
                         onLongPress={() => setHeld(i)}
@@ -102,38 +104,46 @@ export function LinksCard({ entity, full = false }: { entity: ObjectRecord; full
   );
 }
 
-/** Add a Link by hand: the word (this Object's own words, related, or your own), then the record. */
+/**
+ * Add a Link by hand: the word, then the record. The words are this record's
+ * own link Fields (Project, People, Venue), which fill the Field and pick only
+ * from the Objects it takes, then *related* or your own word, which pick from
+ * anything.
+ */
 export function LinkSheet({ visible, onClose, entity }: { visible: boolean; onClose: () => void; entity: ObjectRecord }) {
   const os = useOS();
   const toast = useToast();
-  const [kind, setKind] = useState('related');
-  const [picking, setPicking] = useState(false);
   const def = os.registry.object(entity.object);
-  const kinds = [...new Set(['related', ...(def.links?.map((r) => r.kind) ?? [])])];
-  const kindLabel = (k: string) => def.links?.find((r) => r.kind === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1);
+  const fields = def.fields.filter((f) => f.type === 'link' && f.linkWord);
+  const [kind, setKind] = useState('related');
+  const [custom, setCustom] = useState('');
+  const [picking, setPicking] = useState(false);
+  const field = custom ? undefined : fields.find((f) => f.linkWord === kind);
+  const word = custom.trim() || kind;
+  const types = field?.linkTo && field.linkTo !== 'any' ? ([] as string[]).concat(field.linkTo) : [];
   return (
     <>
       <Sheet visible={visible && !picking} onClose={onClose} title="Link to…" footer={<Button title="Choose record" icon="search" block onPress={() => setPicking(true)} />}>
         <FormField label="Link as">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {kinds.map((k) => (
-              <FilterChip key={k} label={kindLabel(k)} selected={kind === k} onPress={() => setKind(k)} />
+            {[...new Map(fields.map((f) => [f.linkWord!, f.label])).entries()].map(([k, label]) => (
+              <FilterChip key={k} label={label} selected={!custom && kind === k} onPress={() => (setKind(k), setCustom(''))} />
             ))}
+            <FilterChip label="Related" selected={!custom && kind === 'related'} onPress={() => (setKind('related'), setCustom(''))} />
           </View>
         </FormField>
-        <TextField label="Or your own word" value={kinds.includes(kind) ? '' : kind} onChange={(v) => setKind(v || 'related')} placeholder="vendor, gift for" />
+        <TextField label="Or your own word" value={custom} onChange={setCustom} placeholder="vendor, gift for" />
       </Sheet>
       <EntityPicker
         visible={visible && picking}
         onClose={() => setPicking(false)}
-        types={[]}
+        types={types}
         exclude={[entity.id]}
         onSelect={(otherId) => {
-          const word = kind.trim() || 'related';
-          const l = os.links.link(entity.id, otherId, word);
+          const undo = addLink(os, entity.id, otherId, word);
           setPicking(false);
           onClose();
-          toast.show({ message: `Linked as ${kindLabel(word).toLowerCase()}`, icon: 'link', undo: () => os.links.remove(l.id) });
+          toast.show({ message: `Linked as ${(field?.label ?? word).toLowerCase()}`, icon: 'link', undo });
         }}
       />
     </>

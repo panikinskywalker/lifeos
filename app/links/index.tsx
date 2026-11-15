@@ -13,11 +13,11 @@ export default function LinksIndex() {
   return (
     <Screen title="Links" subtitle="How your records connect" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}>
       {rows.length ? (
-        <Section title="Most linked">
+        <Section title="Joins up the most">
           <RowList>
             {rows.map((r) => {
               const def = os.registry.objects.get(r.type);
-              return <RowItem key={r.id} icon={def?.icon ?? 'link'} tint={tintForModule(r.module ?? undefined)} title={r.title} subtitle={def?.label} value={`${r.links}`} meta={r.links === 1 ? 'link' : 'links'} onPress={() => router.push(`/links/${r.id}` as never)} />;
+              return <RowItem key={r.id} icon={def?.icon ?? 'link'} tint={tintForModule(r.module ?? undefined)} title={r.title} subtitle={[def?.label, r.modules > 1 ? `across ${r.modules} modules` : null].filter(Boolean).join(' · ')} value={`${r.links}`} meta={r.links === 1 ? 'link' : 'links'} onPress={() => router.push(`/links/${r.id}` as never)} />;
             })}
           </RowList>
         </Section>

@@ -1078,23 +1078,48 @@ Component gallery (dev).
   by module, link words on the lines; tap re-centres, long-press opens. Reads
   Link records only, so every module gets it without writing anything. Not to
   be confused with the tiles on Today, which are charts and open Metric.
-  Decided with R11 (2 Nov):
+  Decided with R11 (2 Nov), the logic sharpened 15 Nov:
+  - **How a Link reads.** Most Links are made by a link Field (a Task's
+    Project, a Game's captain, an Appearance's player), so the Field says what
+    the Link means. From the record holding the Field it reads as the Field's
+    label ("Project", "Venue", "Captain, team B"). From the record it points
+    at, it is one of the other Object's records: the Project has "Tasks", Priya
+    has "Appearances" and "Debts", never the Field's word read backwards
+    ("Player", "Person"). When one Object points here through several Fields,
+    each is named: "Games · captain", "Games · fronted by", "Transactions · to
+    account". Links no Field made use the Object's declared words (a Place:
+    "Been here"), then core's words (*with*: "Was at"; *works at*: "People
+    here"), then the other Object's name. Between two records of one Object
+    only the direction tells (Koramangala "In" Bengaluru; Bengaluru
+    "Contains").
   - **The Links card** is on every record: the generic page draws it, and a
     board that draws the whole page gets it below its page unless it draws its
     own (Person's, from NR-People). It shows a small map when two or more
-    things are linked, then **groups by link word as read from this record**
-    ("Works at", and on the Organisation "People here"), each row tinted by the
-    other record's module, dated things newest first, payments with their sum.
-    Four rows a group, then *N more* (opens Links). Tap opens the record;
-    long-press offers Open · Show in Links · **Remove link** (with Undo).
-    **Link** adds one by hand: pick the word (this Object's own words, related,
-    or your own) and the record. Mentions are not here (Mentioned in has them).
+    things are linked, then the groups, each row tinted by the other record's
+    module, dated things newest first, payments with their sum. A row says
+    what the record joins up ("Sat, 17 Oct · Playground Arena · ₹450 · unpaid"
+    on an Appearance) and marks a guessed Link. Groups of hidden Objects (a
+    habit's check-ins) come last. Four rows a group, then *N more* (opens
+    Links). Tap opens the record; long-press offers Open · Show in Links ·
+    **Remove link** (with Undo). Mentions are not here (Mentioned in has them).
+  - **Adding and removing keep Fields in step.** A Link a Field made is taken
+    out of the Field when removed (else the next edit would bring it back);
+    **Link** offers this record's own link Fields (Project, People, Venue),
+    which fill the Field and pick only from the Objects it takes, then
+    *related* or your own word, which pick from anything.
   - **The Links screen** (`/links/<id>`): the network (direct links or two
     steps out), a legend of the modules on it in their tints, and under it the
     centre's Links card in full, so adding and removing work here too;
-    re-centring shows *Back to* the start.
-  - **From Browse** (`/links`): the records with the most links, each opening
-    its Links screen.
+    re-centring shows *Back to* the start. Ring two is ranked by how many of
+    ring one each record shares (Karan, at two of Priya's games, first), at
+    most four of one Object, forty records in all. Records of hidden Objects
+    (check-ins, readings) stay off it, the centre apart. Each line carries its
+    word, read from the nearer record ("venue"; "captain" and "player" for the
+    role the near record plays).
+  - **From Browse** (`/links`): the records that join up the most, by breadth
+    (each kind of linked record counts up to five, so 40 payments on a card
+    don't outrank a person linked to games, debts, a group and a trip), then
+    modules reached; hidden Objects neither count nor appear.
 - **Automations**: a tile in the Browse grid. The list of your automations with
   last run and state; the editor (trigger → conditions → steps, outputs passed
   along); templates; run log per run and per step; run now. Manual-run

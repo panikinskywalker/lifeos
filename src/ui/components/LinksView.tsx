@@ -8,7 +8,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { tintForModule } from '../theme/moduleTint';
 
 type SimNode = GraphNode & SimulationNodeDatum;
-type SimLink = SimulationLinkDatum<SimNode> & { kind: string; fromId: string; toId: string };
+type SimLink = SimulationLinkDatum<SimNode> & { kind: string; word?: string; fromId: string; toId: string };
 
 const RADIUS = [24, 17, 11];
 
@@ -26,7 +26,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 /** Force layout, run to rest up front (≤ 40 nodes: a few ms), centre pinned at 0,0. */
 function layout(nodes: GraphNode[], edges: GraphEdge[]) {
   const sim: SimNode[] = nodes.map((n) => ({ ...n, ...(n.hop === 0 ? { fx: 0, fy: 0 } : {}) }));
-  const links: SimLink[] = edges.map((e) => ({ source: e.from, target: e.to, kind: e.kind, fromId: e.from, toId: e.to }));
+  const links: SimLink[] = edges.map((e) => ({ source: e.from, target: e.to, kind: e.kind, word: e.word, fromId: e.from, toId: e.to }));
   const s = forceSimulation(sim)
     .force('link', forceLink<SimNode, SimLink>(links).id((d) => d.id).distance((l) => (Math.max((l.source as SimNode).hop, (l.target as SimNode).hop) === 1 ? 90 : 70)).strength(0.7))
     .force('charge', forceManyBody().strength(-260))
@@ -70,7 +70,7 @@ export function LinksView({ nodes, edges, height = 360, onSelect, onOpen, labels
               <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={touchesCentre ? t.c.fg.tertiary : t.c.line} strokeWidth={touchesCentre ? 1.5 : 1} />
               {labels && touchesCentre ? (
                 <Label halo={t.c.bg.container} x={((a.x ?? 0) + (b.x ?? 0)) / 2} y={((a.y ?? 0) + (b.y ?? 0)) / 2 + 3} fontSize={9} fill={t.c.fg.secondary} textAnchor="middle" fontFamily={t.type.labelMicro.fontFamily}>
-                  {edgeLabel(l.kind, a.hop === 0 ? 'out' : 'in').toLowerCase()}
+                  {l.word ?? edgeLabel(l.kind, a.hop === 0 ? 'out' : 'in').toLowerCase()}
                 </Label>
               ) : null}
             </G>
