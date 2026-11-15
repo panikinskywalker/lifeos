@@ -155,19 +155,28 @@ export function tripBookings(os: LifeOSContext, tripId: string): Booking[] {
 const WIDE = new Set(['city', 'area', 'country']);
 
 /**
- * A trip's destination as a Place (word `to`): a Place of that name, a city,
- * area or country first, else a new city. The Place Object is places'; it is
- * matched by its data. Returns the Place's id, or null without places.
+ * The Place a name means: one of that name (a city, area or country first),
+ * else a new one of this kind, with its pin when given. The Place Object is
+ * places'; it is matched by its data. Null without places.
  */
+export function placeFor(os: LifeOSContext, name: string, opts: { kind?: string; coordinates?: { lat: number; lng: number } } = {}): string | null {
+  if (!os.registry.objects.has('place') || !name.trim()) return null;
+  const n = norm(name);
+  const same = os.records.query<{ kind?: string; coordinates?: unknown }>('place', {}, { limit: 100_000 }).filter((p) => !p.archived && (norm(p.title) === n || norm(p.title.split(',')[0]!) === n));
+  const hit = same.find((p) => p.data.kind === opts.kind) ?? same.find((p) => WIDE.has(p.data.kind ?? '')) ?? same[0];
+  if (hit) {
+    if (opts.coordinates && !hit.data.coordinates) os.records.update(hit.id, { data: { coordinates: opts.coordinates } }, 'assistant');
+    return hit.id;
+  }
+  return os.records.create({ object: 'place', title: name.trim(), data: { kind: opts.kind ?? 'city', ...(opts.coordinates ? { coordinates: opts.coordinates } : {}) } }, 'assistant').id;
+}
+
+/** A trip's destination as a Place (word `to`); returns the Place's id, or null without places. */
 export function linkTripPlace(os: LifeOSContext, trip: ObjectRecord<TripData>): string | null {
   if (trip.data.placeId || !os.registry.objects.has('place')) return trip.data.placeId ?? null;
-  const name = trip.data.destination?.trim();
-  if (!name) return null;
-  const n = norm(name);
-  const same = os.records.query<{ kind?: string }>('place', {}, { limit: 100_000 }).filter((p) => !p.archived && (norm(p.title) === n || norm(p.title.split(',')[0]!) === n));
-  const place = same.find((p) => WIDE.has(p.data.kind ?? '')) ?? same[0] ?? os.records.create({ object: 'place', title: name, data: { kind: 'city' } }, 'assistant');
-  os.records.update<TripData>(trip.id, { data: { placeId: place.id } }, 'assistant');
-  return place.id;
+  const id = placeFor(os, trip.data.destination ?? '');
+  if (id) os.records.update<TripData>(trip.id, { data: { placeId: id } }, 'assistant');
+  return id;
 }
 
 /** Trips linked to a Place (its Trips here), newest first. */

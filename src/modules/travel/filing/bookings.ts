@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { Mail } from '@core/filing/mail';
 import { AIRPORTS, parseFlight, parseStay, type ParsedFlight, type ParsedStay } from './tickets';
+import { stayOnStop } from '../stops';
 
 export { parseFlight, parseStay, AIRPORTS, type ParsedFlight, type ParsedStay };
 
@@ -72,5 +73,7 @@ export function fileStay(os: LifeOSContext, ingestId: string, st: ParsedStay, ma
   os.records.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
   const tripId = tripOn(os, st.checkIn, st.place, ingestId, account, st.checkOut);
   if (tripId && !os.links.forEntity(id, 'part_of').some((r) => r.other.id === tripId)) os.links.link(id, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: ingestId });
+  // The trip template (R7g): the stay lands on the trip's stop for its city.
+  if (tripId) stayOnStop(os, tripId, id, st.place);
   return { eventId: id, tripId };
 }

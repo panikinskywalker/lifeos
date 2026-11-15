@@ -620,6 +620,7 @@ these kinds). People is *covers* for a booking; Cost is its total.
 | Field | Type | Kind | Notes |
 |---|---|---|---|
 | Booking | select (`booking`) | stay, flight, activity, other | confirmed · pending · planned · cancelled; planned is not booked yet, cancelled leaves the money |
+| Stop | link → Stop, word *stop* (`stopId`) | stay | the trip stop the stay is at, from the booking mail's city or the import; its own word because *at* is places' (an Event *at* its Place) |
 | From, To | link → Stop, words *from* / *to* (`fromStopId`, `toStopId`) | journey | kind `journey` is new, beside flight and stay |
 | Mode | select (`mode`) | journey | flight · train · bus · train and bus · taxi · car · walk · other |
 | Plan | select (`plan`) | journey | booked · suggested · decided, not booked · to decide |
@@ -768,7 +769,9 @@ bookings with their payment fields, 15 journeys, 10 day plans, 61 things to do,
 Nov) is imported once, each slice importing its part. The snapshot holds
 booking references, so it never goes in the repository: it is fetched again
 from the app when the importer runs and shared into LifeOS as a file (You ›
-Data). Later trips start in LifeOS.
+Data). Later trips start in LifeOS. The trip, its stops and the Events it
+makes keep a hidden source key (`tripapp:japan-dec-2026…`), so importing the
+same file again updates them in place.
 
 **Decided 15 Nov**: sharing by members as above, built once a host is chosen;
 Budget each (old trips' budgets read as yours); paybacks between any two people
@@ -1654,7 +1657,8 @@ screens checked on the phone → overrides only where the default is wrong)
   (either first) → 4 → 6 → 7; 8 once a host is chosen. The Japan trip is the first one built on it, with the
   *japan* look, imported from the Japan app's data slice by slice (1: the trip, stops, day plans; 2: bookings
   and journeys; 3: things and events; 4: expenses and paybacks as Bills; 5: checklist and alerts).
-  - [ ] **1. Stops and the line.** Stop; the fold (once): each trip's destination becomes its first stop, and
+  - [x] **1. Stops and the line.** *Built 15 Nov (branch `claude/serene-edison-o0lpvy`; no migration; see
+    `docs/handover/r7g-1-stops.md`).* Stop; the fold (once): each trip's destination becomes its first stop, and
     each stay already filed makes or finds the stop for its city. Plan › Line (stops in order with nights and
     stay, gaps and planned nights, ideas with Add to the line, swap two stops), Plan › Days (the calendar,
     each night's stop, moving days, Add to my calendar as .ics), Plan › Map (the stops' pins and the route,

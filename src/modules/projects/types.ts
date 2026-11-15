@@ -111,6 +111,8 @@ export interface EventData {
   personIds?: string[];
   projectId?: string;
   tripId?: string;
+  /** Travel (R7g): the trip stop a stay is at (word `stop`; places owns `at`). */
+  stopId?: string;
   airline?: string;
   flightNo?: string;
   cost?: number;
@@ -127,7 +129,7 @@ export const eventType: ObjectDef<EventData> = {
   labelPlural: 'Events',
   icon: 'calendar',
   color: 'red',
-  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), projectId: z.string().optional(), tripId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional(), source: z.string().optional(), sourceKey: z.string().optional(), calendars: z.array(z.string()).optional() }),
+  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), projectId: z.string().optional(), tripId: z.string().optional(), stopId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional(), source: z.string().optional(), sourceKey: z.string().optional(), calendars: z.array(z.string()).optional() }),
   fields: [
     { key: 'kind', label: 'Kind', type: 'text', summary: true, placeholder: 'flight, dinner, meeting, concert…' },
     { key: 'startAt', label: 'Starts', type: 'datetime', required: true, default: () => Date.now() + 3600000 },
@@ -137,6 +139,7 @@ export const eventType: ObjectDef<EventData> = {
     { key: 'personIds', label: 'People', type: 'link', linkTo: 'person', linkWord: 'person', section: 'Links', default: [] },
     { key: 'projectId', label: 'Project', type: 'link', linkTo: 'project', linkWord: 'project', section: 'Links' },
     { key: 'tripId', label: 'Trip', type: 'link', linkTo: 'trip', linkWord: 'trip', section: 'Links' },
+    { key: 'stopId', label: 'Stop', type: 'link', linkTo: 'stop', linkWord: 'stop', section: 'Travel', description: 'The trip stop a stay is at' },
     { key: 'airline', label: 'Airline', type: 'text', section: 'Travel' },
     { key: 'flightNo', label: 'Flight no.', type: 'text', section: 'Travel' },
     { key: 'cost', label: 'Cost', type: 'money', section: 'Details' },

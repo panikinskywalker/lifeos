@@ -3,7 +3,8 @@ import type { ModuleManifest } from '@core/registry/types';
 import type { ObjectRecord } from '@core/domain/types';
 import { withExtras } from '@core/ai/cards';
 import { bus } from '@core/events/bus';
-import { TRAVEL_COLOR, tripType, type TripData } from './types';
+import { TRAVEL_COLOR, stopType, tripType, type TripData } from './types';
+import { foldStops } from './stops';
 import { travelParsers } from './filing/parser';
 import { linkTripPlace, nextTrip, trips, tripSpend } from './trips';
 import { travelBrain } from './brain';
@@ -11,6 +12,8 @@ import { travelBrain } from './brain';
 export * from './types';
 export * from './trips';
 export * from './packing';
+export * from './stops';
+export * from './importApp';
 export { travelBrain, AIRLINE_SITES } from './brain';
 export { parseFlight, parseStay, type ParsedFlight, type ParsedStay } from './filing/bookings';
 
@@ -27,7 +30,7 @@ export const travelModule: ModuleManifest = {
   icon: 'airplane',
   color: TRAVEL_COLOR,
   dependencies: ['crm'],
-  objects: [tripType],
+  objects: [tripType, stopType],
   filing: { parsers: travelParsers },
   brain: travelBrain,
   onStart: (os) => {
@@ -35,6 +38,11 @@ export const travelModule: ModuleManifest = {
     if (!os.settings.get<boolean>('travel.foldedR7d', false) && os.registry.objects.has('place')) {
       for (const t of trips(os)) linkTripPlace(os, t);
       os.settings.set('travel.foldedR7d', true);
+    }
+    // R7g slice 1, once: a trip's destination becomes its first stop; each stay lands on the stop for its city.
+    if (!os.settings.get<boolean>('travel.foldedR7g1', false) && os.registry.objects.has('event')) {
+      foldStops(os);
+      os.settings.set('travel.foldedR7g1', true);
     }
     // A trip saved without a Place gets the one its destination names.
     bus.on('entity.created', ({ entity }) => {

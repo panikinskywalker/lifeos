@@ -13,6 +13,7 @@ import { Icon, ProgressBar, Text, useToast, type IconName } from '@ui/kit';
 import { categoryOf } from '@modules/finance/types';
 import { addToTrip, backHome, daysToStart, hasPacked, linkedTo, spentWhileAway, stillPacked, tripBookings, tripDays, tripPhase, tripSpend, tripsTo, type Booking, type TripData } from '@modules/travel';
 import { airlineBadge, Chip28, companions, Dash, datesLabel, dayOf, Disc, Face, firstName, GlassPill, HERO_GLOWS, longDates, plural, purposeLabel, Row, RowCard, routes, SectionHead, SerifName, shortDay, shortIso, statusLabel, timeOf, TripPhoto, weekdayShort, WHITE, whenShort } from './parts';
+import { LineCard } from './plan';
 
 /**
  * The Trip page (NR-Travel-Trip, the whole record page): the photo with the
@@ -209,6 +210,8 @@ export function TripPage({ entity, ctx, controls, say }: Props) {
             </View>
           ) : null}
         </View>
+
+        <LineCard tripId={trip.id} />
 
         <View style={{ gap: 10 }}>
           <SectionHead title="Who’s going" action="Add" onAction={() => controls?.edit()} />
