@@ -306,6 +306,8 @@ export interface MatchInput {
   playerIds: string[];
   /** A Player profile record, one of the picked. */
   frontedById?: string;
+  /** A match a player suggested (Turf web's id), booked by this one: Turf web closes it. */
+  suggestionId?: string;
 }
 
 /** What a venue fills in for a new match. */
@@ -344,6 +346,7 @@ function matchBody(os: LifeOSContext, m: MatchInput, c: ReturnType<typeof checkM
     playerIds: c.players.map((p) => turfPlayerId(p.data)!),
     expectedPlayers: expectedFor(m.expectedPlayers, m.sideSize, m.playerIds.length),
     frontedByPlayerId: fronted ? turfPlayerId(fronted.data) ?? '' : '',
+    ...(m.suggestionId ? { suggestionId: m.suggestionId } : {}),
   };
 }
 

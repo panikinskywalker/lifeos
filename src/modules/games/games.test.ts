@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, fetchTurfInbox, decideTurf, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -225,6 +225,44 @@ describe('fetchTurfSync', () => {
     os.settings.set(TURF_URL, 'https://x.example');
     secrets.set(TURF_KEY, KEY);
     expect(await src.available!(os)).toBe(true);
+  });
+});
+
+describe('the bell: Turf web answers now', () => {
+  const KEY = `tw_${'k'.repeat(30)}`;
+  const answer = (status: number, body: unknown) => vi.fn(async (_url: unknown, _init?: RequestInit) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
+  beforeEach(() => {
+    os.settings.set(TURF_URL, 'turf-web.example.dev');
+    secrets.set(TURF_KEY, KEY);
+  });
+
+  it('reads the inbox with the key, and sends each decision as Turf web’s own buttons do', async () => {
+    const inbox = answer(200, { submissions: [], paidClaims: [], claims: [], suggestions: [], replies: [], count: 0 });
+    expect((await fetchTurfInbox(os, inbox as unknown as typeof fetch)).count).toBe(0);
+    expect(String(inbox.mock.calls[0]![0])).toBe('https://turf-web.example.dev/api/inbox');
+    expect(new Headers(inbox.mock.calls[0]![1]!.headers).get('authorization')).toBe(`Bearer ${KEY}`);
+    const sent: Array<[string, unknown]> = [];
+    const ok = vi.fn(async (url: unknown, init?: RequestInit) => {
+      sent.push([String(url).replace('https://turf-web.example.dev', ''), JSON.parse(String(init?.body))]);
+      return new Response('{"ok":true}', { status: 200 });
+    });
+    const f = ok as unknown as typeof fetch;
+    await decideTurf(os, 'paid', 'c1', true, 150, f);
+    await decideTurf(os, 'paid', 'c2', false, undefined, f);
+    await decideTurf(os, 'stats', 's1', true, undefined, f);
+    await decideTurf(os, 'join', 'j1', false, undefined, f);
+    await decideTurf(os, 'suggestion', 'g1', false, undefined, f);
+    expect(sent).toEqual([
+      ['/api/paid-claims', { id: 'c1', decision: 'confirm', amount: 150 }],
+      ['/api/paid-claims', { id: 'c2', decision: 'dismiss' }],
+      ['/api/claims', { id: 's1', decision: 'approve' }],
+      ['/api/squad-invites', { submissionId: 'j1', decision: 'reject' }],
+      ['/api/suggestions', { id: 'g1', decision: 'decline' }],
+    ]);
+  });
+
+  it('says what Turf web said when it refuses', async () => {
+    await expect(decideTurf(os, 'stats', 'gone', true, undefined, answer(404, { error: 'That claim is closed.' }) as unknown as typeof fetch)).rejects.toThrow('That claim is closed.');
   });
 });
 

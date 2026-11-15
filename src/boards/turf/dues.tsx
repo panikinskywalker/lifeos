@@ -36,11 +36,12 @@ export const todayIso = () => format(new Date(), 'yyyy-MM-dd');
 /* ------------------------------------------------------------------ */
 
 /** The top bar's right side on Turf screens: "Synced 9:40" and a round ⋯ (Turf web settings). */
-export function HeaderRight() {
+export function HeaderRight({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
   return (
     <>
       <SyncPill />
+      {children}
       <IconButton icon="more" filled accessibilityLabel="Turf web settings" onPress={() => router.push('/settings/turf' as never)} />
     </>
   );

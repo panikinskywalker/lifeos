@@ -9,6 +9,7 @@ import { TurfMatchForm } from './match';
 import { TurfPickTeams } from './teams';
 import { TurfAudit, TurfDues } from './dues';
 import { TurfSubmission } from './submission';
+import { TurfBell } from './bell';
 import { TurfPlayer, TurfPlayerEdit, TurfStatsCard } from './player';
 import { TurfLeaders } from './leaders';
 import { TurfLogStats } from './stats';
@@ -30,7 +31,7 @@ export const turfBoard: BoardManifest = {
   // The bottom bar inside Turf (docs/MODEL.md, The bar inside a board): Home · Games · + New match · Players · Venues.
   bar: {
     tabs: [
-      { screen: 'index', label: 'Home', icon: 'home', also: ['dues', 'audit'] },
+      { screen: 'index', label: 'Home', icon: 'home', also: ['dues', 'audit', 'bell'] },
       { screen: 'games', label: 'Games', icon: 'calendar', also: ['game', 'teams', 'stats'] },
       { screen: 'players', label: 'Players', icon: 'people', also: ['leaders', 'player', 'card', 'player-edit', 'submission'] },
       { screen: 'venues', label: 'Venues', icon: 'location', also: ['venue'] },
@@ -52,6 +53,7 @@ export const turfBoard: BoardManifest = {
     { key: 'player-edit', title: 'Edit player', component: TurfPlayerEdit },
     { key: 'venue', title: 'Edit venue', component: TurfVenueEdit },
     { key: 'submission', title: 'Profile submission', component: TurfSubmission },
+    { key: 'bell', title: 'To check', component: TurfBell },
     { key: 'players', title: 'Players', component: TurfPlayers },
     { key: 'venues', title: 'Venues', component: TurfVenues },
   ],

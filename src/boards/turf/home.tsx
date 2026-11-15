@@ -17,6 +17,7 @@ import { NotConnected, type Props, TINT, useBack } from './common';
 import { CopyAllRow, Disc, DueRows, HeaderRight, PillButton, SectionHead, StatTile, TurfCard, day, todayIso } from './dues';
 import { SmsAskCard, SmsPaidCard, SubmissionCard, answeredAsks } from './checkcards';
 import { FlipCard, Pulse } from './motion';
+import { BellButton } from './bell';
 
 /**
  * Turf · Noir 1 · Home (TF-Home): the section switcher, money at a glance,
@@ -599,7 +600,7 @@ export function TurfHome(_props: Props) {
     );
   }
   return (
-    <Screen title="Turf" subtitle="Browse" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Turf" subtitle="Browse" onBack={back} right={<HeaderRight><BellButton /></HeaderRight>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       {body}
     </Screen>
   );

@@ -19,6 +19,8 @@ import {
   setStats,
   splitShare,
   toggleCaptain,
+  turfPlayerId,
+  turfVenueId,
   ATTENDANCE,
   PAYMENT_TERMS,
   type AppearanceData,
@@ -56,6 +58,22 @@ function useBack() {
 /* ------------------------------------------------------------------ */
 
 /** New match (no `game`) or Edit match (TF-NewMatch): the venue fills format, cost and kick-off; pick players; the shares split. */
+/** A match a player suggested, from the bell's Book it: its day, kick-off and ground, and whoever suggested or backed it. */
+function fromSuggestion(os: LifeOSContext, params: Record<string, string>): MatchInput {
+  const venue = allVenues(os).find((v) => params.venueTurf && turfVenueId(v.data) === params.venueTurf);
+  const ids = (params.players ?? '').split(',');
+  return {
+    paymentTerms: 'postpaid',
+    totalCost: 0,
+    ...(venue ? matchDefaults(os, venue.id) : {}),
+    date: params.date || today(),
+    time: params.time || (venue ? matchDefaults(os, venue.id).time : undefined),
+    venueId: venue?.id ?? '',
+    playerIds: allPlayers(os).filter((p) => ids.includes(turfPlayerId(p.data) ?? '')).map((p) => p.id),
+    suggestionId: params.suggestion,
+  };
+}
+
 export function TurfMatchForm({ ctx, params }: Props) {
   const os = useOS();
   const t = useTheme();
@@ -73,7 +91,7 @@ export function TurfMatchForm({ ctx, params }: Props) {
     for (const g of allGames(o)) if (g.data.frontedById) n.set(g.data.frontedById, (n.get(g.data.frontedById) ?? 0) + 1);
     return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
   }, []);
-  const [m, setM] = useState<MatchInput>(() => (editing ? matchInputOf(os, editing) : null) ?? { date: today(), venueId: '', totalCost: 0, paymentTerms: 'postpaid', playerIds: [] });
+  const [m, setM] = useState<MatchInput>(() => (editing ? matchInputOf(os, editing) : null) ?? (params.suggestion ? fromSuggestion(os, params) : null) ?? { date: today(), venueId: '', totalCost: 0, paymentTerms: 'postpaid', playerIds: [] });
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'available' | 'regulars' | 'guests'>('all');
   const [pickDay, setPickDay] = useState(false);

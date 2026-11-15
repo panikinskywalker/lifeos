@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.67 · 15 Nov 2026
+
+**Turf has the bell.** Turf's Home has Turf web's bell, with a count of what
+waits for you: "I've paid" from players (Confirm, Not yet, or Confirm part when
+only some came in), numbers players logged themselves (Approve or Reject), join
+requests and profile changes, matches players suggested (Book it opens New match
+filled in and closes the suggestion; or Decline), and the latest answers to
+upcoming matches, including who moved up from the waiting list. It needs Turf
+web to answer; what you decide comes back with the next sync.
+
 ## v0.0.66 · 15 Nov 2026
 
 **Turf: take anyone off a match.** Editing a match refused anyone who had money
