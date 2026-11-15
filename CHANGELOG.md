@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.59 · 15 Nov 2026
+
+**A budget made for you.** With no targets set, Money home suggests one from
+your last 3 months: a limit per category, what usually comes in, and what that
+leaves to save. **Use these** sets them, with Undo.
+
 ## v0.0.58 · 15 Nov 2026
 
 **AI sorts what is left in Other.** Money home shows how many payments have no

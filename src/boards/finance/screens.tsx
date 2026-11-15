@@ -9,6 +9,7 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ChipRow, Icon, IconButton, ProgressBar, RingBadges, Sheet, Text, useToast } from '@ui/kit';
 import { sortWithAI, undoSort } from '@modules/finance/aiSort';
+import { suggestBudget, undoBudget, adoptBudget } from '@modules/finance/budget';
 import { dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange, targetStatuses } from '@modules/finance/lib';
 import { subscriptionRunRate } from '@modules/finance/reports';
 import { comingUp, monthClose, pace, type MonthClose, type Pace } from '@modules/finance/home';
@@ -116,7 +117,7 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
 
       {data.byCat.length ? <WhereItWent byCat={data.byCat} total={data.spent} month={monthName!} offset={offset} /> : null}
 
-      {data.targets.length ? <Targets targets={data.targets} /> : null}
+      {data.targets.length ? <Targets targets={data.targets} /> : <SuggestedBudget />}
 
       <View onLayout={(e) => (anchors.current.accounts = e.nativeEvent.layout.y)}>
         <Accounts nw={data.nw} />
@@ -521,6 +522,45 @@ function Targets({ targets }: { targets: ReturnType<typeof targetStatuses> }) {
             </View>
           );
         })}
+      </View>
+    </View>
+  );
+}
+
+/** No targets yet: a budget from your last 3 months, and what it leaves to save; one tap makes it yours (docs/MODEL.md, Suggested budget). */
+function SuggestedBudget() {
+  const os = useOS();
+  const t = useTheme();
+  const toast = useToast();
+  const s = useLive((o) => suggestBudget(o), []);
+  if (!s) return null;
+  const money = os.format.currency;
+  const take = () => {
+    const before = adoptBudget(os, s);
+    toast.show({ message: `Budget set · ${money(s.total)} a month across ${s.items.length} categories`, icon: 'check', undo: () => undoBudget(os, s, before) });
+  };
+  return (
+    <View style={{ gap: 10 }}>
+      <SectionHead title="A budget for you" sub="From your last 3 months" />
+      <View style={{ padding: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 12 }}>
+        {s.items.map((i) => (
+          <View key={i.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: catColor(i.category, t) }} />
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, lineHeight: 18, fontWeight: '600' }}>{categoryOf(i.category).label}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{money(i.monthly)}</Text>
+          </View>
+        ))}
+        <Hairline />
+        {s.income > 0 ? (
+          <Text style={{ fontSize: 14, lineHeight: 20, fontWeight: '500' }}>
+            About {money(s.income)} comes in a month. {s.save >= 0 ? <Text style={{ fontWeight: '700', color: t.c.accent.gold }}>This leaves {money(s.save)} to save.</Text> : <Text style={{ fontWeight: '700', color: t.c.alert.coralText }}>That is {money(-s.save)} more than comes in.</Text>}
+          </Text>
+        ) : (
+          <Text variant="caption" color="secondary">No income filed in these months, so nothing to compare it with yet.</Text>
+        )}
+        <Pressable accessibilityRole="button" accessibilityLabel={`Use these, ${money(s.total)} a month`} onPress={take} style={({ pressed }) => ({ height: 48, borderRadius: 999, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+          <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.accent.mustardInk }}>Use these · {money(s.total)}/mo</Text>
+        </Pressable>
       </View>
     </View>
   );

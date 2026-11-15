@@ -1255,6 +1255,13 @@ Sources. Read-only, always.
   plus your category list. Each shop it is sure of is taught (the next payment
   files itself) and its payments move, with Undo; it never picks Other or
   Transfer. Logged in Sent to Claude.
+- **A suggested budget** (15 Nov, Rutvij; from broke). With no targets set, Money
+  home shows *A budget for you* from your last 3 full months: a monthly limit
+  for each category you spent in at least twice (its middle month, rounded up to
+  ₹500, or ₹100 under ₹2,000; not Other, transfers or investing), what usually
+  comes in (Came in, averaged over months with income), and "This leaves ₹X to
+  save" (or how far over). **Use these** makes them the category targets, with
+  Undo; after that the Targets section shows instead.
 - **How it works** (11 Nov, from a friend's design that matches the agent): the
   model gets Money's read-only tools by name and description, a Money prompt
   (your money manager; every figure from a tool, never its own arithmetic; never
