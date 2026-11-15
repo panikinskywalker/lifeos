@@ -85,6 +85,9 @@ export function readStatement(answer: unknown): StatementRead {
   return { accounts, holdings };
 }
 
+/** An account's name with its last digits, once. */
+const nameOf = (a: { title: string; data: AccountData }) => (a.data.last4 && !a.title.includes(a.data.last4) ? `${a.title} ••${a.data.last4}` : a.title);
+
 const words = (s: string) => new Set(s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !['fund', 'direct', 'growth', 'plan', 'regular', 'option', 'the', 'bank', 'ltd', 'limited'].includes(w)));
 /** The holding whose name shares the most words (at least two, or all of a short one). */
 function matchHolding(holdings: Array<{ id: string; title: string }>, name: string) {
@@ -105,14 +108,18 @@ export function proposeChanges(os: LifeOSContext, read: StatementRead, now = Dat
   const out: Proposal[] = [];
   read.accounts.forEach((r, k) => {
     const bank = r.bank.toLowerCase().split(/\s+/)[0] ?? '';
-    const same = accounts.filter((a) => (r.last4 ? a.data.last4 === r.last4 : true) && (a.data.kind === 'credit') === (r.kind === 'credit') && (!bank || `${a.title} ${a.data.institution ?? ''}`.toLowerCase().includes(bank)));
-    const found = same.length === 1 ? same[0]! : r.last4 ? same[0] ?? null : null;
+    const kindOk = (a: (typeof accounts)[number]) => (a.data.kind === 'credit') === (r.kind === 'credit');
+    const bankOk = (a: (typeof accounts)[number]) => !bank || `${a.title} ${a.data.institution ?? ''}`.toLowerCase().includes(bank);
+    // The last digits decide: one account of that kind ending in them is the one, whatever bank was read.
+    const byDigits = r.last4 ? accounts.filter((a) => kindOk(a) && a.data.last4 === r.last4) : [];
+    const byBank = accounts.filter((a) => kindOk(a) && bankOk(a) && (!r.last4 || !a.data.last4));
+    const found = byDigits.length === 1 ? byDigits[0]! : byDigits.find(bankOk) ?? (!r.last4 && byBank.length === 1 ? byBank[0]! : null);
     const at = r.asOf ? Date.parse(`${r.asOf}T23:59:00`) : now;
     const when = r.asOf ? ` (${r.asOf})` : '';
     if (r.kind === 'credit') {
       if (!r.owed && !r.dueOn) return;
       if (found) {
-        out.push({ id: `a${k}`, label: `${found.title}${found.data.last4 ? ` ••${found.data.last4}` : ''}: you owe ${money(r.owed)}`, detail: `was ${money(Math.max(0, -(found.data.knownBalance ?? 0)))}${r.dueOn ? ` · bill due ${r.dueOn}${r.minDue ? `, minimum ${money(r.minDue)}` : ''}` : ''}${when}`, apply: () => {
+        out.push({ id: `a${k}`, label: `${nameOf(found)}: you owe ${money(r.owed)}`, detail: `was ${money(Math.max(0, -(found.data.knownBalance ?? 0)))}${r.dueOn ? ` · bill due ${r.dueOn}${r.minDue ? `, minimum ${money(r.minDue)}` : ''}` : ''}${when}`, apply: () => {
           const statement = found.data.statement;
           const before = setBalance(os, found.id, -r.owed, at);
           if (r.dueOn) os.records.update(found.id, { data: { statement: { total: r.owed, min: r.minDue || undefined, dueOn: r.dueOn, at } } }, 'user');
@@ -127,7 +134,7 @@ export function proposeChanges(os: LifeOSContext, read: StatementRead, now = Dat
       return;
     }
     if (found) {
-      out.push({ id: `a${k}`, label: `${found.title}${found.data.last4 ? ` ••${found.data.last4}` : ''}: balance ${money(r.balance)}`, detail: `was ${typeof found.data.knownBalance === 'number' ? money(found.data.knownBalance) : 'from its payments'}${when}`, apply: () => {
+      out.push({ id: `a${k}`, label: `${nameOf(found)}: balance ${money(r.balance)}`, detail: `was ${typeof found.data.knownBalance === 'number' ? money(found.data.knownBalance) : 'from its payments'}${when}`, apply: () => {
         const before = setBalance(os, found.id, r.balance, at);
         return () => os.records.update(found.id, { data: before }, 'user');
       } });

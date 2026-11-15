@@ -62,6 +62,17 @@ describe('Upload a statement', () => {
     expect(os.records.query('investment')).toHaveLength(1);
   });
 
+  it('the last digits win over a misread bank, and an account named with its digits is not named twice', () => {
+    const c = card();
+    os.records.create<AccountData>({ object: 'account', title: 'HSBC ••355', data: { kind: 'bank', institution: 'HSBC', last4: '355', currency: 'INR', openingBalance: 0 } as AccountData });
+    const ps = proposeChanges(os, readStatement({ accounts: [
+      { bank: 'Axis', last4: '8013', kind: 'credit', balance: 0, owed: 15036, minDue: 0, dueOn: '', asOf: '' },
+      { bank: 'HSBC', last4: '355', kind: 'bank', balance: 296958, owed: 0, minDue: 0, dueOn: '', asOf: '' },
+    ], holdings: [] }));
+    expect(ps.map((p) => p.label)).toEqual(['ICICI Bank card ••8013: you owe ₹15,036', 'HSBC ••355: balance ₹2,96,958']);
+    expect(c.id).toBeTruthy();
+  });
+
   it('keeps only what makes sense from a reading', () => {
     expect(readStatement({ accounts: [{ bank: '', last4: '', kind: 'bank', balance: 1, owed: 0, minDue: 0, dueOn: 'soon', asOf: '' }], holdings: [{ name: 'X', units: 0, value: 0, invested: 0, sip: 0, sipDay: 0 }] })).toEqual({ accounts: [], holdings: [] });
   });
