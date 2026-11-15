@@ -222,6 +222,8 @@ export interface DeviceBridge {
    * in demo mode, where nothing leaves the phone.
    */
   agent?(): Promise<{ main: LLMProvider; smart?: LLMProvider } | null>;
+  /** The Claude key from You › Agent, for Ask Money's agent (docs/MODEL.md, Ask Money is an agent: how it runs). */
+  claudeKey?(): Promise<string | null>;
   /** The phone's secure store (keys a source needs, e.g. Turf web's): never in settings, never in a backup. */
   secrets?: {
     get(key: string): Promise<string | null>;

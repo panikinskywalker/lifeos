@@ -1268,7 +1268,15 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
     agent and its environment once, keeps their IDs, and updates the agent when
     its definition changes. Each Ask conversation is a session; every tool is
     one the phone answers (no sandbox tools, no web; the environment's network
-    is closed). Web search can be switched on later.
+    is closed). Web search can be switched on later. Built 15 Nov (v0.0.72):
+    the phone reads the session's events by polling (React Native's fetch
+    cannot stream); each conversation has a spend cap of US$0.50 at list
+    price; its tools are Money's reads that already pass the privacy gate
+    (money_query, money_show, net worth, investments, subscriptions) plus
+    money_overview (pace, before payday, anything wrong), recategorise and
+    keep_view (at once, with Undo) and set_budget (asks first). Who owes whom,
+    splits and settling stay off it for now, since they name people. With no
+    Claude key, Ask uses the agent chain in You › Agent as before.
 - **Add a payment** (15 Nov, Rutvij): the **+** opens a sheet: Snap a bill,
   Attach, Type it, or say it ("₹640 at Shree Sagar, paid in cash, half is
   Arjun's"). What is read from the bill fills the payment; *Paid with* is Cash,

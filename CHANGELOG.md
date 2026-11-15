@@ -7,6 +7,20 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.72 · 15 Nov 2026
+
+**Ask Money is an agent: your money guru.** With a Claude key in You › Agent,
+a question in Ask Money goes to an agent on Claude Haiku 5.5 that works it out
+in steps you can see, answers in its own words with a chart and the payments
+behind it, and says what to do. It can change things for you: move every
+payment to a shop into a category (and learn it), put a live card on Money
+home ("a card that tracks Swiggy this month"), and, after asking, set a
+monthly line or a category limit. Each change shows with Undo. It never moves
+money and makes no buy or sell calls. Every figure is still worked out on the
+phone, and only rounded amounts and placeholders for people leave it. The
+agent is made once with your key; each conversation has a small spend cap.
+Without a Claude key, Ask works as before.
+
 ## v0.0.71 · 15 Nov 2026
 
 **Accounts look like their cards; Subscriptions and Reports follow.**

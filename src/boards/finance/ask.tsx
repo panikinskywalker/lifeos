@@ -8,6 +8,8 @@ import { Assistant, type AssistantTurn } from '@core/ai/assistant';
 import { classifyFailure } from '@core/ai/limits';
 import { maskPeople, unmask } from '@core/ai/privacy';
 import { peopleNames } from '@modules/finance/filing/moneyIn';
+import { MoneyAgentChat } from '@modules/finance/askAgent';
+import { ManagedError } from '@core/ai/managedAgent';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ChipRow, Icon, IconButton, LineChart, ScreenHeader, Text, TrackColumns, useToast } from '@ui/kit';
@@ -21,12 +23,23 @@ import { Caps, Hairline, IconDisc, Rows, SectionHead, TxRow, catColor, day, kind
 const ASK_TOOLS = new Set(['money_query', 'money_show', 'net_worth', 'portfolio', 'subscriptions_run_rate']);
 const ASKED_KEY = 'finance.askQueued';
 
+interface AgentTurn {
+  texts: Array<{ id: string; text: string }>;
+  steps: string[];
+  shows: AskAnswer[];
+  changes: Array<{ label: string; undo?: () => void; undone?: boolean }>;
+  confirm?: { label: string; resolve: (ok: boolean) => void };
+  done?: boolean;
+}
+
 interface Item {
   id: string;
   question: string;
   answer?: AskAnswer;
   busy?: boolean;
   waiting?: boolean;
+  /** Ask Money's agent at work on this question (docs/MODEL.md, Ask Money is an agent). */
+  agent?: AgentTurn;
 }
 
 /* ------------------------------------------------------------------ */
@@ -297,6 +310,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
   const assistant = useRef<Assistant | null>(null);
+  const chat = useRef<MoneyAgentChat | null>(null);
   const [text, setText] = useState('');
   const [items, setItems] = useState<Item[]>([]);
   const start = useLive((o) => starters(o), []);
@@ -320,6 +334,9 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
     const id = `q${Date.now()}`;
     const phone = askOnPhone(ctx, q);
     if (phone) return push({ id, question: q, answer: phone });
+    // With a Claude key, the question goes to Ask Money's agent (Claude Haiku 5.5, tools answered here).
+    const key = await ctx.device?.claudeKey?.().catch(() => null);
+    if (key) return askAgent(id, q, key);
     push({ id, question: q, busy: true });
     const agent = await ctx.device?.agent?.().catch(() => null);
     if (!agent) return put(id, { busy: false, answer: { text: 'This one needs a model, and none is set up here. Add a free key in You › Agent (OpenRouter’s free models work), then ask again.', source: 'phone' } });
@@ -342,6 +359,28 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
     }
   };
 
+  const askAgent = async (id: string, q: string, apiKey: string) => {
+    const turn = (fn: (a: AgentTurn) => AgentTurn) => setItems((xs) => xs.map((x) => (x.id === id && x.agent ? { ...x, agent: fn(x.agent) } : x)));
+    push({ id, question: q, agent: { texts: [], steps: [], shows: [], changes: [] } });
+    chat.current ??= new MoneyAgentChat(ctx, { apiKey });
+    const masked = maskPeople(ctx, q, peopleNames(ctx));
+    try {
+      const end = await chat.current.ask(masked, {
+        text: (tid, text) => turn((a) => ({ ...a, texts: [...a.texts.filter((x) => x.id !== tid), { id: tid, text }] })),
+        step: (label) => turn((a) => (a.steps.includes(label) ? a : { ...a, steps: [...a.steps, label] })),
+        show: (sh) => turn((a) => ({ ...a, shows: [...a.shows, { ...answerQuery(ctx, sh.query, sh.block as BlockKind, sh.title), text: sh.sentence, source: 'model' }] })),
+        change: (c) => turn((a) => ({ ...a, changes: [...a.changes, c] })),
+        confirm: (label) => new Promise<boolean>((resolve) => turn((a) => ({ ...a, confirm: { label, resolve: (ok) => { turn((b) => ({ ...b, confirm: undefined })); resolve(ok); } } }))),
+      });
+      turn((a) => ({ ...a, done: true, texts: end === 'budget' ? [...a.texts, { id: 'budget', text: 'This conversation reached its spend cap. Start a new one from Money home.' }] : a.texts }));
+      ctx.brain.sent.add({ at: Date.now(), pass: 'ask', why: masked, model: 'claude-haiku-5-5', lines: ['Money agent · rounded amounts, dates, categories; people as placeholders'], records: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, outcome: 'ok', error: null });
+    } catch (e) {
+      const status = e instanceof ManagedError ? e.status : 0;
+      const msg = status === 401 || status === 403 ? 'Your Claude key in You › Agent did not work for Ask Money. It needs Claude Managed Agents, a beta, on for your account.' : `That didn’t work: ${(e as Error).message.slice(0, 140)}`;
+      turn((a) => ({ ...a, done: true, texts: [...a.texts, { id: 'error', text: msg }] }));
+    }
+  };
+
   const bubble = (q: string) => (
     <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingLeft: 44 }}>
       <View style={{ paddingVertical: 11, paddingHorizontal: 15, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: 6, backgroundColor: t.c.bg.tileRaised }}>
@@ -353,7 +392,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
       <ScrollView ref={scroll} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: 24, gap: 18 }} keyboardShouldPersistTaps="handled">
-        <ScreenHeader title="Ask Money" subtitle="Reads your records. It cannot move money." onBack={() => (router.canGoBack() ? router.back() : router.replace('/module/finance/index' as never))} />
+        <ScreenHeader title="Ask Money" subtitle="Your money guru · it cannot move money" onBack={() => (router.canGoBack() ? router.back() : router.replace('/module/finance/index' as never))} />
 
         {empty ? (
           <View style={{ padding: 20, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 12 }}>
@@ -425,7 +464,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
         {items.map((x) => (
           <View key={x.id} style={{ gap: 12 }}>
             {bubble(x.question)}
-            {x.busy ? <Text color="secondary" style={{ fontSize: 15, lineHeight: 22, paddingHorizontal: 4 }}>Working it out…</Text> : x.answer ? <AnswerView a={x.answer} onFollow={(f) => push({ id: `f${Date.now()}`, ...f })} /> : null}
+            {x.agent ? <AgentTurnView a={x.agent} onFollow={(f) => push({ id: `f${Date.now()}`, ...f })} /> : x.busy ? <Text color="secondary" style={{ fontSize: 15, lineHeight: 22, paddingHorizontal: 4 }}>Working it out…</Text> : x.answer ? <AnswerView a={x.answer} onFollow={(f) => push({ id: `f${Date.now()}`, ...f })} /> : null}
             {x.waiting ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 }}>
                 <Icon name="clock" size={14} color={t.c.fg.secondary} />
@@ -435,7 +474,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
           </View>
         ))}
 
-        {!items.length && !empty ? <Text color="secondary" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 4 }}>A question you type goes to the model in You › Agent as a summary: rounded amounts, dates and categories, with people as placeholders. Never your texts.</Text> : null}
+        {!items.length && !empty ? <Text color="secondary" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 4 }}>A question you type goes to Ask Money's agent (Claude Haiku, on your Claude key) or else the model in You › Agent: rounded amounts, dates and categories, with people as placeholders. Never your texts. It can change categories, keep cards on Money home and, after asking, set limits; each change has Undo.</Text> : null}
       </ScrollView>
 
       <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 12, paddingBottom: insets.bottom + 16 }}>
@@ -445,6 +484,59 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
         </View>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+/** The agent's turn: what it did, what it said, what it showed, what it changed (with Undo), and what it asks first. */
+function AgentTurnView({ a, onFollow }: { a: AgentTurn; onFollow: (item: { question: string; answer: AskAnswer }) => void }) {
+  const t = useTheme();
+  return (
+    <View style={{ gap: 12 }}>
+      {a.steps.length ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
+          <Icon name="sparkle" size={14} color={t.c.accent.gold} />
+          <Text color="secondary" numberOfLines={2} style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '500' }}>{a.steps.join(' · ')}</Text>
+        </View>
+      ) : null}
+      {a.texts.map((x) => (
+        <Text key={x.id} style={{ fontSize: 15, lineHeight: 22, paddingHorizontal: 4 }}>{x.text}</Text>
+      ))}
+      {a.shows.map((sh, i) => (
+        <AnswerView key={i} a={sh} onFollow={onFollow} />
+      ))}
+      {a.changes.map((c, i) => (
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingLeft: 16, paddingRight: 8, borderRadius: 20, backgroundColor: t.c.bg.tile }}>
+          <Icon name={c.undone ? 'x' : 'check'} size={16} color={c.undone ? t.c.fg.secondary : t.c.accent.gold} />
+          <Text style={{ flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '600', color: c.undone ? t.c.fg.secondary : t.c.fg.primary }}>{c.undone ? `Undone · ${c.label}` : c.label}</Text>
+          {c.undo && !c.undone ? <UndoButton onPress={() => { c.undo!(); c.undone = true; }} /> : null}
+        </View>
+      ))}
+      {a.confirm ? (
+        <View style={{ padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 12 }}>
+          <Text style={{ fontSize: 15, lineHeight: 21, fontWeight: '600' }}>{a.confirm.label}</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Yes, do it" onPress={() => a.confirm!.resolve(true)} style={{ flex: 1, height: 44, borderRadius: 999, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.accent.mustardInk }}>Yes, do it</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Not now" onPress={() => a.confirm!.resolve(false)} style={{ flex: 1, height: 44, borderRadius: 999, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700' }}>Not now</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+      {!a.done && !a.confirm ? <Text color="secondary" style={{ fontSize: 15, lineHeight: 22, paddingHorizontal: 4 }}>{a.texts.length || a.shows.length ? 'Still working…' : 'Thinking…'}</Text> : null}
+    </View>
+  );
+}
+
+function UndoButton({ onPress }: { onPress: () => void }) {
+  const t = useTheme();
+  const [done, setDone] = useState(false);
+  if (done) return null;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Undo" onPress={() => { onPress(); setDone(true); }} style={{ height: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: t.c.bg.tileRaised, justifyContent: 'center' }}>
+      <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '700' }}>Undo</Text>
+    </Pressable>
   );
 }
 
