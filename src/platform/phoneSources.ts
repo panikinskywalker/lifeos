@@ -1,4 +1,4 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { AppState, PermissionsAndroid, Platform } from 'react-native';
 import * as Contacts from 'expo-contacts/legacy';
 import * as Calendar from 'expo-calendar/legacy';
 import type { Access, CalendarEvent, CallEntry, DeviceContact } from '@core/registry/context';
@@ -20,9 +20,16 @@ export async function contactsGranted(): Promise<boolean> {
   }
 }
 
-/** Your phone's contacts (for the picker), sorted by name. */
+/**
+ * Your phone's contacts (for the picker, and crm's sync), sorted by name. It
+ * checks access first and asks only while you are in the app: on Android,
+ * asking opens the system's permission screen in LifeOS's task even when
+ * access is already granted, which brought LifeOS to the front from the
+ * background sync (15 Nov).
+ */
 export async function loadDeviceContacts(): Promise<DeviceContact[]> {
-  if (!(await Contacts.requestPermissionsAsync()).granted) return [];
+  const granted = (await Contacts.getPermissionsAsync()).granted || (AppState.currentState === 'active' && (await Contacts.requestPermissionsAsync()).granted);
+  if (!granted) return [];
   const { data } = await Contacts.getContactsAsync({
     fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails, Contacts.Fields.Birthday, Contacts.Fields.Company, Contacts.Fields.JobTitle, Contacts.Fields.Image],
     sort: Contacts.SortTypes.FirstName,

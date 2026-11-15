@@ -93,7 +93,10 @@ export default function RootLayout() {
         else if (d?.entityId && d.entityType) router.push(`/entity/${d.entityType}/${d.entityId}` as never);
         else router.push('/reminders' as never);
       });
-      Notifications.requestPermissionsAsync().catch(() => {});
+      // Ask only when not granted and Android still lets us: asking opens the permission screen even when granted.
+      void Notifications.getPermissionsAsync()
+        .then((p) => (!p.granted && p.canAskAgain && AppState.currentState === 'active' ? Notifications.requestPermissionsAsync() : null))
+        .catch(() => {});
     }
     return () => {
       sub.remove();

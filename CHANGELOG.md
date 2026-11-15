@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.63 · 15 Nov 2026
+
+**LifeOS no longer opens itself (the real cause).** The background sync of your
+contacts asked Android for contacts permission each time it ran. On Android,
+asking opens the permission screen inside LifeOS even when permission is already
+given, and that pulled LifeOS to the front a few seconds after you left it. Now
+it only checks, and asks only while you are in the app; the notifications
+permission on start works the same way.
+
 ## v0.0.62 · 15 Nov 2026
 
 **LifeOS no longer opens itself.** With the app lock on, leaving the app asked
