@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, fetchTurfInbox, decideTurf, payPart, owedOn, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, fetchTurfInbox, decideTurf, payPart, owedOn, autoPick, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -248,6 +248,22 @@ describe('votes, kit wishes and partner picks from Turf web (its migration 0029)
     applyTurfSync(os, page({}, [{ table: 'potm_votes', key: 'g_sat:p_karan', rev: 42 }, { table: 'player_partners', key: 'p_karan:p_priya', rev: 42 }]));
     expect(game('2026-10-17').data.potmVotes).toBeUndefined();
     expect(karan().data.partners).toBeUndefined();
+  });
+});
+
+describe('auto-pick, as Turf web’s New match', () => {
+  beforeEach(() => applyTurfSync(os, first()));
+
+  it('fills to the number asked, a keeper among them, never someone already in or unavailable', () => {
+    const squad = q<{ name: string; position?: string; availability: string }>('player');
+    const id = (name: string) => squad.find((p) => p.data.name === name)!.id;
+    const add = autoPick(os, [id('Rutvij')], 3);
+    expect(add).toHaveLength(2);
+    expect(add).not.toContain(id('Rutvij'));
+    const keepers = squad.filter((p) => /goal|^gk$/i.test(p.data.position ?? '') && p.data.availability === 'AVL');
+    if (keepers.length) expect(add.some((x) => keepers.some((k) => k.id === x))).toBe(true);
+    expect(add.every((x) => squad.find((p) => p.id === x)!.data.availability === 'AVL')).toBe(true);
+    expect(autoPick(os, add, 2)).toEqual([]);
   });
 });
 

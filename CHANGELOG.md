@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.76 · 16 Nov 2026
+
+**Turf: Auto-pick and a searchable audit log.**
+- **Auto-pick** in New match and Edit match fills the squad to the number
+  expected, as Turf web does: who said In, keepers until there are two, who said
+  Maybe, last match's players, then most appearances, only people available.
+- **The audit log** has a search (names, amounts, who made the change).
+- Faces find their photo with one small lookup each, so long lists stay quick.
+
 ## v0.0.75 · 16 Nov 2026
 
 **Turf gets the votes, kit wishes and partner picks.** Turf web now sends them

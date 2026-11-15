@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { sourceState } from '@core/sources/deviceData';
-import { FORMATIONS, TURF_KEY, allPlayers, formationOf, isSending, kitsOf, turfBase, turfPlayerId, rows as formationRows, saveTeams, setFormation, shuffleTeams, suggestTeams, type AppearanceData, type GameData, type Kit, type PlayerProfileData, type TeamSuggestion } from '@modules/games';
+import { FORMATIONS, TURF_KEY, formationOf, isSending, kitsOf, turfBase, turfPlayerId, rows as formationRows, saveTeams, setFormation, shuffleTeams, suggestTeams, type AppearanceData, type GameData, type Kit, type PlayerProfileData, type TeamSuggestion } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { displayFont, monoFonts } from '@ui/theme/tokens';
@@ -93,7 +93,7 @@ export function useTurfPhoto(path: string | null | undefined) {
 /** A player's face: their Turf web photo when there is one (and it loads), else initials on their colour. */
 export function Face({ id, name, size = 32 }: { id: string; name: string; size?: number }) {
   const path = useLive((o) => {
-    const p = allPlayers(o).find((x) => x.data.personId === id);
+    const p = o.records.query<PlayerProfileData>('player', { filter: { and: [{ field: 'data.personId', op: 'eq', value: id }] } }, { limit: 1 })[0];
     const turfId = p ? turfPlayerId(p.data) : null;
     return p?.data.photoPath && turfId ? `/api/players/${encodeURIComponent(turfId)}/photo?v=${encodeURIComponent(p.data.photoPath)}` : null;
   }, [id]);

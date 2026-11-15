@@ -21,6 +21,7 @@ import {
   toggleCaptain,
   turfPlayerId,
   turfVenueId,
+  autoPick,
   kitOf,
   DEFAULT_KITS,
   KIT_PRESETS,
@@ -327,6 +328,21 @@ export function TurfMatchForm({ ctx, params }: Props) {
               ] as const
             ).map(([k, l]) => <FilterChip key={k} label={l} selected={filter === k} onPress={() => setFilter(k)} />),
           )}
+          {m.sideSize || m.expectedPlayers ? (
+          <Button
+            title={`Auto-pick to ${expected}`}
+            icon="star"
+            variant="secondary"
+            size="sm"
+            disabled={m.playerIds.length >= expected}
+            onPress={() => {
+              const add = autoPick(os, m.playerIds, expected, editing ?? undefined);
+              if (!add.length) return toast.show({ message: 'Nobody else is available', icon: 'info' });
+              set({ playerIds: [...m.playerIds, ...add] });
+              toast.show({ message: `Picked ${add.length} · in, keepers, last match, regulars`, icon: 'check' });
+            }}
+          />
+          ) : null}
           {list.map((p) => {
             const on = m.playerIds.includes(p.id);
             const away = p.data.availability === 'INJ' ? 'injured' : p.data.availability === 'OOS' ? 'out' : null;

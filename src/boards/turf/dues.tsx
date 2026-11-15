@@ -561,7 +561,8 @@ export function TurfAudit(_props: Props) {
   const { busy, pull } = usePull();
   const undo = useUndo(pull);
   // Money only, as Turf web's audit log: payments, marked paid and undone, credit. Each match keeps its own history.
-  const entries = useLive((o) => auditLog(o, 'dues'), []);
+  const [q, setQ] = useState('');
+  const entries = useLive((o) => auditLog(o, 'dues'), []).filter((e) => found(q, e.summary, e.actor, e.device));
   const today = todayIso();
   const yesterday = format(new Date(Date.now() - 86_400_000), 'yyyy-MM-dd');
   const byDay = new Map<string, AuditEntry[]>();
@@ -574,6 +575,7 @@ export function TurfAudit(_props: Props) {
       <Text variant="caption" color="tertiary">
         Money only: payments, marked paid and undone, credit, newest first. Goals, sides and edits are in each match’s history.
       </Text>
+      <SearchBox value={q} onChange={setQ} placeholder="Search names or amounts" />
       {byDay.size ? (
         [...byDay.entries()].map(([d, items]) => (
           <TurfCard key={d || 'undated'} gap={8}>

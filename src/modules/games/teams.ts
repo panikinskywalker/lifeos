@@ -137,3 +137,34 @@ export function shuffleTeams(apps: Array<ObjectRecord<AppearanceData>>, keeper: 
   const order = [...pool.filter((a) => keeper(a.data)), ...pool.filter((a) => !keeper(a.data))];
   return Object.fromEntries(order.map((a, i) => [a.id, i % 2 === 0 ? 'A' : 'B']));
 }
+
+/**
+ * Auto-pick up to `expected` (Turf web's New match, docs/RATINGS.md): who said
+ * In, keepers until there are two, who said Maybe, last match's players, then
+ * most appearances; only those available. Takes and returns Player profile ids.
+ */
+export function autoPick(os: LifeOSContext, picked: string[], expected: number, gameId?: string): string[] {
+  const everyone = live(os.records.query<PlayerProfileData>('player', {}, { limit: 100_000 }));
+  const profiles = everyone.filter((p) => p.data.availability === 'AVL');
+  const games = live(os.records.query<GameData>('game', {}, { limit: 100_000 })).filter((g) => g.id !== gameId).sort((a, b) => b.data.date.localeCompare(a.data.date));
+  const apps = live(os.records.query<AppearanceData>('appearance', {}, { limit: 100_000 })).filter((a) => a.data.attendance !== 'no_show');
+  const count = new Map<string, number>();
+  for (const a of apps) count.set(a.data.personId, (count.get(a.data.personId) ?? 0) + 1);
+  const last = new Set(apps.filter((a) => a.data.gameId === games[0]?.id).map((a) => a.data.personId));
+  const said = gameId ? os.records.get<GameData>(gameId)?.data.rsvps ?? {} : {};
+  const turfId = (p: (typeof profiles)[number]) => p.data.sourceKey?.replace('turf:players:', '') ?? '';
+  const byApps = [...profiles].sort((a, b) => (count.get(b.data.personId) ?? 0) - (count.get(a.data.personId) ?? 0));
+  const keeper = (p: (typeof profiles)[number]) => /goal|^gk$/i.test(p.data.position ?? '');
+  const have = new Set(picked);
+  const add: string[] = [];
+  const take = (id: string) => {
+    if (!have.has(id) && !add.includes(id) && have.size + add.length < expected) add.push(id);
+  };
+  for (const p of profiles) if (said[turfId(p)] === 'going') take(p.id);
+  const keepers = () => [...have, ...add].filter((id) => everyone.some((x) => x.id === id && keeper(x))).length;
+  for (const p of byApps) if (keeper(p) && keepers() < 2) take(p.id);
+  for (const p of profiles) if (said[turfId(p)] === 'maybe') take(p.id);
+  for (const p of profiles) if (last.has(p.data.personId)) take(p.id);
+  for (const p of byApps) take(p.id);
+  return add;
+}
