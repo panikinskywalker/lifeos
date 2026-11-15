@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.37 · 15 Nov 2026
+
+**Payee names cleaned up.** Payees an older version named with a reference
+number ("Playo Refno 387827…", "Piyush Sunil Refno …") get their name back; a
+copy of a payee that exists is merged into it, and its payments take the clean
+name.
+
 ## v0.0.36 · 15 Nov 2026
 
 **One name per payee.** "Playo" and "PLAYO" (or any bank's spelling) now show

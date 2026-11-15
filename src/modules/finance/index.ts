@@ -7,7 +7,7 @@ import { financeBrain } from './brain';
 import { financeParsers } from './filing/parser';
 import { financeSources } from './sources';
 import { financeFilingTools } from './filing/tools';
-import { linkMissingPayees } from './filing/payee';
+import { linkMissingPayees, tidyPayeeNames } from './filing/payee';
 import { spotSubscriptions } from './filing/recurring';
 import { learnCategory, payeeOf } from './filing/rules';
 import { foldSplitShares } from './split';
@@ -87,6 +87,11 @@ export const financeModule: ModuleManifest = {
     foldInstitutions(os);
     // Your share (14 Nov): splits saved before it count your part from now on. Once.
     foldSplitShares(os);
+    // Payee names an older parser left with a reference number: cleaned and merged, once (15 Nov).
+    if (!os.settings.get<boolean>('finance.payeeTidyV1', false)) {
+      tidyPayeeNames(os);
+      os.settings.set('finance.payeeTidyV1', true);
+    }
     // Payments filed before subscriptions were spotted get looked at once (phase D).
     if (!os.settings.get<boolean>('finance.spottedV1', false)) {
       spotSubscriptions(os);

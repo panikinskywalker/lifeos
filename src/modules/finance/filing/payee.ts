@@ -80,6 +80,46 @@ export function payeeFor(os: LifeOSContext, name: string | null | undefined, vpa
   return { id: e.id, type: 'org', created: true, guess: null, confidence: 1 };
 }
 
+/** What an older parser left on a payee's name: "Playo Refno 387827321234", "Piyush Sunil If not u?". */
+const NAME_JUNK = /\s+(?:refno|ref\s*no\.?|ref\b|utr\b|rrn\b|if not u\b|upi\s*ref\b).*$|\s+\d{6,}.*$/i;
+
+/**
+ * Once (15 Nov): payees an older parser named with a reference number get their
+ * name back, a copy of one that exists is merged into it (links and UPI ids
+ * move), and the payments named after the old name take the clean one.
+ */
+export function tidyPayeeNames(os: LifeOSContext): number {
+  if (!os.registry.objects.has('org')) return 0;
+  const orgs = os.records.query<{ upi?: string }>('org', {}, { limit: 5000 });
+  let n = 0;
+  for (const o of orgs) {
+    if (!NAME_JUNK.test(o.title)) continue;
+    const clean = o.title.replace(NAME_JUNK, '').trim();
+    if (!clean) continue;
+    const into = orgs.find((x) => x.id !== o.id && !NAME_JUNK.test(x.title) && norm(x.title) === norm(clean) && os.records.get(x.id));
+    const target = into ?? o;
+    os.db.transaction(() => {
+      for (const { relation, other, direction } of os.links.forEntity(o.id)) {
+        if (other.object === 'transaction') {
+          const tx = os.records.get(other.id);
+          if (tx && tx.title === o.title) os.records.update(tx.id, { title: into ? into.title : clean }, 'system');
+        }
+        if (!into) continue;
+        if (direction === 'in') os.links.link(other.id, into.id, relation.kind, relation.meta, 'system');
+        else os.links.link(into.id, other.id, relation.kind, relation.meta, 'system');
+        os.links.remove(relation.id, 'system');
+      }
+      if (into) {
+        const upi = [into.data.upi, o.data.upi].filter(Boolean).join(', ');
+        if (upi && upi !== into.data.upi) os.records.update(into.id, { data: { upi } }, 'system');
+        os.records.delete(o.id, 'system');
+      } else os.records.update(target.id, { title: clean }, 'system');
+    });
+    n++;
+  }
+  return n;
+}
+
 /** Link a payment to its payee (people as 'person', everyone else as 'payee'), remembering what the message called them. */
 export function linkPayee(os: LifeOSContext, txId: string, m: PayeeMatch, said: string | null, vpa: string | null, source = 'sms') {
   const kind = m.type === 'person' ? 'person' : 'payee';

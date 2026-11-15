@@ -261,3 +261,23 @@ describe('one name per payee', () => {
     expect(os.records.query('org').filter((o) => o.title === 'Playo')).toHaveLength(1);
   });
 });
+
+describe('payee names an older parser left', () => {
+  it('"Playo Refno 387827321234" folds into Playo; its payments take the clean name', async () => {
+    const { tidyPayeeNames } = await import('./payee');
+    const good = os.records.create({ object: 'org', title: 'Playo', data: { kind: 'shop' } });
+    const junk = os.records.create({ object: 'org', title: 'Playo Refno 387827321234', data: { kind: 'shop', upi: 'playo@icici' } });
+    const lone = os.records.create({ object: 'org', title: 'Piyush Sunil Refno 219987', data: { kind: 'payee' } });
+    const a = os.records.create({ object: 'transaction', title: 'Playo Refno 387827321234', data: { amount: 3582.6, kind: 'expense', category: 'other', date: '2026-10-27', merchant: 'Playo Refno 387827321234' } });
+    const b = os.records.create({ object: 'transaction', title: 'Piyush Sunil Refno 219987', data: { amount: 419, kind: 'expense', category: 'other', date: '2026-10-24', merchant: 'PIYUSH SUNIL' } });
+    os.links.link(a.id, junk.id, 'payee', {}, 'assistant');
+    os.links.link(b.id, lone.id, 'payee', {}, 'assistant');
+    expect(tidyPayeeNames(os)).toBe(2);
+    expect(os.records.get(junk.id)).toBeUndefined();
+    expect(os.records.get(a.id)!.title).toBe('Playo');
+    expect(os.links.forEntity(a.id, 'payee')[0]!.other.id).toBe(good.id);
+    expect(os.records.get<{ upi?: string }>(good.id)!.data.upi).toBe('playo@icici');
+    expect(os.records.get(lone.id)!.title).toBe('Piyush Sunil');
+    expect(os.records.get(b.id)!.title).toBe('Piyush Sunil');
+  });
+});
