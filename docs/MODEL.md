@@ -1248,6 +1248,13 @@ Sources. Read-only, always.
   and works out every exact figure it shows. Who owes whom stays on the phone
   (not a tool Ask sends). Not yet gated: questions queued while no model was
   free are answered later by Talk's general path.
+- **Better categories: AI sorts what is left in Other** (15 Nov, Rutvij). Money
+  home shows *No category yet · N payments in Other* with **Sort with AI**: the
+  shops (never people) whose payments are still in Other and that you have not
+  set yourself go to your model by name, each with a rounded typical amount,
+  plus your category list. Each shop it is sure of is taught (the next payment
+  files itself) and its payments move, with Undo; it never picks Other or
+  Transfer. Logged in Sent to Claude.
 - **How it works** (11 Nov, from a friend's design that matches the agent): the
   model gets Money's read-only tools by name and description, a Money prompt
   (your money manager; every figure from a tool, never its own arithmetic; never

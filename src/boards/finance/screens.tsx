@@ -7,7 +7,8 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { ChipRow, Icon, IconButton, ProgressBar, RingBadges, Sheet, Text } from '@ui/kit';
+import { ChipRow, Icon, IconButton, ProgressBar, RingBadges, Sheet, Text, useToast } from '@ui/kit';
+import { sortWithAI, undoSort } from '@modules/finance/aiSort';
 import { dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange, targetStatuses } from '@modules/finance/lib';
 import { subscriptionRunRate } from '@modules/finance/reports';
 import { comingUp, monthClose, pace, type MonthClose, type Pace } from '@modules/finance/home';
@@ -103,6 +104,7 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
       <MonthCard label={m.label} offset={offset} setOffset={setOffset} spent={data.spent} usual={data.usual} income={data.income} incomeLine={data.incomeLine} days={data.days} onDay={setOpenDay} pace={data.pace} />
 
       <NeedsYou />
+      <SortOther />
 
       {data.owes.length ? <WhoOwes owes={data.owes} /> : null}
 
@@ -428,6 +430,30 @@ function ComingUp({ coming }: { coming: ReturnType<typeof comingUp> }) {
       </Rows>
     </View>
   );
+}
+
+/** Payments still in Other: your model sorts the shops (names and rounded amounts only), with Undo (docs/MODEL.md, Better categories). */
+function SortOther() {
+  const os = useOS();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const n = useLive((o) => o.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')='expense' AND json_extract(data,'$.category')='other'`)?.n ?? 0, []);
+  if (n < 1) return null;
+  const sort = async () => {
+    setBusy(true);
+    try {
+      const agent = await os.device?.agent?.().catch(() => null);
+      if (!agent) return toast.show({ message: 'Connect OpenRouter in You › Agent first (one tap, free models)', icon: 'info' });
+      const done = await sortWithAI(os, agent.main);
+      if (!done || !done.shops.length) return toast.show({ message: 'Nothing it was sure of. Set one yourself and it is learned', icon: 'info' });
+      toast.show({ message: `Sorted ${done.shops.length} shop${done.shops.length === 1 ? '' : 's'} · ${done.changed.length} payments`, icon: 'check', undo: () => undoSort(os, done) });
+    } catch (e) {
+      toast.show({ message: `Couldn’t sort: ${(e as Error).message.slice(0, 80)}`, icon: 'alert' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <SectionHead title="No category yet" sub={`${n} payment${n === 1 ? '' : 's'} in Other`} action={busy ? 'Sorting…' : 'Sort with AI'} lime onAction={busy ? undefined : () => void sort()} />;
 }
 
 function NeedsYou() {

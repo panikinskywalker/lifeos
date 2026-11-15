@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.58 · 15 Nov 2026
+
+**AI sorts what is left in Other.** Money home shows how many payments have no
+category, with **Sort with AI**: your model gets only the shop names and a
+rounded typical amount (never people, never your texts), and each shop it is
+sure of is learned, so its next payment files itself. Undo puts them back.
+
 ## v0.0.57 · 15 Nov 2026
 
 **Ask Money sends a summary, not your details.** Amounts go rounded and
