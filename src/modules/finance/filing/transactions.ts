@@ -330,7 +330,7 @@ export function noteBalance(os: LifeOSContext, accountId: string, balance: numbe
 }
 
 /** Your Cash account: the one you have, else one made (kind cash). */
-function cashAccount(os: LifeOSContext, created: string[]): string | null {
+export function cashAccount(os: LifeOSContext, created: string[] = []): string | null {
   if (!os.registry.objects.has('account')) return null;
   const have = os.records.query<{ kind?: string }>('account', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'cash' }] } }, { limit: 5 })[0];
   if (have) return have.id;

@@ -21,6 +21,7 @@ import { ToCheckBell } from '../../screens/ToCheckBell';
 import { PayeeGuess } from './payeeGuess';
 import { YourViews } from './ask';
 import { walletTotals } from './wallet';
+import { AddSheet } from './addSheet';
 import { Caps, Disc, KIND_WORD, SectionHead, Hairline, IconDisc, Rows, Spark, TxRow, accountIcon, catColor, shortMoney, day, kindWord, relDay, splitOf } from './parts';
 
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
@@ -39,6 +40,7 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
   const bottom = useBottomBarInset();
   const [menu, setMenu] = useState(false);
   const [budget, setBudget] = useState(false);
+  const [adding, setAdding] = useState(false);
   const m = monthRange(0);
   const data = useLive(
     (o) => {
@@ -74,7 +76,7 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
         <>
           <IconButton icon="grid" accessibilityLabel="Money screens" filled onPress={() => setMenu(true)} />
           <ToCheckBell />
-          <IconButton icon="plus" accessibilityLabel="Add a payment" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} onPress={() => router.push('/entity/transaction/new' as never)} />
+          <IconButton icon="plus" accessibilityLabel="Add a payment" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} onPress={() => setAdding(true)} />
         </>
       }
     />
@@ -82,6 +84,7 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
   const sheets = (
     <>
       <MoneyScreens visible={menu} onClose={() => setMenu(false)} />
+      <AddSheet visible={adding} onClose={() => setAdding(false)} />
       <Sheet visible={budget} onClose={() => setBudget(false)} title="A budget for you">
         <SuggestedBudget bare onDone={() => setBudget(false)} />
       </Sheet>

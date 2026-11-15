@@ -7,6 +7,18 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.73 · 15 Nov 2026
+
+**The + in Money takes a bill, or just your words.** Tap + on Money home or
+Spend: **Snap a bill** or **Attach** one (Claude reads the total, the shop, the
+date, the items and the tax), **Type it** for the full form, or write it as you
+would say it ("₹640 at Shree Sagar, paid in cash, half is Arjun's"). You see
+what was read, pick **Paid with**: Cash, any of your accounts or cards, or
+someone else paid, and Save, with Undo. Paid in cash comes off your Cash
+account (made the first time). If someone shares it, its page opens so you can
+split it. The bill's photo goes to Claude only because you pressed the button,
+and is deleted from the phone once read.
+
 ## v0.0.72 · 15 Nov 2026
 
 **Ask Money is an agent: your money guru.** With a Claude key in You › Agent,

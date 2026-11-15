@@ -1281,8 +1281,12 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   Attach, Type it, or say it ("₹640 at Shree Sagar, paid in cash, half is
   Arjun's"). What is read from the bill fills the payment; *Paid with* is Cash,
   an account or card, or someone else paid; the split and the bill stay on it.
-  The photo stays on the phone; only what was read leaves it, if your AI reads
-  it.
+  Built 15 Nov (v0.0.73): a snapped or attached bill goes to Claude once, to
+  be read, because you pressed the button (as Snap the fridge: the brain's
+  key, budget and Sent to Claude log), and the camera's file is then deleted;
+  what you type or say is read on the phone. Paid in cash lands in your Cash
+  account (made once). Who shares it is set on the payment's page, which
+  opens after saving.
 - **Privacy** (decided 11 Nov): money questions may go to any provider in the chain,
   OpenRouter's free models included, knowing some free providers log or train on
   what they are sent. Only the records needed leave (payee, amount, date,

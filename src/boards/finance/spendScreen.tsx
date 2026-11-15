@@ -11,6 +11,7 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ChipRow, FilterChip, Icon, IconButton, OnBar, PickerSheet, RingBadges, ScreenHeader, Sheet, Text, useBottomBarInset } from '@ui/kit';
 import { blocks } from '@ui/theme/tokens';
+import { AddSheet } from './addSheet';
 import { Caps, Rows, SmallPill, SplitBar, TxRow, catColor, day, kindWord, shortMoney, splitOf } from './parts';
 
 const PERIODS: Array<[SpendPeriod, string]> = [['month', 'This month'], ['last_month', 'Last month'], ['3_months', '3 months'], ['year', 'This year'], ['all', 'All time']];
@@ -60,6 +61,7 @@ export function SpendScreen() {
     return { spending: spendInRange(o, from, range.to), income: incomeInRange(o, from, range.to), investments: inv?.s ?? 0, count } as Record<string, number>;
   }, [period]);
   const [picking, setPicking] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [openDay, setOpenDay] = useState<string | null>(null);
   const toggle = (list: string[], set: (x: string[]) => void, v: string) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const catWords = cats.map((c) => categoryOf(c).label).join(', ');
@@ -185,7 +187,7 @@ export function SpendScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
       <View style={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: 12 }}>
-        <ScreenHeader title="Spend" subtitle="Money" onBack={() => (router.canGoBack() ? router.back() : router.replace('/module/finance' as never))} right={<IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} accessibilityLabel="Add a transaction" onPress={() => router.push('/entity/transaction/new' as never)} />} />
+        <ScreenHeader title="Spend" subtitle="Money" onBack={() => (router.canGoBack() ? router.back() : router.replace('/module/finance' as never))} right={<IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} accessibilityLabel="Add a payment" onPress={() => setAdding(true)} />} />
       </View>
       <FlatList
         data={groups}
@@ -232,6 +234,7 @@ export function SpendScreen() {
       />
       <PickerSheet visible={picking} onClose={() => setPicking(false)} title="Period" items={PERIODS.map(([v, l]) => ({ id: v, title: l }))} selected={[period]} onSelect={(v) => { setPeriod(v as SpendPeriod); setPicking(false); }} />
       <DaySheet date={openDay} onClose={() => setOpenDay(null)} />
+      <AddSheet visible={adding} onClose={() => setAdding(false)} />
     </View>
   );
 }
