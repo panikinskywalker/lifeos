@@ -306,6 +306,21 @@ the account, so balances always match the bank. What you *spent* is your share:
 - **Folded once** on first start with this: splits saved before get their share,
   and Turf payments matched from texts before become paybacks.
 
+**Counting money: what money in is (15 Nov, Rutvij; `docs/research/money-basics.md`).**
+Came in is money you earned, so it is not inflated by friends paying you back.
+- **From a shop you paid**: money in from a payee you paid in the 90 days before,
+  for no more than you paid, is a refund in that payment's category.
+- **From a friend**: money in from a person, or from a name not known to be a
+  business (a friend with no contact), is money back (share 0): not in Came in.
+  The payment says *Not income* with **Count as income**, which counts it and
+  everything from that person after (remembered; Undo).
+- **Salary** and money from businesses (interest, an employer) stay income.
+- **Card bills** are transfers, never spending: the card's "payment received"
+  joins the bank's debit, and money to CRED ("to CRED Club", "; CRED credited")
+  is on its way to a card.
+- Sorted as each payment is filed, and once (`finance.moneyInV1`) for money in
+  filed before, leaving alone payments you changed yourself.
+
 **Balances follow the bank (14 Nov, phase A).** A bank text's balance ("Avl Bal")
 becomes the account's known balance for its day; the account adds only payments
 dated after it, so every new text corrects it (an older text never overwrites a

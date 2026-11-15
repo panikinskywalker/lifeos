@@ -12,6 +12,8 @@ import { monoFonts } from '@ui/theme/tokens';
 import { Icon, Sheet, Text, useToast } from '@ui/kit';
 import { linkPaymentToPlayer, playersOwing, undoSmsPayment } from '@modules/games';
 import { learnMyName, unlearnMyName } from '@modules/finance/filing/payee';
+import { payeeOf } from '@modules/finance/filing/rules';
+import { countAsIncome, undoCountAsIncome } from '@modules/finance/filing/moneyIn';
 import { categoryOf, type AccountData, type TransactionData } from '@modules/finance/types';
 import type { DebtData } from '@modules/finance/split';
 import { PayeeGuess } from './payeeGuess';
@@ -105,6 +107,7 @@ export function TransactionPage({ entity, ctx, controls, say }: { entity: Object
       <PayeeGuess entity={tx} ctx={ctx} />
 
       <SplitBlock entity={tx} ctx={ctx} />
+      <NotIncome tx={tx} ctx={ctx} />
       <TurfShare tx={tx} ctx={ctx} />
 
       <View style={{ gap: 10 }}>
@@ -247,6 +250,22 @@ export function TransactionPage({ entity, ctx, controls, say }: { entity: Object
       {say}
     </View>
   );
+}
+
+/** Money in that is not counted as income (docs/MODEL.md, Counting money): says why, and Count as income turns it back (remembered for that person). */
+function NotIncome({ tx, ctx }: { tx: ObjectRecord<TransactionData>; ctx: LifeOSContext }) {
+  const toast = useToast();
+  const turf = useLive((o) => o.links.forEntity(tx.id, 'pays').length > 0, [tx.id, tx.version]);
+  const payee = useLive((o) => payeeOf(o, tx.id), [tx.id, tx.version]);
+  const d = tx.data;
+  if (d.kind !== 'income' || turf || !(d.refund || d.share === 0)) return null;
+  const who = payee?.title ?? d.merchant ?? 'them';
+  const sub = d.refund ? `Refund from ${who} · off ${categoryOf(d.category).label}` : `Money back from ${who}`;
+  const count = () => {
+    const u = countAsIncome(ctx, tx.id);
+    toast.show({ message: u.personId ? `Counted as income · and money from ${who} from now on` : 'Counted as income', icon: 'check', undo: () => undoCountAsIncome(ctx, u) });
+  };
+  return <SectionHead title="Not income" sub={sub} action="Count as income" onAction={count} />;
 }
 
 /** Money in from a friend for a game: pick who paid; their oldest open Turf shares are marked paid (with Undo). */

@@ -3,6 +3,7 @@ import { findTwin, sourceLabel, type RawMessage } from '@core/filing/queue';
 import type { FileContext, FileOutcome } from '@core/filing/contract';
 import { toInr } from './fx';
 import { askWhoIs, isMyName, linkPayee, payeeFor } from './payee';
+import { sortMoneyIn } from './moneyIn';
 import { categoryFor, learnedCategory, payeeOf, rangeRule, ruleCategory } from './rules';
 import { accountFor } from './accounts';
 import { askSip, isNamelessNach, sipFor } from './sip';
@@ -162,6 +163,11 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
       label += ` · ${name}`;
       if (!rr.sure) flag = `Guessed ${name}: ${rr.why}. Change the category if not — it won’t guess for this payer again`;
     }
+  }
+  // Money in from a friend is money back; from a shop you paid, a refund (docs/MODEL.md, Counting money).
+  if (data.kind === 'income') {
+    const sorted = sortMoneyIn(os, e.id);
+    if (sorted) label += sorted === 'back' ? ' · money back, not income' : ' · a refund';
   }
   if (!t.investment && !t.transfer && t.direction === 'debit' && data.category === 'subscriptions' && typeof data.merchant === 'string') {
     linkSubscription(os, e.id, data.merchant, amount, date, (data.accountId as string | undefined) ?? undefined, created, item.source as 'sms' | 'notification' | 'email', fx.originalCurrency ? { amount: fx.originalAmount as number, currency: fx.originalCurrency as string } : undefined);

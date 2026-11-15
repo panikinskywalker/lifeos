@@ -7,6 +7,17 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.53 · 15 Nov 2026
+
+**Came in is money you earned.** Friends paying you back no longer count as
+income: a payment from a person, or a name the app does not know as a shop,
+says *Not income · Money back* with **Count as income**, and once you count
+someone's, theirs count from then on. Money back from a shop you paid in the
+last 90 days is a refund in that category, so it comes off spending. Salary and
+money from businesses stay income. A card bill paid through CRED ("…; CRED
+credited") is a transfer, not spending. Your earlier money in is sorted the
+same way once, leaving alone anything you changed.
+
 ## v0.0.52 · 15 Nov 2026
 
 **SIP questions never go dead.** "Read my texts again" replaces payments it

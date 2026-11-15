@@ -8,6 +8,7 @@ import { financeParsers } from './filing/parser';
 import { financeSources } from './sources';
 import { financeFilingTools } from './filing/tools';
 import { linkMissingPayees, tidyPayeeNames } from './filing/payee';
+import { sortOldMoneyIn } from './filing/moneyIn';
 import { spotSubscriptions } from './filing/recurring';
 import { learnCategory, payeeOf } from './filing/rules';
 import { foldSplitShares } from './split';
@@ -91,6 +92,11 @@ export const financeModule: ModuleManifest = {
     if (!os.settings.get<boolean>('finance.payeeTidyV1', false)) {
       tidyPayeeNames(os);
       os.settings.set('finance.payeeTidyV1', true);
+    }
+    // Money in filed before Counting money (15 Nov): friends' money is money back, a shop's is a refund. Once.
+    if (!os.settings.get<boolean>('finance.moneyInV1', false)) {
+      sortOldMoneyIn(os);
+      os.settings.set('finance.moneyInV1', true);
     }
     // Payments filed before subscriptions were spotted get looked at once (phase D).
     if (!os.settings.get<boolean>('finance.spottedV1', false)) {

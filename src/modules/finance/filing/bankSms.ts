@@ -308,7 +308,8 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
   const self = cardToSavings || /\bby (?:cash by )?self\b|\bto self\b|\bself transfer\b|\bown account\b/i.test(t);
   const intoOwn = direction === 'credit' && (/\bforex\b[^.]{0,30}\bcard\b/i.test(t) || /\bloan a\/?c\b/i.test(t) || (wallet && /\badded to your\b/i.test(t)));
   // CRED pays your card bills: money to it is on its way to one of your cards.
-  const viaCred = direction === 'debit' && /\bto CRED(?: Club)?\b/i.test(t);
+  // "paid … to CRED Club" (HSBC) and "debited …; CRED credited" (ICICI).
+  const viaCred = direction === 'debit' && /\bto CRED(?: Club)?\b|\bCRED(?: Club)? credited\b/i.test(t);
   const transfer = cardPayment || self || intoOwn || viaCred || (direction === 'credit' && isCard && /\b(payment|received towards|thank you for (?:your )?payment)\b/i.test(t));
   const refund = direction === 'credit' && !transfer && /\b(refund(?:ed)?|reversed|reversal|cashback)\b/i.test(t);
   const fund = mf ? (/\b(?:in|of|for|towards|to)\s+([A-Z][A-Za-z0-9&.' -]{2,50}?(?:Mutual Fund|Fund|MF|Scheme))\b/i.exec(t)?.[1]?.trim() ?? /\b([A-Z][A-Za-z&]+(?:\s[A-Z][A-Za-z&]+){0,3})\s+(?:Mutual Fund|MF)\b/.exec(t)?.[1]?.trim() ?? null) : null;
