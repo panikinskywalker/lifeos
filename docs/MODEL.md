@@ -1348,9 +1348,10 @@ what they are, each opening the thing itself. Then two sections:
   Records. Drawn as the module stack: the open card (and the last, which
   nothing covers) shows its Overview's line and, in dot letters, whatever says
   it best: a number, a name, a place or a day (`card.dots`, 8 characters; else
-  the number in the line). 15 Nov, Rutvij: Turf's card shows the next match's
-  day ("SAT 21", the venue under it), or with none booked the name of whoever
-  owes most ("KARAN", what everyone owes under it).
+  the number in the line). A card may take turns between faces (`card.cycle`,
+  3.5 s each). 15 Nov, Rutvij: Turf's card shows the next match's day ("SAT
+  21", the venue under it); with none booked it takes turns between what is
+  owed ("3740", "13 owe ₹3,740") and BOOK ("No match booked"). Never a name.
 Then **everything else lives here too**: Links, Facts (the Second Brain's), Recent, Tags, Reminders,
 To check history, Data sources status, the component gallery (dev). If it is a
 screen and not a tab, Browse reaches it. Any board can also be pinned to Today as a

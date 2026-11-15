@@ -74,7 +74,9 @@ export default function BrowseTab() {
             // The open card says what matters now (its Overview's line), with its dots: the card's own (a name, a place, a day), else the number ("41 DAYS").
             const card = cards[m.id];
             const line = card?.headline ?? `${n.toLocaleString('en-IN')} ${unit}`;
-            return { key: m.id, title: shortNameForModule(m.id, m.name), line, headline: card?.dots?.toUpperCase().slice(0, 8) ?? dotHeadline(line) ?? undefined, icon: m.icon, tint: tintForModule(m.id), onPress: () => router.push(`/module/${m.id}`) };
+            const dots = (headline: string, own?: string) => own?.toUpperCase().slice(0, 8) ?? dotHeadline(headline) ?? undefined;
+            const faces = card?.cycle?.map((c) => ({ line: c.headline, headline: dots(c.headline, c.dots) }));
+            return { key: m.id, title: shortNameForModule(m.id, m.name), line, headline: dots(line, card?.dots), faces, icon: m.icon, tint: tintForModule(m.id), onPress: () => router.push(`/module/${m.id}`) };
           })}
         />
       </Section>

@@ -33,6 +33,8 @@ export interface ModuleOverview {
     alert?: boolean;
     /** What Browse's module card writes in dot letters: a number, a name, a place, a day ("SAT 21", "KARAN"); 8 characters at most. Without it, the number in the headline. */
     dots?: string;
+    /** Faces Browse's card takes turns showing, a few seconds each (Turf with no match booked: what is owed, then BOOK). */
+    cycle?: Array<{ headline: string; dots?: string }>;
   };
   blocks: OverviewBlock[];
 }

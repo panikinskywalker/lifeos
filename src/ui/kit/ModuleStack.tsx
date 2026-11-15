@@ -15,6 +15,8 @@ export interface StackItem {
   line?: string;
   /** In dot numerals on the open card ("41 DAYS"). */
   headline?: string;
+  /** Line and dots to take turns showing, a few seconds each, in place of `line` and `headline`. */
+  faces?: Array<{ line?: string; headline?: string }>;
   icon: IconName | (string & {});
   tint: TintKey;
   onPress: () => void;
@@ -53,16 +55,32 @@ function Card({ it, i, open, isOpen, last, width, onPress }: { it: StackItem; i:
   useEffect(() => {
     Animated.timing(reveal, { toValue: shown ? 1 : 0, duration: shown ? 360 : 120, delay: shown ? 120 : 0, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [shown, reveal]);
+  // Several faces: while shown, fade to the next every few seconds.
+  const faces = it.faces?.length ? it.faces : [{ line: it.line, headline: it.headline }];
+  const [f, setF] = useState(0);
+  const swap = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!shown || faces.length < 2) return;
+    const id = setInterval(() => {
+      Animated.timing(swap, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
+        setF((x) => x + 1);
+        Animated.timing(swap, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+      });
+    }, 3500);
+    return () => clearInterval(id);
+  }, [shown, faces.length, swap]);
+  const face = faces[f % faces.length]!;
+  const fade = Animated.multiply(reveal, swap);
   const squeeze = (to: number) => Animated.spring(press, { toValue: to, damping: 20, stiffness: 400, mass: 0.6, useNativeDriver: true }).start();
   const [from, to] = t.gradients[it.tint];
   const inner = width - 32;
-  const cols = it.headline ? it.headline.length * 6 - 1 : 0;
+  const cols = face.headline ? face.headline.length * 6 - 1 : 0;
   const pitch = cols ? Math.min(7.5, inner / cols) : 7.5;
   return (
     <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: i * STRIP, height: CARD, transform: [{ translateY: shift }, { scale: press }], shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 24, shadowOffset: { width: 0, height: -8 }, elevation: 6 + i, borderRadius: t.radius.tile }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={isOpen ? `${it.title}${it.line ? `, ${it.line}` : ''}. Open` : `${it.title}. Show`}
+        accessibilityLabel={isOpen ? `${it.title}${face.line ? `, ${face.line}` : ''}. Open` : `${it.title}. Show`}
         onPressIn={() => squeeze(0.975)}
         onPressOut={() => squeeze(1)}
         onPress={onPress}
@@ -74,19 +92,19 @@ function Card({ it, i, open, isOpen, last, width, onPress }: { it: StackItem; i:
             <Text variant="tileTitle" color="#F5F5F7" numberOfLines={1}>
               {it.title}
             </Text>
-            {it.line ? (
-              <Animated.View style={{ opacity: reveal }}>
+            {face.line ? (
+              <Animated.View style={{ opacity: fade }}>
                 <Text variant="caption" color="#F5F5F79E" numberOfLines={1} style={{ fontWeight: '500' }}>
-                  {it.line}
+                  {face.line}
                 </Text>
               </Animated.View>
             ) : null}
           </View>
           <Icon name={isOpen ? 'chevron-right' : it.icon} size={20} color="#F5F5F7" />
         </View>
-        {it.headline ? (
-          <Animated.View style={{ alignItems: 'center', paddingTop: 12, opacity: reveal, transform: [{ translateY: reveal.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
-            <DotNumber text={it.headline} pitch={pitch} color="#F5F5F7" />
+        {face.headline ? (
+          <Animated.View style={{ alignItems: 'center', paddingTop: 12, opacity: fade, transform: [{ translateY: reveal.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
+            <DotNumber text={face.headline} pitch={pitch} color="#F5F5F7" />
           </Animated.View>
         ) : null}
       </Pressable>

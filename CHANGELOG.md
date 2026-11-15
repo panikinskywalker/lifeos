@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.50 · 15 Nov 2026
+
+**Turf's card shows the match, not a person.** With a match booked, Browse's
+Turf card shows its day ("SAT 21") with the venue. With none booked, it takes
+turns every few seconds between what friends owe and BOOK. A module card can
+now take turns between faces like this.
+
 ## v0.0.49 · 15 Nov 2026
 
 **No cut names on Turf's card.** A name longer than 8 letters ("Rushikesh")
