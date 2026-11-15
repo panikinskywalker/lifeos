@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.82 · 16 Nov 2026
+
+**Ask Money's agent answers everything you type.** With a Claude key, a typed
+question always goes to the agent; before, a question that looked like one of
+the phone's fixed answers ("where did my money go") got that fixed answer
+instead. The starter buttons still answer at once on the phone. The agent also
+digs further now: it compares with last month or your usual month, finds what
+drives a number down to the shop or bill, and ends with one to three concrete
+steps in rupees.
+
 ## v0.0.81 · 16 Nov 2026
 
 **The Analytics chart's period is a real dropdown.** Tap "This week" on Money

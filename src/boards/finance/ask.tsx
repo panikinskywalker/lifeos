@@ -327,16 +327,17 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
     setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);
   };
 
-  const ask = async (question: string) => {
+  const ask = async (question: string, starter = false) => {
     const q = question.trim();
     if (!q) return;
     setText('');
     const id = `q${Date.now()}`;
+    // A starter you tap is answered on the phone at once. Anything you type goes to Ask Money's agent when
+    // there is a Claude key (Claude Haiku 5.5, tools answered here), never to the phone's fixed answers.
+    const key = starter ? null : await ctx.device?.claudeKey?.().catch(() => null);
+    if (key) return askAgent(id, q, key);
     const phone = askOnPhone(ctx, q);
     if (phone) return push({ id, question: q, answer: phone });
-    // With a Claude key, the question goes to Ask Money's agent (Claude Haiku 5.5, tools answered here).
-    const key = await ctx.device?.claudeKey?.().catch(() => null);
-    if (key) return askAgent(id, q, key);
     push({ id, question: q, busy: true });
     const agent = await ctx.device?.agent?.().catch(() => null);
     if (!agent) return put(id, { busy: false, answer: { text: 'This one needs a model, and none is set up here. Add a free key in You › Agent (OpenRouter’s free models work), then ask again.', source: 'phone' } });
@@ -411,7 +412,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
               {start.map((s, i) => (
                 <React.Fragment key={s.question}>
                   {i ? <Hairline /> : null}
-                  <Pressable accessibilityRole="button" accessibilityLabel={`${s.question}, ${s.line}`} onPress={() => void ask(s.question)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 64, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${s.question}, ${s.line}`} onPress={() => void ask(s.question, true)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 64, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}>
                     <IconDisc icon={s.icon} />
                     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                       <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '600' }}>{s.question}</Text>

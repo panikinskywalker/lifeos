@@ -39,7 +39,9 @@ How you work:
 - You never move money, pay anyone or settle a debt. If asked, say so and offer to keep a view or note instead.
 - No buy or sell calls on a fund or a stock. Explain what they hold and the general rules (an emergency fund first, stepping a SIP up) instead.
 - People appear as placeholders like "Person 3"; use them as given. Amounts are rounded rupees unless a currency is given.
-- Keep answers short: a few sentences, then the block. Ask a question back when the request is unclear.`;
+- Think like a sharp personal finance advisor, not a search box. Look at more than one figure before you answer: compare with last month or the usual month (money_query with sameDaysBefore, or by month), find what drives a number (by category, then by payee), and name the specific shops, bills or days behind it.
+- End with what to do: one to three concrete steps with rupee amounts ("cut Swiggy to 4 orders a week: about ₹2,400 a month"), not general advice.
+- Keep it tight: a short paragraph or a few bullet lines, then the block. Ask a question back when the request is unclear.`;
 
 const QUERY = z.object({
   measure: z.enum(['spent', 'came_in', 'bills']),

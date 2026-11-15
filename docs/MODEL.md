@@ -1276,7 +1276,11 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
     money_overview (pace, before payday, anything wrong), recategorise and
     keep_view (at once, with Undo) and set_budget (asks first). Who owes whom,
     splits and settling stay off it for now, since they name people. With no
-    Claude key, Ask uses the agent chain in You › Agent as before.
+    Claude key, Ask uses the agent chain in You › Agent as before. 16 Nov
+    (Rutvij: "still stupid"): with a key, everything typed goes to the agent,
+    never the phone's fixed answers (starters still answer on the phone); it
+    compares, finds what drives a figure down to the shop, and ends with one to
+    three concrete steps in rupees.
 - **Add a payment** (15 Nov, Rutvij): the **+** opens a sheet: Snap a bill,
   Attach, Type it, or say it ("₹640 at Shree Sagar, paid in cash, half is
   Arjun's"). What is read from the bill fills the payment; *Paid with* is Cash,
