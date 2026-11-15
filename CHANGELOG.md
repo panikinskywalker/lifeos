@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.56 · 15 Nov 2026
+
+**OpenRouter in one tap.** You › Agent › OpenRouter has **Connect OpenRouter**:
+sign in on OpenRouter's page and the key comes back to the phone, nothing to
+copy. If it does not come back, **Paste a code instead** gets a one-time code
+from OpenRouter to paste.
+
 ## v0.0.55 · 15 Nov 2026
 
 **Balances follow the bank.** Each account page has **Set balance**: type what

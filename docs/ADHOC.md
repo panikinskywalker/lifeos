@@ -20,6 +20,12 @@ A friendly "LifeOS import" file (records + links, not raw backup rows) that goes
 
 ## Offered, waiting on a decision
 
+- **Ideas from broke** (15 Nov; an open-source Rocket Money clone, github.com/nextwork-projects/broke, read only, nothing copied):
+  - *Suggested budget:* from your history, a limit per category and "this leaves ₹X to save" against your usual income; one tap **Use these**. Ours has targets and a monthly line but no suggestion.
+  - *One privacy gate for every AI path:* a cloud model gets a summary (rounded amounts, names as tokens); full detail only to a model on the device; answers can never change data. Ours sends Ask Money's query results (exact totals, payee names) as records.
+  - *Statement import:* CSV, OFX, QIF or PDF with column mapping and a preview count, plus **Clear my data** to redo it. Ours has neither import nor CSV export (also in `docs/research/money-basics.md`).
+  - *OpenRouter in one tap:* OAuth PKCE sign-in instead of pasting a key; or use an AI app already on your computer.
+
 - **Notion connector** (28 Sep): internal-integration token pasted once; you share pages / databases with it. Could bring pages in as searchable notes linked to people / projects, a task database as tasks, a journal onto the Time view. *24 Oct: the People CRM part is pushed as R2b (MODEL layer 4, *Notion*); notes, tasks and the journal stay open.*
 - **Other token connectors:** GitHub (commits → an Activity tracker "days coded"), Todoist / Linear (tasks), Splitwise (shared expenses). Strava / Spotify need a sign-in flow like Google.
 - **Missing-keys warning** (27 Sep): "Your AI keys are missing — add them in You › Agent" instead of dumps quietly waiting.

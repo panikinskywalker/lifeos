@@ -2108,6 +2108,12 @@ learns on the phone.
   (free, tool calling, 1M context) for main and side jobs; the old
   `llama-3.3-70b-instruct:free` is no longer offered. A model you typed in You ›
   Agent is kept.
+- **Connect your AI: OpenRouter in one tap** (15 Nov, Rutvij; from broke). You ›
+  Agent › OpenRouter has **Connect OpenRouter**: you sign in on OpenRouter's
+  own page (OAuth PKCE, key labelled "LifeOS") and the key comes back to the
+  phone (`lifeos://openrouter`), kept in secure storage like a typed one. If the
+  page cannot come back, **Paste a code instead** opens OpenRouter's page with
+  no way back, which shows a code to paste once. Pasting a key still works.
 
 ### How it works: code notices, Claude judges
 - **Candidates, in code.** Each module offers what might need you, cheaply,
