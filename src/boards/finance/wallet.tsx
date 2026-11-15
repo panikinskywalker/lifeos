@@ -40,6 +40,10 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
   // The bank account with the most in it is drawn in full on top; the rest tuck under it as their edges, cards first.
   const cards = data.nw.accounts.filter((r) => r.account.data.kind !== 'investment').sort((a, b) => Number(b.account.data.kind === 'bank') - Number(a.account.data.kind === 'bank') || b.balance - a.balance);
   const rest = cards.slice(1).sort((a, b) => Number(b.account.data.kind === 'credit') - Number(a.account.data.kind === 'credit') || Math.abs(b.balance) - Math.abs(a.balance));
+  // The main account starts in the middle of the wheel, with cards on both sides.
+  const half = Math.min(4, Math.floor(rest.length / 2));
+  const above = rest.slice(0, half).reverse();
+  const below = rest.slice(half);
   const back = () => (router.canGoBack() ? router.back() : router.replace('/module/finance' as never));
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 24 }}>
@@ -55,7 +59,8 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
 
       {cards.length ? (
         <CardWheel
-          cards={[cards[0]!, ...rest].map(({ account: acc, balance }) => {
+          initial={above.length}
+          cards={[...above, cards[0]!, ...below].map(({ account: acc, balance }) => {
             const d = acc.data;
             const card = d.kind === 'credit';
             const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
