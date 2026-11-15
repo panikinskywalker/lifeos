@@ -24,17 +24,17 @@ const CARD = 170;
 const STRIP = 54;
 const SPRING = { damping: 18, stiffness: 180, mass: 0.9, useNativeDriver: true } as const;
 
-/** A 160° module gradient behind a card (NR-KitComponents · Module stack). */
-function Gradient({ id, from, to }: { id: string; from: string; to: string }) {
+/** A 160° module gradient behind a card (NR-KitComponents · Module stack). Sized in numbers: Android's svg left "100%" short of the card. */
+function Gradient({ id, from, to, width, height }: { id: string; from: string; to: string; width: number; height: number }) {
   return (
-    <Svg style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} width="100%" height="100%" preserveAspectRatio="none">
+    <Svg style={{ position: 'absolute', top: 0, left: 0 }} width={width} height={height}>
       <Defs>
         <LinearGradient id={id} x1="0.33" y1="0" x2="0.67" y2="1">
           <Stop offset="0" stopColor={from} />
           <Stop offset="1" stopColor={to} />
         </LinearGradient>
       </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+      <Rect x="0" y="0" width={width} height={height} fill={`url(#${id})`} />
     </Svg>
   );
 }
@@ -66,7 +66,7 @@ function Card({ it, i, open, isOpen, width, onPress }: { it: StackItem; i: numbe
         onPress={onPress}
         style={{ flex: 1, borderRadius: t.radius.tile, overflow: 'hidden', padding: 16 }}
       >
-        <Gradient id={`stack-${it.key}`} from={from} to={to} />
+        <Gradient id={`stack-${it.key}`} from={from} to={to} width={width} height={CARD} />
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="tileTitle" color="#F5F5F7" numberOfLines={1}>
@@ -102,8 +102,14 @@ export function ModuleStack({ items }: { items: StackItem[] }) {
   const [open, setOpen] = useState(items.length - 1);
   const [width, setWidth] = useState(340);
   const at = Math.min(open, items.length - 1);
+  // Taller while a card above the last is open: the cards below it slide down, and the page moves with them.
+  const target = items.length ? CARD + (items.length - 1) * STRIP + (at < items.length - 1 ? CARD - STRIP : 0) : 0;
+  const height = useRef(new Animated.Value(target)).current;
+  useEffect(() => {
+    Animated.spring(height, { toValue: target, ...SPRING, useNativeDriver: false }).start();
+  }, [target, height]);
   return (
-    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height: items.length ? CARD + (items.length - 1) * STRIP : 0 }}>
+    <Animated.View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height }}>
       {items.map((it, i) => (
         <Card
           key={it.key}
@@ -119,6 +125,6 @@ export function ModuleStack({ items }: { items: StackItem[] }) {
           }}
         />
       ))}
-    </View>
+    </Animated.View>
   );
 }

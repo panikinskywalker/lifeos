@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.45 · 15 Nov 2026
+
+**Browse's module cards fit on the phone.** Their colour now fills each card
+to its rounded corners (on Android it stopped short on the right and the
+bottom), and opening a card higher up makes room for the cards below it, so
+the last one no longer runs under the rows that follow.
+
 ## v0.0.44 · 15 Nov 2026
 
 **A little extra is fine.** When a friend you know sends up to ₹20 more than
