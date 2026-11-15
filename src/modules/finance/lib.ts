@@ -30,20 +30,37 @@ export function periodRange(period: 'monthly' | 'weekly' | 'yearly', at: number 
 }
 
 /**
- * Signed balance: opening + income − expense ± transfers. Credit cards show
- * what you owe as negative. When a bank text has stated the balance, that is
- * the start instead, and only payments dated after its day are added.
+ * Signed balance (docs/MODEL.md, Balances follow the bank): opening + money in
+ * − money out. In is income, transfers in and redemptions (an investment into
+ * the account); out is spending, transfers out and buys. Credit cards show what
+ * you owe as negative. When the bank has stated the balance (a text, or Set
+ * balance), that is the start instead, and only payments after it are added:
+ * dated after its day, or that day and heard after it.
  */
 export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountData>): number {
-  const since = typeof account.data.knownBalance === 'number' && account.data.knownOn ? account.data.knownOn : null;
-  const sum = (field: 'accountId' | 'toAccountId', kind: string) => {
-    const and: Array<{ field: string; op: 'eq' | 'gt'; value: string }> = [{ field: `data.${field}`, op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: kind }];
-    if (since) and.push({ field: 'data.date', op: 'gt', value: since });
-    return os.records.aggregate('transaction', { filter: { and } }, { sum: ['data.amount'] })['sum_data.amount'];
-  };
-  const start = since ? account.data.knownBalance! : (account.data.openingBalance ?? 0);
-  // A buy or SIP leaves the account it was paid from (R1: kind 'investment'); the money shows up again as the holding's value.
-  return start + sum('accountId', 'income') - sum('accountId', 'expense') - sum('accountId', 'transfer') + sum('toAccountId', 'transfer') - sum('accountId', 'investment');
+  const d = account.data;
+  const known = typeof d.knownBalance === 'number' && d.knownOn ? { on: d.knownOn, at: d.knownAt ?? 0 } : null;
+  const j = (k: string) => `json_extract(r.data,'$.${k}')`;
+  const heard = `COALESCE((SELECT q.received_at FROM ingest_queue q WHERE q.id = ${j('sourceRef')}), r.created_at)`;
+  const after = known ? `AND (${j('date')} > ? OR (${j('date')} = ? AND ${heard} > ?))` : '';
+  const row = os.db.get<{ i: number | null; o: number | null }>(
+    `SELECT SUM(CASE WHEN ${j('accountId')}=? AND ${j('kind')}='income' THEN ${j('amount')} WHEN ${j('toAccountId')}=? AND ${j('kind')} IN ('transfer','investment') THEN ${j('amount')} ELSE 0 END) AS i,
+            SUM(CASE WHEN ${j('accountId')}=? AND ${j('kind')} IN ('expense','transfer','investment') THEN ${j('amount')} ELSE 0 END) AS o
+       FROM records r WHERE r.object='transaction' AND r.deleted_at IS NULL ${after}`,
+    [account.id, account.id, account.id, ...(known ? [known.on, known.on, known.at] : [])],
+  );
+  const start = known ? d.knownBalance! : (d.openingBalance ?? 0);
+  return start + (row?.i ?? 0) - (row?.o ?? 0);
+}
+
+/** You told it what the bank shows: that is the balance from now on (Set balance, Reconcile). */
+export function setBalance(os: LifeOSContext, accountId: string, balance: number, now = Date.now()): { knownBalance?: number; knownOn?: string; knownAt?: number } {
+  const a = os.records.get<AccountData>(accountId);
+  const before = { knownBalance: a?.data.knownBalance, knownOn: a?.data.knownOn, knownAt: a?.data.knownAt };
+  const dt = new Date(now);
+  const day = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  os.records.update(accountId, { data: { knownBalance: balance, knownOn: day, knownAt: now } }, 'user');
+  return before;
 }
 
 /** An account's money in and out by month, oldest first (its page's columns): in is income and transfers in; out is spending, transfers and buys. Full amounts, as the bank sees them. */
@@ -52,7 +69,7 @@ export function accountFlows(os: LifeOSContext, accountId: string, months = 6, n
   const j = (k: string) => `json_extract(data,'$.${k}')`;
   const rows = os.db.all<{ m: string; i: number; o: number }>(
     `SELECT substr(${j('date')},1,7) AS m,
-       SUM(CASE WHEN (${j('accountId')}=? AND ${j('kind')}='income') OR (${j('toAccountId')}=? AND ${j('kind')}='transfer') THEN ${j('amount')} ELSE 0 END) AS i,
+       SUM(CASE WHEN (${j('accountId')}=? AND ${j('kind')}='income') OR (${j('toAccountId')}=? AND ${j('kind')} IN ('transfer','investment')) THEN ${j('amount')} ELSE 0 END) AS i,
        SUM(CASE WHEN ${j('accountId')}=? AND ${j('kind')} IN ('expense','transfer','investment') THEN ${j('amount')} ELSE 0 END) AS o
      FROM records WHERE object='transaction' AND deleted_at IS NULL AND ${j('date')} BETWEEN ? AND ? GROUP BY m`,
     [accountId, accountId, accountId, ranges[0]!.start, ranges[ranges.length - 1]!.end],

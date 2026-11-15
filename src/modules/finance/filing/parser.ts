@@ -2,12 +2,12 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { FileContext, FileOutcome, MessageParser, ParserRead, RawMessage } from '@core/filing/contract';
 import { setDedupeKey, sourceLabel } from '@core/filing/queue';
 import { mailKind } from '@core/filing/mail';
-import { BANK_NAMES, PAYMENT_APPS, bankOf, looksLikeBankSender, parseBankSms, parsePaymentNotification, parseCardBill, parseUpcomingCharge, type CardBill, type ParsedTxn, type SmsKind, type UpcomingCharge } from './bankSms';
+import { BANK_NAMES, PAYMENT_APPS, bankOf, looksLikeBankSender, parseBankSms, parsePaymentNotification, parseCardBill, parseUpcomingCharge, type CardBill, type ParsedTxn, type SmsKind, type StatedBalance, type UpcomingCharge } from './bankSms';
 import { fileHeadsUp } from './recurring';
 import { fileBillDue, parseBillDue, type BillDue } from './bills';
 import { accountFor } from './accounts';
 import { receiptTxn } from './mail';
-import { dedupeKey, enrichFrom, fileTxn, findDuplicateFor, sameMoneyFor } from './transactions';
+import { dedupeKey, enrichFrom, fileTxn, findDuplicateFor, noteBalance, sameMoneyFor } from './transactions';
 
 /**
  * The money parser (finance filing, R1): bank SMS, payment-app notifications
@@ -21,10 +21,12 @@ const iso = (t: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-type MoneyRead = ParserRead & ({ kind: 'txn'; txn: ParsedTxn } | { kind: 'card-bill'; reason: 'bill'; bill: CardBill } | { kind: 'heads-up'; reason: 'mandate'; charge: UpcomingCharge } | { kind: 'bill-due'; reason: 'bill'; due: BillDue } | { kind: 'skip'; reason: string });
+type MoneyRead = ParserRead & ({ kind: 'txn'; txn: ParsedTxn } | { kind: 'card-bill'; reason: 'bill'; bill: CardBill } | { kind: 'heads-up'; reason: 'mandate'; charge: UpcomingCharge } | { kind: 'bill-due'; reason: 'bill'; due: BillDue } | { kind: 'balance'; reason: 'balance'; balance: StatedBalance } | { kind: 'skip'; reason: string });
 
 /** A text the bank parser sets aside as a bill may be a card's statement or reminder: then it is filed on the card. */
 function orCardBill(r: SmsKind, text: string, from: string, at = 0): MoneyRead {
+  // A balance with no money moving is the account's known balance.
+  if (r.kind === 'skip' && r.reason === 'balance') return { kind: 'balance', reason: 'balance', balance: r.balance };
   // The heads-up before a standing-instruction charge sets that Subscription's next charge.
   if (r.kind === 'skip' && r.reason === 'mandate') {
     const charge = parseUpcomingCharge(text, at);
@@ -69,6 +71,14 @@ function fileCardBill(os: LifeOSContext, m: RawMessage, bill: CardBill, ctx: Fil
 }
 
 function file(os: LifeOSContext, m: RawMessage, r: ParserRead, ctx: FileContext): FileOutcome {
+  if ((r as MoneyRead).kind === 'balance') {
+    const b = (r as MoneyRead & { kind: 'balance' }).balance;
+    if (!os.registry.objects.has('account')) return { status: 'dismissed', note: 'no accounts' };
+    const acc = accountFor(os, { isCard: false, last4: b.last4, bank: b.bank } as ParsedTxn, m.from);
+    if (!acc) return { status: 'dismissed', note: 'no account for this balance' };
+    noteBalance(os, acc, b.amount, iso(m.receivedAt), m.receivedAt);
+    return { status: 'confirmed', entityId: acc, note: 'the account balance the bank stated' };
+  }
   if ((r as MoneyRead).kind === 'card-bill') return fileCardBill(os, m, (r as MoneyRead & { kind: 'card-bill' }).bill, ctx);
   if ((r as MoneyRead).kind === 'bill-due') return fileBillDue(os, m, (r as MoneyRead & { kind: 'bill-due' }).due, ctx);
   if ((r as MoneyRead).kind === 'heads-up') return fileHeadsUp(os, m, (r as MoneyRead & { kind: 'heads-up' }).charge, ctx);

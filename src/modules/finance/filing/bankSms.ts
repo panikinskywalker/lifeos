@@ -22,6 +22,8 @@ export interface ParsedTxn {
   /** Last digits of the account or card the money moved on. */
   last4: string | null;
   isCard: boolean;
+  /** The text says "debit card": the money left the bank account, not a credit card. */
+  debitCard?: boolean;
   /** Who was paid / who paid (a shop, a person, a VPA's name). */
   counterparty: string | null;
   vpa: string | null;
@@ -53,7 +55,14 @@ export interface CardBill {
   bank: string | null;
 }
 
-export type SmsKind = { kind: 'txn'; txn: ParsedTxn } | { kind: 'skip'; reason: 'otp' | 'promo' | 'bill' | 'mandate' | 'declined' | 'info' | 'investment-confirmation' | 'delivery' };
+/** A balance the bank stated with no money moving (filed as the account's known balance). */
+export interface StatedBalance {
+  amount: number;
+  last4: string;
+  bank: string | null;
+}
+
+export type SmsKind = { kind: 'txn'; txn: ParsedTxn } | { kind: 'skip'; reason: 'otp' | 'promo' | 'bill' | 'mandate' | 'declined' | 'info' | 'investment-confirmation' | 'delivery' } | { kind: 'skip'; reason: 'balance'; balance: StatedBalance };
 
 /**
  * A card statement or a reminder of one ("Total of Rs 26,046.50 or minimum of
@@ -286,7 +295,13 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
   // Paying off a card ("payment of Rs 12,345 for your … Credit Card was successful") credits the card.
   const cardPayment = /\bpayment\b[^\n]{0,60}\b(?:for|towards|against|on)\s+your\b[^.]{0,40}\bcard\b/i.test(t) || /\bpayment\b[^\n]{0,40}\b(?:received\b[^.]{0,20}\btowards|credited to your (?:\w+ )?card)\b/i.test(t);
   // "Your SI for Adobe Rs.1675.60 has been processed" is a charge even without the word "debited".
-  if (ci < 0 && di < 0 && !(recurring && executed) && !cardPayment) return { kind: 'skip', reason: 'info' };
+  if (ci < 0 && di < 0 && !(recurring && executed) && !cardPayment) {
+    // "Avl Bal in A/c XX123 is Rs 52,000" moves no money but says what is there (not a card's limit).
+    const b = /\bbal(?:ance)?\b[^₹]{0,40}?(?:INR|Rs\.?|₹)\s?([\d,]+(?:\.\d{1,2})?)/i.exec(t);
+    const l4 = /(?:a\/?c|acct|account)(?:\s*(?:no\.?|number|ending(?:\s+in)?))?\s*[:\s]*(?:[xX*]+-?|\.\.)?\s*(\d{3,6})\b/i.exec(t)?.[1]?.slice(-4);
+    if (b && l4 && !/\b(?:limit|lmt|card)\b/i.test(t)) return { kind: 'skip', reason: 'balance', balance: { amount: num(b[1]!), last4: l4, bank: bankOf(sender, t) } };
+    return { kind: 'skip', reason: 'info' };
+  }
   // "debited … ; SWIGGY credited" (ICICI) is a debit: the first word decides.
   // "Refund of Rs X from your Credit Card to Savings Account": the money leaves the card.
   const cardToSavings = /\bfrom\b[^.]{0,40}\bcard\b[^.]{0,30}\bto (?:your )?savings (?:a\/?c|account)\b/i.test(t);
@@ -326,6 +341,7 @@ export function parseBankSms(text: string, sender?: string | null): SmsKind {
       channel,
       last4,
       isCard,
+      debitCard: /\bdebit card\b/i.test(t),
       counterparty: brand?.name ?? name,
       vpa,
       ref,

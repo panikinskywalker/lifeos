@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
@@ -7,8 +7,8 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Text, TrackColumns } from '@ui/kit';
-import { accountBalance, accountFlows } from '@modules/finance/lib';
+import { Button, NumberField, Sheet, Text, TrackColumns, useToast } from '@ui/kit';
+import { accountBalance, accountFlows, setBalance } from '@modules/finance/lib';
 import type { AccountData, TransactionData } from '@modules/finance/types';
 import { FieldRow, FieldValue, Hairline, IconDisc, KIND_WORD, Metric, Quick, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, TxRow, accountIcon, day, kindWord, relDay, shortMoney } from './parts';
 
@@ -32,6 +32,17 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
   const late = !!st && st.dueOn < today;
   const monthName = format(new Date(), 'MMM').toUpperCase();
   const addTx = (kind: string) => router.push({ pathname: '/entity/[type]/new', params: { type: 'transaction', accountId: a.id, kind } } as never);
+  // Set balance (docs/MODEL.md, Balances follow the bank): what the bank shows becomes the start; Undo puts the old one back.
+  const toast = useToast();
+  const [ask, setAsk] = useState(false);
+  const [typed, setTyped] = useState<number | undefined>(undefined);
+  const saveBalance = () => {
+    if (typed == null) return;
+    const before = setBalance(ctx, a.id, typed);
+    setAsk(false);
+    setTyped(undefined);
+    toast.show({ message: `Balance set to ${money(typed)}`, icon: 'check', undo: () => void ctx.records.update(a.id, { data: before }, 'user') });
+  };
 
   return (
     <View style={{ paddingHorizontal: t.layout.gutter, gap: 24 }}>
@@ -68,10 +79,17 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
       </View>
 
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Quick label="Add payment" icon="plus" onPress={() => addTx('expense')} />
+        <Quick label="Add" icon="plus" onPress={() => addTx('expense')} />
         <Quick label="Transfer" icon="arrow.up.arrow.down" onPress={() => addTx('transfer')} />
+        {card ? null : <Quick label="Set balance" icon="check" onPress={() => setAsk(true)} />}
         <Quick label="Edit" icon="edit" onPress={() => controls?.edit()} />
       </View>
+      <Sheet visible={ask} onClose={() => setAsk(false)} title="What does the bank show?" footer={<Button title="Set balance" onPress={saveBalance} disabled={typed == null} />}>
+        <View style={{ gap: 10 }}>
+          <NumberField label="Balance now" unit="₹" value={typed} onChange={setTyped} autoFocus />
+          <Text variant="caption" color="secondary">This becomes the balance from now on; only payments after it are added. The app shows {money(balance)}.</Text>
+        </View>
+      </Sheet>
 
       {flows.some((f) => f.out > 0) ? (
         <TrackColumns label="Money out" period="last 6 months" value={shortMoney(ctx, now?.out ?? 0)} values={flows.map((f) => f.out)} labels={flows.map((f) => f.label)} today={flows.length - 1} axis={(n) => shortMoney(ctx, n)} />

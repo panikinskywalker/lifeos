@@ -98,6 +98,13 @@ export const financeModule: ModuleManifest = {
       sortOldMoneyIn(os);
       os.settings.set('finance.moneyInV1', true);
     }
+    // A fund redemption filed before 15 Nov took money out of the bank: it arrives there. Once.
+    if (!os.settings.get<boolean>('finance.redemptionsV1', false)) {
+      for (const r of os.records.query<{ accountId?: string; toAccountId?: string; rawText?: string }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'investment' }] } }, { limit: 100_000 })) {
+        if (r.data.accountId && !r.data.toAccountId && /\bredeem(?:ed|ption)?\b/i.test(r.data.rawText ?? '')) os.records.update(r.id, { data: { accountId: undefined, toAccountId: r.data.accountId } }, 'system');
+      }
+      os.settings.set('finance.redemptionsV1', true);
+    }
     // Payments filed before subscriptions were spotted get looked at once (phase D).
     if (!os.settings.get<boolean>('finance.spottedV1', false)) {
       spotSubscriptions(os);

@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.55 · 15 Nov 2026
+
+**Balances follow the bank.** Each account page has **Set balance**: type what
+the bank shows and that is the balance from now on (with Undo). A payment made
+later on the same day as a bank's balance text now counts. Cashing out a mutual
+fund adds to your bank account instead of taking money out. A debit card spend
+lands on your account at that bank instead of making a new credit card. A text
+that only states your balance sets it, and a repeat text still does.
+
 ## v0.0.54 · 15 Nov 2026
 
 **No more merged or doubled payments.** Two payments used to become one

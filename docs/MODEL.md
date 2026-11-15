@@ -339,6 +339,18 @@ becomes the account's known balance for its day; the account adds only payments
 dated after it, so every new text corrects it (an older text never overwrites a
 newer one; a card's figure is its limit, so cards are left out). Cash taken from
 an ATM lands in your **Cash** account (made once if you have none).
+15 Nov, Rutvij (`docs/research/money-basics.md`):
+- **After the bank's figure** means dated after its day, or that day and heard
+  after it (the payment's text came later, or you typed it later).
+- **A text that only states the balance** ("Available balance in A/c XX1234 is
+  Rs 52,000") sets it; a phone plan's "Main-Bal" or reward points never do.
+- **A repeat text** (the same payment seen again) still sets the balance it states.
+- **Set balance** on an account's page: what the bank shows becomes the balance
+  from now on, with Undo.
+- **A fund redemption** arrives in the bank account; a buy or SIP leaves it.
+  Redemptions filed before are turned around once (`finance.redemptionsV1`).
+- **A debit card** spends from the bank account: a debit-card text lands on your
+  one account at that bank, never a new credit card.
 
 **A card's bill (14 Nov, phase A).** A card's statement or reminder text ("Total
 of Rs 26,046.50 or minimum of Rs 1,310.00 is due by 30-OCT-26", Axis's "Due on …

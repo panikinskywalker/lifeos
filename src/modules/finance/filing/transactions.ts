@@ -128,7 +128,8 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
     const bank = t.last4 ? accountFor(os, { ...t, investment: false }, item.from, created) : null;
     const inv = sipId ?? investmentFor(os, t.fund, created);
     const out = t.direction === 'debit';
-    data = { amount, kind: 'investment', category: 'investment', merchant: t.fund ?? 'Mutual fund', date, accountId: bank ?? undefined, investmentId: inv ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined };
+    // A buy leaves the bank account; a redemption arrives in it.
+    data = { amount, kind: 'investment', category: 'investment', merchant: t.fund ?? 'Mutual fund', date, accountId: out ? (bank ?? undefined) : undefined, toAccountId: out ? undefined : (bank ?? undefined), investmentId: inv ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined };
     if (inv) {
       const cur = os.records.get<{ invested?: number }>(inv);
       os.records.update(inv, { data: { invested: Math.max(0, (cur?.data.invested ?? 0) + (out ? amount : -amount)) } }, 'assistant');
@@ -315,7 +316,7 @@ function payStatement(os: LifeOSContext, cardId: string, amount: number) {
 }
 
 /** Keep the balance a bank text stated on its account, when it is the newest one heard. */
-function noteBalance(os: LifeOSContext, accountId: string, balance: number, day: string, at: number) {
+export function noteBalance(os: LifeOSContext, accountId: string, balance: number, day: string, at: number) {
   const a = os.records.get<{ kind?: string; knownAt?: number }>(accountId);
   if (!a || a.data.kind === 'credit' || (a.data.knownAt ?? 0) > at) return;
   os.records.update(accountId, { data: { knownBalance: balance, knownOn: day, knownAt: at } }, 'assistant');
