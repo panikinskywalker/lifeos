@@ -1829,7 +1829,12 @@ screens checked on the phone → overrides only where the default is wrong)
       decided in layer 2 *Money* (`games/smsMatch.ts`: sender = UPI id or the
       bank's name; known = a learned alias in core `aliases`, a player's UPI,
       or finance's Person; sure → recorded with Undo; else a question, and a
-      Yes learns the sender); boards can now give To check their own cards
+      Yes learns the sender. **15 Nov, Rutvij: a payment that comes in is marked
+      paid right away**: a bank name whose first name is only one player's, or
+      the Person finance linked, counts as known; exact amount within 30 days of
+      the game is recorded on its own and the sender learned; only part payments
+      and names two players share are asked; unmatched money in is looked at
+      again on start and after each sync); boards can now give To check their own cards
       (`BoardManifest.checkCards`). Gaps: squad-invite requests (new players
       asking to join) and photos aren't in the sync yet; undoing a change
       from the audit log stays on Turf web.

@@ -4,7 +4,7 @@ import { gamesAiTools } from './aiTools';
 import { gamesBrain } from './brain';
 import { turfWebSource } from './sources';
 import { bus } from '@core/events/bus';
-import { matchTransaction } from './smsMatch';
+import { matchRecentPayments, matchTransaction } from './smsMatch';
 import { linkVenuePayments, matchVenuePayment } from './venuePay';
 
 export * from './types';
@@ -62,6 +62,7 @@ export const gamesModule: ModuleManifest = {
     // The turf you fronted (Your share): bookings already in, once on start.
     try {
       linkVenuePayments(os);
+      matchRecentPayments(os);
     } catch (e) {
       console.warn('[turf] booking match failed', e);
     }

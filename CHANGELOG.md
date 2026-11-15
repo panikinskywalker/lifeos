@@ -7,6 +7,18 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.40 · 15 Nov 2026
+
+**A friend's payment marks their Turf share paid right away.** Money in from a
+squad member (their UPI id, the person Money matched, or a bank name whose
+first name is only one player's) for exactly what they owe, within 30 days of
+the game, is recorded on its own and the sender remembered; To check shows it,
+with Undo. Only part payments and names two players share are asked. Money in
+already filed is looked at again on start and after each sync.
+
+**"Who paid this?"** On a money-in payment, the Turf section lists who owes you;
+pick one and their oldest shares are marked paid, with Undo.
+
 ## v0.0.39 · 15 Nov 2026
 
 **Turf moves like Turf web.** Recent games slide and flip in 3D when you open

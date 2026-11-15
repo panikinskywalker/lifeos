@@ -673,30 +673,28 @@ describe('shares paid by SMS (R9c.6)', () => {
   const asks = () => os.filings.toCheck().filter((f) => f.kind === SMS_ASK);
   const paid = () => os.filings.toCheck().filter((f) => f.kind === SMS_PAID);
 
-  it('a new sender is asked about once; Yes records the share and learns them; next time it is recorded on its own, with Undo', () => {
-    // Karan owes ₹500 (Wed 14) and ₹450 (Sat 17). A first SMS from an unknown UPI id: asked.
+  it('a squad member paying exactly what they owe is recorded on its own and learned, with Undo; a part payment is asked, and Yes records it (15 Nov)', () => {
+    // Karan owes ₹500 (Wed 14) and ₹450 (Sat 17). His bank name's first name is only his: sure.
     sms(450, '2026-10-18', 'KARAN MEHTA', 'Rs.450.00 credited to HDFC Bank A/c XX1234 on 18-10-26 from VPA karan.m@okhdfc (UPI 426912345679)');
-    expect(asks().map((f) => f.label)).toEqual(['Karan paid ₹450 for Sat, 17 Oct?']);
-    expect(asks()[0]!.flag).toMatch(/₹450 in from KARAN MEHTA · SMS/);
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹450 · Sat, 17 Oct/)]);
+    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ amountPaid: 450 });
+    expect(os.aliases.lookup('karan.m@okhdfc').map((a) => a.entityId)).toEqual([person('Karan').id]);
+    expect(turfChanges(os).sending.map((i) => i.payload.body)).toEqual([expect.objectContaining({ action: 'payment', playerId: 'p_karan', amount: 450, via: 'sms' })]);
+    undoSmsPayment(os, paid()[0]!.id);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(0);
+
+    // Part of the Wednesday share: asked; Yes records it, once; it stays until sent.
+    sms(200, '2026-10-19', 'KARAN MEHTA', 'Rs.200.00 credited to HDFC Bank A/c XX1234 on 19-10-26 from VPA karan.m@okhdfc');
+    expect(asks().map((f) => f.label)).toEqual(['Karan paid ₹200 of ₹500 for Wed, 14 Oct?']);
+    expect(asks()[0]!.flag).toMatch(/₹200 in from KARAN MEHTA · SMS/);
     const askId = asks()[0]!.id;
     confirmSmsAsk(os, askId);
     confirmSmsAsk(os, askId); // a second Yes pays nothing more
-    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ amountPaid: 450 });
-    // The answered question stays until the payment has gone, then leaves To check.
+    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(200);
     expect(asks().map((f) => f.id)).toEqual([askId]);
     settleSmsAsk(os, askId);
     expect(asks()).toHaveLength(0);
-    expect(os.aliases.lookup('karan.m@okhdfc').map((a) => a.entityId)).toEqual([person('Karan').id]);
-    expect(turfChanges(os).sending.map((i) => i.payload.body)).toEqual([expect.objectContaining({ action: 'payment', playerId: 'p_karan', amount: 450, via: 'sms' })]);
-
-    // The same sender pays the Wednesday share: known, exact, in the window — recorded without asking.
-    sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited to HDFC Bank A/c XX1234 on 19-10-26 from VPA karan.m@okhdfc');
-    expect(asks()).toHaveLength(0);
-    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹500 · Wed, 14 Oct/)]);
-    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(500);
-    undoSmsPayment(os, paid()[0]!.id);
-    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(0);
-    expect(paid()).toHaveLength(0);
   });
 
   it('a smaller amount is asked as a part payment; money from outside the squad or with nothing open is left alone', () => {
@@ -727,6 +725,20 @@ describe('shares paid by SMS (R9c.6)', () => {
     expect(matchVenuePayment(os, spend(1800, '2026-10-17').id)).toBeNull(); // one booking per game
     undoVenuePayment(os, f[0]!.id);
     expect(share(booking.id)).toBeUndefined();
+  });
+
+  it('by hand: "Who paid this?" marks their oldest open shares paid, learns the sender, with Undo', async () => {
+    const { linkPaymentToPlayer, playersOwing } = await import('./smsMatch');
+    const tx = sms(950, '2026-11-02', 'MR K M', 'Rs.950.00 credited from VPA km.pay@okaxis');
+    expect(asks()).toHaveLength(0);
+    expect(playersOwing(os).map((p) => p.name)).toContain('Karan');
+    const id = linkPaymentToPlayer(os, tx.id, person('Karan').id)!;
+    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(500);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(450);
+    expect(os.aliases.lookup('km.pay@okaxis').map((a) => a.entityId)).toEqual([person('Karan').id]);
+    expect(os.records.get<{ share?: number }>(tx.id)!.data.share).toBe(0);
+    undoSmsPayment(os, id);
+    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(0);
   });
 
   it('one of several UPI ids on their Person is known at once (core identity)', () => {
