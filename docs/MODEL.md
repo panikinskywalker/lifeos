@@ -351,6 +351,11 @@ an ATM lands in your **Cash** account (made once if you have none).
   Redemptions filed before are turned around once (`finance.redemptionsV1`).
 - **A debit card** spends from the bank account: a debit-card text lands on your
   one account at that bank, never a new credit card.
+- **Cards follow the bank too**: a card statement or reminder text ("Total of
+  Rs 14,768.76 … is due by …") sets what you owe as of its day, and only spends
+  and payments after it count, so a payment the app never saw no longer leaves a
+  card lakhs in debt for good. **Set owed** on a card's page does the same by
+  hand (what the card app shows), with Undo; *Owed* says "bank said, d MMM".
 
 **A card's bill (14 Nov, phase A).** A card's statement or reminder text ("Total
 of Rs 26,046.50 or minimum of Rs 1,310.00 is due by 30-OCT-26", Axis's "Due on …

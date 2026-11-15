@@ -51,6 +51,17 @@ describe('balances follow the bank', () => {
     expect(balanceOf(a.id)).toBe(12_000);
   });
 
+  it("a card's statement sets what you owe from its day; spends add and payments come off after it", () => {
+    const card = os.records.create<AccountData>({ object: 'account', title: 'ICICI Bank card ••3007', data: { kind: 'credit', institution: 'ICICI Bank', last4: '3007', currency: 'INR', openingBalance: 0 } });
+    // Old spends the app heard about, and a missed payment, would say ₹90,000 owed.
+    os.records.create({ object: 'transaction', data: { amount: 90_000, kind: 'expense', category: 'shopping', date: '2026-08-02', accountId: card.id } }, 'assistant');
+    sms('JX-ICICIT-S', 'ICICI Bank Credit Card XX3007 Statement is sent to ru*****@gmail.com. Total of Rs 14,768.76 or minimum of Rs 13,480.00 is due by 07-SEP-26.', Date.parse('2026-08-27T10:00:00'));
+    expect(balanceOf(card.id)).toBe(-14_768.76);
+    os.records.create({ object: 'transaction', data: { amount: 699.01, kind: 'expense', category: 'subscriptions', date: '2026-08-29', accountId: card.id } }, 'assistant');
+    os.records.create({ object: 'transaction', data: { amount: 14_768.76, kind: 'transfer', category: 'transfer', date: '2026-09-05', toAccountId: card.id } }, 'assistant');
+    expect(balanceOf(card.id)).toBeCloseTo(-699.01, 2);
+  });
+
   it('a debit card spend comes off your account at that bank, not a new credit card', () => {
     const a = bank();
     sms('VM-SBIBNK-S', 'Rs 500.00 spent on your SBI Debit Card XX9999 at AMAZON on 02-Nov-26. Avl Bal Rs 4,500.00', Date.parse('2026-11-02T09:00:00'));

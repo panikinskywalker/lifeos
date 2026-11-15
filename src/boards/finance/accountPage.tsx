@@ -38,10 +38,11 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
   const [typed, setTyped] = useState<number | undefined>(undefined);
   const saveBalance = () => {
     if (typed == null) return;
-    const before = setBalance(ctx, a.id, typed);
+    // A card's figure is what you owe: its balance is that, below zero.
+    const before = setBalance(ctx, a.id, card ? -Math.abs(typed) : typed);
     setAsk(false);
     setTyped(undefined);
-    toast.show({ message: `Balance set to ${money(typed)}`, icon: 'check', undo: () => void ctx.records.update(a.id, { data: before }, 'user') });
+    toast.show({ message: card ? `Owed set to ${money(Math.abs(typed))}` : `Balance set to ${money(typed)}`, icon: 'check', undo: () => void ctx.records.update(a.id, { data: before }, 'user') });
   };
 
   return (
@@ -64,7 +65,7 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
         <View style={{ flexDirection: 'row', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: t.c.line }}>
           {card ? (
             <>
-              <Metric label="OWED" value={money(owed)} line={balance > 0 ? `${money(balance)} in credit` : 'on the card now'} />
+              <Metric label="OWED" value={money(owed)} line={balance > 0 ? `${money(balance)} in credit` : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : 'from its spends'} />
               <Metric label="BILL" value={st ? money(st.total) : '-'} line={st ? `${late ? 'was due' : 'due'} ${format(day(st.dueOn), 'EEE d MMM')}` : 'no statement yet'} color={late ? t.c.alert.coralText : undefined} />
               <Metric label="LIMIT USED" value={d.creditLimit ? `${Math.round((owed / d.creditLimit) * 100)}%` : '-'} line={d.creditLimit ? `of ${shortMoney(ctx, d.creditLimit)}` : 'no limit set'} />
             </>
@@ -81,13 +82,13 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Quick label="Add" icon="plus" onPress={() => addTx('expense')} />
         <Quick label="Transfer" icon="arrow.up.arrow.down" onPress={() => addTx('transfer')} />
-        {card ? null : <Quick label="Set balance" icon="check" onPress={() => setAsk(true)} />}
+        <Quick label={card ? 'Set owed' : 'Set balance'} icon="check" onPress={() => setAsk(true)} />
         <Quick label="Edit" icon="edit" onPress={() => controls?.edit()} />
       </View>
-      <Sheet visible={ask} onClose={() => setAsk(false)} title="What does the bank show?" footer={<Button title="Set balance" onPress={saveBalance} disabled={typed == null} />}>
+      <Sheet visible={ask} onClose={() => setAsk(false)} title={card ? 'What does the card app say you owe?' : 'What does the bank show?'} footer={<Button title={card ? 'Set owed' : 'Set balance'} onPress={saveBalance} disabled={typed == null} />}>
         <View style={{ gap: 10 }}>
-          <NumberField label="Balance now" unit="₹" value={typed} onChange={setTyped} autoFocus />
-          <Text variant="caption" color="secondary">This becomes the balance from now on; only payments after it are added. The app shows {money(balance)}.</Text>
+          <NumberField label={card ? 'Owed now' : 'Balance now'} unit="₹" value={typed} onChange={setTyped} autoFocus />
+          <Text variant="caption" color="secondary">This becomes the figure from now on; only payments after it are added. The app shows {card ? money(owed) : money(balance)}.</Text>
         </View>
       </Sheet>
 

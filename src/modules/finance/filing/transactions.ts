@@ -316,6 +316,13 @@ function payStatement(os: LifeOSContext, cardId: string, amount: number) {
 }
 
 /** Keep the balance a bank text stated on its account, when it is the newest one heard. */
+/** A card statement's total is what you owe on its day: the card's balance from there (negative), when it is the newest figure heard. */
+export function noteOwed(os: LifeOSContext, cardId: string, owed: number, day: string, at: number) {
+  const a = os.records.get<{ kind?: string; knownAt?: number }>(cardId);
+  if (!a || a.data.kind !== 'credit' || (a.data.knownAt ?? 0) > at) return;
+  os.records.update(cardId, { data: { knownBalance: -owed, knownOn: day, knownAt: at } }, 'assistant');
+}
+
 export function noteBalance(os: LifeOSContext, accountId: string, balance: number, day: string, at: number) {
   const a = os.records.get<{ kind?: string; knownAt?: number }>(accountId);
   if (!a || a.data.kind === 'credit' || (a.data.knownAt ?? 0) > at) return;

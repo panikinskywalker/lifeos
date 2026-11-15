@@ -7,7 +7,7 @@ import { fileHeadsUp } from './recurring';
 import { fileBillDue, parseBillDue, type BillDue } from './bills';
 import { accountFor } from './accounts';
 import { receiptTxn } from './mail';
-import { dedupeKey, enrichFrom, fileTxn, findDuplicateFor, noteBalance, sameMoneyFor } from './transactions';
+import { dedupeKey, enrichFrom, fileTxn, findDuplicateFor, noteBalance, noteOwed, sameMoneyFor } from './transactions';
 
 /**
  * The money parser (finance filing, R1): bank SMS, payment-app notifications
@@ -65,6 +65,8 @@ function fileCardBill(os: LifeOSContext, m: RawMessage, bill: CardBill, ctx: Fil
   if (!card) return { status: 'dismissed', note: 'no card' };
   const prev = os.records.get<{ statement?: { at: number } }>(card)?.data.statement;
   if (!prev || prev.at <= m.receivedAt) os.records.update(card, { data: { statement: { total: bill.total, min: bill.min ?? undefined, dueOn: bill.dueOn, at: m.receivedAt } } }, 'assistant');
+  // What the bank says you owe is the card's balance from that day (docs/MODEL.md, Balances follow the bank: cards).
+  noteOwed(os, card, bill.total, iso(m.receivedAt), m.receivedAt);
   const due = new Date(`${bill.dueOn}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
   os.filings.add({ source: m.source, sourceRef: ctx.id, kind: 'card-bill', action: 'updated', entityId: card, label: `Card bill · ${os.format.currency(bill.total)} due ${due} · ••${bill.last4}` });
   return { status: 'confirmed', entityId: card };

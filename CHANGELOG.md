@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.65 · 15 Nov 2026
+
+**Cards owe what the bank says.** A card used to add up every spend since its
+first text, minus only the payments LifeOS matched to it, so one missed bill
+payment left it lakhs in debt (ICICI ••8013 read ₹2,00,076). Now a card
+statement text sets what you owe from its day, and each card's page has **Set
+owed** to type what the card app shows, with Undo.
+
 ## v0.0.64 · 15 Nov 2026
 
 **Ask Money's box is clear of the bottom bar.** A screen with its own box at the
