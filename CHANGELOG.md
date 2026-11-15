@@ -7,6 +7,23 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.70 · 15 Nov 2026
+
+**Spend reads at a glance, and the form wears its kind.**
+- **One period control:** the arrows step between this month and last month;
+  the middle ("November · 1 to 15") picks any period.
+- **What to count shows its totals:** Spent, Came in, Investing and All, each
+  with its figure; the one you picked is lime.
+- **Categories are chips** with their colour and how many payments; tap to
+  filter, All to clear.
+- **The total card** says how it compares in plain words ("₹1,540 less than
+  last month by today") instead of a percentage pill.
+- **A calendar of the month:** every date box shows what you spent that day,
+  more lime for more, the biggest day solid lime, today ringed; tap a day for
+  its payments. Then the ring with every category.
+- **New transaction:** the amount card takes the kind's colour: Spent orange,
+  Received lime, Transfer blue, Investment lilac.
+
 ## v0.0.69 · 15 Nov 2026
 
 **Money's new home, its own bar, and Accounts and cards.**
