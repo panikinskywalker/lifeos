@@ -7,6 +7,18 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.80 · 16 Nov 2026
+
+**Every card its own face; SIPs next to Subscriptions.**
+- **The card wheel is prettier:** each account and card has its own colour and
+  pattern (half rounds, stripes, rings, quarter rounds, dots, waves, a mountain
+  and its sun, a half sun), always the same for that account. Cards behind the
+  front one sit a little crooked like a real pile, fan in when the screen
+  opens, and give under your finger with a tap of feedback. Amounts show their
+  paise small.
+- **Subscriptions has tabs:** Subscriptions, Bills and **SIPs**. SIPs lists every
+  holding with a monthly SIP, when it next goes, and what you invest a month.
+
 ## v0.0.79 · 16 Nov 2026
 
 **The card wheel opens on your main account in the middle**, with cards above

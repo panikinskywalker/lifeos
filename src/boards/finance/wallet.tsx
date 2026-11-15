@@ -66,7 +66,7 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
             const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
             return {
               key: acc.id,
-              color: late ? '#FF8A7A' : CARD[d.kind] ?? blocks.sky,
+              alert: late,
               title: acc.title.replace(/\s*[•·]+\s*\d{3,4}$/, ''),
               corner: card ? 'You owe' : KIND_WORD[d.kind],
               amount: card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),

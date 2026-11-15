@@ -1404,12 +1404,17 @@ references).** Each screen takes the direction that suits it:
   wheel** (kit `CardWheel`): the card in focus full size, the rest stacked
   behind, tops above and amounts below, smaller and tilted away like the iOS
   time picker; it snaps card by card with a haptic tick; tap a card behind to
-  bring it forward, the front one to open it.
+  bring it forward, the front one to open it. Every card has its own face (ten
+  colours, eight patterns, picked from the account so it stays the same), sits
+  a little crooked behind the front one, fans in when the screen opens and gives
+  under your finger; a card whose bill is late is coral.
 - **An account's or card's page** (direction A): the account drawn as its card
   (balance or what you owe on it), then round-icon buttons Add · Transfer · Set
   balance (Set owed) · Edit.
 - **Subscriptions** (direction B): a month and a year, the logos in a row, then
-  the list. **Reports** (direction A): Came in and Spent tiles, how this month
+  the list. Tabs (16 Nov, Rutvij): Subscriptions · Bills · **SIPs**, where every
+  holding with a monthly SIP shows with its day, when it next goes and what is
+  invested a month. **Reports** (direction A): Came in and Spent tiles, how this month
   compares, and the Analytics chart.
 
 ### Money pages with no artboard, from the kit (14 Nov, phase C)

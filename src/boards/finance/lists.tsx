@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,8 +10,8 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { IconButton, OnBar, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
 import { perMonth } from '@modules/finance/reports';
 import { balances, type DebtData } from '@modules/finance/split';
-import type { SubscriptionData } from '@modules/finance/types';
-import { Caps, Disc, Rows, SectionHead, day, debtReason, shortMoney } from './parts';
+import type { InvestmentData, SubscriptionData } from '@modules/finance/types';
+import { Caps, Disc, Rows, SectionHead, Seg, day, debtReason, shortMoney } from './parts';
 import { NoSubscriptions } from './screens';
 import { SettleButton } from './splitScreens';
 
@@ -92,55 +92,93 @@ export function SubscriptionsScreen(_: { ctx: LifeOSContext; params: Record<stri
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
+  const [tab, setTab] = useState<'subs' | 'bills' | 'sips'>('subs');
   const all = useLive((o) => o.records.query<SubscriptionData>('subscription', {}, { limit: 1000 }), []);
+  // SIPs sit here too (16 Nov, Rutvij): every holding with a monthly SIP, its day and when it next goes.
+  const sips = useLive((o) => (o.registry.objects.has('investment') ? o.records.query<InvestmentData>('investment', { filter: { and: [{ field: 'status', op: 'neq', value: 'sold' }] } }, { limit: 200 }).filter((i) => (i.data.sip ?? 0) > 0) : []), []);
   const live = all.filter((s) => (s.status ?? 'active') === 'active').sort((a, b) => a.data.nextBillingAt.localeCompare(b.data.nextBillingAt));
   const active = live.filter((s) => !s.data.bill);
   const bills = live.filter((s) => s.data.bill);
   const rest = all.filter((s) => (s.status ?? 'active') !== 'active');
   const monthly = active.reduce((n, s) => n + perMonth(s.data.amount, s.data.rrule), 0);
+  const sipMonthly = sips.reduce((n, i) => n + (i.data.sip ?? 0), 0);
   const money = (s: ObjectRecord<SubscriptionData>, n: number) => os.format.currency(Math.round(n), s.data.currency);
   const open = (s: ObjectRecord<SubscriptionData>) => router.push(`/entity/subscription/${s.id}` as never);
-  const add = <IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} accessibilityLabel="Add a subscription" onPress={() => router.push('/entity/subscription/new' as never)} />;
+  const add = <IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} accessibilityLabel={tab === 'sips' ? 'Add an investment' : 'Add a subscription'} onPress={() => router.push((tab === 'sips' ? '/entity/investment/new' : '/entity/subscription/new') as never)} />;
+  const nextSip = (day?: number) => {
+    const now = new Date();
+    const d = Math.min(day ?? 1, 28);
+    const next = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > d ? 1 : 0), d, 12);
+    return format(next, 'yyyy-MM-dd');
+  };
   return (
-    <ListScreen title="Subscriptions" sub={live.length ? [active.length ? `${active.length} subscription${active.length === 1 ? '' : 's'}` : null, bills.length ? `${bills.length} bill${bills.length === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ') : 'Money'} right={add}>
-      {active.length ? (
+    <ListScreen title="Subscriptions" sub={[active.length ? `${active.length} subscription${active.length === 1 ? '' : 's'}` : null, bills.length ? `${bills.length} bill${bills.length === 1 ? '' : 's'}` : null, sips.length ? `${sips.length} SIP${sips.length === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ') || 'Money'} right={add}>
+      <Seg value={tab} onChange={setTab} options={[{ value: 'subs', label: `Subscriptions${active.length ? ` ${active.length}` : ''}` }, { value: 'bills', label: `Bills${bills.length ? ` ${bills.length}` : ''}` }, { value: 'sips', label: `SIPs${sips.length ? ` ${sips.length}` : ''}` }]} track={t.c.bg.tile} fontSize={13} />
+      {tab === 'subs' ? (
         <>
-          <Headline label="EVERY MONTH" value={os.format.currency(Math.round(monthly))} unit="/mo" line={`${os.format.currency(Math.round(monthly * 12))} a year`} />
-          <Logos names={live.map((s) => ({ key: s.id, name: s.data.name }))} />
+          {active.length ? (
+            <>
+              <Headline label="EVERY MONTH" value={os.format.currency(Math.round(monthly))} unit="/mo" line={`${os.format.currency(Math.round(monthly * 12))} a year`} />
+              <Logos names={active.map((s) => ({ key: s.id, name: s.data.name }))} />
+              <View style={{ gap: 10 }}>
+                <SectionHead title="Next to renew" />
+                <Rows gap={4}>
+                  {active.map((s) => {
+                    const when = inDays(s.data.nextBillingAt);
+                    const soon = when === 'today' || when === 'tomorrow' || when === 'due';
+                    return <Row key={s.id} name={s.data.name} title={s.data.name} line={`${format(day(s.data.nextBillingAt), 'EEE d MMM')} · ${when}`} lineColor={soon ? t.c.alert.coralText : undefined} amount={money(s, s.data.amount)} meta={perMonth(s.data.amount, s.data.rrule) !== s.data.amount ? `${money(s, perMonth(s.data.amount, s.data.rrule))}/mo` : undefined} onPress={() => open(s)} />;
+                  })}
+                </Rows>
+              </View>
+            </>
+          ) : (
+            <NoSubscriptions />
+          )}
+          {rest.length ? (
+            <View style={{ gap: 10 }}>
+              <SectionHead title="Paused and cancelled" sub={String(rest.length)} />
+              <Rows gap={4}>
+                {rest.map((s) => (
+                  <Row key={s.id} name={s.data.name} title={s.data.name} line={s.status === 'paused' ? 'Paused' : 'Cancelled'} amount={money(s, s.data.amount)} amountColor={t.c.fg.secondary} onPress={() => open(s)} />
+                ))}
+              </Rows>
+            </View>
+          ) : null}
+        </>
+      ) : null}
+      {tab === 'bills' ? (
+        bills.length ? (
           <View style={{ gap: 10 }}>
-            <SectionHead title="Next to renew" />
+            <Headline label="BILLS NEXT" value={os.format.currency(Math.round(bills.reduce((n, b) => n + b.data.amount, 0)))} line="from their texts; each is paid when a payment to its biller matches" />
             <Rows gap={4}>
-              {active.map((s) => {
-                const when = inDays(s.data.nextBillingAt);
-                const soon = when === 'today' || when === 'tomorrow' || when === 'due';
-                return <Row key={s.id} name={s.data.name} title={s.data.name} line={`${format(day(s.data.nextBillingAt), 'EEE d MMM')} · ${when}`} lineColor={soon ? t.c.alert.coralText : undefined} amount={money(s, s.data.amount)} meta={perMonth(s.data.amount, s.data.rrule) !== s.data.amount ? `${money(s, perMonth(s.data.amount, s.data.rrule))}/mo` : undefined} onPress={() => open(s)} />;
+              {bills.map((b) => {
+                const when = inDays(b.data.nextBillingAt);
+                return <Row key={b.id} name={b.data.name} title={b.data.payee ? `${b.data.name} · ${b.data.payee}` : b.data.name} line={`${when === 'due' ? 'was due' : 'due'} ${format(day(b.data.nextBillingAt), 'EEE d MMM')}${when === 'due' ? '' : ` · ${when}`}`} lineColor={when === 'due' || when === 'today' ? t.c.alert.coralText : undefined} amount={money(b, b.data.amount)} onPress={() => open(b)} />;
               })}
             </Rows>
           </View>
-        </>
-      ) : (
-        <NoSubscriptions />
-      )}
-      {bills.length ? (
-        <View style={{ gap: 10 }}>
-          <SectionHead title="Bills" sub={`${os.format.currency(Math.round(bills.reduce((n, b) => n + b.data.amount, 0)))} next`} />
-          <Rows gap={4}>
-            {bills.map((b) => {
-              const when = inDays(b.data.nextBillingAt);
-              return <Row key={b.id} name={b.data.name} title={b.data.payee ? `${b.data.name} · ${b.data.payee}` : b.data.name} line={`${when === 'due' ? 'was due' : 'due'} ${format(day(b.data.nextBillingAt), 'EEE d MMM')}${when === 'due' ? '' : ` · ${when}`}`} lineColor={when === 'due' || when === 'today' ? t.c.alert.coralText : undefined} amount={money(b, b.data.amount)} onPress={() => open(b)} />;
-            })}
-          </Rows>
-        </View>
+        ) : (
+          <Text color="secondary" style={{ fontSize: 14, lineHeight: 20, paddingHorizontal: 4 }}>No bills yet. Electricity, water or an EMI shows up here when its bill text arrives.</Text>
+        )
       ) : null}
-      {rest.length ? (
-        <View style={{ gap: 10 }}>
-          <SectionHead title="Paused and cancelled" sub={String(rest.length)} />
-          <Rows gap={4}>
-            {rest.map((s) => (
-              <Row key={s.id} name={s.data.name} title={s.data.name} line={s.status === 'paused' ? 'Paused' : 'Cancelled'} amount={money(s, s.data.amount)} amountColor={t.c.fg.secondary} onPress={() => open(s)} />
-            ))}
-          </Rows>
-        </View>
+      {tab === 'sips' ? (
+        sips.length ? (
+          <>
+            <Headline label="INVESTED EVERY MONTH" value={os.format.currency(Math.round(sipMonthly))} unit="/mo" line={`${os.format.currency(Math.round(sipMonthly * 12))} a year`} />
+            <Logos names={sips.map((i) => ({ key: i.id, name: i.title }))} />
+            <View style={{ gap: 10 }}>
+              <SectionHead title="Next to go" />
+              <Rows gap={4}>
+                {[...sips].sort((a, b) => nextSip(a.data.sipDay).localeCompare(nextSip(b.data.sipDay))).map((i) => {
+                  const next = nextSip(i.data.sipDay);
+                  return <Row key={i.id} name={i.title} title={i.title} line={`${format(day(next), 'EEE d MMM')} · ${inDays(next)}`} amount={os.format.currency(Math.round(i.data.sip ?? 0), i.data.currency)} meta={i.data.currentValue != null ? `now ${shortMoney(os, i.data.currentValue)}` : undefined} onPress={() => router.push(`/entity/investment/${i.id}` as never)} />;
+                })}
+              </Rows>
+            </View>
+          </>
+        ) : (
+          <Text color="secondary" style={{ fontSize: 14, lineHeight: 20, paddingHorizontal: 4 }}>No SIPs yet. A holding with a monthly SIP shows here, and a debit by NACH for its amount files itself as investing.</Text>
+        )
       ) : null}
     </ListScreen>
   );
