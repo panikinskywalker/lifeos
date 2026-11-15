@@ -1284,6 +1284,15 @@ No screen stays on the generic layout; each is put together from v3 Noir kit par
   it is not this year); the parser export sits with the
   masked samples (You › Data sources › Message samples), not behind SMS senders.
 
+### Names and storage (15 Nov, Rutvij)
+- **One name per payee**: once a payment is matched to a payee for certain, it
+  shows the payee's name ("Playo" for the bank's "PLAYO"); the merchant Field
+  keeps the bank's spelling ("As the bank wrote it").
+- **No useless storage**: a Delivery's one-time code goes as soon as it is
+  delivered (else after a week). After 90 days a payment keeps its Fields and who
+  it was paid to; its activity thread (created, linked, the message it came from)
+  and its links to the bank account are deleted, except what you wrote or changed.
+
 ### Money on its own (agreed 14 Nov, phase D)
 Learned from Rutvij's masked texts: SBI's nameless "debit by NACH" (₹5,000, ₹2,000
 around the 5th) are SIPs counted as spending; ICICI warns before every

@@ -136,6 +136,9 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
     if (pm) {
       linkPayee(os, e.id, pm, t.counterparty, t.vpa, item.source);
       if (pm.guess) flag = pm.guess;
+      // One name per payee: "PLAYO" and "Playo" both read Playo (the bank's spelling stays in the merchant Field).
+      const name = pm.guess ? null : os.records.get(pm.id)?.title;
+      if (name && name !== e.title) os.records.update(e.id, { title: name }, 'assistant');
       // A UPI ID no one has, under a person's name: To check asks who it is (in place of "Payee: …").
       const asked = askWhoIs(os, e.id, pm, t.counterparty, t.vpa, item.source, id);
       if (pm.created && !asked) created.push(pm.id);

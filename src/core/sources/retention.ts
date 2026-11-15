@@ -14,17 +14,24 @@ import { isOtpText } from '../filing/otp';
  *  - messages that became records: the record stays, the raw SMS wording goes
  *  - screen time: daily totals stay, the per-app breakdown goes
  *  - synced calendar events that ended: removed (ones you made stay)
+ *  - after 90 days a payment keeps its Fields and who it was paid to; its activity
+ *    (created, linked, the message it came from) and its links to the bank account go,
+ *    unless you wrote or changed it (15 Nov, Rutvij: no useless storage)
  */
 
 const DAY = 86_400_000;
 /** Messages that filed nothing, and one-time codes, live a week (MODEL layer 4, agreed 6 Nov). */
 const THROWAWAY_DAYS = 7;
+/** A payment's activity and its links to the bank account live 90 days (15 Nov). */
+const TRAIL_DAYS = 90;
 
 export interface PruneResult {
   ignoredMessages: number;
   rawTexts: number;
   appUsageRows: number;
   calendarEvents: number;
+  /** Activity entries and bank-account links taken off payments older than 90 days. */
+  paymentTrails: number;
 }
 
 /** One-time codes (MODEL layer 4): the wording once a week old or its parcel delivered, and a Delivery's OTP Field after a week. */
@@ -41,7 +48,8 @@ function clearCodes(os: LifeOSContext, weekAgo: number) {
   );
   for (const e of events) if (e.done && isOtpText(e.body)) os.db.run(`UPDATE events SET body=NULL WHERE id=?`, [e.id]);
   for (const s of os.db.all<{ address: string; sample: string }>(`SELECT address, sample FROM sms_senders WHERE sample IS NOT NULL`)) if (isOtpText(s.sample)) os.db.run(`UPDATE sms_senders SET sample=NULL WHERE address=?`, [s.address]);
-  os.db.run(`UPDATE records SET data = json_remove(data, '$.otp') WHERE object='delivery' AND json_extract(data,'$.otp') IS NOT NULL AND COALESCE(json_extract(data,'$.otpAt'), updated_at) < ?`, [weekAgo]);
+  // A Delivery's code goes once it is delivered, and after a week whatever happened.
+  os.db.run(`UPDATE records SET data = json_remove(data, '$.otp') WHERE object='delivery' AND json_extract(data,'$.otp') IS NOT NULL AND (json_extract(data,'$.status')='delivered' OR COALESCE(json_extract(data,'$.otpAt'), updated_at) < ?)`, [weekAgo]);
   // An Undo snapshot from filing keeps the old code too.
   os.db.run(`UPDATE filings SET before = json_remove(before, '$.otp') WHERE json_extract(before,'$.otp') IS NOT NULL AND created_at < ?`, [weekAgo]);
 }
@@ -52,7 +60,7 @@ export function pruneOldData(os: LifeOSContext, opts: { days?: number; now?: num
   const weekAgo = now - THROWAWAY_DAYS * DAY;
   const cutoffDay = new Date(cutoff).toISOString().slice(0, 10);
   const count = (sql: string, p: unknown[]) => os.db.get<{ n: number }>(sql, p as never[])?.n ?? 0;
-  const r: PruneResult = { ignoredMessages: 0, rawTexts: 0, appUsageRows: 0, calendarEvents: 0 };
+  const r: PruneResult = { ignoredMessages: 0, rawTexts: 0, appUsageRows: 0, calendarEvents: 0, paymentTrails: 0 };
   os.db.transaction(() => {
     r.ignoredMessages = count(`SELECT COUNT(*) AS n FROM ingest_queue WHERE status IN ('dismissed','duplicate','failed') AND received_at < ?`, [weekAgo]);
     os.db.run(`DELETE FROM ingest_queue WHERE status IN ('dismissed','duplicate','failed') AND received_at < ?`, [weekAgo]);
@@ -82,8 +90,17 @@ export function pruneOldData(os: LifeOSContext, opts: { days?: number; now?: num
       os.db.run(`DELETE FROM records WHERE id=?`, [id]);
     }
     r.calendarEvents = old.length;
+
+    // Old payments: the activity code wrote (not yours) and the links to the bank account (the Field keeps which account).
+    const trailCut = now - TRAIL_DAYS * DAY;
+    const oldTx = `SELECT id FROM records WHERE object='transaction' AND COALESCE(occurred_at, created_at) < ?`;
+    r.paymentTrails = count(`SELECT COUNT(*) AS n FROM events WHERE actor <> 'user' AND record_id IN (${oldTx})`, [trailCut]);
+    os.db.run(`DELETE FROM events WHERE actor <> 'user' AND record_id IN (${oldTx})`, [trailCut]);
+    const bankLinks = `(from_id IN (${oldTx}) AND to_id IN (SELECT id FROM records WHERE object='account')) OR (to_id IN (${oldTx}) AND from_id IN (SELECT id FROM records WHERE object='account'))`;
+    r.paymentTrails += count(`SELECT COUNT(*) AS n FROM links WHERE ${bankLinks}`, [trailCut, trailCut]);
+    os.db.run(`DELETE FROM links WHERE ${bankLinks}`, [trailCut, trailCut]);
   });
-  if (r.ignoredMessages + r.rawTexts + r.appUsageRows + r.calendarEvents) bus.emit('data.changed', { table: 'retention', id: 'prune' });
+  if (r.ignoredMessages + r.rawTexts + r.appUsageRows + r.calendarEvents + r.paymentTrails) bus.emit('data.changed', { table: 'retention', id: 'prune' });
   return r;
 }
 

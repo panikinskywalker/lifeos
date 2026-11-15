@@ -1,4 +1,5 @@
 import type { ModuleManifest } from '@core/registry/types';
+import { bus } from '@core/events/bus';
 import { deliveryType } from './types';
 import { deliveriesParsers } from './filing/parser';
 import { backfillDeliveries } from './filing/deliveries';
@@ -25,5 +26,10 @@ export const deliveriesModule: ModuleManifest = {
       backfillDeliveries(os);
       os.settings.set('deliveries.backfilled', true);
     }
+    // Delivered: its one-time code is no use any more, so it goes now (15 Nov; the daily clean-up catches the rest).
+    bus.on('entity.updated', ({ entity }) => {
+      const d = entity.data as { status?: string; otp?: string };
+      if (entity.object === 'delivery' && d.status === 'delivered' && d.otp) os.records.update(entity.id, { data: { otp: undefined, otpAt: undefined } }, 'system');
+    });
   },
 };

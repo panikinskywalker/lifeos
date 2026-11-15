@@ -250,3 +250,14 @@ describe('payment app notifications: ads are not payments (CRED, 15 Nov)', () =>
     expect(spendInRange(os, '2026-10-01', '2026-10-31')).toBe(0);
   });
 });
+
+describe('one name per payee', () => {
+  it('"Playo" and "PLAYO" from two banks read Playo, the bank spelling kept', () => {
+    sms('VA-CBSSBI-S', 'Dear UPI user A/C X3930 debited by 1720.80 on date 18Oct26 trf to Playo Refno 600000000001 If not u? call-1800111109 for other services-18001234-SBI', '2026-10-18');
+    sms('VM-HSBCIN-S', 'INR 3582.60 is paid from HSBC account XXXXXX3006 to PLAYO on 27-Oct-26 with ref 600000000002. If this is not done by you, call 18002673456 to report.', '2026-10-27');
+    const t = os.records.query<{ merchant?: string }>('transaction');
+    expect(t.map((x) => x.title)).toEqual(['Playo', 'Playo']);
+    expect(t.map((x) => x.data.merchant).sort()).toEqual(['PLAYO', 'Playo']);
+    expect(os.records.query('org').filter((o) => o.title === 'Playo')).toHaveLength(1);
+  });
+});

@@ -51,7 +51,7 @@ const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.
 const day = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`);
 const shortDay = (iso: string) => day(iso).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 const labelOf = (c: string) => categoryOf(c).label;
-const payeeOf = (t: ObjectRecord<TransactionData>) => t.data.merchant ?? t.title;
+const payeeOf = (t: ObjectRecord<TransactionData>) => t.title || t.data.merchant || '';
 
 /** Work a money query out on the phone. */
 export function runQuery(os: LifeOSContext, q: MoneyQuery, now = new Date()): Figures {

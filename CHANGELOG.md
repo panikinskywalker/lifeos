@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.36 · 15 Nov 2026
+
+**One name per payee.** "Playo" and "PLAYO" (or any bank's spelling) now show
+as the same payee's name; "As the bank wrote it" keeps the bank's spelling.
+
+**Less kept for nothing.** A delivery's one-time code goes the moment it is
+delivered. After 90 days a payment keeps its amount, date, account, category and
+who it was paid to, but its activity thread and links to the bank account go;
+anything you wrote or changed on it stays.
+
 ## v0.0.35 · 15 Nov 2026
 
 **Ads from payment apps are no longer payments.** CRED's "use your CRED cash

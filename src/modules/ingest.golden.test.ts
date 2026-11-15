@@ -431,3 +431,26 @@ describe('deliveries from texts read before tracking existed', () => {
     expect(os.records.get<{ otp?: string }>(d!.id)!.data.otp).toBeUndefined();
   });
 });
+
+describe('no useless storage (15 Nov)', () => {
+  it("a payment past 90 days loses its activity and bank-account links, keeps its Fields, payee and your own notes", async () => {
+    const { pruneOldData } = await import('@core/sources/retention');
+    const old = Date.now() - 100 * 86_400_000;
+    fileMessage(os, { source: 'sms', from: 'VM-HDFCBK', body: 'Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On 26/07/26', receivedAt: old });
+    const t = txs()[0]!;
+    os.records.timeline.add({ entityId: t.id, kind: 'note', title: 'Dinner with Priya', actor: 'user', occurredAt: Date.now() });
+    const account = (t.data as { accountId?: string }).accountId!;
+    os.links.link(t.id, account, 'account', {}, 'system');
+    const sub = os.records.create({ object: 'transaction', data: { amount: 99, kind: 'expense', category: 'food', date: '2026-07-27', merchant: 'Swiggy' } });
+    os.links.link(t.id, sub.id, 'refunds', {}, 'system');
+    const before = os.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM events WHERE record_id=?`, [t.id])!.n;
+    const r = pruneOldData(os);
+    expect(r.paymentTrails).toBeGreaterThan(0);
+    const left = os.db.all<{ actor: string; title: string }>(`SELECT actor, title FROM events WHERE record_id=?`, [t.id]);
+    expect(left).toEqual([{ actor: 'user', title: 'Dinner with Priya' }]);
+    expect(before).toBeGreaterThan(1);
+    expect(os.links.forEntity(t.id).some((l) => l.other.id === account)).toBe(false);
+    expect(os.links.forEntity(t.id).some((l) => l.other.id === sub.id)).toBe(true); // other links (a payee, a subscription, a refund) stay
+    expect(txs()[0]!.data).toMatchObject({ amount: 450, accountId: account });
+  });
+});
