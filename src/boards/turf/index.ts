@@ -22,6 +22,8 @@ export const turfBoard: BoardManifest = {
   icon: 'target',
   color: 'green',
   placement: 'browse',
+  // Turf is the games module's board: Browse lists it once (under Boards) and "Games" opens it.
+  module: 'games',
   tiles: turfTiles,
   screens: [
     { key: 'index', title: 'Turf', component: TurfHome },

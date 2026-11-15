@@ -7,6 +7,7 @@ import Svg, { Defs, Line, LinearGradient, Rect, Stop } from 'react-native-svg';
 import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
+import { linkGroups } from '@core/graph/read';
 import { useLive } from '@ui/hooks';
 import { Icon, Text, useToast } from '@ui/kit';
 import { ThemeProvider } from '@ui/theme/ThemeProvider';
@@ -67,8 +68,6 @@ const OBJECT_LOOK: Record<string, { color: string; icon: string }> = {
 };
 export const lookFor = (object: string) => OBJECT_LOOK[object] ?? { color: blocks.yellow, icon: 'doc' };
 
-/** The link word a person-side reader expects ("with", "paid") for a Link kind. */
-const WORD: Record<string, string> = { person: 'with', payee: 'paid', member: 'in', player: 'played', vendor: 'vendor for', captain: 'captain', 'fronted by': 'fronted' };
 
 const firstOf = (title: string) => title.trim().split(/\s+/)[0] ?? title;
 const dayMonth = (t: number) => {
@@ -413,7 +412,7 @@ interface LinkRow {
 function LinksMap({ centre, rows, onOpen }: { centre: { id: string; name: string; photo?: string | null }; rows: LinkRow[]; onOpen: () => void }) {
   const [w, setW] = useState(0);
   const h = 170;
-  const nodes = rows.slice(0, 10);
+  const nodes = rows.filter((r, k) => rows.findIndex((x) => x.id === r.id) === k).slice(0, 10);
   const cx = w / 2;
   const cy = h / 2;
   const rx = Math.max(0, w / 2 - 34);
@@ -570,26 +569,29 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
     (os) => {
       const links = os.links.forEntity(id).filter((l) => l.relation.kind !== 'mention');
       const seen = new Set<string>();
-      const rows: LinkRow[] = [];
       const linked: ObjectRecord[] = [];
       for (const l of links) {
         if (seen.has(l.other.id)) continue;
         seen.add(l.other.id);
         const r = os.records.get<Record<string, unknown>>(l.other.id);
-        if (!r) continue;
-        linked.push(r);
-        const when = r.occurredAt ? dayMonth(r.occurredAt) : null;
-        const amount = r.object === 'transaction' && typeof r.data.amount === 'number' ? os.format.currency(r.data.amount as number) : null;
-        rows.push({
-          id: r.id,
-          object: r.object,
-          title: r.title,
-          sub: [amount, r.subtitle && r.subtitle !== r.title ? r.subtitle : null, when].filter(Boolean).join(' · ') || os.registry.objects.get(r.object)?.label || null,
-          word: WORD[l.relation.kind] ?? l.relation.kind,
-          guessed: (l.relation.confidence ?? 1) < 1,
-          photo: r.object === 'person' ? ((r.data.photo as { uri?: string } | undefined)?.uri ?? null) : null,
-        });
+        if (r) linked.push(r);
       }
+      // The Links card reads as core's Links do (MODEL.md layer 5): one game once, not the game, her Appearance and a Debt.
+      const rows: LinkRow[] = linkGroups(os, id).flatMap((g) =>
+        g.items.map((i) => {
+          const r = os.records.get<Record<string, unknown>>(i.id);
+          const amount = i.amount != null ? os.format.currency(Math.abs(i.amount)) : null;
+          return {
+            id: i.id,
+            object: i.type,
+            title: i.title,
+            sub: [amount, i.context ?? i.subtitle, i.at && !i.via ? dayMonth(i.at) : null].filter(Boolean).join(' · ') || os.registry.objects.get(i.type)?.label || null,
+            word: g.word,
+            guessed: i.guessed,
+            photo: i.type === 'person' ? ((r?.data.photo as { uri?: string } | undefined)?.uri ?? null) : null,
+          };
+        }),
+      );
       const facts = os.facts.list({ subjectId: id, limit: 200 });
       const dumpFacts = facts.filter((f) => f.source === 'dump');
       if (dumpFacts.length) {

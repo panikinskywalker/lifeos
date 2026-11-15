@@ -16,7 +16,8 @@ export default function BrowseTab() {
   const counts = useLive((o) => o.records.countsByType(), []);
   const facts = useLive((o) => o.facts.list({ limit: 10000 }).length, []);
   const recent = useLive((o) => o.records.recent(6), []);
-  const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core');
+  // A module whose board is already under Boards (Turf for games, Home for inventory) is not listed again.
+  const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core' && os.registry.boardFor(m.id)?.placement !== 'browse');
   const boards = [...os.registry.boards.values()].filter((b) => b.placement === 'browse');
   return (
     <Screen tab title="Browse" right={<View style={{ flexDirection: 'row', gap: 8 }}><ToCheckBell /><IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} /></View>}>

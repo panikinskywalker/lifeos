@@ -1,5 +1,12 @@
 # Links and Activity · design prompt for Claude Design
 
+**Done (15 Nov):** the design is on the canvas's *Links · Noir* page as
+`L-*` artboards (L1 one hop, L2 two hops, L3 a link tapped, L4 the record's
+Links card, L5 add a link, L6 everything (backlog), L7 the parts), and the
+Activity row below them (`A-*`: A1 home, A2 a tracker, A3 new tracker, A4
+the Today tile). The app's Links follow L1 to L5 and L7. The prompt below is
+kept as it was asked.
+
 Paste the prompt below into Claude Design on the LifeOS canvas
 (https://claude.ai/artifact/RVT9hLfcQ7tvgXvZN1x6cF), page *v3 Noir*. Source of
 truth: `docs/MODEL.md` layer 1 (*Link*, *Links*), layer 3 (*Activity*), layer 5
