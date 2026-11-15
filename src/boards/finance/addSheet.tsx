@@ -39,7 +39,7 @@ const dropFile = (uri: string) => {
  * Undo. A bill's photo goes to Claude only because you pressed the button, and
  * is deleted from the phone once read.
  */
-export function AddSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onClose: () => void; /** Opens Upload a statement (balances, card bills and funds from a PDF or screenshot). */ onUpload?: () => void }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
@@ -113,6 +113,12 @@ export function AddSheet({ visible, onClose }: { visible: boolean; onClose: () =
             <TextInput accessibilityLabel="Say it in words" value={said} onChangeText={setSaid} onSubmitEditing={fromSaid} returnKeyType="done" placeholder="₹640 at Shree Sagar, paid in cash" placeholderTextColor={t.c.fg.secondary} style={{ flex: 1, minWidth: 0, color: t.c.fg.primary, fontSize: 15 }} />
             <IconButton icon="arrow-up" accessibilityLabel="Read it" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} disabled={!said.trim()} onPress={fromSaid} />
           </View>
+          {onUpload ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Upload a statement instead" onPress={() => { close(); onUpload(); }} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 20, borderWidth: 1, borderStyle: 'dashed', borderColor: t.c.line, opacity: pressed ? 0.8 : 1 })}>
+              <Icon name="file" size={18} color={t.c.accent.gold} />
+              <Text style={{ flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '600' }}>Upload a statement: balances, card bills and funds</Text>
+            </Pressable>
+          ) : null}
           <Text color="secondary" style={{ fontSize: 12, lineHeight: 17 }}>A bill you snap goes to Claude once, to be read, because you pressed the button. The photo is then deleted from the phone.</Text>
         </View>
       ) : null}

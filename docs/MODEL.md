@@ -1291,6 +1291,15 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   what you type or say is read on the phone. Paid in cash lands in your Cash
   account (made once). Who shares it is set on the payment's page, which
   opens after saving.
+- **Upload a statement** (16 Nov, Rutvij): an Upload in Money (the + sheet, the
+  grid menu, Accounts and cards) takes a PDF or a screenshot of a bank or card
+  statement, or a fund or broker summary (CAMS, Groww, Coin). It goes to Claude
+  once, to be read, because you pressed the button (the brain's key, budget and
+  Sent to Claude log; a PDF goes as a document). The phone matches what was read
+  to your accounts (bank, card or not, last digits) and holdings (by the words
+  in their names) and lists each change, ticked: a bank's balance, what a card
+  owes with its bill and due day, a fund's value, what went in and its SIP, or a
+  new account, card or holding. Apply does the ticked ones, with Undo for all.
 - **Privacy** (decided 11 Nov): money questions may go to any provider in the chain,
   OpenRouter's free models included, knowing some free providers log or train on
   what they are sent. Only the records needed leave (payee, amount, date,

@@ -22,6 +22,7 @@ import { PayeeGuess } from './payeeGuess';
 import { YourViews } from './ask';
 import { walletTotals } from './wallet';
 import { AddSheet } from './addSheet';
+import { UploadSheet } from './uploadSheet';
 import { Caps, Disc, KIND_WORD, SectionHead, Hairline, IconDisc, Rows, Spark, TxRow, accountIcon, catColor, shortMoney, day, kindWord, relDay, splitOf } from './parts';
 
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
@@ -41,6 +42,7 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
   const [menu, setMenu] = useState(false);
   const [budget, setBudget] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('This week');
   const chart = useLive((o) => chartSeries(o, chartPeriod), [chartPeriod]);
   const m = monthRange(0);
@@ -84,8 +86,9 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
   );
   const sheets = (
     <>
-      <MoneyScreens visible={menu} onClose={() => setMenu(false)} />
-      <AddSheet visible={adding} onClose={() => setAdding(false)} />
+      <MoneyScreens visible={menu} onClose={() => setMenu(false)} onUpload={() => setUploading(true)} />
+      <UploadSheet visible={uploading} onClose={() => setUploading(false)} />
+      <AddSheet visible={adding} onClose={() => setAdding(false)} onUpload={() => setUploading(true)} />
       <Sheet visible={budget} onClose={() => setBudget(false)} title="A budget for you">
         <SuggestedBudget bare onDone={() => setBudget(false)} />
       </Sheet>
@@ -192,10 +195,11 @@ function PaceLine({ p }: { p: Pace }) {
 }
 
 /** The other Money screens, from the grid button in the header. */
-function MoneyScreens({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function MoneyScreens({ visible, onClose, onUpload }: { visible: boolean; onClose: () => void; onUpload: () => void }) {
   const router = useRouter();
   const go = (to: string | { pathname: string; params: Record<string, string> }) => {
     onClose();
+    if (to === 'upload') return onUpload();
     router.push(to as never);
   };
   const rows: Array<[string, string, string | { pathname: string; params: Record<string, string> }]> = [
@@ -207,6 +211,7 @@ function MoneyScreens({ visible, onClose }: { visible: boolean; onClose: () => v
     ['Reports', 'chart', '/module/finance/reports'],
     ['Import & export', 'file', '/module/finance/files'],
     ['Ask Money', 'sparkle', '/module/finance/ask'],
+    ['Upload a statement', 'file', 'upload'],
   ];
   return (
     <Sheet visible={visible} onClose={onClose} title="Money">

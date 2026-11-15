@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { CardWheel, Icon, IconButton, ScreenHeader, Text, useBottomBarInset } fr
 import { incomeInRange, monthRange, netWorth, spendInRange } from '@modules/finance/lib';
 import { INSTRUMENTS, type AccountData } from '@modules/finance/types';
 import { KIND_WORD, Rows, SectionHead, Spark, day } from './parts';
+import { UploadSheet } from './uploadSheet';
 
 const INK = '#0B0B0D';
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
@@ -33,6 +34,7 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const bottom = useBottomBarInset();
+  const [uploading, setUploading] = useState(false);
   const m = monthRange(0);
   const data = useLive((o) => ({ nw: netWorth(o), spent: spendInRange(o, m.start, m.end), income: incomeInRange(o, m.start, m.end) }), [m.start]);
   const money = (n: number, c?: string) => `${n < 0 ? '−' : ''}${os.format.currency(Math.round(Math.abs(n)), c)}`;
@@ -47,7 +49,7 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
   const back = () => (router.canGoBack() ? router.back() : router.replace('/module/finance' as never));
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 24 }}>
-      <ScreenHeader title="Accounts and cards" subtitle="Money" onBack={back} right={<IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} accessibilityLabel="Add an account" onPress={() => router.push('/entity/account/new' as never)} />} />
+      <ScreenHeader title="Accounts and cards" subtitle="Money" onBack={back} right={<><IconButton icon="file" filled accessibilityLabel="Upload a statement" onPress={() => setUploading(true)} /><IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} accessibilityLabel="Add an account" onPress={() => router.push('/entity/account/new' as never)} /></>} />
 
       <View style={{ gap: 2 }}>
         <Text color="secondary" style={{ fontSize: 14, lineHeight: 19 }}>In your accounts</Text>
@@ -89,6 +91,15 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
       </View>
 
       {data.nw.holdings.length ? <Investments holdings={data.nw.holdings} /> : null}
+
+      <Pressable accessibilityRole="button" accessibilityLabel="Upload a statement or screenshot to update balances and funds" onPress={() => setUploading(true)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 24, borderWidth: 1, borderStyle: 'dashed', borderColor: t.c.line, opacity: pressed ? 0.8 : 1 })}>
+        <Icon name="file" size={20} color={t.c.accent.gold} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '600' }}>Upload a statement</Text>
+          <Text color="secondary" style={{ fontSize: 13, lineHeight: 17 }}>A PDF or screenshot updates balances, card bills and funds</Text>
+        </View>
+      </Pressable>
+      <UploadSheet visible={uploading} onClose={() => setUploading(false)} />
 
       <Text color="secondary" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 4 }}>Balances follow the bank: each text that states one sets it. Cash taken from an ATM lands in Cash.</Text>
     </ScrollView>

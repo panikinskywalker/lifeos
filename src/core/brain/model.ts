@@ -10,9 +10,9 @@ export interface BrainUsage {
   cacheWrite: number;
 }
 
-/** A photo you sent on purpose (Snap the fridge): base64, read once, kept nowhere. */
+/** A photo or PDF you sent on purpose (Snap the fridge, a statement you uploaded): base64, read once, kept nowhere. */
 export interface BrainImage {
-  mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf';
   data: string;
 }
 

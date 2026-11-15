@@ -44,7 +44,8 @@ export async function askWithPhoto(os: LifeOSContext, model: BrainModel | null, 
   if (!model) return { ok: false, note: 'no key' };
   const maxTokens = ask.maxTokens ?? 1500;
   const user = `${ask.prompt}\n\n${JSON.stringify(ask.record)}`;
-  const estimate = PHOTO_TOKENS + Math.ceil((ask.system.length + user.length) / 4) + maxTokens;
+  // A PDF statement runs to a few pages; each page costs about what a photo does.
+  const estimate = (ask.image.mediaType === 'application/pdf' ? PHOTO_TOKENS * 4 : PHOTO_TOKENS) + Math.ceil((ask.system.length + user.length) / 4) + maxTokens;
   if (os.brain.sent.tokensToday(now) + estimate > brainSettings(os).budget) return { ok: false, note: 'over budget' };
   const lines = [`${ask.moduleName} · ${ask.what}: read once, not kept`, `${ask.moduleName} · ${fields(ask.record)}`];
   const base = { at: now, pass: 'photo', why: ask.why, model: model.model, lines, records: 1 };

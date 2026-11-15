@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.84 · 16 Nov 2026
+
+**Upload a statement and Money updates itself from it.** In the + sheet, the
+grid menu or on Accounts and cards, upload a PDF or a screenshot: a bank or card
+statement, a CAMS or broker summary, your bank or fund app. Claude reads it once
+(because you pressed the button), and Money lists what it would change, each
+ticked: a bank balance, what a card owes with its bill and due date, a fund's
+value, what you put in and its SIP, or a new account, card or holding it does
+not know yet. Untick anything wrong and Apply; Undo puts it all back.
+
 ## v0.0.83 · 16 Nov 2026
 
 **Ask Money reads well and the keyboard no longer hides your typing.** The
