@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.57 · 15 Nov 2026
+
+**Ask Money sends a summary, not your details.** Amounts go rounded and
+people's names go as placeholders ("Person 3"), in your question too; the phone
+puts the names back in the answer and works out every exact figure it shows.
+Shops keep their names. Who owes whom is answered on the phone only.
+
 ## v0.0.56 · 15 Nov 2026
 
 **OpenRouter in one tap.** You › Agent › OpenRouter has **Connect OpenRouter**:

@@ -8,6 +8,8 @@ import type { InvestmentData } from './types';
 import { applySplit, balanceWith, balances, clearSplit, settleUp, undoSettle } from './split';
 import { answerMoney, readMoneyQuestion, type MoneyQuestion } from './answers';
 import { BLOCKS, PERIODS, runQuery, type MoneyQuery } from './ask';
+import { personToken, roundMoney, unmask } from '@core/ai/privacy';
+import { peopleNames } from './filing/moneyIn';
 
 /** Finance tools for the agent (no React Native — unit-tested). */
 export const financeAiTools: AiToolDef[] = [
@@ -35,16 +37,20 @@ export const financeAiTools: AiToolDef[] = [
         leaveOut: z.array(z.string()).optional(),
         sort: z.enum(['newest', 'largest']).optional(),
       }),
+      // Through the privacy gate (docs/MODEL.md): amounts rounded, people as placeholders; a placeholder it filters by is put back first.
       run: async (input, os) => {
-        const f = runQuery(os, input as MoneyQuery);
+        const q = input as MoneyQuery;
+        const f = runQuery(os, q.payee ? { ...q, payee: unmask(os, q.payee) } : q);
+        const people = new Set(peopleNames(os).map((n) => n.toLowerCase()));
+        const name = (s: string) => (people.has(s.toLowerCase()) ? personToken(os, s) : s);
         return {
           label: f.label,
-          total: Math.round(f.total),
-          sameDaysBefore: f.before != null ? Math.round(f.before) : null,
-          groups: f.groups.slice(0, 15).map((g) => ({ label: g.label, value: Math.round(g.value) })),
+          total: roundMoney(f.total),
+          sameDaysBefore: f.before != null ? roundMoney(f.before) : null,
+          groups: f.groups.slice(0, 15).map((g) => ({ label: q.by === 'payee' ? name(g.label) : g.label, value: roundMoney(g.value) })),
           count: f.rows.length || f.bills.length,
-          payments: f.rows.slice(0, 30).map((t) => ({ payee: t.data.merchant ?? t.title, amount: t.data.amount, date: t.data.date, category: t.data.category })),
-          due: f.bills.map((b) => ({ title: b.title, amount: b.amount, due: b.due })),
+          payments: f.rows.slice(0, 30).map((t) => ({ payee: name(t.title || t.data.merchant || ''), amount: roundMoney(t.data.amount), date: t.data.date, category: t.data.category })),
+          due: f.bills.map((b) => ({ title: name(b.title), amount: roundMoney(b.amount), due: b.due })),
         };
       },
     },
@@ -173,7 +179,7 @@ export const financeAiTools: AiToolDef[] = [
       input: z.object({}),
       run: async (_i, os) => {
         const rr = subscriptionRunRate(os);
-        return { monthly: rr.monthly, yearly: rr.yearly, subscriptions: rr.rows.map((r) => ({ id: r.sub.id, name: r.sub.title, perMonth: Math.round(r.perMonth), nextBillingAt: (r.sub.data as { nextBillingAt?: string }).nextBillingAt })) };
+        return { monthly: roundMoney(rr.monthly), yearly: roundMoney(rr.yearly), subscriptions: rr.rows.map((r) => ({ id: r.sub.id, name: r.sub.title, perMonth: roundMoney(r.perMonth), nextBillingAt: (r.sub.data as { nextBillingAt?: string }).nextBillingAt })) };
       },
     },
     {
@@ -183,11 +189,11 @@ export const financeAiTools: AiToolDef[] = [
       run: async (input, os) => {
         const nw = netWorth(os);
         return {
-          total: nw.total,
-          assets: nw.assets,
-          investments: nw.investments,
-          liabilities: nw.liabilities,
-          series: netWorthSeries(os, (input as { months?: number }).months ?? 12).map((p) => ({ month: p.label, total: p.total })),
+          total: roundMoney(nw.total),
+          assets: roundMoney(nw.assets),
+          investments: roundMoney(nw.investments),
+          liabilities: roundMoney(nw.liabilities),
+          series: netWorthSeries(os, (input as { months?: number }).months ?? 12).map((p) => ({ month: p.label, total: roundMoney(p.total) })),
         };
       },
     },
@@ -198,7 +204,7 @@ export const financeAiTools: AiToolDef[] = [
       run: async (_i, os) => {
         if (!os.registry.objects.has('investment')) return { investments: [] };
         const all = os.records.query<InvestmentData>('investment', { filter: { and: [{ field: 'status', op: 'neq', value: 'sold' }] } }, { limit: 500 });
-        const rows = all.map((i) => ({ id: i.id, name: i.title, instrument: i.data.instrument, invested: i.data.invested, currentValue: i.data.currentValue ?? null, gain: i.data.currentValue != null ? Math.round(i.data.currentValue - i.data.invested) : null, sip: i.data.sip ?? null, maturesOn: i.data.maturesOn ?? null }));
+        const rows = all.map((i) => ({ id: i.id, name: i.title, instrument: i.data.instrument, invested: roundMoney(i.data.invested), currentValue: i.data.currentValue != null ? roundMoney(i.data.currentValue) : null, gain: i.data.currentValue != null ? roundMoney(i.data.currentValue - i.data.invested) : null, sip: i.data.sip != null ? roundMoney(i.data.sip) : null, maturesOn: i.data.maturesOn ?? null }));
         const by: Record<string, { invested: number; value: number }> = {};
         for (const r of rows) {
           const b = (by[r.instrument] ??= { invested: 0, value: 0 });

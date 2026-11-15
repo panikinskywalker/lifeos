@@ -1240,6 +1240,14 @@ Sources. Read-only, always.
   OpenRouter's free models included, knowing some free providers log or train on
   what they are sent. Only the records needed leave (payee, amount, date,
   category), never raw texts, under the daily budget and in the Sent to Claude log.
+- **The privacy gate** (15 Nov, Rutvij; from broke): what Ask Money sends a cloud
+  model is a summary. Amounts are rounded (₹10 under ₹1,000, else ₹100); people's
+  names (your contacts, and payees not known to be a business) go as stable
+  placeholders ("Person 3"), in your question too; shops keep their names. The
+  phone puts the names back in the answer and in any payee the model filters by,
+  and works out every exact figure it shows. Who owes whom stays on the phone
+  (not a tool Ask sends). Not yet gated: questions queued while no model was
+  free are answered later by Talk's general path.
 - **How it works** (11 Nov, from a friend's design that matches the agent): the
   model gets Money's read-only tools by name and description, a Money prompt
   (your money manager; every figure from a tool, never its own arithmetic; never

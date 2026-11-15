@@ -41,6 +41,13 @@ export function sortMoneyIn(os: LifeOSContext, txId: string): 'back' | 'refund' 
   return 'back';
 }
 
+/** Names that may be people's (your contacts, and payees not known to be a business): the privacy gate hides these. */
+export function peopleNames(os: LifeOSContext): string[] {
+  const people = os.registry.objects.has('person') ? os.records.query('person', {}, { limit: 10_000 }).map((p) => p.title) : [];
+  const unsure = os.registry.objects.has('org') ? os.records.query<{ kind?: string }>('org', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'payee' }] } }, { limit: 10_000 }).map((o) => o.title) : [];
+  return [...people, ...unsure].filter((n) => !!n && n.trim().length >= 2);
+}
+
 /** A person, or a payee the app is not sure is a business (an org of kind 'payee'). */
 const isSomeone = (os: LifeOSContext, p: { id: string; type: string }) => p.type === 'person' || (p.type === 'org' && os.records.get<{ kind?: string }>(p.id)?.data.kind === 'payee');
 

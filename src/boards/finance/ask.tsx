@@ -6,6 +6,8 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { Assistant, type AssistantTurn } from '@core/ai/assistant';
 import { classifyFailure } from '@core/ai/limits';
+import { maskPeople, unmask } from '@core/ai/privacy';
+import { peopleNames } from '@modules/finance/filing/moneyIn';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ChipRow, Icon, IconButton, LineChart, ScreenHeader, Text, TrackColumns, useToast } from '@ui/kit';
@@ -15,7 +17,8 @@ import type { TransactionData } from '@modules/finance/types';
 import { Caps, Hairline, IconDisc, Rows, SectionHead, TxRow, catColor, day, kindWord, relDay, shortMoney } from './parts';
 
 /** The tools a typed question may use: Money's read-only ones (MODEL: only payee, amount, date, category leave). */
-const ASK_TOOLS = new Set(['money_query', 'money_show', 'net_worth', 'portfolio', 'subscriptions_run_rate', 'balances']);
+// Who owes whom names people, so it stays on the phone (askOnPhone answers it); the rest go through the privacy gate.
+const ASK_TOOLS = new Set(['money_query', 'money_show', 'net_worth', 'portfolio', 'subscriptions_run_rate']);
 const ASKED_KEY = 'finance.askQueued';
 
 interface Item {
@@ -273,15 +276,16 @@ function AnswerView({ a, onFollow }: { a: AskAnswer; onFollow: (item: { question
   );
 }
 
-/** The model's answer from its turns: the money_show call (sentence, block, query), and how many payments it saw. */
-function fromTurns(turns: AssistantTurn[]): AskAnswer {
+/** The model's answer from its turns: the money_show call (sentence, block, query), and how many payments it saw. Placeholders become names again here. */
+function fromTurns(os: LifeOSContext, turns: AssistantTurn[]): AskAnswer {
   const sent = turns.filter((x) => x.toolName === 'money_query').reduce((n, x) => n + (((x.toolResult as { payments?: unknown[]; due?: unknown[] } | undefined)?.payments?.length ?? 0) + ((x.toolResult as { due?: unknown[] } | undefined)?.due?.length ?? 0)), 0);
   const show = [...turns].reverse().find((x) => x.toolName === 'money_show' && !x.isError);
   if (show) {
     const i = show.toolInput as { sentence: string; block: BlockKind; title: string; query: MoneyQuery };
-    return { text: i.sentence, block: { kind: i.block, title: i.title, query: i.query }, source: 'model', sent };
+    const query = i.query?.payee ? { ...i.query, payee: unmask(os, i.query.payee) } : i.query;
+    return { text: unmask(os, i.sentence), block: { kind: i.block, title: unmask(os, i.title), query }, source: 'model', sent };
   }
-  const text = turns.filter((x) => x.role === 'assistant').map((x) => x.text).join('\n\n').trim();
+  const text = unmask(os, turns.filter((x) => x.role === 'assistant').map((x) => x.text).join('\n\n').trim());
   return { text: text || 'I could not work that out.', source: 'model', sent };
 }
 
@@ -321,10 +325,12 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
     if (!agent) return put(id, { busy: false, answer: { text: 'This one needs a model, and none is set up here. Add a free key in You › Agent (OpenRouter’s free models work), then ask again.', source: 'phone' } });
     assistant.current ??= new Assistant(ctx, { provider: agent.main, smartProvider: agent.smart, parser: false, metered: true, contextBudget: 0, selectTools: false, extraSystem: ASK_PROMPT, toolFilter: (tool) => ASK_TOOLS.has(tool.name), confirm: async () => true, maxToolRounds: 5 });
     try {
-      const turns = await assistant.current.send(q);
-      const answer = fromTurns(turns);
+      // Through the privacy gate: people's names in your question go as placeholders.
+      const masked = maskPeople(ctx, q, peopleNames(ctx));
+      const turns = await assistant.current.send(masked);
+      const answer = fromTurns(ctx, turns);
       put(id, { busy: false, answer });
-      ctx.brain.sent.add({ at: Date.now(), pass: 'ask', why: q, model: agent.main.model ?? agent.main.id, lines: [`Money · ${answer.sent ?? 0} payments: payee, amount, date, category`], records: answer.sent ?? 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, outcome: 'ok', error: null });
+      ctx.brain.sent.add({ at: Date.now(), pass: 'ask', why: masked, model: agent.main.model ?? agent.main.id, lines: [`Money · a summary of ${answer.sent ?? 0} payments: rounded amounts, dates, categories; people as placeholders`], records: answer.sent ?? 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, outcome: 'ok', error: null });
     } catch (e) {
       const f = classifyFailure(e);
       if (f.kind === 'wait') {
