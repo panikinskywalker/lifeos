@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
 import { blocks, fonts, instrument, monoFonts } from '../theme/tokens';
 import { Icon } from '../icons';
 import { Text } from './Text';
+import { ActionSheet } from './ActionSheet';
 import { dialTicks, donutDashes, dotColumns, halfTicks, hourLevels } from './layout';
 
 /**
@@ -32,15 +33,23 @@ function CardTitle({ title, sub }: { title?: string; sub?: string }) {
 }
 
 /** A colour block's caps label and its dark period pill ("ANALYTICS" · "This week"). */
-function BlockHead({ label, period }: { label: string; period?: string }) {
+function BlockHead({ label, period, onPeriod }: { label: string; period?: string; onPeriod?: () => void }) {
+  const chip = period ? (
+    <>
+      <Icon name="chevron-down" size={13} color="#F5F5F7" />
+      <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: '#F5F5F7' }}>{period}</Text>
+    </>
+  ) : null;
+  const chipStyle = { marginLeft: 'auto' as const, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5, height: 28, paddingHorizontal: 11, borderRadius: 999, backgroundColor: INK };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
       <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '600', letterSpacing: 0.9, color: INK }}>{label.toUpperCase()}</Text>
-      {period ? (
-        <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 11, borderRadius: 999, backgroundColor: INK }}>
-          <Icon name="chevron-down" size={13} color="#F5F5F7" />
-          <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: '#F5F5F7' }}>{period}</Text>
-        </View>
+      {period && onPeriod ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`${period}, pick another period`} hitSlop={10} onPress={onPeriod} style={({ pressed }) => [chipStyle, { opacity: pressed ? 0.8 : 1 }]}>
+          {chip}
+        </Pressable>
+      ) : period ? (
+        <View style={chipStyle}>{chip}</View>
       ) : null}
     </View>
   );
@@ -183,7 +192,8 @@ export function HourTicks({ values, title, sub }: { values: number[]; title?: st
 /* Columns in tracks: the orange chart, as is.                          */
 /* ------------------------------------------------------------------ */
 
-export function TrackColumns({ values, labels, today, value, label, period, axis, color = blocks.orange }: { values: number[]; labels: string[]; today?: number; value: string; label: string; period?: string; axis?: (n: number) => string; color?: string }) {
+export function TrackColumns({ values, labels, today, value, label, period, axis, color = blocks.orange, periods, onPeriod }: { values: number[]; labels: string[]; today?: number; value: string; label: string; period?: string; axis?: (n: number) => string; color?: string; /** The periods the chip offers; picking one calls onPeriod. */ periods?: string[]; onPeriod?: (p: string) => void }) {
+  const [picking, setPicking] = useState(false);
   const [w, onLayout] = useWidth(318);
   const max = Math.max(1, ...values);
   // Four grid labels up to a round top, as the kit's 0 · 2k · 4k · 6k.
@@ -199,7 +209,7 @@ export function TrackColumns({ values, labels, today, value, label, period, axis
   const fmt = axis ?? ((x: number) => (x >= 1000 ? `${Math.round(x / 100) / 10}k`.replace('.0k', 'k') : String(Math.round(x))));
   return (
     <View style={{ padding: 16, borderRadius: 28, backgroundColor: color, gap: 10 }}>
-      <BlockHead label={label} period={period} />
+      <BlockHead label={label} period={period} onPeriod={periods && onPeriod ? () => setPicking(true) : undefined} />
       <Text style={{ fontSize: 38, lineHeight: 39, fontWeight: '700', letterSpacing: -1.5, color: INK, fontVariant: ['tabular-nums'] }}>{value}</Text>
       <View onLayout={onLayout}>
         <Svg width={w} height={170} style={{ overflow: 'visible' }}>
@@ -219,6 +229,7 @@ export function TrackColumns({ values, labels, today, value, label, period, axis
           })}
         </Svg>
       </View>
+      {periods && onPeriod ? <ActionSheet visible={picking} onClose={() => setPicking(false)} title="Period" actions={periods.map((p) => ({ label: p === period ? `${p} ✓` : p, onPress: () => onPeriod(p) }))} /> : null}
     </View>
   );
 }

@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.81 · 16 Nov 2026
+
+**The Analytics chart's period is a real dropdown.** Tap "This week" on Money
+home's orange chart to pick This week (by day), This month or Last month (by
+week), 3 months or This year (by month); the columns and the total follow.
+
 ## v0.0.80 · 16 Nov 2026
 
 **Every card its own face; SIPs next to Subscriptions.**

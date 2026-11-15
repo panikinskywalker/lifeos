@@ -41,6 +41,8 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
   const [menu, setMenu] = useState(false);
   const [budget, setBudget] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('This week');
+  const chart = useLive((o) => chartSeries(o, chartPeriod), [chartPeriod]);
   const m = monthRange(0);
   const data = useLive(
     (o) => {
@@ -49,7 +51,6 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
       return {
         spent: spendInRange(o, m.start, m.end),
         byCat: spendByCategory(o, m.start, m.end).sort((a, b) => b.total - a.total),
-        week: dailySpend(o, format(subDays(now, 6), 'yyyy-MM-dd'), format(now, 'yyyy-MM-dd')),
         monthCount: o.records.count('transaction', inMonth),
         count: o.records.count('transaction'),
         recent: o.records.query<TransactionData>('transaction', { sort: [{ field: 'data.date', dir: 'desc' }, { field: 'createdAt', dir: 'desc' }] }, { limit: 5 }),
@@ -101,7 +102,6 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
     );
   }
 
-  const weekTotal = data.week.reduce((n, d) => n + d.total, 0);
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 22 }}>
       {header}
@@ -114,11 +114,13 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
 
       <TrackColumns
         label="ANALYTICS"
-        period="This week"
-        value={shortMoney(os, weekTotal)}
-        values={data.week.map((d) => d.total)}
-        labels={data.week.map((d) => format(day(d.date), 'EEE'))}
-        today={data.week.length - 1}
+        period={chartPeriod}
+        periods={[...CHART_PERIODS]}
+        onPeriod={(p) => setChartPeriod(p as ChartPeriod)}
+        value={shortMoney(os, chart.values.reduce((a, b) => a + b, 0))}
+        values={chart.values}
+        labels={chart.labels}
+        today={chart.today}
         axis={(n) => shortMoney(os, n)}
       />
 
@@ -138,6 +140,31 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
       {sheets}
     </ScrollView>
   );
+}
+
+const CHART_PERIODS = ['This week', 'This month', 'Last month', '3 months', 'This year'] as const;
+type ChartPeriod = (typeof CHART_PERIODS)[number];
+
+/** What the Analytics columns show for a period: days for a week, weeks for a month, months for longer. */
+function chartSeries(os: LifeOSContext, p: ChartPeriod): { values: number[]; labels: string[]; today?: number } {
+  const now = new Date();
+  const iso = (d: Date) => format(d, 'yyyy-MM-dd');
+  if (p === 'This week') {
+    const days = dailySpend(os, iso(subDays(now, 6)), iso(now));
+    return { values: days.map((d) => d.total), labels: days.map((d) => format(day(d.date), 'EEE')), today: days.length - 1 };
+  }
+  if (p === 'This month' || p === 'Last month') {
+    const m = monthRange(p === 'This month' ? 0 : -1);
+    const days = dailySpend(os, m.start, m.end);
+    const weeks = [0, 7, 14, 21, 28].filter((s) => s < days.length).map((s) => days.slice(s, s + 7));
+    return { values: weeks.map((w) => w.reduce((a, d) => a + d.total, 0)), labels: weeks.map((w) => `${Number(w[0]!.date.slice(8))}-${Number(w[w.length - 1]!.date.slice(8))}`), today: p === 'This month' ? Math.min(weeks.length - 1, Math.floor((now.getDate() - 1) / 7)) : undefined };
+  }
+  const months = p === '3 months' ? [-2, -1, 0] : Array.from({ length: now.getMonth() + 1 }, (_, i) => i - now.getMonth());
+  return {
+    values: months.map((k) => { const r = monthRange(k); return spendInRange(os, r.start, r.end); }),
+    labels: months.map((k) => format(new Date(now.getFullYear(), now.getMonth() + k, 1), p === '3 months' ? 'MMM' : 'MMMMM')),
+    today: months.length - 1,
+  };
 }
 
 /** The pace in one line: what a day can be and stay under your line, or how far over it you are. */
