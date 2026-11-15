@@ -599,7 +599,7 @@ export function TurfHome(_props: Props) {
     );
   }
   return (
-    <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Turf" subtitle="Browse" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       {body}
     </Screen>
   );

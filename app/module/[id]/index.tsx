@@ -1,5 +1,5 @@
 import React from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useLive, useOS } from "@ui/hooks";
 import { tintForModule } from "@ui/theme/moduleTint";
 import { EmptyState, RowItem, RowList, Screen, Section } from "@ui/kit";
@@ -30,6 +30,9 @@ export default function ModuleRoute() {
   // A module with a board home opens on it (the NR-* artboards), not on a list of record types.
   const home = screens.find((s) => s.key === "index");
   if (home) return <home.component ctx={os} params={{}} />;
+  // A module whose board is a cross-module one opens that board (games → Turf: one Turf, docs/MODEL.md Browse).
+  const shownWith = board ? undefined : [...os.registry.boards.values()].find((b) => b.shownWith === m.id);
+  if (shownWith) return <Redirect href={`/board/${shownWith.id}` as never} />;
   const tint = tintForModule(m.id);
   const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
   const hasHome = screens.some((s) => s.key === "index");

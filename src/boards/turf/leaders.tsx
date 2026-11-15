@@ -202,7 +202,7 @@ export function TurfLeaders(_props: Props) {
 
   const top = d.sorted[0];
   return (
-    <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<SyncPill />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Turf" subtitle="Browse" onBack={back} right={<SyncPill />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <Segmented options={[{ value: 'squad', label: 'Squad' }, { value: 'leaders', label: 'Leaders' }]} value="leaders" onChange={(v) => v === 'squad' && router.replace('/board/turf/players' as never)} />
       {!d.any ? (
         <NotConnected />

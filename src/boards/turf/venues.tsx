@@ -164,7 +164,7 @@ export function TurfVenues({ ctx }: Props) {
   }, []);
   const open = (id?: string) => router.push((id ? `/board/turf/venue?venue=${id}` : '/board/turf/venue') as never);
   return (
-    <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<TurfSyncPill busy={busy} />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Turf" subtitle="Browse" onBack={back} right={<TurfSyncPill busy={busy} />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <SyncBanners onRetry={() => void pull()} />
       {!venues.length && status.kind === 'off' ? (
         <NotConnectedCard />

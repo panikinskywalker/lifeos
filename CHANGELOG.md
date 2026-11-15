@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.51 · 15 Nov 2026
+
+**One Turf.** Browse had Turf twice: a tile under Boards that opened the Turf
+app, and a card under Modules that opened a plain list of its records. Now the
+card opens the Turf app and the extra tile is gone.
+
 ## v0.0.50 · 15 Nov 2026
 
 **Turf's card shows the match, not a person.** With a match booked, Browse's

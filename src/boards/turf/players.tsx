@@ -62,7 +62,7 @@ export function TurfPlayers({ ctx }: Props) {
   return (
     <Screen
       title="Turf"
-      subtitle="Browse › Boards"
+      subtitle="Browse"
       onBack={back}
       right={
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

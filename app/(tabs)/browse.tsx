@@ -31,7 +31,8 @@ export default function BrowseTab() {
   // Only modules and boards that are shown (You › Modules; docs/MODEL.md, Modules shown).
   const shown = useLive((o) => [...(shownModules(o) ?? ['*'])].join(), []);
   const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core' && isModuleShown(os, m.id));
-  const boards = [...os.registry.boards.values()].filter((b) => b.placement === 'browse' && isBoardShown(os, b.id));
+  // A board shown with a module is that module's card in the stack (Turf is the games card), not a second tile.
+  const boards = [...os.registry.boards.values()].filter((b) => b.placement === 'browse' && isBoardShown(os, b.id) && !(b.shownWith && modules.some((m) => m.id === b.shownWith)));
   void shown;
   const cards = useLive((o) => Object.fromEntries(modules.map((m) => {
     try {

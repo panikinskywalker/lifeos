@@ -134,7 +134,7 @@ export function TurfGames({ ctx }: Props) {
   const { rows } = useMatches();
   const f = ctx.format.currency;
   return (
-    <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<SyncPill />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Turf" subtitle="Browse" onBack={back} right={<SyncPill />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <Segmented
         options={[
           { value: 'centre', label: 'Match centre' },

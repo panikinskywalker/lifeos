@@ -16,7 +16,7 @@ import { TurfVenueEdit } from './venue-edit';
 import { SmsAskCard, SmsPaidCard, TurfBookingCard, SubmissionCard } from './checkcards';
 import { turfOverview } from './overview';
 
-/** Turf (docs/MODEL.md layer 3; R9): the first user board, over games + crm + places + finance. A Browse › Boards tile. */
+/** Turf (docs/MODEL.md layer 3; R9): the first user board, over games + crm + places + finance. In Browse it is the games card (one Turf). */
 export const turfBoard: BoardManifest = {
   id: 'turf',
   name: 'Turf',

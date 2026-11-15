@@ -1352,6 +1352,10 @@ what they are, each opening the thing itself. Then two sections:
   3.5 s each). 15 Nov, Rutvij: Turf's card shows the next match's day ("SAT
   21", the venue under it); with none booked it takes turns between what is
   owed ("3740", "13 owe ₹3,740") and BOOK ("No match booked"). Never a name.
+  **One Turf** (15 Nov, Rutvij): a module whose board is a cross-module one
+  opens that board (`shownWith`), and that board is not listed again under
+  Boards. The games card opens the Turf board; games' plain record lists are
+  reached through search.
 Then **everything else lives here too**: Links, Facts (the Second Brain's), Recent, Tags, Reminders,
 To check history, Data sources status, the component gallery (dev). If it is a
 screen and not a tab, Browse reaches it. Any board can also be pinned to Today as a
