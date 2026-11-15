@@ -1657,7 +1657,14 @@ screens checked on the phone → overrides only where the default is wrong)
   (`ownLinks`, set by Person), with Remove link and Undo; the Links screen with
   a module legend and the card in full; Browse › Links. Design prompt
   `docs/design/LINKS-BRIEF.md` (`NR-Links-*`, `NR-Activity-*`); hand-over
-  `docs/handover/r11-activity-links.md`. **Phone check pending.**
+  `docs/handover/r11-activity-links.md`. **Second pass 15 Nov (v0.0.31)**:
+  Links built to the *Links · Noir* artboards L1 to L7 (the map with motion
+  and zoom, the card, a link's sheet with Set dates, add with Both ways,
+  everything with a time-lapse); words from Fields as the record says them;
+  one thing once (`linkRole`: faces, joins); payments an audit trail on the
+  timeline, not Links; Turf named once; Activity rebuilt to the A1 to A4
+  artboards with *what made a day count* (layer 3, layer 5). **Phone check
+  pending.**
 
 ### The model
 - [ ] **R12 Mac model first** — Ollama over Tailscale as the first provider; a
