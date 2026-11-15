@@ -310,6 +310,7 @@ interface BoardManifest {
   checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds (Turf's SMS questions; crm's 'payee-who')
   quickActions?: QuickAction[];        // the global "+" menu
   buttons?: ManualRun[];               // not used yet: R10 put the by-hand runs on the Automations board
+  bar?: { tabs: { screen; label; icon; also?: string[] }[]; action?: { label; icon; screen } }; // the bottom bar inside the board: its sections, the raised button its action (Turf); without it the app's bar shows
 }
 ```
 

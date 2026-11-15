@@ -10,7 +10,6 @@ import { fonts, monoFonts } from '@ui/theme/tokens';
 import { Button, FilterChip, Icon, Screen, Segmented, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Crest, Display, Face, Mono, SyncPill } from './teams';
-import { Switcher } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
 
 /**
@@ -136,7 +135,6 @@ export function TurfGames({ ctx }: Props) {
   const f = ctx.format.currency;
   return (
     <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<SyncPill />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
-      <Switcher active="games" />
       <Segmented
         options={[
           { value: 'centre', label: 'Match centre' },

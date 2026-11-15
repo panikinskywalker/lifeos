@@ -15,6 +15,9 @@ export interface BottomBarItem {
 /** The nav sits 20 above the bottom edge (inset 20). */
 const BAR_BOTTOM_GAP = 20;
 
+/** True under a layout that floats the bar over its screens (boards and modules), so a Screen leaves room for it. */
+export const OnBar = React.createContext(false);
+
 /** Space a tab screen must leave at the bottom so content clears the floating nav. */
 export function useBottomBarInset(): number {
   const t = useTheme();

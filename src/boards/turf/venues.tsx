@@ -8,7 +8,6 @@ import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, EmptyState, Icon, Screen, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
-import { Switcher } from './switcher';
 import { NotConnectedCard, SyncBanners, TurfSyncPill, useTurfStatus } from './states';
 import { shortDay, useBack, type Props } from './common';
 
@@ -166,7 +165,6 @@ export function TurfVenues({ ctx }: Props) {
   const open = (id?: string) => router.push((id ? `/board/turf/venue?venue=${id}` : '/board/turf/venue') as never);
   return (
     <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<TurfSyncPill busy={busy} />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
-      <Switcher active="venues" />
       <SyncBanners onRetry={() => void pull()} />
       {!venues.length && status.kind === 'off' ? (
         <NotConnectedCard />

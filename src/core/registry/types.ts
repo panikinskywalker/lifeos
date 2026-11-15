@@ -199,6 +199,14 @@ export interface ManualRun {
   route?: string;
 }
 
+/** A section in a board's bar: the screen it opens, and the deeper screens that keep it lit (Players lights for Leaders). */
+export interface BoardBarTab {
+  screen: string;
+  label: string;
+  icon: string;
+  also?: string[];
+}
+
 export interface BoardManifest {
   id: string;
   name: string;
@@ -217,6 +225,13 @@ export interface BoardManifest {
   overrides?: ObjectOverride[];
   quickActions?: QuickAction[];
   buttons?: ManualRun[];
+  /**
+   * The bottom bar inside the board (docs/MODEL.md, The bar inside a board):
+   * its own sections, and its raised button doing `action` in place of Dump
+   * (Turf: Home, Games, + New match, Players, Venues). Without it the app's
+   * own bar shows.
+   */
+  bar?: { tabs: BoardBarTab[]; action?: { label: string; icon: string; screen: string } };
   /**
    * To check cards for filings of this board's own kinds (Turf: an SMS that
    * may pay a share — Yes / Not this; a friend's profile — Review / Later).

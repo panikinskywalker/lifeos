@@ -12,7 +12,7 @@ import { displayFont, monoFonts } from '@ui/theme/tokens';
 import { Icon, RowItem, RowList, Screen, Section, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Crest, Display, Face } from './teams';
-import { Switcher, useCopyShare } from './switcher';
+import { useCopyShare } from './switcher';
 import { NotConnected, type Props, TINT, useBack } from './common';
 import { CopyAllRow, Disc, DueRows, HeaderRight, PillButton, SectionHead, StatTile, TurfCard, day, todayIso } from './dues';
 import { SmsAskCard, SmsPaidCard, SubmissionCard, answeredAsks } from './checkcards';
@@ -600,7 +600,6 @@ export function TurfHome(_props: Props) {
   }
   return (
     <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
-      <Switcher active="index" />
       {body}
     </Screen>
   );

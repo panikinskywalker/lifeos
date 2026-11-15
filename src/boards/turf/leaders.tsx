@@ -8,7 +8,7 @@ import { blocks, displayFont } from '@ui/theme/tokens';
 import { ActionSheet, Button, ChipRow, EmptyState, FilterChip, Icon, IconButton, Screen, Segmented, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Face, SyncPill } from './teams';
-import { Switcher, useCopyShare } from './switcher';
+import { useCopyShare } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
 import { RiseIn } from './motion';
 
@@ -203,7 +203,6 @@ export function TurfLeaders(_props: Props) {
   const top = d.sorted[0];
   return (
     <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<SyncPill />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
-      <Switcher active="players" />
       <Segmented options={[{ value: 'squad', label: 'Squad' }, { value: 'leaders', label: 'Leaders' }]} value="leaders" onChange={(v) => v === 'squad' && router.replace('/board/turf/players' as never)} />
       {!d.any ? (
         <NotConnected />

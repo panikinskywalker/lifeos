@@ -744,7 +744,8 @@ new Object, that is a new module. It may add filing hints scoped to itself
     attendance) and *Team view*.
   - **Player profile**: attributes chart, stats, kit colours, availability,
     their dues.
-  Those five sections are the board's own; the LifeOS bottom bar stays.
+  Those five sections are the board's own, in the bottom bar while you are in
+  Turf (The bar inside a board, below).
 - **Today** and **Upkeep**: boards over every module, pinned to the bottom bar.
 - **Time**: what happened in a day / month / year, over every module.
 - **Activity** (R11, 2 Nov): a Browse board (`src/boards/activity`) over core's
@@ -1361,6 +1362,17 @@ nothing it collects is lost, and a linked record (a payee in People) still
 opens. You › Modules has a switch per module and **Show every module**; demo
 data shows every module too. A cross-module board is shown with its module
 (Turf with games, `shownWith`); Today and Upkeep always are.
+
+### The bar inside a board (15 Nov, Rutvij)
+The bottom bar never goes away. Inside a board that has sections of its own,
+the bar takes them, and its raised button does the board's main action in
+place of Dump: in **Turf**, Home · Games · **+** (New match) · Players ·
+Venues, which replaced Turf's switcher at the top. A section stays lit on its
+deeper pages (Players on Leaders and a player). The back button at the top
+leaves the board. Every other board and module page (Money for now) keeps the
+app's own bar, and its buttons lead back out to Today, Upkeep, Dump, Browse
+and You. A board declares its sections as `bar` (`docs/PLUGINS.md` contract:
+`BoardManifest.bar`).
 
 ### You (settings)
 Data sources (each source: permission, enabled, last sync, today's count; SMS

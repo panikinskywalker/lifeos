@@ -17,7 +17,7 @@ export { FormField, TextField, NumberField, MoneyField, DateField, SelectField, 
 export { RecordHeader, type HeaderStat } from './RecordHeader';
 export { Section, ListGroup, Card } from './SectionCard';
 export { Icon, icons, type IconName } from '../icons';
-export { BottomBar, useBottomBarInset, type BottomBarItem } from './BottomBar';
+export { BottomBar, OnBar, useBottomBarInset, type BottomBarItem } from './BottomBar';
 export { Screen, ScreenHeader } from './Screen';
 export { DetailRow } from './DetailRow';
 export { Timeline, type TimelineEntry } from './Timeline';

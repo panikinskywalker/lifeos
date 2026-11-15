@@ -8,7 +8,6 @@ import { fonts } from '@ui/theme/tokens';
 import { ChipRow, EmptyState, FilterChip, Icon, IconButton, Screen, Segmented, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Face, SyncPill } from './teams';
-import { Switcher } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
 
 /**
@@ -73,7 +72,6 @@ export function TurfPlayers({ ctx }: Props) {
       }
       refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}
     >
-      <Switcher active="players" />
       <Segmented options={[{ value: 'squad', label: 'Squad' }, { value: 'leaders', label: 'Leaders' }]} value="squad" onChange={(v) => v === 'leaders' && router.replace('/board/turf/leaders' as never)} />
       {!squad.length ? (
         <NotConnected />

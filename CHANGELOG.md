@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.42 · 15 Nov 2026
+
+**The bottom bar stays when you open a board or module.** Inside Turf it turns
+into Turf's own: Home, Games, Players and Venues, with the big lime button as
+New match instead of Dump. Turf's switcher at the top is gone, since the bar
+does its job. Money and every other page keep the app's bar, so Today, Browse
+and the rest are one tap away.
+
 ## v0.0.41 · 15 Nov 2026
 
 **Only what is finished is shown.** Money and Turf for now: other modules stay

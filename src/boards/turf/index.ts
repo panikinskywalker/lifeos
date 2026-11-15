@@ -24,6 +24,16 @@ export const turfBoard: BoardManifest = {
   placement: 'browse',
   shownWith: 'games',
   tiles: turfTiles,
+  // The bottom bar inside Turf (docs/MODEL.md, The bar inside a board): Home · Games · + New match · Players · Venues.
+  bar: {
+    tabs: [
+      { screen: 'index', label: 'Home', icon: 'home', also: ['dues', 'audit'] },
+      { screen: 'games', label: 'Games', icon: 'calendar', also: ['game', 'teams', 'stats'] },
+      { screen: 'players', label: 'Players', icon: 'people', also: ['leaders', 'player', 'card', 'player-edit', 'submission'] },
+      { screen: 'venues', label: 'Venues', icon: 'location', also: ['venue'] },
+    ],
+    action: { label: 'New match', icon: 'plus', screen: 'match' },
+  },
   screens: [
     { key: 'index', title: 'Turf', component: TurfHome },
     { key: 'games', title: 'Games', component: TurfGames },
