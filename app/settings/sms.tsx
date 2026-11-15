@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { senders, setSenderTrusted } from '@core/filing/messages';
 import { BANK_NAMES } from '@modules/finance/filing/bankSms';
+import { rereadTexts, undoReread } from '@modules/finance/filing/reread';
 import { useLive, useOS } from '@ui/hooks';
 import { Button, EmptyState, RowList, Screen, Section, SwitchField, Text, useToast } from '@ui/kit';
 import { importSmsHistory } from '../../src/platform/sources';
@@ -50,6 +51,20 @@ export default function SmsSendersScreen() {
             })
           }
         />
+        <Section title="Read my texts again">
+          <Text variant="caption" color="secondary">
+            Files the texts LifeOS still has (the last 60 days) again with today’s rules. Payments it filed itself are replaced; any you edited, split or linked by hand stay as they are. Undo puts the old ones back.
+          </Text>
+          <Button
+            title="Read my texts again"
+            icon="refresh"
+            variant="secondary"
+            onPress={() => {
+              const r = rereadTexts(os);
+              toast.show({ message: `${r.read} texts read again · ${r.removed.length} payments replaced, ${r.kept} you changed kept`, icon: 'check', undo: () => void undoReread(os) });
+            }}
+          />
+        </Section>
       </View>
     </Screen>
   );

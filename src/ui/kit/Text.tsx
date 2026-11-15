@@ -14,6 +14,8 @@ export function Text({ variant = 'body', color, style, children, ...rest }: Text
   const t = useTheme();
   const c = color === 'secondary' ? t.c.fg.secondary : color === 'tertiary' ? t.c.fg.tertiary : color && color !== 'primary' ? color : t.c.fg.primary;
   const flat = StyleSheet.flatten(style) as TextStyle | undefined;
+  // `color: undefined` in a style means "no colour given": on Android it would wipe the theme's and draw black.
+  if (flat && 'color' in flat && flat.color === undefined) delete flat.color;
   const face = flat?.fontWeight !== undefined && !flat.fontFamily ? { fontFamily: fontForWeight(flat.fontWeight), fontWeight: undefined } : null;
   return (
     <RNText maxFontSizeMultiplier={1.6} {...rest} style={[t.type[variant] as TextStyle, { color: c }, flat, face]}>

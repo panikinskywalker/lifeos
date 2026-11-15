@@ -102,6 +102,28 @@ export function fileItem(os: LifeOSContext, id: string): IngestResult {
   return fileReads(os, m, id, 'import', [{ parser, read: item.parsed.read }]);
 }
 
+/**
+ * Read one kept message again with one parser and file it now (a re-read with a
+ * newer parser, Money's "Read my texts again"). Its old outcome is forgotten
+ * first; what the caller had filed from it is the caller's to remove.
+ */
+export function refileMessage(os: LifeOSContext, id: string, parserId: string): IngestResult {
+  const item = messageItem(os, id);
+  const parser = os.registry.parsers.get(parserId);
+  if (!item || !parser || !item.text) return { id, status: 'failed' };
+  const m: RawMessage = { source: item.source as RawMessage['source'], from: item.from, account: item.account, title: item.title, body: item.text, receivedAt: item.receivedAt };
+  setQueueItem(os, id, { status: 'pending', entityId: null, note: null, parsed: null });
+  const read = parser.read(os, m);
+  if (!read || read.kind === 'skip') {
+    if (read) setQueueItem(os, id, { parsed: { parser: parserId, read } });
+    const note = read?.reason ?? 'no parser understood it';
+    setQueueItem(os, id, { status: 'dismissed', note });
+    return { id, status: 'dismissed', reason: note };
+  }
+  setQueueItem(os, id, { parsed: { parser: parserId, read } });
+  return fileReads(os, m, id, 'live', [{ parser, read }]);
+}
+
 /** First-run review: file the proposals you kept; the rest are dismissed. */
 export function confirmProposed(os: LifeOSContext, keep: string[], dismiss: string[] = []): number {
   let n = 0;

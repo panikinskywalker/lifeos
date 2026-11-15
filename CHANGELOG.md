@@ -7,6 +7,17 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.34 · 15 Nov 2026
+
+**Read my texts again** (You › Data sources › SMS): payments filed by older
+versions (a loan offer read as ₹20 lakh, card bills and money to yourself
+counted as spending, "Refno" in names) are filed again with today's rules.
+Payments you edited, split or linked by hand stay as they are; Undo puts the old
+ones back.
+
+**Figures are readable on the phone again.** A number with no colour of its own
+(Money home's Spent, an account's balance) was drawn in black on Android.
+
 ## v0.0.33 · 15 Nov 2026
 
 **The Dump box files straight away again.** Opening Dump with nothing waiting

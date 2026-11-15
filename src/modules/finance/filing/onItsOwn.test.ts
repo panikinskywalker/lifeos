@@ -212,3 +212,24 @@ describe('month close', () => {
     expect(monthClose(os, new Date('2026-11-01T09:00:00'))).toMatchObject({ usual: null, changes: [] });
   });
 });
+
+describe('read my texts again', () => {
+  it('replaces what the old parser filed, keeps what you changed, and Undo puts it back', async () => {
+    const { rereadTexts, undoReread } = await import('./reread');
+    sms('VM-HSBCIN-S', 'INR 22005.39 is paid from HSBC account XXXXXX4421 to CRED Club on 05-Oct-26 with ref 512345678901. If this is not done by you, call 18002673456 to report.', '2026-10-05');
+    sms('JM-ICICIT-S', 'ICICI Bank Acct XX637 debited for Rs 375.00 on 06-Oct-26; ZOMATO credited. UPI:612345678909. Call 18002662 for dispute. SMS BLOCK 637 to 9215676766.', '2026-10-06');
+    const [cred, zomato] = [txs().find((t) => t.data.amount === 22005.39)!, txs().find((t) => t.data.amount === 375)!];
+    // What v0.0.28 had made of them: the card bill as "Other" spending; you set Zomato's category yourself.
+    os.records.update(cred.id, { data: { kind: 'expense', category: 'other', merchant: 'HSBC account XXXX' } }, 'system');
+    os.records.update(zomato.id, { data: { category: 'groceries' } }, 'user');
+    const r = rereadTexts(os);
+    expect(r).toMatchObject({ kept: 1 });
+    expect(r.removed).toEqual([cred.id]);
+    const now = txs();
+    expect(now.find((t) => t.id === zomato.id)!.data.category).toBe('groceries');
+    expect(now.find((t) => t.data.amount === 22005.39)!.data).toMatchObject({ kind: 'transfer', merchant: 'CRED Club' });
+    expect(now.filter((t) => t.data.amount === 22005.39)).toHaveLength(1);
+    undoReread(os);
+    expect(txs().find((t) => t.data.amount === 22005.39)!.data.merchant).toBe('HSBC account XXXX');
+  });
+});
