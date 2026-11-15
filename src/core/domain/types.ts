@@ -77,6 +77,16 @@ export interface ObjectDef<TData = Record<string, unknown>> {
   defaultViews?: SavedViewDef[];
   /** Hide from generic "browse all" screens. */
   hidden?: boolean;
+  /**
+   * How Links shows this Object's records (MODEL.md layer 5, *Links*). An
+   * `aspectOf` record is another face of the record in that Field (a Player
+   * profile of its Person, a Venue of its Place) and folds into it. A `joins`
+   * record is the meeting of the records in two Fields (an Appearance: a
+   * person in a game): Links shows it as one link between them, and records
+   * about it (the Debt for that share) fold into that link. `words` names a
+   * side as seen from the other ("Players" for the person, seen from a game).
+   */
+  linkRole?: { aspectOf: string } | { joins: [string, string]; words?: Record<string, string> };
   /** Meters the record tracks (a vehicle's odometer), mirrored into a data field; cycles read the latest reading. */
   meters?: Array<{ meter: string; field: string; label: string; unit: string }>;
   /** Template cycle → data fields it writes back after done/skip/set (keeps "Next billing date" true). Dates as yyyy-MM-dd. */

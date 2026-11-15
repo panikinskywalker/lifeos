@@ -11,6 +11,8 @@ import { personType } from '../modules/crm/types';
 import { eventType, projectType, taskType } from '../modules/projects/types';
 import { accountType, transactionType } from '../modules/finance/types';
 import { habitLogType, habitType } from '../modules/habits/types';
+import { appearanceObject, gameObject, playerProfileObject, venueObject } from '../modules/games/types';
+import { debtType } from '../modules/finance/types';
 
 let os: LifeOSContext;
 beforeEach(async () => {
@@ -22,7 +24,8 @@ beforeEach(async () => {
       { id: 'places', name: 'places', version: '1', description: '', icon: 'x', color: '#000', objects: [placeType, orgType] },
       { id: 'projects', name: 'projects', version: '1', description: '', icon: 'x', color: '#000', objects: [eventType, projectType, taskType] },
       { id: 'habits', name: 'habits', version: '1', description: '', icon: 'x', color: '#000', objects: [habitType, habitLogType] },
-      { id: 'finance', name: 'finance', version: '1', description: '', icon: 'x', color: '#000', objects: [transactionType, accountType] },
+      { id: 'finance', name: 'finance', version: '1', description: '', icon: 'x', color: '#000', objects: [transactionType, accountType, debtType] },
+      { id: 'games', name: 'games', version: '1', description: '', icon: 'x', color: '#000', objects: [gameObject, appearanceObject, playerProfileObject, venueObject] },
     ],
     registry: new Registry(),
   });
@@ -159,5 +162,48 @@ describe('the Links card (R11)', () => {
     const g = egoGraph(os, proj.id);
     expect(g.nodes.filter((n) => n.hop === 2)[0]!.title).toBe('Priya');
     expect(g.nodes.filter((n) => n.hop === 2 && n.type === 'transaction').length).toBeLessThanOrEqual(4);
+  });
+
+  it('shows one thing once: a game is not also each Appearance and the Debt for a share; a Venue is its Place, a Player profile its Person', () => {
+    const priya = os.records.create({ object: 'person', title: 'Priya', data: {} });
+    const karan = os.records.create({ object: 'person', title: 'Karan', data: {} });
+    const arena = os.records.create({ object: 'place', title: 'Playground Arena', data: {} });
+    const venue = os.records.create({ object: 'venue', title: 'Playground Arena', data: { name: 'Playground Arena', placeId: arena.id } });
+    os.records.create({ object: 'player', title: 'Priya', data: { personId: priya.id, name: 'Priya' } });
+    const game = os.records.create({ object: 'game', title: 'Sat, 17 Oct · Playground Arena', data: { date: '2026-10-17', totalCost: 1800, venueId: venue.id, captainBId: priya.id } });
+    const ap = os.records.create({ object: 'appearance', title: 'Game on Sat, 17 Oct', data: { gameId: game.id, personId: priya.id, gameDate: '2026-10-17' } });
+    os.records.create({ object: 'appearance', title: 'Game on Sat, 17 Oct', data: { gameId: game.id, personId: karan.id, gameDate: '2026-10-17' } });
+    const debt = os.records.create({ object: 'debt', title: 'Turf · Playground Arena · 2026-10-17', data: { personId: priya.id, direction: 'they_owe', amount: 450, date: '2026-10-17', kind: 'split' } });
+    os.links.link(debt.id, ap.id, 'for');
+
+    const words = (id: string) => linkGroups(os, id).map((g) => [g.word, g.items.map((i) => i.title)]);
+    expect(words(priya.id)).toEqual([
+      ['Games', ['Sat, 17 Oct · Playground Arena']],
+      ['Games · captain', ['Sat, 17 Oct · Playground Arena']],
+    ]);
+    const played = linkGroups(os, priya.id)[0]!.items[0]!;
+    expect(played).toMatchObject({ removable: false, via: { id: ap.id, type: 'appearance' } });
+    expect(played.context).toContain('Owes you ₹450'); // the Debt folded into her share
+    // What you owe Priya for Karan's share (she fronted) folds into her row for that game too.
+    const kap = linkGroups(os, game.id)[0]!.items.find((i) => i.title === 'Karan')!.via!;
+    const owe = os.records.create({ object: 'debt', title: 'Turf · Playground Arena · 2026-10-17', data: { personId: priya.id, direction: 'i_owe', amount: 450, date: '2026-10-17', kind: 'split' } });
+    os.links.link(owe.id, kap.id, 'for');
+    expect(linkGroups(os, priya.id).map((g) => g.word)).toEqual(['Games', 'Games · captain']);
+    expect(linkGroups(os, priya.id)[0]!.items[0]!.context).toContain('You owe ₹450');
+    expect(words(game.id)).toEqual([
+      ['Players', ['Karan', 'Priya']],
+      ['Captain, team B', ['Priya']],
+      ['Venue', ['Playground Arena']],
+    ]);
+    expect(linkGroups(os, game.id).find((g) => g.word === 'Venue')!.items[0]).toMatchObject({ type: 'place', removable: true, via: { id: venue.id } });
+    expect(words(arena.id)).toEqual([['Games', ['Sat, 17 Oct · Playground Arena']]]);
+
+    const g = egoGraph(os, priya.id);
+    expect(g.nodes.map((n) => `${n.hop}:${n.title}`).sort()).toEqual(['0:Priya', '1:Sat, 17 Oct · Playground Arena', '2:Karan', '2:Playground Arena']);
+    expect(g.nodes.find((n) => n.title === 'Playground Arena')!.type).toBe('place');
+    expect(g.edges.find((e) => [e.from, e.to].sort().join() === [priya.id, game.id].sort().join())!.word).toBe('played in');
+    expect(mostLinked(os).map((r) => r.type)).not.toContain('appearance');
+    expect(mostLinked(os).map((r) => r.type)).not.toContain('venue');
+    expect(mostLinked(os).map((r) => r.type)).not.toContain('player');
   });
 });

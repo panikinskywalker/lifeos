@@ -179,3 +179,44 @@ Patch notes:
   through a field fills that field.
 - Browse › Links shows what joins up the most, not habits with many check-ins;
   the Links network puts people and places before repeated records.
+
+## Follow-up 2, 15 Nov: one thing once
+
+Rutvij: "game and turf are the same thing, it appears twice". On Priya the demo
+showed each game as the game, her Appearance ("Game on Sat, 17 Oct"), a Debt
+titled after the turf ("Turf · Playground Arena · 2026-10-17"), plus her Player
+profile beside her and a Venue beside its Place.
+
+- **`ObjectDef.linkRole`** (core type, `src/core/domain/types.ts`; PLUGINS.md):
+  `{ aspectOf: field }` (a face of the record in that Field) or
+  `{ joins: [fieldA, fieldB], words? }` (the meeting of two records).
+  Declared in `src/modules/games/types.ts`: Appearance joins `personId` and
+  `gameId` (the person side reads "Players"); Player profile is a face of
+  `personId`; Venue a face of `placeId`. Three lines; no data changes.
+- **`src/core/graph/view.ts`** (new): `viewLinks` (faces folded in, a join as
+  one link to its other end carrying the join's line and what folded into it,
+  a share's Debt folded into its game row), `canonicalId`, `aspectsOf`,
+  `isDetail`. `linkGroups`, `egoGraph` and `mostLinked` read through it;
+  `LinkItem` gains `removable` and `via`.
+- **Person's own Links card** (`src/boards/crm/profile.tsx`) now takes its rows
+  from `linkGroups`, so the profile reads the same (its local word list is
+  gone; the map shows each record once). Shared edit in crm's board.
+- Card: a game row says the share and what is owed, holding it offers *Open the
+  appearance* and no Remove; rows don't repeat the game's own line and date.
+- Tests: `src/core/linkGroups.test.ts`, 7 (a new one for faces and joins on
+  Priya, a game, the Place, the network and Most linked). 634 of 635 pass;
+  the deliveries failure is the base's, as before. Typecheck green; web export
+  builds; the demo's Priya checked in the browser.
+
+Phone checks: Priya's profile and Links screen: "Games · 3" with her shares,
+no Appearances or Player profile; the network: games and Football, then Karan,
+Rutvij, Arjun, Playground Arena, Dome Turf; Playground Arena (the Place) lists
+its Games; a game lists its Players.
+
+Not changed: Football's Debts still list on the group (money owed, each "Priya
+· Owes you ₹450"); their titles are the games module's ("Turf · <venue> ·
+<date>").
+
+Patch notes:
+- Links show each thing once: a game is one game, not also each player's
+  appearance and share; a player profile is the person, a venue is the place.

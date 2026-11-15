@@ -62,7 +62,7 @@ export function LinksCard({ entity, full = false }: { entity: ObjectRecord; full
                         icon={def?.icon ?? 'link'}
                         tint={tintForModule(i.module ?? undefined)}
                         title={i.guessed ? `${i.title}?` : i.title}
-                        subtitle={[i.context, i.subtitle ?? (i.context ? null : def?.label), i.at ? os.format.date(i.at) : null].filter(Boolean).join(' · ')}
+                        subtitle={[i.context, i.via && !i.removable ? null : (i.subtitle ?? (i.context ? null : def?.label)), i.at && !i.via ? os.format.date(i.at) : null].filter(Boolean).join(' · ')}
                         tag={i.guessed ? { label: 'guess', tone: 'alertText' } : undefined}
                         value={i.amount != null ? money(i.amount) : undefined}
                         onPress={() => open(i)}
@@ -80,7 +80,7 @@ export function LinksCard({ entity, full = false }: { entity: ObjectRecord; full
             );
           })}
           <Text variant="caption" color="tertiary" style={{ paddingHorizontal: 4 }}>
-            Hold a link to remove it.
+            Hold a link for more, or to remove it.
           </Text>
           {full ? null : <Button title="Open Links" icon="link" variant="secondary" size="sm" onPress={() => openLinks()} />}
         </View>
@@ -93,8 +93,10 @@ export function LinksCard({ entity, full = false }: { entity: ObjectRecord; full
           held
             ? [
                 { label: 'Open', icon: 'arrow-right', onPress: () => open(held) },
+                // Through a join or a face (Priya's Appearance in the game, the Venue of a Place): that record too.
+                ...(held.via ? [{ label: `Open the ${(os.registry.objects.get(held.via.type)?.label ?? 'record').toLowerCase()}`, icon: 'file', onPress: () => router.push(`/entity/${held.via!.type}/${held.via!.id}` as never) }] : []),
                 { label: 'Show in Links', icon: 'link', onPress: () => openLinks(held.id) },
-                { label: 'Remove link', icon: 'trash', destructive: true, onPress: () => remove(held) },
+                ...(held.removable ? [{ label: 'Remove link', icon: 'trash', destructive: true, onPress: () => remove(held) }] : []),
               ]
             : []
         }

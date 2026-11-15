@@ -1092,6 +1092,19 @@ Component gallery (dev).
     here"), then the other Object's name. Between two records of one Object
     only the direction tells (Koramangala "In" Bengaluru; Bengaluru
     "Contains").
+  - **One thing once** (15 Nov). Some records are another face of a thing, or
+    the meeting of two, and Links shows the thing, not each record. An Object
+    says which with `linkRole`. A **face** folds into the record in a Field: a
+    Player profile is its Person, a Venue is its Place (so Playground Arena is
+    one node with its Games). A **join** is shown as one link between the two
+    records it joins: an Appearance is Priya playing in a game, so Priya has
+    "Games" and a game has "Players", each row carrying the share ("₹450 ·
+    paid · 1 goal"); what is about that share (its Debt) folds into the same
+    row ("Owes you ₹450"), as does what you owe for someone else's share in a
+    game shown there. Joins and their Debts are never nodes in the network;
+    holding a game row offers *Open the appearance*, and it is removed from the
+    game, not from the card. Today: games' Appearance (join), Player profile
+    and Venue (faces).
   - **The Links card** is on every record: the generic page draws it, and a
     board that draws the whole page gets it below its page unless it draws its
     own (Person's, from NR-People). It shows a small map when two or more
