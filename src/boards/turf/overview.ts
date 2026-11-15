@@ -20,7 +20,8 @@ export function turfOverview(os: LifeOSContext, now = Date.now()): ModuleOvervie
     const first = top.name.trim().split(/\s+/)[0] ?? top.name;
     const total = owing.reduce((s, o) => s + o.amount, 0);
     const others = owing.length > 1 ? ` · ${owing.length} owe ${os.format.currency(Math.round(total))}` : '';
-    return { card: { headline: `${first} owes ${os.format.currency(Math.round(top.amount))}${others}`, dots: first.toUpperCase().slice(0, 8) }, blocks: [] };
+    // Their name in dots when it fits (8 letters), else what they owe ("1600"): never a cut name.
+    return { card: { headline: `${first} owes ${os.format.currency(Math.round(top.amount))}${others}`, dots: first.length <= 8 ? first.toUpperCase() : String(Math.round(top.amount)) }, blocks: [] };
   }
   return { card: { headline: 'Everyone has paid' }, blocks: [] };
 }

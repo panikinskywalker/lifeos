@@ -7,6 +7,11 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.49 · 15 Nov 2026
+
+**No cut names on Turf's card.** A name longer than 8 letters ("Rushikesh")
+shows what they owe in dots instead of being cut short.
+
 ## v0.0.48 · 15 Nov 2026
 
 **Module cards can say a word, not just a number.** The dot letters on a
