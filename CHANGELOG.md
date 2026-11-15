@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.60 · 15 Nov 2026
+
+**Ask Money catches what is easy to miss.** Bank charges (interest, late fees,
+forex markup, GST on charges, annual fees) are filed as Fees by their words, and
+a new one shows in *Did anything look wrong?*, along with any bill that crept up
+10% or more over the year. Ask "What's an APR, and what has mine cost me?" or
+"Am I spending more than I make?" and it answers on the phone.
+
 ## v0.0.59 · 15 Nov 2026
 
 **A budget made for you.** With no targets set, Money home suggests one from

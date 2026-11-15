@@ -29,6 +29,9 @@ const KNOWN: Array<[RegExp, string]> = [
   [w('annual maintenance|maintenance charges|card charges|late fee|processing fee'), 'fees'],
 ];
 
+/** What a bank charges you (docs/MODEL.md, Fees you might miss): money out with these words is a fee. */
+export const FEES = w('finance charges?|interest charged|interest (?:of|amount)|late (?:payment )?(?:fee|charges?)|overlimit|over limit fee|forex markup|markup fee|cross currency|convenience fee|surcharge|bounce charges?|return charges?|ecs return|nach return|non.?maintenance|min(?:imum)? (?:average )?balance charges?|sms (?:alert )?charges|annual fee|joining fee|renewal fee|cash advance fee|gst on (?:charges|fee|interest)');
+
 export interface CategoryRule {
   /** A word or phrase; matched case-insensitively against the merchant and the message. Empty = any merchant. */
   keyword: string;
@@ -162,6 +165,8 @@ export function rangeRule(os: LifeOSContext, p: { amount: number; direction: 'de
 export function categoryFor(os: LifeOSContext, merchant: string | null | undefined, text = '', amount?: number | null, direction: 'debit' | 'credit' = 'debit'): string {
   const byRule = ruleCategory(os, merchant, text, amount, direction);
   if (byRule) return byRule;
+  // A bank charging you (interest, a late fee, forex markup, GST on charges) is a fee, whoever the shop was.
+  if (direction === 'debit' && FEES.test(text)) return 'fees';
   if (merchant) {
     const taught = learnedCategory(os, merchant);
     if (taught) return taught;

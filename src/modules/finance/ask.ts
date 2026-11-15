@@ -207,7 +207,25 @@ export function oddThings(os: LifeOSContext, now = new Date()): Odd {
     const key = `price:${sub.id}:${last.from}`;
     return ok.has(key) ? [] : [{ key, sub, from: prev.amount, to: last.amount, since: last.from }];
   });
-  return { twice, fees, prices };
+  // A bill that crept up over the year: 10% or more above what it was 12 months ago (or when first seen this year).
+  const yearAgo = isoOf(new Date(now.getTime() - 365 * DAY));
+  const crept = (os.registry.objects.has('subscription') ? os.records.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 1000 }) : []).flatMap((sub) => {
+    if (prices.some((p) => p.sub.id === sub.id)) return [];
+    const h = [...(sub.data.priceHistory ?? [])].sort((a, b) => a.from.localeCompare(b.from));
+    const cur = h[h.length - 1];
+    const base = [...h].reverse().find((x) => x.from <= yearAgo) ?? h.find((x) => x.from > yearAgo);
+    if (!cur || !base || cur === base || cur.amount < base.amount * 1.1) return [];
+    const key = `crept:${sub.id}:${base.from}:${cur.amount}`;
+    return ok.has(key) ? [] : [{ key, sub, from: base.amount, to: cur.amount, since: base.from }];
+  });
+  return { twice, fees, prices: [...prices, ...crept] };
+}
+
+/** Card and loan interest charged this calendar year (fees that say interest or finance charges). */
+export function interestThisYear(os: LifeOSContext, now = new Date()): Array<ObjectRecord<TransactionData>> {
+  return os.records
+    .query<TransactionData>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: `${now.getFullYear()}-01-01` }] } }, { limit: 20_000 })
+    .filter((t) => /\b(?:interest|finance charges?)\b/i.test(`${t.data.merchant ?? ''} ${t.title} ${t.data.rawText ?? ''}`) && t.data.category === 'fees');
 }
 
 export const oddCount = (o: Odd) => o.twice.length + o.fees.length + o.prices.length;
@@ -270,11 +288,26 @@ export function askOnPhone(os: LifeOSContext, question: string, now = new Date()
   }
   if (/\b(?:anything|something)\b.*\b(?:wrong|odd|off|strange)\b|\blook(?:s|ed)? wrong\b/.test(q)) {
     const n = oddCount(oddThings(os, now));
-    return { text: n ? `${n} thing${n === 1 ? '' : 's'} to check. None is certain, and only you can tell.` : 'Nothing looks wrong: no double charges, new fees or price changes in the last 30 days.', block: n ? { kind: 'odd' } : undefined, source: 'phone' };
+    return { text: n ? `${n} thing${n === 1 ? '' : 's'} to check. None is certain, and only you can tell.` : 'Nothing looks wrong: no double charges, new fees or price changes in the last 30 days, and no bill has crept up this year.', block: n ? { kind: 'odd' } : undefined, source: 'phone' };
   }
   if (/\b(?:chart|graph)\b.*\bspend|\bweekly spend\b/.test(q)) {
     const query: MoneyQuery = { measure: 'spent', period: 'month', by: 'week' };
     return answerQuery(os, query, 'bars', 'Weekly spend', now);
+  }
+  // "What's an APR, and what has mine cost me?": the word, then this year's interest.
+  if (/\bapr\b|\binterest\b.*\b(?:cost|paid|pay|charged|card)\b|\bhow much interest\b/.test(q) && !/\binterest (?:earned|credited|income)\b/.test(q)) {
+    const txs = interestThisYear(os, now);
+    const total = txs.reduce((n, t) => n + t.data.amount, 0);
+    const what = 'APR is the yearly interest rate a card or loan charges on what you have not paid back by the due date. Paying the full bill every month means none.';
+    const cost = txs.length ? `This year, interest has cost you ${os.format.currency(Math.round(total))} across ${txs.length} charge${txs.length === 1 ? '' : 's'}.` : 'No interest charges filed this year.';
+    return { text: `${what} ${cost}`, block: txs.length ? { kind: 'card', card: { kind: 'list', title: 'Interest this year', items: txs.map((t) => ({ entityId: t.id, type: 'transaction', title: t.title, value: os.format.currency(t.data.amount) })) } } : undefined, source: 'phone' };
+  }
+  // "Am I spending more than I make?": a usual month over the last 3.
+  if (/\bspend(?:ing)? more than i (?:make|earn|get)\b|\bliving beyond\b|\bover ?spending\b|\bearn(?:ing)? (?:more|less) than i spend\b/.test(q)) {
+    const left = leftEachMonth(os, now);
+    const query: MoneyQuery = { measure: 'spent', period: '3_months', by: 'month' };
+    if (left == null) return { text: 'No money in is filed for the last 3 months, so I cannot compare yet.', block: { kind: 'bars', title: 'Spent each month', query }, source: 'phone' };
+    return { text: left < 0 ? `Yes. Over the last 3 months you spent about ${os.format.currency(-left)} more than came in, in a usual month.` : `No. In a usual month over the last 3, about ${os.format.currency(left)} is left after spending.`, block: { kind: 'bars', title: 'Spent each month', query }, source: 'phone' };
   }
   const mq = readMoneyQuestion(question);
   if (!mq) return null;

@@ -1262,6 +1262,18 @@ Sources. Read-only, always.
   comes in (Came in, averaged over months with income), and "This leaves ₹X to
   save" (or how far over). **Use these** makes them the category targets, with
   Undo; after that the Targets section shows instead.
+- **What Claude's Personal Finance answers, on the phone** (15 Nov, Rutvij):
+  - *Fees you might miss*: money out whose text says what a bank charges
+    (interest or finance charges, a late fee, forex markup, GST on charges, a
+    bounce or minimum-balance charge, an annual fee) is filed as Fees, unless a
+    rule you set says otherwise; a new one shows in *Did anything look wrong?*
+  - *A bill that crept up*: a subscription or bill 10% or more above what it was
+    12 months ago (or when first seen this year) shows there too, as *A bill went
+    up* with Keep it.
+  - *"What's an APR, and what has mine cost me?"*: the word in one line, then
+    the interest and finance charges filed this year, with the payments.
+  - *"Am I spending more than I make?"*: yes or no from a usual month over the
+    last 3, with spending by month.
 - **How it works** (11 Nov, from a friend's design that matches the agent): the
   model gets Money's read-only tools by name and description, a Money prompt
   (your money manager; every figure from a tool, never its own arithmetic; never
