@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.35 · 15 Nov 2026
+
+**Ads from payment apps are no longer payments.** CRED's "use your CRED cash
+amount of ₹20,00,000 to make the most of this sale season" was filed as ₹20
+lakh spent, and "tap to check" became a payee called "check". Notifications
+that sell something are skipped; a call to action is never a payee; CRED's
+"Axis Bank account has been successfully credited" is the card's side of a bill
+paid from your bank, joined with that debit as one transfer.
+
 ## v0.0.34 · 15 Nov 2026
 
 **Read my texts again** (You › Data sources › SMS): payments filed by older

@@ -356,11 +356,29 @@ export const PAYMENT_APPS: Record<string, string> = {
 /** UPI apps (short "₹450 paid to Swiggy" texts); every other listed app is a bank app that posts its SMS text. */
 const UPI_APPS = new Set(['com.google.android.apps.nbu.paisa.user', 'com.phonepe.app', 'net.one97.paytm', 'com.dreamplug.androidapp', 'in.org.npci.upiapp']);
 
+/** A payment app selling something: an offer, a sale, rewards, a product to apply for. */
+const APP_AD = /\b(?:make the most|sale season|sale\b|offers?\b|deals?\b|cash(?:back)? amount|cashback|rewards?|coins?|claim|apply (?:for|now)|unlock|win\b|earn\b|voucher|limited time|hurry|exclusive|introducing|grab|avail|discount|% off|free\b|pre-?approved|eligible)\b/i;
+/** Words that say money really moved. */
+const APP_MOVED = /\b(?:paid (?:to|successfully)|payment (?:of [^\n]{0,20})?(?:successful|received|done)|sent to|received from|debited|has been (?:successfully )?(?:credited|paid|debited|received)|transferred)\b/i;
+/** "Make the most…", "check": a call to action, never someone you paid. */
+const NOT_A_PAYEE = /^(?:check|view|know|see|claim|apply|make|use|get|pay|continue|complete|unlock|redeem|avail|track|tap|enjoy|shop|explore|learn|activate|start|try)\b/i;
+
 export function parsePaymentNotification(pkg: string, title: string, text: string): SmsKind {
   const both = `${title}\n${text}`;
   if (!UPI_APPS.has(pkg)) return parseBankSms(both, PAYMENT_APPS[pkg] ?? pkg);
+  // Ads from payment apps ("use your CRED cash amount of ₹20,00,000 to make the most of this sale season") move no money.
+  if (APP_AD.test(both) && !APP_MOVED.test(both)) return { kind: 'skip', reason: 'promo' };
+  // CRED paying a card bill: "Axis Bank account has been successfully credited. tap to check." The card's side of a
+  // transfer: it joins the bank's debit to CRED, so neither counts as spending.
+  const card = /\b([a-z][a-z ]{1,25}?)\s+(?:account|credit card|card)\s+has been (?:successfully )?credited\b/i.exec(both);
+  const amt = /(?:INR|Rs\.?|₹)\s?([\d,]+(?:\.\d{1,2})?)/i.exec(both);
+  if (card) {
+    if (!amt) return { kind: 'skip', reason: 'info' };
+    return { kind: 'txn', txn: { amount: num(amt[1]!), direction: 'credit', currency: 'INR', inrAmount: null, investment: false, fund: null, recurring: false, brand: null, bank: bankOf(null, `${card[1]} card`), channel: 'card', last4: /[xX*]{2,}-?(\d{3,4})/.exec(both)?.[1] ?? null, isCard: true, counterparty: PAYMENT_APPS[pkg] ?? null, vpa: null, ref: null, balance: null, date: null, transfer: true } };
+  }
   // "₹450 paid to Swiggy" / "Paid ₹450 to SWIGGY" / "You paid ₹450 to Swiggy" / "Received ₹2,600 from Priya"
   const m = /(?:(paid|sent|received|you received|you paid)\s+)?(?:INR|Rs\.?|₹)\s?([\d,]+(?:\.\d{1,2})?)\s*(paid|sent|received)?\s*(?:to|from)\s+([^\n.•]{2,40})/i.exec(both);
+  if (m && NOT_A_PAYEE.test(m[4]!.trim())) return { kind: 'skip', reason: 'info' };
   if (m) {
     const verb = (m[1] ?? m[3] ?? '').toLowerCase();
     const direction = /received/.test(verb) || /\bfrom\b/i.test(m[0]) ? 'credit' : 'debit';

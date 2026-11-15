@@ -233,3 +233,20 @@ describe('read my texts again', () => {
     expect(txs().find((t) => t.data.amount === 22005.39)!.data.merchant).toBe('HSBC account XXXX');
   });
 });
+
+describe('payment app notifications: ads are not payments (CRED, 15 Nov)', () => {
+  const note = (title: string, body: string, when: string) => fileMessage(os, { source: 'notification', from: 'com.dreamplug.androidapp', title, body, receivedAt: Date.parse(`${when}T23:36:00`) });
+  it('an ad with a big number, a call to action, an offer: nothing filed', () => {
+    note('Your CRED cash is waiting', 'use your CRED cash amount of ₹20,00,000 to make the most of this sale season', '2026-10-08');
+    note('₹1 is all it takes', 'claim it, apply for the CRED Insurance plan today', '2026-10-04');
+    note('Payment of ₹570', 'tap to check', '2026-10-04');
+    expect(txs()).toHaveLength(0);
+  });
+  it("CRED's \"Axis Bank account has been successfully credited\" is the card's side of the bill paid from the bank: one transfer", () => {
+    sms('VM-HSBCIN-S', 'INR 250.00 is paid from HSBC account XXXXXX4421 to CRED Club on 05-Oct-26 with ref 512345678911. If this is not done by you, call 18002673456 to report.', '2026-10-05');
+    note('₹250 paid successfully', 'Axis Bank account has been successfully credited. tap to check.', '2026-10-05');
+    expect(txs()).toHaveLength(1);
+    expect(txs()[0]!.data).toMatchObject({ kind: 'transfer', amount: 250 });
+    expect(spendInRange(os, '2026-10-01', '2026-10-31')).toBe(0);
+  });
+});
