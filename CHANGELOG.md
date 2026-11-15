@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.61 · 15 Nov 2026
+
+**Import and export.** Money has an *Import & export* screen: export your
+payments for any period as a CSV for a spreadsheet, or import a bank statement's
+CSV. The columns are guessed (and yours to change), a preview says what will be
+added, payments already here are skipped, and Undo takes the whole import back.
+
 ## v0.0.60 · 15 Nov 2026
 
 **Ask Money catches what is easy to miss.** Bank charges (interest, late fees,

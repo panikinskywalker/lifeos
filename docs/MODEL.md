@@ -1274,6 +1274,18 @@ Sources. Read-only, always.
     the interest and finance charges filed this year, with the payments.
   - *"Am I spending more than I make?"*: yes or no from a usual month over the
     last 3, with spending by month.
+- **Import and export** (15 Nov, Rutvij; from broke and `docs/research/money-basics.md`).
+  Money › *Import & export* (a chip on Money home): **Export as CSV** for this
+  month, last month, 3 months, this year or all (Date, Payee, Category, Kind,
+  Amount with money out negative, Account, Note), through the share sheet.
+  **Import a bank statement**: a CSV from the bank's site; the header row is
+  found under the bank's own lines, the columns guessed (date, description, one
+  amount or money out and in apart) and yours to change, dates and amounts read
+  the Indian way (day first, "1,234.50 Dr", brackets); a preview says how many
+  payments, out and in, and how many rows could not be read; you pick the
+  account. Each row becomes a payment (source `import`), categorised like a
+  text; one already filed (same amount and kind within a day, names agreeing)
+  is skipped; Undo takes the whole import back. PDF, OFX and QIF wait.
 - **How it works** (11 Nov, from a friend's design that matches the agent): the
   model gets Money's read-only tools by name and description, a Money prompt
   (your money manager; every figure from a tool, never its own arithmetic; never

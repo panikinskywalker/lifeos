@@ -85,7 +85,7 @@ export const accountType: ObjectDef<AccountData> = {
   links: [{ kind: 'account', label: 'Transactions', to: 'transaction', cardinality: 'many' }, { kind: 'institution', label: 'Institution', to: 'org', cardinality: 'one' }],
 };
 
-export type TransactionSource = 'sms' | 'notification' | 'mail' | 'dump' | 'manual' | 'cycle';
+export type TransactionSource = 'sms' | 'notification' | 'mail' | 'dump' | 'manual' | 'cycle' | 'import';
 
 export interface TransactionData {
   amount: number;
@@ -146,7 +146,7 @@ export const transactionType: ObjectDef<TransactionData> = {
     split: z.any().optional(),
     share: z.coerce.number().nonnegative().optional(),
     refund: z.boolean().optional(),
-    source: z.enum(['sms', 'notification', 'mail', 'dump', 'manual', 'cycle']).optional(),
+    source: z.enum(['sms', 'notification', 'mail', 'dump', 'manual', 'cycle', 'import']).optional(),
     sourceRef: z.string().optional(),
     rawText: z.string().optional(),
   }),

@@ -98,6 +98,7 @@ export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, stri
         <NavChip label="Subscriptions" icon="repeat" onPress={() => router.push('/module/finance/subscriptions' as never)} />
         <NavChip label="Investments" icon="trend" onPress={() => goAnchor('investments')} />
         <NavChip label="Reports" icon="chart" onPress={() => router.push('/module/finance/reports' as never)} />
+        <NavChip label="Import & export" icon="file" onPress={() => router.push('/module/finance/files' as never)} />
       </ChipRow>
 
       {data.close ? <MonthClosed c={data.close} /> : null}
