@@ -8,13 +8,13 @@
  */
 
 /** Payment gateways / aggregators that prefix the real merchant ("PYU*SWIGGY"). */
-const GATEWAY = /^(?:paypal|pp|raz|rzp|razorpay|pyu|payu|ccavenue|cca|ccav|bd|billdesk|ind|pay|sq|sqr|sp|cf|cashfree|jtpay|easebuzz|phonepe|paytm|gpay|juspay|stripe)\s*\*\s*/i;
+const GATEWAY = /^(?:paypal|pp|raz|rzp|razorpay|pyu|payu|ccavenue|cca|ccav|bd|billdesk|ind|pay|sq|sqr|sp|cf|cashfree|jtpay|easebuzz|phonepe|paytm|gpay|juspay|stripe|phicom)\s*\*\s*/i;
 /** Rail words and reference prefixes in "Info:" lines ("NEFT-", "UPI/", "BIL*INFT*", "MMT/IMPS/"). */
 const RAIL = /^(?:neft|rtgs|imps|upi|mmt|inft|bil|ft|nfs|ach|nach|ecs|pos|vps|vin|ib|mob ?bk|trf|to|by)$/i;
 const INDIAN_CITY = /\s+(?:bangalore|bengaluru|mumbai|new delhi|delhi|gurgaon|gurugram|noida|pune|hyderabad|chennai|kolkata|ahmedabad|jaipur|kochi)\b.*$/i;
 /** Words that are never who you paid: bank boilerplate caught by a loose pattern. */
-const NOT_A_NAME = /^(?:(?:upi|imps|neft|rtgs|rs|inr|customer|clearing|report|ref|info|txn|transaction|pos|atm|cash|branch|beneficiary|remitter|self|paying|cc)$|(?:rs|inr|₹)\.?\s*\d|(?:the (?:beneficiary|account|card|bank|payee)|mobile|a\/?c|acct|account|card|bank|you|your|debit card|credit card|online banking|net ?banking|money transfer|trf|fd)\b)/i;
-const BOILERPLATE = /\b(?:not you|if not|report|dispute|customer care|call \d|sms block|avl|bal(?:ance)?|limit|team \w+ bank)\b/i;
+const NOT_A_NAME = /^(?:(?:upi|imps|neft|rtgs|rs|inr|customer|clearing|report|ref|info|txn|transaction|pos|atm|cash|branch|beneficiary|remitter|self|paying|cc|cms|clg|deactivate|activate)$|(?:nach|transfer|chq|cheque)\b|(?:rs|inr|₹)\.?\s*\d|(?:the (?:beneficiary|account|card|bank|payee)|mobile|a\/?c|acct|account|card|bank|you|your|debit card|credit card|online banking|net ?banking|money transfer|trf|fd)\b)/i;
+const BOILERPLATE = /\b(?:not you|if not|report|dispute|customer care|call \d|sms block|avl|bal(?:ance)?|limit|team \w+ bank|of (?:rs|inr))\b/i;
 
 /** A descriptor → a readable merchant name, or null when nothing name-like is left. */
 export function cleanMerchant(raw: string | null | undefined): string | null {
@@ -33,15 +33,18 @@ export function cleanMerchant(raw: string | null | undefined): string | null {
     const named = s.split(/\s*[/*]\s*|\s*-\s*/).map((p) => p.trim()).filter((p) => p && !RAIL.test(p) && !isCode(p));
     s = (named.find((p) => /[a-z]{3}/i.test(p) && /\s/.test(p)) ?? named[named.length - 1] ?? '').replace(/^(?:upi|neft|rtgs|imps)\s+/i, '');
   } else if (s.includes('*')) {
-    s = s.split('*')[0]!; // "ADOBE *CREATIVE CLD" — the brand comes first
+    // "ADOBE *CREATIVE CLD": the brand comes first; "WWW*HOSTELW", "BKG*Hotel": a prefix, the name after.
+    const [head, ...rest] = s.split('*');
+    s = /^(?:www|bkg)$/i.test(head!.trim()) && rest.join(' ').trim() ? rest.join(' ') : head!;
   }
   s = s.replace(/^(?:[A-Z]{4}0[A-Z0-9]{6,}|[A-Z0-9]*\d{6,}[A-Z0-9]*)[-\s]+/i, ''); // IFSC / ref code in front
   s = s.replace(/[-\s]*[xX]*\d{4,}$/, ''); // trailing reference / terminal digits ("EAZYDINE0000000")
   s = s.replace(INDIAN_CITY, '');
   s = s.replace(/\s+(?:[a-z]{2})?IND?$/, ''); // trailing "IN" / "IND" / "kaIN" (state + country)
-  s = s.replace(/,?\s+(?:(?:pvt|private)\.?\s*)?(?:inc|llc|ltd|limited|pvt|private)\.?$/i, '');
+  s = s.replace(/,?\s+(?:(?:pvt|private)\.?\s*)?(?:inc|llc|ltd|limited|pvt|private)\.?$/i, '').replace(/\s*\((?:I|India)\)$/i, '');
+  if (/^(?:[A-Z] ){2,}[A-Z]$/i.test(s)) s = s.replace(/ /g, ''); // "P L A Y O"
   s = s.replace(/^(?:to|at|on|from|by)\s+/i, '').replace(/[\s.;,:*-]+$/, '').replace(/^[\s.;,:*-]+/, '').trim();
-  if (!s || (s.match(/[a-z]/gi)?.length ?? 0) < 2 || /^\d[\d\s-]*$/.test(s) || NOT_A_NAME.test(s) || BOILERPLATE.test(s)) return null;
+  if (!s || (s.match(/[a-z]/gi)?.length ?? 0) < 2 || (s.match(/\d/g)?.length ?? 0) > (s.match(/[a-z]/gi)?.length ?? 0) || /^[^a-z]*:/i.test(s) || /^\d[\d\s-]*$/.test(s) || NOT_A_NAME.test(s) || BOILERPLATE.test(s)) return null;
   if (/^[\w.-]+@[a-z]+$/i.test(s)) s = s.split('@')[0]!.replace(/[._-]+/g, ' ');
   return s.slice(0, 40);
 }
@@ -95,7 +98,7 @@ const BRANDS: Array<[RegExp, KnownMerchant]> = [
   [/\bzomato\s*gold\b/i, { name: 'Zomato Gold', category: 'subscriptions', subscription: true }],
   // Everyday brands whose descriptors are hard to read.
   [/\bswiggy\b|\bbundl\s*tech/i, { name: 'Swiggy', category: 'food' }],
-  [/\bzomato\b/i, { name: 'Zomato', category: 'food' }],
+  [/\bzomato\b|\beternal limited\b|^eternal$/i, { name: 'Zomato', category: 'food' }],
   [/\binstamart\b/i, { name: 'Instamart', category: 'groceries' }],
   [/\bblinkit\b|\bgrofers\b/i, { name: 'Blinkit', category: 'groceries' }],
   [/\bzepto\b|\bkiranakart\b/i, { name: 'Zepto', category: 'groceries' }],
@@ -103,14 +106,17 @@ const BRANDS: Array<[RegExp, KnownMerchant]> = [
   [/\buber\b/i, { name: 'Uber', category: 'transport' }],
   [/\bola\s*(?:cabs|money)?\b|\bani\s*technologies\b/i, { name: 'Ola', category: 'transport' }],
   [/\brapido\b|\broppen\b/i, { name: 'Rapido', category: 'transport' }],
-  [/\bamazon\b|\bamzn\b/i, { name: 'Amazon', category: 'shopping' }],
+  [/\bamazon\b|\bamzn\b|\bapay\b|\ba\.in\b/i, { name: 'Amazon', category: 'shopping' }],
   [/\bflipkart\b/i, { name: 'Flipkart', category: 'shopping' }],
   [/\bmyntra\b/i, { name: 'Myntra', category: 'shopping' }],
   [/\bairtel\b|\bbharti\s*(?:airtel|hexacom)\b/i, { name: 'Airtel', category: 'utilities' }],
-  [/\breliance\s*jio\b|\bjio\s*(?:prepaid|postpaid|fiber)\b/i, { name: 'Jio', category: 'utilities' }],
+  [/\breliance\s*jio\b|\bmyjio\b|\bjio\s*(?:prepaid|postpaid|fiber|platforms?)\b/i, { name: 'Jio', category: 'utilities' }],
   [/\bmakemytrip\b|\bmmt\s*travel/i, { name: 'MakeMyTrip', category: 'travel' }],
   [/\bindigo\b|\binterglobe\b/i, { name: 'IndiGo', category: 'travel' }],
-  [/\birctc\b/i, { name: 'IRCTC', category: 'transport' }],
+  [/\birctc\b|\bindian railway/i, { name: 'IRCTC', category: 'transport' }],
+  [/\bbkg\b|\bbooking\.com\b/i, { name: 'Booking.com', category: 'travel' }],
+  [/\bhostelw/i, { name: 'Hostelworld', category: 'travel' }],
+  [/\bdistrict dining\b/i, { name: 'District', category: 'food' }],
   [/\bbookmyshow\b|\bbigtree\b/i, { name: 'BookMyShow', category: 'entertainment' }],
 ];
 

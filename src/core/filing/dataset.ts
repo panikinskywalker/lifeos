@@ -1,5 +1,6 @@
 import type { LifeOSContext } from '../registry/context';
 import type { RawMessage } from './contract';
+import { isOtpText } from './otp';
 import { messageOutcome } from './queue';
 
 /**
@@ -21,13 +22,7 @@ export interface DatasetMessage {
   account?: string | null;
 }
 
-/** "Never share your OTP" at the end of a payment text doesn't make it an OTP. */
-const NOT_SHARING = /\b(?:never|do not|don'?t|pls do not|please do not)\s+(?:share|disclose)\b[^.\n]*/gi;
-const OTP_WORDS = /\b(otp|one[- ]time (?:password|pin|code)|verification code|security code|login code|passcode|auth(?:entication)? code|confirmation code)\b/i;
-
-export function isOtpText(body: string): boolean {
-  return OTP_WORDS.test(body.replace(NOT_SHARING, ''));
-}
+export { isOtpText };
 
 /** A person's phone number (a friend's text), not a bank / shop header or a service short code. */
 export function isPersonalSender(from: string): boolean {
@@ -49,7 +44,7 @@ function localIso(ms: number): string {
 }
 
 /** What every parser read in one message (null = not its business). */
-function parserViews(os: LifeOSContext, m: RawMessage): Record<string, unknown> {
+export function parserViews(os: LifeOSContext, m: RawMessage): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const p of os.registry.parsers.values()) {
     try {

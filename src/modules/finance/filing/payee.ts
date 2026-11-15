@@ -230,3 +230,55 @@ export function keepWhoAsOrg(os: LifeOSContext, filingId: string): string | null
   });
   return orgId;
 }
+
+/* ------------------------------------------------------------------ */
+/* Your own name (10 Nov): money to or from it is a transfer.           */
+/* ------------------------------------------------------------------ */
+
+const MY_NAMES = 'finance.myNames';
+
+/** The names your banks write for you, each as lower-case words ("rutvij anil mahakale"). */
+export const myNames = (os: LifeOSContext): string[] => os.settings.get<string[]>(MY_NAMES, []);
+
+/** Banks cut names short ("RUTVIJ ANIL MAHA", "RUTVIJ AN", "Mr RUTVIJ"): yours when the first word is yours and every word after starts the next of yours. */
+export function isMyName(os: LifeOSContext, said: string | null | undefined): boolean {
+  const a = tokens(said ?? '');
+  if (!a.length) return false;
+  return myNames(os).some((n) => {
+    const b = n.split(' ');
+    return a.length <= b.length && a[0] === b[0] && a.every((w, i) => b[i]!.startsWith(w));
+  });
+}
+
+/**
+ * "That's me" on a payment: the name the bank wrote is yours. It is kept (a
+ * longer one replaces a shorter one it covers), and this payment and every one
+ * to or from that name become transfers between your accounts. Returns what
+ * Undo needs.
+ */
+export function learnMyName(os: LifeOSContext, said: string): { name: string; before: string[]; changed: Array<{ id: string; kind: string; category: string; accountId?: string }> } {
+  const name = tokens(said).join(' ');
+  const before = myNames(os);
+  const covers = (long: string, short: string) => short.split(' ').every((w, i) => long.split(' ')[i]?.startsWith(w));
+  const kept = before.filter((n) => !covers(name, n));
+  os.settings.set(MY_NAMES, kept.some((n) => covers(n, name)) ? kept : [...kept, name]);
+  const changed: Array<{ id: string; kind: string; category: string; accountId?: string }> = [];
+  os.db.transaction(() => {
+    for (const t of os.records.query<{ merchant?: string; kind: string; category: string; accountId?: string }>('transaction', {}, { limit: 50_000 })) {
+      if ((t.data.kind !== 'expense' && t.data.kind !== 'income') || !isMyName(os, t.data.merchant)) continue;
+      changed.push({ id: t.id, kind: t.data.kind, category: t.data.category, accountId: t.data.accountId });
+      // Money from yourself arrives at this account; money to yourself leaves it.
+      const arrives = t.data.kind === 'income';
+      os.records.update(t.id, { data: { kind: 'transfer', category: 'transfer', accountId: arrives ? undefined : t.data.accountId, toAccountId: arrives ? t.data.accountId : undefined } }, 'user');
+    }
+  });
+  return { name, before, changed };
+}
+
+/** Undo "That's me": the names as they were, the payments back to what they were. */
+export function unlearnMyName(os: LifeOSContext, u: ReturnType<typeof learnMyName>): void {
+  os.db.transaction(() => {
+    os.settings.set(MY_NAMES, u.before);
+    for (const c of u.changed) if (os.records.get(c.id)) os.records.update(c.id, { data: { kind: c.kind, category: c.category, accountId: c.accountId, toAccountId: undefined } }, 'user');
+  });
+}

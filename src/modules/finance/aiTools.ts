@@ -6,9 +6,22 @@ import { monthlySubscriptionCost, netWorthSeries, subscriptionRunRate } from './
 import { spendQuery, type SpendKind, type SpendPeriod } from './spend';
 import type { InvestmentData } from './types';
 import { applySplit, balanceWith, balances, clearSplit, settleUp, undoSettle } from './split';
+import { answerMoney, readMoneyQuestion, type MoneyQuestion } from './answers';
 
 /** Finance tools for the agent (no React Native — unit-tested). */
 export const financeAiTools: AiToolDef[] = [
+    {
+      name: 'money_answer',
+      description: 'An everyday money question worked out on the phone: where the money went, spend on a category or at a merchant, income, biggest spends, balances, net worth, subscriptions, investments, what is due before payday and what is left, anything charged twice, whether an amount is affordable.',
+      input: z.object({ question: z.string() }),
+      answers: (question) => (readMoneyQuestion(question) ? { question } : null),
+      run: async (input, os) => {
+        const q: MoneyQuestion | null = readMoneyQuestion((input as { question: string }).question);
+        if (!q) return { answer: null };
+        const { answer, card } = answerMoney(os, q);
+        return withExtras({ answer }, { card });
+      },
+    },
     {
       name: 'split_transaction',
       description: 'Split an expense with people ("that was dinner with Arjun, split it", "split the cab 3 ways, Priya paid"). parts: everyone sharing it, "me" for the user; method equal | exact (₹) | percent | shares with a value each. payer "me" or a personId. Asks the user before saving.',

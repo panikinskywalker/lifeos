@@ -1,6 +1,7 @@
 import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { OPEN_TASK, TASK_DUE, type EventData, type ProjectData, type TaskData } from './types';
+import { spentOf } from '@core/dashboard/money';
 
 /**
  * Projects' reads and writes (R4): ticking a task (a repeating one rolls its
@@ -126,8 +127,8 @@ export function projectSpend(os: LifeOSContext, projectId: string): number {
   for (const l of os.links.forEntity(projectId)) {
     if (l.other.object !== 'transaction' || seen.has(l.other.id)) continue;
     seen.add(l.other.id);
-    const t = os.records.get<{ amount?: number; kind?: string }>(l.other.id);
-    if (t && t.data.kind === 'expense') sum += Number(t.data.amount) || 0;
+    const t = os.records.get<{ amount?: number; share?: number; kind?: string }>(l.other.id);
+    if (t && t.data.kind === 'expense') sum += spentOf(t.data);
   }
   return sum;
 }

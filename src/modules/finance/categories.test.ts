@@ -4,7 +4,7 @@ import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
-import { setCategoryRules } from './filing/rules';
+import { categoryFor, setCategoryRules } from './filing/rules';
 import { CATEGORIES, categoryOf, subscriptionType, transactionType } from './types';
 import { addCategory, applyCategories, customCategories, deleteCategory, trackCategoryField, updateCategory } from './categories';
 
@@ -52,5 +52,21 @@ describe('your own categories', () => {
     expect(os.records.get<{ category: string }>(tx.id)!.data.category).toBe('other');
     expect(os.settings.get<Array<{ keyword: string }>>('categoryRules', []).map((r) => r.keyword)).toEqual(['ZOMATO']);
     expect(pick(transactionType).options!.some((o) => o.value === 'c_gym')).toBe(false);
+  });
+});
+
+describe('built-in categories, from Rutvij’s texts (10 Nov)', () => {
+  it('names banks cut short still find their category', () => {
+    expect(['SHREE SAI MEDICA', 'MAXCARE MULTISPE', 'COLLECTIVE COFF', 'BHAIYA JI VADAPA', 'Adidas India Ma'].map((m) => categoryFor(os, m))).toEqual(['health', 'health', 'food', 'food', 'shopping']);
+    expect(categoryFor(os, 'Zomato Media Pr')).toBe('food');
+    expect(['MYJIO', 'ETERNAL', 'SAI ICE CREAM', 'WAKEFIT'].map((m) => categoryFor(os, m))).toEqual(['utilities', 'food', 'food', 'shopping']);
+  });
+
+  it('a large NEFT from a company is salary; a small one, or one from a person, is not', () => {
+    const text = 'credited with INR 196,958.00 as NEFT from HDFC A/c ***1234 of ACME TECH (I) ***';
+    expect(categoryFor(os, 'ACME TECH (I)', text, 196958, 'credit')).toBe('salary');
+    expect(categoryFor(os, 'ACME TECH (I)', text, 11642.64, 'credit')).toBe('other');
+    expect(categoryFor(os, 'PRIYA SHARMA', text, 50000, 'credit')).toBe('other');
+    expect(categoryFor(os, 'ACME TECH (I)', text, 196958, 'debit')).toBe('other');
   });
 });

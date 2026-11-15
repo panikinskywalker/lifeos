@@ -79,6 +79,28 @@ describe('reports', () => {
     expect(m.daily).toHaveLength(30);
     expect(netWorthSeries(os, 3, now).map((p) => p.total)).toEqual([10000, 58000, 104000]);
   });
+
+  it('net worth over time agrees with today, ignores buys and starts before the first payment', async () => {
+    const { netWorthSeries } = await import('./reports');
+    const { accountFlows } = await import('./lib');
+    const now = new Date('2026-09-20T12:00:00');
+    // The bank said 70,000 on 1 Sep; the opening balance is long out of date.
+    const bank = os.records.create({ object: 'account', data: { name: 'HDFC', kind: 'bank', openingBalance: 5, knownBalance: 70000, knownOn: '2026-09-01' } });
+    const wallet = os.records.create({ object: 'account', data: { name: 'Paytm', kind: 'wallet', openingBalance: 0 } });
+    const tx = (amount: number, kind: string, date: string, extra: Record<string, unknown> = {}) => os.records.create({ object: 'transaction', data: { amount, kind, category: 'food', date, accountId: bank.id, ...extra } });
+    tx(20000, 'income', '2026-08-01', { category: 'salary' });
+    tx(5000, 'investment', '2026-09-05');
+    tx(1000, 'transfer', '2026-09-06', { toAccountId: wallet.id });
+    tx(2000, 'expense', '2026-09-10');
+    const series = netWorthSeries(os, 12, now);
+    expect(series.map((p) => p.end)).toEqual(['2026-07-31', '2026-08-31', '2026-09-30']);
+    // Today: bank 70,000 - 5,000 - 1,000 - 2,000 = 62,000, wallet 1,000; the buy moved money, the expense did not come back.
+    expect(series.map((p) => p.total)).toEqual([45000, 65000, 63000]);
+    expect(accountFlows(os, bank.id, 2, now)).toEqual([
+      { month: '2026-08', label: 'Aug', in: 20000, out: 0 },
+      { month: '2026-09', label: 'Sep', in: 0, out: 8000 },
+    ]);
+  });
 });
 
 describe('R1 finance Objects', () => {

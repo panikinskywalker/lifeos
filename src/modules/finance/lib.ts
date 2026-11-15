@@ -3,6 +3,7 @@ import type { ObjectRecord } from '@core/domain/types';
 import { nextOccurrence } from '@core/automation/recurrence';
 import type { AccountData, InvestmentData, SubscriptionData, TransactionData } from './types';
 import { categoryTargets } from './categories';
+import { incomeSql, MONEY_KINDS_SQL, spentSql } from '@core/dashboard/money';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -28,15 +29,36 @@ export function periodRange(period: 'monthly' | 'weekly' | 'yearly', at: number 
   return monthRange(0, now);
 }
 
-/** Signed balance: opening + income − expense ± transfers. Credit cards show what you owe as negative. */
+/**
+ * Signed balance: opening + income − expense ± transfers. Credit cards show
+ * what you owe as negative. When a bank text has stated the balance, that is
+ * the start instead, and only payments dated after its day are added.
+ */
 export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountData>): number {
-  const inc = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'income' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
-  const exp = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'expense' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
-  const out = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'transfer' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
-  const inn = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.toAccountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'transfer' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
+  const since = typeof account.data.knownBalance === 'number' && account.data.knownOn ? account.data.knownOn : null;
+  const sum = (field: 'accountId' | 'toAccountId', kind: string) => {
+    const and: Array<{ field: string; op: 'eq' | 'gt'; value: string }> = [{ field: `data.${field}`, op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: kind }];
+    if (since) and.push({ field: 'data.date', op: 'gt', value: since });
+    return os.records.aggregate('transaction', { filter: { and } }, { sum: ['data.amount'] })['sum_data.amount'];
+  };
+  const start = since ? account.data.knownBalance! : (account.data.openingBalance ?? 0);
   // A buy or SIP leaves the account it was paid from (R1: kind 'investment'); the money shows up again as the holding's value.
-  const inv = os.records.aggregate('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: account.id }, { field: 'data.kind', op: 'eq', value: 'investment' }] } }, { sum: ['data.amount'] })['sum_data.amount'];
-  return (account.data.openingBalance ?? 0) + inc - exp - out + inn - inv;
+  return start + sum('accountId', 'income') - sum('accountId', 'expense') - sum('accountId', 'transfer') + sum('toAccountId', 'transfer') - sum('accountId', 'investment');
+}
+
+/** An account's money in and out by month, oldest first (its page's columns): in is income and transfers in; out is spending, transfers and buys. Full amounts, as the bank sees them. */
+export function accountFlows(os: LifeOSContext, accountId: string, months = 6, now: number | Date = Date.now()): Array<{ month: string; label: string; in: number; out: number }> {
+  const ranges = Array.from({ length: months }, (_, i) => monthRange(i - months + 1, now));
+  const j = (k: string) => `json_extract(data,'$.${k}')`;
+  const rows = os.db.all<{ m: string; i: number; o: number }>(
+    `SELECT substr(${j('date')},1,7) AS m,
+       SUM(CASE WHEN (${j('accountId')}=? AND ${j('kind')}='income') OR (${j('toAccountId')}=? AND ${j('kind')}='transfer') THEN ${j('amount')} ELSE 0 END) AS i,
+       SUM(CASE WHEN ${j('accountId')}=? AND ${j('kind')} IN ('expense','transfer','investment') THEN ${j('amount')} ELSE 0 END) AS o
+     FROM records WHERE object='transaction' AND deleted_at IS NULL AND ${j('date')} BETWEEN ? AND ? GROUP BY m`,
+    [accountId, accountId, accountId, ranges[0]!.start, ranges[ranges.length - 1]!.end],
+  );
+  const by = new Map(rows.map((r) => [r.m, r]));
+  return ranges.map((r) => ({ month: r.start.slice(0, 7), label: r.label.split(' ')[0]!.slice(0, 3), in: by.get(r.start.slice(0, 7))?.i ?? 0, out: by.get(r.start.slice(0, 7))?.o ?? 0 }));
 }
 
 export function netWorth(os: LifeOSContext): { total: number; assets: number; liabilities: number; investments: number; accounts: Array<{ account: ObjectRecord<AccountData>; balance: number }>; holdings: Array<{ investment: ObjectRecord<InvestmentData>; value: number }> } {
@@ -57,23 +79,29 @@ export function netWorth(os: LifeOSContext): { total: number; assets: number; li
   return { total: assets + investments - liabilities, assets, liabilities, investments, accounts: rows, holdings };
 }
 
+/** Your share of spending in a range (MODEL layer 2): expenses at your share, less refunds. */
+const MONEY_ROWS = `FROM records WHERE object='transaction' AND deleted_at IS NULL AND ${MONEY_KINDS_SQL()} AND json_extract(data,'$.date') BETWEEN ? AND ?`;
+
 export function spendInRange(os: LifeOSContext, start: string, end: string, category?: string): number {
-  const and = [{ field: 'data.kind', op: 'eq' as const, value: 'expense' }, { field: 'data.date', op: 'gte' as const, value: start }, { field: 'data.date', op: 'lte' as const, value: end }];
-  if (category) and.push({ field: 'data.category', op: 'eq', value: category });
-  return os.records.aggregate('transaction', { filter: { and } }, { sum: ['data.amount'] })['sum_data.amount'];
+  const row = os.db.get<{ s: number | null }>(`SELECT SUM(${spentSql()}) AS s ${MONEY_ROWS}${category ? ` AND json_extract(data,'$.category')=?` : ''}`, category ? [start, end, category] : [start, end]);
+  return Math.max(0, row?.s ?? 0);
 }
 
+/** What came in: income at your share, leaving out refunds and paybacks. */
 export function incomeInRange(os: LifeOSContext, start: string, end: string): number {
-  return os.records.aggregate('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'income' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, { sum: ['data.amount'] })['sum_data.amount'];
+  return os.db.get<{ s: number | null }>(`SELECT SUM(${incomeSql()}) AS s ${MONEY_ROWS}`, [start, end])?.s ?? 0;
 }
 
 export function spendByCategory(os: LifeOSContext, start: string, end: string) {
-  return os.records.groupBy('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, 'data.category', { sum: ['data.amount'] }).map((g) => ({ category: g.key ?? 'other', total: g.values['sum_data.amount'], count: g.values.count }));
+  return os.db
+    .all<{ category: string | null; total: number; count: number }>(`SELECT json_extract(data,'$.category') AS category, SUM(${spentSql()}) AS total, SUM(json_extract(data,'$.kind')='expense') AS count ${MONEY_ROWS} GROUP BY category`, [start, end])
+    .filter((g) => g.count > 0 && g.total > 0)
+    .map((g) => ({ category: g.category ?? 'other', total: g.total, count: g.count }));
 }
 
 export function dailySpend(os: LifeOSContext, start: string, end: string): Array<{ date: string; total: number }> {
-  const rows = os.records.groupBy('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: start }, { field: 'data.date', op: 'lte', value: end }] } }, 'data.date', { sum: ['data.amount'] });
-  const map = new Map(rows.map((r) => [r.key, r.values['sum_data.amount']]));
+  const rows = os.db.all<{ day: string; total: number }>(`SELECT json_extract(data,'$.date') AS day, SUM(${spentSql()}) AS total ${MONEY_ROWS} GROUP BY day`, [start, end]);
+  const map = new Map(rows.map((r) => [r.day, Math.max(0, r.total)]));
   const out: Array<{ date: string; total: number }> = [];
   const d = new Date(start);
   const e = new Date(end);

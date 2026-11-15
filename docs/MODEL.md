@@ -257,7 +257,7 @@ about it; the keys stay as they were (M4.2c) so old records keep working.
 | Status | select | ordered · shipped · out for delivery · delivered · cancelled · returned; **only moves forward**; cancelled and returned close it |
 | Expected | date | from the text ("by Tue, 29 Sep", "today", "in 10 minutes") |
 | Delivered on | date | |
-| OTP | text | the code for the agent; shown large while it is on its way; gone once delivered, and not shown after 3 days; *(hidden)* when it came (`otpAt`) |
+| OTP | text | the code for the agent; shown large while it is on its way; gone once delivered, not shown after 3 days and wiped after 7; *(hidden)* when it came (`otpAt`) |
 | Order | link → Transaction, word *bought in* | the payment: the newest spend whose payee names the shop, in the 2 days before the first text; or one that comes within 2 days after (cash on delivery, a late SMS); never another delivery's |
 | Notes | long text | |
 
@@ -282,6 +282,42 @@ Not Objects: **Category** is a setting (name, colour, rules, monthly target).
 **Subscription** is a Cycle on the Organisation (or Asset) it pays for, with
 cost and auto-posted Transaction; the Subscriptions report lists those cycles.
 **Budget** is the monthly target on a Category.
+
+**Your share (agreed 14 Nov, phase A).** A Transaction's amount is what moved in
+the account, so balances always match the bank. What you *spent* is your share:
+- **Your share** (`share`, money) is the part of the amount that is yours; empty
+  means all of it. A split you paid sets it to your part (Toit ₹2,600 with Priya:
+  ₹1,300); a bill someone else paid is 0 for you until you pay them back, and that
+  payment is your spend.
+- **A payback** is money in that settles what someone owed you: its share is 0, so
+  it is not income. Settle up finds the payment (from that person, the amount of
+  the balance, in the last 45 days) and makes it the payback; Turf's matched ₹147s
+  are paybacks the same way.
+- **A refund** (`refund`) is money back for a purchase: not income, and it takes
+  its amount off spending in the category of what it refunds (Adidas ₹18,899 back
+  lowers Shopping).
+- **Spent** = expenses at your share, less refunds. **Came in** = income at your
+  share, leaving out refunds. Every place that adds up money counts it this way
+  (Money, Spend, Reports, Today, Time, trips, places, projects): one rule in core.
+- **The turf you fronted**: an expense from up to 3 days before a game you fronted
+  to the day after, for its total cost or its advance, with only one such game,
+  is that game's booking; its share is your share of the game. Filed in To check
+  with Undo (Turf's *Turf booked* card).
+- **Folded once** on first start with this: splits saved before get their share,
+  and Turf payments matched from texts before become paybacks.
+
+**Balances follow the bank (14 Nov, phase A).** A bank text's balance ("Avl Bal")
+becomes the account's known balance for its day; the account adds only payments
+dated after it, so every new text corrects it (an older text never overwrites a
+newer one; a card's figure is its limit, so cards are left out). Cash taken from
+an ATM lands in your **Cash** account (made once if you have none).
+
+**A card's bill (14 Nov, phase A).** A card's statement or reminder text ("Total
+of Rs 26,046.50 or minimum of Rs 1,310.00 is due by 30-OCT-26", Axis's "Due on …
+Total amt … Min amt due …") is kept on the card's account: total, minimum, due
+date, the newest wins. A payment into the card that covers it clears it. Money's
+Accounts list shows it under the card ("₹26,046.50 due Thu 30 Oct"), in coral once
+the day has passed.
 
 ### Body (module `health`; Fields agreed 2 Nov with R6)
 | Object | Meaning | Key fields | Filed by |
@@ -801,9 +837,68 @@ Parsed directly by per-sender parsers on the phone → record (Transaction,
 Delivery, Event…). The raw text is kept as a Field on that record, so a misparse
 can be corrected and taught; raw text is cleared 60 days after filing, the record
 stays. A message no parser understands is a **leftover**: kept, listed in To
-check, and offered to the model when one is available. The parsers are trained
+check, and offered to the model when one is available.
+
+**Throwaway messages live a week (agreed 6 Nov).** A message that filed nothing
+(a login OTP, a promotion, a duplicate, a leftover) is deleted after 7 days. A
+one-time code never outlives its use: the wording of any OTP text goes after 7
+days, or at the next daily clean-up once its parcel is delivered, and a sender's
+first-seen line is never an OTP. A Delivery's own OTP Field goes the moment it is
+delivered, and after 7 days at the latest. The Delivery record itself stays,
+because it is the history of what you bought. The parsers are trained
 over time by per-sender rules plus what you teach: category rules, payee
 aliases, trusted senders. The model path for messages should shrink toward zero.
+
+**Learned from Rutvij's own texts (10 Nov).** 753 texts from 90 days on the phone,
+masked on the Mac before anything was read, then kept as parser tests:
+- **One movement, two texts, one transfer.** A card bill paid from another account
+  (straight, by BillPay or through CRED: the debit and the card's "payment
+  received"), a card's credit balance sent to savings, money into your loan
+  account: whichever text comes second joins the first as one transfer, from one
+  account to the other, so it is never counted as spending or income. A plain spend
+  only joins a transfer in, and plain income only a transfer out, so a friend's
+  ₹200 never cancels your ₹200 chai.
+- **Which way it moved**: a transfer that comes in is stored as arriving at the
+  account (`toAccountId`), one that goes out as leaving it, so a card payment lowers
+  what the card owes and cash deposited raises the bank's balance.
+- **Transfers by their words**: cash deposited "by SELF", money into a loan account
+  or a forex card, a card's credit balance sent to your savings.
+- **Your own name is learned (agreed 10 Nov)**: money to or from the name your banks
+  write for you ("RUTVIJ ANIL MAHA", "RUTVIJ AN", "Mr. RUTVIJ") is a transfer between
+  your accounts, not spending or income. You teach it once with **That's me** beside
+  *Paid to / Paid by* on a payment whose payee is not a shop; every earlier payment
+  to that name turns into a transfer too, with Undo. Banks cut names short, so a
+  name matches when its first word is yours and each word after starts the next of
+  yours. The names stay on the phone (`finance.myNames`).
+- **Refunds and cashback** are read as money back for a purchase (filed as income
+  until Money decides how they count).
+- **Not a payment**: a charge that "will be auto-debited", a failed payment that
+  "will be refunded", one the bank is "unable to confirm", a purchase you only
+  initiated, reward points from a shop. An insurance cover ("Rs 20 lakhs") is never
+  the amount; the premium is.
+- **A year of texts and CRED's notifications (11 Nov)**, from the app's parser export
+  (1,956 texts, 114 notifications), masked on the Mac first:
+  - *Asking you to pay is a bill, not a payment*: "tap to pay ₹5,450", "Pay total
+    Rs 1891 or min Rs 100", a disconnection notice, anything ending "Ignore if
+    paid". A request to approve ("AutoPay request for up to Rs 799", "requested
+    money from you") moves nothing yet.
+  - *A shop or service that names no account, card or wallet sends a receipt or a
+    notice*; the bank's own text carries the money. So MakeMyTrip's "thank you for
+    booking", EPFO's passbook balance, a refund only "initiated", a coupon or a
+    sale are never payments. A wallet payment ("using Zepto Cash", "Apay balance")
+    is one, named for its shop.
+  - *A fund house's SIP confirmation* repeats the bank's debit and is set aside.
+  - *A card bill paid through CRED* ("payment of ₹50,000 on your ICICI Bank credit
+    card XXXX-8013 has been processed") is a transfer into that card.
+  - *Words that are never a name*: "NACH of Rs 500", "transfer of Rs 295", "Chq no",
+    CLG, CMS, "deactivate"; a gateway in front of the shop (PhiCom*) is dropped.
+  - *Categories*: a NEFT or RTGS of ₹20,000 or more from a company is salary;
+    shortened names still match ("MEDICA", "MULTISPE", "COFF", "VADAPA"); annual
+    maintenance and card charges are fees; a nameless NACH debit is asked, not
+    taken for a subscription.
+- **Names cut cleanly**: SBI's "trf to NAME Refno", HSBC's "paid from HSBC account
+  … to NAME", "Mr." before a name, the payer of an incoming NEFT ("of ACME"),
+  "WWW*" and "BKG*" prefixes, spaced letters ("P L A Y O").
 
 ### Dumps (what you type, say or share)
 Stored verbatim as a Dump, then filed. Every record, link, fact and event filed
@@ -842,6 +937,31 @@ No model is trained; the parsers are rebuilt against your real texts.
    the gap list.
 3. **Ship**; the next export shows what is still unread.
 The same loop applies to mail and payment notifications.
+
+### Message samples (agreed 6 Nov)
+The working set for that loop, kept in the app (You › Data sources › Message
+samples). The full export above stays for when every text is needed; samples are
+what you send first, because they are small and masked.
+- **One example per shape, per sender.** A message whose wording matches one
+  already kept (digits aside) only adds to its count. At most 30 shapes per sender,
+  newest kept. Every message the app takes in adds to it; a button adds the last 12
+  months of texts from the phone's inbox.
+- **Masked before it is stored**: account and card digits, reference and phone
+  numbers, balances and limits, the name part of UPI ids and mail addresses,
+  number plates, PIN codes, the address a card or kit was sent to, and application
+  and file ids become placeholders of the same shape. Amounts, merchants and people's names stay,
+  because the parsers read them. Because it is masked it is not raw text, so the
+  60-day rule does not apply; you can clear it.
+- **Left out**: one-time codes and passwords in any wording ("is your Instagram
+  code", "Delivery Code is", "Share DAC", "Password is"), texts from people's own
+  numbers, mail from people. The same check clears such a text's wording after a week.
+- **Grouped by who read it**: Not read yet first (the gap list), then each module
+  (Money, Deliveries, Travel…), then Read and skipped. You can read every example
+  before it leaves.
+- **Export** is one JSON file through the share sheet, with what each parser reads
+  in each example today. You choose where it goes. When you send it to Claude, its
+  masked contents go to Anthropic. The file is then the fixture set for better
+  parsers on the phone, and the next export shows what is still unread.
 
 ### The Source contract
 Each source declares: id, the modules it feeds, the permission it needs,
@@ -1044,6 +1164,145 @@ from the model when available). Below: the last 15 days of dumps, each with
 what it filed as chips (1 person · 2 facts · 1 task), per-item Undo, and its
 state (filed · waiting, why · needs you).
 
+**Everyday money questions are answered on the phone (agreed 6 Nov).** No model,
+no network, nothing leaves: code reads the question and works out the figure from
+your Transactions, Accounts and subscriptions. It covers: where the money went,
+how much on a category or at a merchant (with the payments behind it and the change
+from the period before), what came in, the biggest spends, balances, net worth,
+subscriptions, investments, what is due before payday and what would be left,
+anything charged twice, and whether a stated amount is affordable. **Payday** is
+worked out: the day of the month of your latest Salary. Anything else goes to the
+model as before, with every read-only money tool now open to it.
+
+### Ask Money (proposed 6 Nov, drawn in the Money design file; not built)
+Money you can talk to, on the idea of Personal Finance in Claude. Claude's own
+feature is US only and reaches banks through Plaid, so LifeOS builds it on its own
+Sources. Read-only, always.
+- **Where**: an ask box at the top of Money home, opening its own screen with
+  starter questions from your data. Every existing Money screen stays below it.
+- **Who does the sums**: the phone's code computes every figure. A model only picks
+  which figures to fetch and explains them; it never does arithmetic. The starter
+  questions run on the phone alone.
+- **Show the payments**: every figure opens the exact payments behind it, adding up
+  to it.
+- **Follow-ups**: in the same thread, kept while the screen is open and not saved.
+  What you want to keep, you keep as a view.
+- **Views**: "show weekly spend as a chart" returns a view from a closed set of Noir
+  blocks (number, bars, line, calendar, list), adjustable in words. **Keep** pins it
+  to Money home. It stores the question for the numbers, not the numbers, so it stays
+  live without another model call.
+- **Noticing**: double charges, new fees and bills that rose become Money's
+  candidates in the morning brief (layer 8).
+- **Limits**: it never moves money and gives no investment advice; asked, it says so
+  and shows what you hold.
+- **Privacy** (decided 11 Nov): money questions may go to any provider in the chain,
+  OpenRouter's free models included, knowing some free providers log or train on
+  what they are sent. Only the records needed leave (payee, amount, date,
+  category), never raw texts, under the daily budget and in the Sent to Claude log.
+- **How it works** (11 Nov, from a friend's design that matches the agent): the
+  model gets Money's read-only tools by name and description, a Money prompt
+  (your money manager; every figure from a tool, never its own arithmetic; never
+  moves money; no investment advice) and must answer in one fixed shape: a
+  sentence, one block from the closed set, and the payments behind each figure.
+  Everyday questions stay on the phone with no model (`money_answer`).
+- **When**: after Money counts your share (splits, Turf, paybacks), so its answers
+  rest on numbers that are right.
+- **Open**: the cost per question (not measured); bank statement PDFs to backfill
+  history; India's Account Aggregator framework (not checked whether an individual
+  can use it).
+
+### Money home: four answers at a glance (14 Nov, phase B)
+Built from the v3 Noir kit; top to bottom:
+1. **This month and the pace**: spent and came in (your share), then one line:
+   "₹806 a day keeps it under ₹72k" while under your **monthly line**, "₹4,356 over
+   your line of ₹72k" once over. The line is the one you set (You › Categories ›
+   Monthly line), else your usual month (the average of the last three months
+   with spending). A day's allowance is what is left over the days left, today
+   included.
+2. **Needs you**: what To check asks about money (who a sender is, a payee guess).
+3. **Who owes whom**: everyone with a balance (Turf, splits, IOUs), net per person,
+   biggest first; owed to you in lime, you owe in coral; a row opens their page,
+   where Settle is.
+4. **Coming up before payday**: card bills (a late one first, in coral),
+   subscription renewals and SIPs, soonest first, with their total; payday is the
+   day of your latest Salary, else the month's end. The Dump box's "what's due
+   before payday?" answers from the same list.
+Then the rest as before: subscriptions and net worth, where it went, targets,
+accounts, investments, recent.
+
+### Money pages with no artboard, from the kit (14 Nov, phase C)
+No screen stays on the generic layout; each is put together from v3 Noir kit parts.
+- **An account's page**: the top bar; the account's disc, name, bank and last
+  digits; pills for its kind and whether it counts in net worth; three numbers:
+  *Balance* (with "bank said, 12 Nov" when a text stated it, else "from
+  opening balance"), *In* and *Out* this month. A card shows *Owed*, *Bill*
+  (amount and due day, coral once late) and *Limit used* instead. Then Add payment
+  and Transfer; *Money out* by month as columns in tracks (six months); its latest
+  payments; its Fields; attachments, tags and reminders.
+- **Subscriptions** (Money › Subscriptions): what they cost a month and a year,
+  then the active ones, soonest renewal first, each with its day in words
+  ("Thu 10 Dec · in 26 days") and its cost a month; paused and cancelled ones
+  below. None active: the *No active subscriptions* card from the States design.
+- **Who owes whom** (Money › Who owes whom, the *All* of that home section): owed
+  to you and you owe; one block per person with their net and Settle up, their
+  open items under it ("Sat 17 Oct · Turf at Playground Arena"); the last settled ones
+  below. A Turf debt's reason is "Turf · <venue>"; its date is its own Field.
+- **A debt's page**: the top bar; the person's disc, what it was for, who owes whom;
+  pills for open or settled, its kind and its group; three numbers: *Amount*, *Date*
+  and the whole *Balance* with that person. Then Settle up (everything with them,
+  with Undo) or Reopen once settled, their page and Edit; the payment it came from;
+  what else is open between you; its Fields; attachments, tags and reminders.
+- **Reports**: account kinds in words, one minus sign (−). The net worth line
+  ends at today's net worth and is walked back by each month's payments, so it
+  agrees with the number above it; it starts the month before your first payment.
+  A buy or SIP moves money into a holding and does not change net worth; holdings
+  count at today's value.
+- **Small things**: Money home's *Accounts › All* opens Reports › Net worth (real
+  balances), not the generic list; the form's date shows whole (the year only when
+  it is not this year); the parser export sits with the
+  masked samples (You › Data sources › Message samples), not behind SMS senders.
+
+### Money on its own (agreed 14 Nov, phase D)
+Learned from Rutvij's masked texts: SBI's nameless "debit by NACH" (₹5,000, ₹2,000
+around the 5th) are SIPs counted as spending; ICICI warns before every
+standing-instruction charge (Adobe, Spotify, Blackmagic, Lovable); electricity
+(MSEDCL) and water (OCW) bills come as texts; Adobe went from ₹1,516 to ₹699 in
+August (a plan change) and nothing said so. In the order built:
+1. **NACH to SIP.** A debit by NACH with no name, for an active Investment's SIP
+   amount within 3 days of its SIP day, is that SIP: filed as investing, not
+   spending, and its Investment's *invested* grows. When none matches, To check
+   asks "₹2,000 by NACH on Mon 5 Oct: a SIP?" with each active holding, *New SIP*
+   and *Not a SIP*. Picking one moves the payment to investing and sets that
+   holding's SIP amount and day, so the next one files itself; *Not a SIP* is
+   remembered for that amount. Until answered it stays spending.
+2. **Heads-ups before a charge** ("Payment of INR 1516.30 towards Merchant Adobe…
+   to be debited… due by 09/07"): set that Subscription's next charge and amount
+   (made if new, auto-post off, since the charge text follows), so it shows in
+   *Coming up*.
+3. **A price change**: a charge or heads-up at a new price adds to the
+   Subscription's price history and puts *A bill went up* (or *down*) in To check
+   ("Netflix went from ₹499 to ₹649 · ₹1,800 more a year", Keep it · See it) and
+   the morning brief. A change under 2% is not one. A foreign one compares its own currency (`foreign`), so the rupee rate
+   does not count as a change.
+4. **Spotted subscriptions**: three payments to the same payee within 5% of the
+   same amount, 25 to 35 days apart, and no Subscription for it: To check asks once,
+   "Spotify, ₹299 every month: track it?". *Track it* makes the Subscription
+   (auto-post off) and links the payments; *Not a subscription* is remembered for
+   that payee.
+5. **Bills are Subscriptions** with `bill` set and auto-post off (the brain already
+   asks "Paid?" for those); `payee` is the word that names the biller in a payment
+   (MSEDCL). A due text (electricity, water, gas, internet, phone, an EMI or a
+   premium, with an amount) sets its amount and due day, made if new; a text with
+   no due day ("Water Bill … is generated") is due 15 days after it. A payment to
+   that payee within 5% of the amount marks it paid: linked, and the next due day
+   is a month on. Money › Subscriptions shows bills in their own group ("3
+   subscriptions · 1 bill"); bills stay out of the subscriptions run-rate.
+6. **Month close**: on the 1st to the 3rd, Money home opens with last month:
+   spent against usual, came in, saved (came in less spent), the three biggest
+   changes by category against usual, new subscriptions and price rises; it opens
+   that month in Reports. The morning brief says it on the 1st.
+*Charged twice?* and *A new fee* come with Ask Money (phase E).
+
 ### Browse
 **Search across the whole app** on top: every record of every module, facts,
 dumps, notes, tags, attachment names, events, cycles, boards and automations by
@@ -1114,6 +1373,14 @@ Component gallery (dev).
 - **Spend**: its own screen from Today's spend tile and the Money overview:
   transactions with sort (date, amount) and filters (category, account, kind,
   date range), spend by category. It is Money's List with its filters pinned.
+- **Money in the v3 Noir kit (14 Nov)**: Money home's *Where it went* is the kit's
+  ring with badges; Spend shows *This week* as columns in tracks (today white) and
+  *When it went* as hour ticks (each spend's hour from when its text arrived, or
+  when you typed it that day; hidden when no times are known); a person's Money
+  section opens with the donut *Shared with Priya · this month* (your share and
+  theirs across the splits they are in); the Money tile on Today has a second look,
+  *Instrument* (Money · live: the last 7 days in dots, against the 7 before), the
+  week bars staying the default.
 
 ## 6. Milestones — proposed 4 Oct
 
@@ -1635,6 +1902,14 @@ screens checked on the phone → overrides only where the default is wrong)
     done.) *Raw texts* (60 days, from M4.2c): ignored messages deleted, the
     wording of filed messages and of the transaction's Original text cleared,
     the per-app screen time and ended synced calendar events removed.
+- [ ] **R17 Ask Money and better parsers** (6 Nov; layers 4 and 5).
+  - [x] Everyday money questions answered on the phone (`money_answer`, an AI tool
+    with `answers`: the question it can take, read on the phone); the read-only
+    money, trip and health tools opened to the question path.
+  - [x] Message samples: collected, masked, grouped, exported.
+  - [x] Throwaway messages and one-time codes live a week.
+  - [ ] Ask Money itself, once its design is agreed.
+  - [ ] Better parsers, from the first samples you send.
 - [ ] **R16 Docs** — `ARCHITECTURE.md`, `GRAPH.md` and SCOPE §C retired into
   this file; `HANDOFF.md` rewritten for the three tiers.
   - [x] `ARCHITECTURE.md` retired (R0, 4 Oct).

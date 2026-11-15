@@ -201,7 +201,7 @@ export const appearanceObject: ObjectDef<AppearanceData> = {
   ],
   occurredAtField: 'gameDate',
   computeTitle: (d) => `Game on ${shortDay(d.gameDate)}`,
-  computeSubtitle: (d, { formatCurrency }) => [formatCurrency(d.share), d.paid ? 'paid' : 'unpaid', d.goals ? `${d.goals} goal${d.goals === 1 ? '' : 's'}` : null].filter(Boolean).join(' · '),
+  computeSubtitle: (d, { formatCurrency }) => [formatCurrency(d.share), d.paid ? 'paid' : (d.amountPaid ?? 0) > 0 ? `${formatCurrency(d.amountPaid!)} paid` : 'unpaid', d.goals ? `${d.goals} goal${d.goals === 1 ? '' : 's'}` : null].filter(Boolean).join(' · '),
   indexed: ['gameId', 'personId', 'paid', 'gameDate', 'sourceKey'],
 };
 

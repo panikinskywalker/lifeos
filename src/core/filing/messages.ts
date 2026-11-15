@@ -2,6 +2,7 @@ import type { LifeOSContext } from '../registry/context';
 import { bus } from '../events/bus';
 import type { FileContext, FileOutcome, MessageParser, ParserRead, RawMessage } from './contract';
 import type { Mail } from './mail';
+import { noteSample } from './samples';
 import { findTwin, hasMessageFor, messageId, messageItem, messageList, messageOutcome, seeSender, senders, setDedupeKey, setQueueItem, setSenderTrusted, sourceLabel, toItem, type IngestItem, type IngestResult } from './queue';
 
 export type { FileContext, FileOutcome, MessageParser, ParserRead, RawMessage, IngestItem, IngestResult };
@@ -55,6 +56,7 @@ export function fileMessage(os: LifeOSContext, m: RawMessage, opts: { mode?: 'li
   if (existing) return { id, status: existing.status, entityId: existing.entityId, reason: 'seen before' };
   const now = Date.now();
   os.db.run(`INSERT INTO ingest_queue(id,source,package,received_at,raw_title,raw_text,status,created_at,updated_at) VALUES (?,?,?,?,?,?,'pending',?,?)`, [id, m.source, m.from, m.receivedAt, m.title ?? null, m.body, now, now]);
+  noteSample(os, m);
   return dispatch(os, m, id, mode);
 }
 
@@ -127,5 +129,6 @@ export function fileMail(os: LifeOSContext, mail: Mail, account: string): Ingest
     `INSERT INTO ingest_queue(id,source,package,received_at,raw_title,raw_text,raw_extra,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'pending',?,?)`,
     [id, 'email', mail.from, mail.date, mail.subject, text, JSON.stringify({ account, fromName: mail.fromName, uid: mail.uid }), now, now],
   );
+  noteSample(os, m);
   return dispatch(os, m, id, 'live');
 }

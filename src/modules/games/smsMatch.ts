@@ -135,6 +135,8 @@ function pay(os: LifeOSContext, txId: string, appearanceIds: string[], amount: n
     if (!os.links.forEntity(txId).some((l) => l.other.id === id)) os.links.link(txId, id, 'pays', {}, 'system');
     left = Math.round((left - part) * 100) / 100;
   }
+  // A payback, not income (MODEL layer 2, Your share): only what is left over, a credit, still counts as money in.
+  if (items.length) os.records.update(txId, { data: { share: Math.max(0, left) } }, 'system');
   return items;
 }
 
@@ -217,6 +219,7 @@ export function undoSmsPayment(os: LifeOSContext, filingId: string): void {
       left -= part;
       if (f.sourceRef) os.links.unlink(f.sourceRef, id, 'pays', 'user');
     }
+    if (f.sourceRef && os.records.get(f.sourceRef)) os.records.update(f.sourceRef, { data: { share: undefined } }, 'user');
     os.filings.markUndone(filingId);
   });
 }

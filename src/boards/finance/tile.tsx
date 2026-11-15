@@ -7,8 +7,8 @@ import { sourceState } from '@core/sources/deviceData';
 import type { TileDef } from '@core/registry/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Caps } from './parts';
-import { Text } from '@ui/kit';
+import { Caps, shortMoney } from './parts';
+import { InstrumentCard, Text } from '@ui/kit';
 
 const iso = (d: Date) => format(d, 'yyyy-MM-dd');
 
@@ -36,18 +36,19 @@ function WeekBars({ week, over, height, letters }: { week: Array<{ day: Date; to
 }
 
 /** Money on Today (NR-Money-Tile): this month against your usual month, the last 7 days; opens Money home. Empty, it names the permission it needs. */
-function MoneyTile({ wide }: { wide: boolean }) {
+function MoneyTile({ wide, look }: { wide: boolean; look?: string }) {
   const router = useRouter();
   const t = useTheme();
   const os = useOS();
   const v = useLive((o) => {
     if (!o.registry.objects.has('transaction')) return null;
     const now = new Date();
-    const byDay = daily(o, 'spend', iso(subDays(now, 6)), iso(now));
-    return { pace: spendPace(o), week: Array.from({ length: 7 }, (_, i) => { const d = subDays(now, 6 - i); return { day: d, total: byDay.get(iso(d)) ?? 0 }; }), sms: sourceState(o, 'sms').enabled };
+    const byDay = daily(o, 'spend', iso(subDays(now, 13)), iso(now));
+    const lastWeek = Array.from({ length: 7 }, (_, i) => byDay.get(iso(subDays(now, 13 - i))) ?? 0).reduce((a, b) => a + b, 0);
+    return { pace: spendPace(o), lastWeek, week: Array.from({ length: 7 }, (_, i) => { const d = subDays(now, 6 - i); return { day: d, total: byDay.get(iso(d)) ?? 0 }; }), sms: sourceState(o, 'sms').enabled };
   }, []);
   if (!v) return null;
-  const { pace: p, week, sms } = v;
+  const { pace: p, week, sms, lastWeek } = v;
   const money = os.format.currency;
   const size = wide ? { minHeight: 167 } : { flex: 1, aspectRatio: 1 };
   const box = { padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, justifyContent: 'space-between' as const, ...size };
@@ -88,6 +89,15 @@ function MoneyTile({ wide }: { wide: boolean }) {
   }
   const today = week[week.length - 1]!.total;
   const seven = week.reduce((n, d) => n + d.total, 0);
+  if (look === 'instrument') {
+    // NR-KitInstruments' "Money · live": this week in dots, the days as a dotted line, against last week.
+    const change = lastWeek ? Math.round(((seven - lastWeek) / lastWeek) * 100) : null;
+    return (
+      <Pressable accessibilityRole="button" accessibilityLabel={`Money: ${money(seven)} spent this week${change != null ? `, ${change}% against last week` : ''}`} onPress={open}>
+        <InstrumentCard title="Money · live" value={shortMoney(os, seven).replace(/^[^\d−-]+/, '')} caption="spent in 7 days" status={sms ? 'Live' : undefined} line={week.map((d) => d.total)} footer={change != null ? { label: 'vs last week', value: `${change > 0 ? '+' : change < 0 ? '−' : ''}${Math.abs(change)}%`, good: change <= 0 } : undefined} />
+      </Pressable>
+    );
+  }
   const foot: TextStyle = { fontSize: 13, lineHeight: 17, fontWeight: '600', fontVariant: ['tabular-nums'], color: t.c.fg.secondary };
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${label}, the last 7 days`} onPress={open} style={({ pressed }) => [box, { opacity: pressed ? 0.9 : 1 }]}>
@@ -109,4 +119,4 @@ function MoneyTile({ wide }: { wide: boolean }) {
   );
 }
 
-export const financeTiles: TileDef[] = [{ type: 'spend', board: 'finance', name: 'Money', description: 'This month against your usual month, the last 7 days', icon: 'wallet', sizes: ['small', 'medium'], defaultSize: 'medium', component: ({ size }) => <MoneyTile wide={size !== 'small'} /> }];
+export const financeTiles: TileDef[] = [{ type: 'spend', board: 'finance', name: 'Money', description: 'This month against your usual month, the last 7 days', icon: 'wallet', sizes: ['small', 'medium'], defaultSize: 'medium', configFields: [{ key: 'style', label: 'Look', type: 'select', options: [{ value: 'bars', label: 'Week bars' }, { value: 'instrument', label: 'Instrument' }] }], component: ({ size, config }) => <MoneyTile wide={size !== 'small'} look={config.style as string | undefined} /> }];

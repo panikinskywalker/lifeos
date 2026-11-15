@@ -101,6 +101,7 @@ export default function SourcesScreen() {
           </Card>
         ) : null}
         {proposed ? <Chip icon="inbox" tone="accent" label={`${proposed} transactions from your SMS history to review`} onPress={() => router.push('/settings/sms-review' as never)} /> : null}
+        <Button title="Message samples" icon="list" variant="secondary" onPress={() => router.push('/settings/samples' as never)} />
         {SOURCES.map((s) => {
           const a = states[s.id];
           const st = info[s.id]!;

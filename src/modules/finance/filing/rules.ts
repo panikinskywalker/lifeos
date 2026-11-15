@@ -16,16 +16,17 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 /** Whole words only: "ola" is not in "Coca-Cola", "rent" is not in "Parent". */
 const w = (alts: string) => new RegExp(`(?:^|[^a-z0-9])(?:${alts})(?:$|[^a-z0-9])`, 'i');
 const KNOWN: Array<[RegExp, string]> = [
-  [w('swiggy|zomato|eatfit|dominos?|pizza|mcdonalds?|kfc|burger|starbucks|cafe|coffee|chai|restaurant|dining|barbeque|biryani|haldiram'), 'food'],
+  [w('swiggy|zomato|eatfit|dominos?|pizza|mcdonalds?|kfc|burger|starbucks|cafe|coffee|chai|restaurant|dining|barbeque|biryani|haldiram|coff\\w*|vada\\w*|bakery|sweets|ice ?cream'), 'food'],
   [w('bigbasket|blinkit|zepto|instamart|dmart|jiomart|grofers|more retail|nature.?s basket|milk|dairy'), 'groceries'],
   [w('uber|ola|rapido|metro|irctc|redbus|fuel|petrol|hpcl|bpcl|iocl|indian oil|shell|fastag|parking'), 'transport'],
-  [w('amazon|flipkart|myntra|ajio|nykaa|meesho|tata cliq|croma|reliance digital|decathlon|ikea'), 'shopping'],
+  [w('amazon|flipkart|myntra|ajio|nykaa|meesho|tata cliq|croma|reliance digital|decathlon|ikea|adidas|nike|puma|zara|uniqlo|wakefit'), 'shopping'],
   [w('netflix|spotify|hotstar|prime video|youtube|bookmyshow|pvr|inox|steam|playstation'), 'entertainment'],
   [w('airtel|jio|vodafone|vi|bsnl|act fibernet|electricity|bescom|tata power|gas|water bill|broadband|recharge'), 'utilities'],
-  [w('apollo|pharmeasy|1mg|netmeds|medplus|hospital|clinic|diagnostic|practo'), 'health'],
+  [w('apollo|pharmeasy|1mg|netmeds|medplus|hospital|clinic|diagnostic|practo|medic\\w*|multispe\\w*|pharma\\w*|chemist'), 'health'],
   [w('makemytrip|goibibo|cleartrip|yatra|indigo|air india|vistara|akasa|spicejet|airbnb|oyo|booking\\.com|agoda|hotel'), 'travel'],
   [w('rent|nobroker|housing'), 'housing'],
   [w('salary|payroll'), 'salary'],
+  [w('annual maintenance|maintenance charges|card charges|late fee|processing fee'), 'fees'],
 ];
 
 export interface CategoryRule {
@@ -169,6 +170,8 @@ export function categoryFor(os: LifeOSContext, merchant: string | null | undefin
     const hit = KNOWN.find(([re]) => re.test(merchant));
     if (hit) return hit[1];
   }
+  // A large bank transfer in from a company is pay ("NEFT from HDFC A/c of ACME TECH (I)").
+  if (direction === 'credit' && (amount ?? 0) >= 20_000 && /\b(?:neft|rtgs|imps)\b/i.test(text) && /\b(?:ltd|limited|pvt|private|tech|technologies|solutions|services|systems|software|labs|llp|india)\b|\([A-Z]{1,3}\)/i.test(merchant ?? '')) return 'salary';
   return text ? (KNOWN.find(([re]) => re.test(text))?.[1] ?? 'other') : 'other';
 }
 

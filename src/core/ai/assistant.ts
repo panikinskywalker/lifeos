@@ -305,7 +305,7 @@ export function selectTools(text: string, tools: AiToolDef[], history: ChatMessa
 }
 
 /** Tools that only read — the one box's question path (docs/GRAPH.md §5). */
-export const READ_ONLY_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'aggregate', 'list_entity_types', 'connections', 'recall', 'upkeep_status', 'balances', 'finance_summary', 'list_reminders', 'recent_activity', 'attach_file', 'find_notes', 'what_i_know']);
+export const READ_ONLY_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'aggregate', 'list_entity_types', 'connections', 'recall', 'upkeep_status', 'balances', 'finance_summary', 'list_reminders', 'recent_activity', 'attach_file', 'find_notes', 'what_i_know', 'spend', 'subscriptions_run_rate', 'net_worth', 'portfolio', 'money_answer', 'trip_spend', 'health_today']);
 
 /** The confirm card's line: the tool's own describe(), else its name and the key inputs. */
 export function confirmSummary(def: AiToolDef, input: unknown, os: LifeOSContext): string {
@@ -323,6 +323,8 @@ export function confirmSummary(def: AiToolDef, input: unknown, os: LifeOSContext
 function summarizeTool(name: string, input: unknown, output: unknown): string {
   const i = input as Record<string, unknown>;
   switch (name) {
+    case 'money_answer':
+      return 'Worked out on the phone';
     case 'search':
       return `Searched "${i.query}"`;
     case 'query_entities':

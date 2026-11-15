@@ -9,7 +9,8 @@ import { messageItem, sourceLabel } from '@core/filing/messages';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { monoFonts } from '@ui/theme/tokens';
-import { Icon, Text } from '@ui/kit';
+import { Icon, Text, useToast } from '@ui/kit';
+import { learnMyName, unlearnMyName } from '@modules/finance/filing/payee';
 import { categoryOf, type AccountData, type TransactionData } from '@modules/finance/types';
 import type { DebtData } from '@modules/finance/split';
 import { PayeeGuess } from './payeeGuess';
@@ -33,6 +34,7 @@ function Stat({ value, label, color }: { value: string; label: string; color?: s
 export function TransactionPage({ entity, ctx, controls, say }: { entity: ObjectRecord<any>; ctx: LifeOSContext; controls?: RecordControls; say?: React.ReactNode }) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const t = useTheme();
   const router = useRouter();
+  const toast = useToast();
   const tx = entity as ObjectRecord<TransactionData>;
   const d = tx.data;
   const money = ctx.format.currency;
@@ -56,6 +58,12 @@ export function TransactionPage({ entity, ctx, controls, say }: { entity: Object
 
   const payeeLink = v.links.find((l) => l.relation.kind === 'payee') ?? v.links.find((l) => l.relation.kind === 'person' && l.relation.meta.as != null);
   const people = v.links.filter((l) => l.other.object === 'person' && l !== payeeLink);
+  // Not a shop: it may be you, under the name your bank writes (a transfer between your own accounts).
+  const maybeMe = !!payeeLink && !!d.merchant && (d.kind === 'expense' || d.kind === 'income') && (payeeLink.other.object === 'person' || ctx.records.get<{ kind?: string }>(payeeLink.other.id)?.data.kind === 'payee');
+  const thatsMe = () => {
+    const u = learnMyName(ctx, d.merchant!);
+    toast.show({ message: `${d.merchant} is you · ${u.changed.length === 1 ? 'a transfer' : `${u.changed.length} payments are transfers`}, and every one after`, icon: 'check', undo: () => unlearnMyName(ctx, u) });
+  };
   const others = v.links.filter((l) => l !== payeeLink && l.other.object !== 'person' && l.other.object !== 'account' && l.other.object !== 'debt');
   const open = (object: string, id: string) => router.push(`/entity/${object}/${id}` as never);
   const objectWord = (object: string) => (ctx.registry.hasObject(object) ? ctx.registry.object(object).label : object);
@@ -107,6 +115,11 @@ export function TransactionPage({ entity, ctx, controls, say }: { entity: Object
                   <Icon name={payeeLink.other.object === 'person' ? 'user' : 'bank'} size={14} color={t.c.fg.primary} />
                   <Text variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>{payeeLink.other.title}</Text>
                 </Pressable>
+                {maybeMe ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${d.merchant} is me: a transfer between my accounts`} hitSlop={8} onPress={thatsMe} style={{ minHeight: 32, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '600', color: t.c.accent.gold }}>That’s me</Text>
+                  </Pressable>
+                ) : null}
               </FieldRow>
             ) : null,
             d.merchant ? (

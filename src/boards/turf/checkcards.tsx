@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { Filing } from '@core/repo/filingRepo';
-import { confirmSmsAsk, dismissSmsAsk, isSending, settleSmsAsk, smsConfirmed, SETTING_SUBMISSIONS, undoSmsPayment, type PlayerProfileData, type SmsAsk, type TurfSubmission } from '@modules/games';
+import { confirmSmsAsk, dismissSmsAsk, isSending, settleSmsAsk, smsConfirmed, SETTING_SUBMISSIONS, undoSmsPayment, undoVenuePayment, type PlayerProfileData, type SmsAsk, type TurfSubmission } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Icon, Text, useToast } from '@ui/kit';
@@ -153,6 +153,24 @@ export function SmsPaidCard({ filing }: { filing: Filing }) {
   };
   return (
     <CardShell faceId={s.personId} name={s.name} title={filing.label} line={s.sending ? 'Filed from an SMS · sending to Turf web…' : 'Filed from an SMS · in Turf web'}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <CardButton title="Looks right" icon="check" lime onPress={() => os.filings.setChecked(filing.id)} />
+        <CardButton title="Undo" icon="undo" onPress={undo} />
+      </View>
+    </CardShell>
+  );
+}
+
+/** A booking you fronted, found among your payments (Your share): Looks right, or Undo makes it all yours again. */
+export function TurfBookingCard({ filing }: { filing: Filing }) {
+  const os = useOS();
+  const toast = useToast();
+  const undo = () => {
+    undoVenuePayment(os, filing.id);
+    toast.show({ message: 'Taken back · the whole payment counts as yours again', icon: 'undo' });
+  };
+  return (
+    <CardShell faceId={filing.id} name="Turf" title={filing.label} line="Found among your payments · only your share counts as spending">
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <CardButton title="Looks right" icon="check" lime onPress={() => os.filings.setChecked(filing.id)} />
         <CardButton title="Undo" icon="undo" onPress={undo} />

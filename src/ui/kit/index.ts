@@ -5,6 +5,8 @@ export { Button, IconButton, type ButtonVariant, type ButtonSize } from './Butto
 export { BentoGrid, Tile, Stat, StatTile, type TileProps, type TileSize } from './Tile';
 export { StackedBar, type StackedBarPart } from './StackedBar';
 export { Ring } from './Ring';
+export { RingBadges, type RingPart } from './RingBadges';
+export { ArcTicks, Dial, Donut, DotNumber, HourTicks, InstrumentCard, Ruler, TrackColumns } from './KitCharts';
 export { RowItem, RowList, Checkbox, type RowItemProps, type ValueTone } from './RowItem';
 export { Chip, FilterChip, ChipRow, type ChipTone } from './Chip';
 export { Sheet } from './Sheet';

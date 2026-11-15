@@ -3,6 +3,8 @@ import { dueWords, pastDay } from '@core/brain/words';
 import type { BrainDef, Candidate, Nudge } from '@core/brain/contract';
 import type { LifeOSContext } from '@core/registry/context';
 import { categoryOf, type InvestmentData, type SubscriptionData, type TransactionData } from './types';
+import { perYear } from './filing/recurring';
+import { monthClose } from './home';
 
 /**
  * What Money brings the brain (docs/MODEL.md layer 8, *Slices 4 and 6*): its
@@ -91,8 +93,35 @@ export function unusualSpends(os: LifeOSContext, now = Date.now()): Candidate[] 
   return out;
 }
 
+/** A Subscription's price changed in the last 3 days (or changes in the next 10, from a heads-up): Keep it, or open it. */
+export function priceChanges(os: LifeOSContext, now = Date.now()): Candidate[] {
+  if (!os.registry.objects.has('subscription')) return [];
+  const from = iso(now - 3 * DAY);
+  const to = iso(now + 10 * DAY);
+  return os.records.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 1000 }).flatMap((s): Candidate[] => {
+    const h = s.data.priceHistory ?? [];
+    const last = h[h.length - 1];
+    const prev = h[h.length - 2];
+    if (!last || !prev || last.from < from || last.from > to) return [];
+    const yearly = Math.round(Math.abs(last.amount - prev.amount) * perYear(s.data.rrule));
+    const up = last.amount > prev.amount;
+    const money = (n: number) => os.format.currency(n);
+    return [{ key: `finance:price:${s.id}:${last.from}`, kind: 'coming up', shape: 'check', subjectId: s.id, title: s.data.name, line: `${s.data.name} went from ${money(prev.amount)} to ${money(last.amount)} · ${money(yearly)} ${up ? 'more' : 'less'} a year`, record: { name: s.data.name, from: prev.amount, to: last.amount, since: last.from, per_year: yearly, went: up ? 'up' : 'down' }, rank: 10, yes: 'Keep it' }];
+  });
+}
+
+/** On the 1st: last month, closed (the card on Money home says the rest). */
+export function closeLine(os: LifeOSContext, now = Date.now()): Candidate[] {
+  const d = new Date(now);
+  const c = d.getDate() === 1 ? monthClose(os, d) : null;
+  if (!c) return [];
+  const money = (n: number) => os.format.currency(Math.round(Math.abs(n)));
+  const vs = c.usual ? `, ${money(c.spent - c.usual)} ${c.spent > c.usual ? 'over' : 'under'} your usual` : '';
+  return [{ key: `finance:close:${c.month}`, kind: 'coming up', shape: 'check', route: '/module/finance/index', title: `${c.label}, closed`, line: `${c.label}: spent ${money(c.spent)}${vs}; ${c.saved >= 0 ? `saved ${money(c.saved)}` : `${money(c.saved)} more out than in`}`, record: { month: c.label, spent: Math.round(c.spent), usual: c.usual, came_in: Math.round(c.income), saved: c.saved }, rank: 5, yes: 'Right' }];
+}
+
 export const financeBrain: BrainDef = {
-  candidates: (os, now) => [...cycles(os, now), ...unusualSpends(os, now)],
+  candidates: (os, now) => [...cycles(os, now), ...unusualSpends(os, now), ...priceChanges(os, now), ...closeLine(os, now)],
   act(os, verb, nudge: Nudge) {
     const p = (nudge.payload ?? {}) as { cycleId?: string; template?: string | null; bill?: { amount: number } };
     if (!p.cycleId) return null;

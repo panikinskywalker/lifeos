@@ -3,6 +3,7 @@ import { Alert, Platform, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BUILTIN_CATEGORIES, categoryRules, rangeRule, ruleAmounts, ruleCategory, ruleText, setCategoryRules } from '@modules/finance/filing/rules';
 import { CATEGORIES } from '@modules/finance/types';
+import { LINE_KEY, monthlyLine } from '@modules/finance/home';
 import { CATEGORY_COLORS, CATEGORY_ICONS, addCategory, categoryTargets, customCategories, deleteCategory, setCategoryTarget, updateCategory, type CustomCategory } from '@modules/finance/categories';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -30,6 +31,8 @@ export default function CategoriesScreen() {
   const t = useTheme();
   const mine = useLive((o) => customCategories(o), []);
   const targets = useLive((o) => categoryTargets(o), []);
+  const line = useLive((o) => o.settings.get<number | null>(LINE_KEY, null), []);
+  const usual = useLive((o) => { const l = monthlyLine(o); return l && !l.yours ? l.amount : null; }, []);
   const [targetFor, setTargetFor] = useState<string | null>(null);
   const groups = useLive((o) => (o.registry.objects.has('group') ? o.records.query('group', {}, { limit: 200 }) : []), []);
   const [mode, setMode] = useState<'exact' | 'range'>('exact');
@@ -94,9 +97,13 @@ export default function CategoriesScreen() {
               ))}
             </RowList>
           ) : (
-            <Text variant="caption" color="secondary">Add your own — Pets, Gym, Kids… They show up wherever you pick a category, in targets, charts and rules. You can also add one straight from a transaction’s category picker.</Text>
+            <Text variant="caption" color="secondary">Add your own: Pets, Gym, Kids… They show up wherever you pick a category, in targets, charts and rules. You can also add one straight from a transaction’s category picker.</Text>
           )}
           <Button title="New category" icon="plus" size="sm" variant="secondary" onPress={() => setEditing('new')} />
+        </Section>
+        <Section title="Monthly line">
+          <Text variant="caption" color="secondary">What you mean to spend in a month, all of it. Money home shows a day's allowance to stay under it. Leave blank to use your usual month.</Text>
+          <NumberField label="Per month ₹" value={line ?? undefined} onChange={(v) => os.settings.set(LINE_KEY, v && v > 0 ? v : null)} placeholder={usual ? String(usual) : '30000'} />
         </Section>
         <Section title="Monthly targets" meta={Object.keys(targets).length ? String(Object.keys(targets).length) : undefined}>
           <Text variant="caption" color="secondary">A monthly amount per category. Spend and the Money overview show how you are pacing against it. Leave blank for none.</Text>

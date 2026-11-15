@@ -7,6 +7,29 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.31 · 15 Nov 2026
+
+**Money counts what you actually spent, and keeps itself up to date.**
+- **Your share**: a split, a Turf game you fronted, a friend paying you back and a
+  refund now count only your part. Settle up finds the real payment.
+- **Read from your own texts**: card bills paid from another account are one
+  transfer; your own name moves money between your accounts, not into spending;
+  balances follow the bank's own figure; card statements give the amount due and
+  the day. One-time codes and passwords are never kept.
+- **Money home answers four things**: a day's allowance against your monthly line
+  (You › Categories › Monthly line), who owes whom, what is coming up before
+  payday, and (on the 1st to the 3rd) last month closed.
+- **On its own**: a nameless NACH debit for a SIP counts as investing (or asks
+  once); the heads-up before a card charge sets that subscription's next charge;
+  a new price goes to To check and the morning brief; three payments a month
+  apart are offered as a subscription; electricity, water and other bills come
+  from their due texts and are marked paid when the payment arrives.
+- **Built from the Noir kit**: the expense ring, donut, hour ticks, columns in
+  tracks and the instrument tile; new pages for an account, a debt,
+  Subscriptions (with Bills) and Who owes whom; Reports' net worth line now ends
+  at today's figure.
+- The parser export moved to You › Data sources › Message samples.
+
 ## v0.0.30 · 5 Nov 2026
 
 **The app now looks like its design files.** Money, Habits, Health, Deliveries,

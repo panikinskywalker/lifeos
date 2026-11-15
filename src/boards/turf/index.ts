@@ -13,7 +13,7 @@ import { TurfPlayer, TurfPlayerEdit, TurfStatsCard } from './player';
 import { TurfLeaders } from './leaders';
 import { TurfLogStats } from './stats';
 import { TurfVenueEdit } from './venue-edit';
-import { SmsAskCard, SmsPaidCard, SubmissionCard } from './checkcards';
+import { SmsAskCard, SmsPaidCard, TurfBookingCard, SubmissionCard } from './checkcards';
 
 /** Turf (docs/MODEL.md layer 3; R9): the first user board, over games + crm + places + finance. A Browse › Boards tile. */
 export const turfBoard: BoardManifest = {
@@ -42,5 +42,5 @@ export const turfBoard: BoardManifest = {
     { key: 'venues', title: 'Venues', component: TurfVenues },
   ],
   // To check cards for Turf's own filings (R9c.6).
-  checkCards: { 'turf-payment': SmsPaidCard, 'turf-payment-ask': SmsAskCard, 'turf-submission': SubmissionCard },
+  checkCards: { 'turf-payment': SmsPaidCard, 'turf-payment-ask': SmsAskCard, 'turf-submission': SubmissionCard, 'turf-booking': TurfBookingCard },
 };

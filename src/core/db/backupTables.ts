@@ -34,6 +34,7 @@ export const BACKUP_TABLES = [
   'brain_learned',
   'brain_skills',
   'brain_sent',
+  'message_samples',
 ] as const;
 
 /** Rebuilt or re-derived on this device, so not worth carrying in a backup. */

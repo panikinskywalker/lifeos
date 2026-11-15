@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -705,6 +705,28 @@ describe('shares paid by SMS (R9c.6)', () => {
     sms(450, '2026-10-18', 'SWIGGY REFUND', 'Rs.450 credited from VPA swiggy@icici');
     sms(999, '2026-12-30', 'KARAN MEHTA', 'Rs.999 credited from VPA karan.m@okhdfc');
     expect(asks()).toHaveLength(1);
+  });
+
+  it("a matched share is a payback, not income (Your share); Undo makes it money in again", () => {
+    os.records.update(person('Karan').id, { data: { upi: 'karan.m@okhdfc' } });
+    const tx = sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited from VPA karan.m@okhdfc');
+    expect(os.records.get<{ share?: number }>(tx.id)!.data.share).toBe(0);
+    undoSmsPayment(os, paid()[0]!.id);
+    expect(os.records.get<{ share?: number }>(tx.id)!.data.share).toBeUndefined();
+  });
+
+  it('the turf you fronted: its booking payment counts only your share; another amount or a far day is left alone; Undo', () => {
+    const spend = (amount: number, date: string) => os.records.create({ object: 'transaction', data: { amount, kind: 'expense', category: 'other', date, merchant: 'Playo' } });
+    const far = spend(1800, '2026-10-01');
+    const odd = spend(1234, '2026-10-16');
+    const booking = spend(1800, '2026-10-16');
+    const share = (id: string) => os.records.get<{ share?: number }>(id)!.data.share;
+    expect([share(far.id), share(odd.id), share(booking.id)]).toEqual([undefined, undefined, 450]);
+    const f = os.filings.toCheck().filter((x) => x.kind === TURF_BOOKING);
+    expect(f.map((x) => x.label)).toEqual([expect.stringMatching(/^Turf booked · ₹1,800 for Sat, 17 Oct · your share ₹450/)]);
+    expect(matchVenuePayment(os, spend(1800, '2026-10-17').id)).toBeNull(); // one booking per game
+    undoVenuePayment(os, f[0]!.id);
+    expect(share(booking.id)).toBeUndefined();
   });
 
   it('one of several UPI ids on their Person is known at once (core identity)', () => {

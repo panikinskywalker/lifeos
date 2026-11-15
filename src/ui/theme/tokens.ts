@@ -143,6 +143,8 @@ export const darkTints: Record<TintKey, Tint> = {
 
 /** Noir colour blocks (tiles on a colour, faces): everything on them is ground-black. */
 export const blocks = { lime: '#D7F55C', sky: '#A9C4FF', orange: '#F26B2B', pink: '#F4A8CE', yellow: '#F6E27F', lilac: '#C9A7F5', mint: '#9FE0B5' } as const;
+/** NR-KitInstruments: the charcoal instrument card and its one signal colour (orange, as in the shot; swappable to lime). */
+export const instrument = { card: '#232327', signal: '#F0622E' } as const;
 
 /** Noir module gradients (Browse · module stack, hero tiles), 160°. */
 export const gradients = {

@@ -487,7 +487,7 @@ function syncDebts(os: LifeOSContext, profiles: Map<string, ObjectRecord<PlayerP
     if (!want) continue;
     const owed = owedOn(a.data);
     const status = owed > 0 ? 'open' : 'settled';
-    const data = clean({ personId: want.personId, direction: want.direction, amount: status === 'open' ? owed : a.data.share, reason: `Turf · ${g.data.venueName} · ${g.data.date}`, date: g.data.date, kind: 'split' as const, groupId: os.settings.get<string | null>(SETTING_GROUP, null) ?? undefined });
+    const data = clean({ personId: want.personId, direction: want.direction, amount: status === 'open' ? owed : a.data.share, reason: `Turf · ${g.data.venueName}`, date: g.data.date, kind: 'split' as const, groupId: os.settings.get<string | null>(SETTING_GROUP, null) ?? undefined });
     const existing = mine[key] ? os.records.get<Record<string, unknown>>(mine[key]) : undefined;
     let id: string;
     if (existing) {

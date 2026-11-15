@@ -40,6 +40,12 @@ export interface AccountData {
   creditLimit?: number;
   includeInNetWorth?: boolean;
   color?: string;
+  /** The balance the bank last stated in a text ("Avl Bal"), the day it was for and when the text came; payments after that day add to it. */
+  knownBalance?: number;
+  knownOn?: string;
+  knownAt?: number;
+  /** A card's latest statement: the total and minimum due, by when (cleared when a payment that covers it arrives). */
+  statement?: { total: number; min?: number; dueOn: string; at: number };
 }
 
 export const accountType: ObjectDef<AccountData> = {
@@ -58,6 +64,10 @@ export const accountType: ObjectDef<AccountData> = {
     creditLimit: z.coerce.number().optional(),
     includeInNetWorth: z.boolean().default(true),
     color: z.string().optional(),
+    knownBalance: z.coerce.number().optional(),
+    knownOn: z.string().optional(),
+    knownAt: z.coerce.number().optional(),
+    statement: z.object({ total: z.number(), min: z.number().optional(), dueOn: z.string(), at: z.number() }).optional(),
   }),
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [
@@ -97,6 +107,10 @@ export interface TransactionData {
   tripId?: string;
   personIds?: string[];
   projectId?: string;
+  /** Your share (MODEL layer 2): the part of the amount that is yours; empty = all of it. A payback is 0. */
+  share?: number;
+  /** Money back for a purchase: not income; it takes its amount off spending in its category. */
+  refund?: boolean;
   /** Where it came from, the source's own id, and the raw text (cleared 60 days after filing). */
   source?: TransactionSource;
   sourceRef?: string;
@@ -130,6 +144,8 @@ export const transactionType: ObjectDef<TransactionData> = {
     projectId: z.string().optional(),
     /** Split details (split.ts SplitRecord); debts are filed separately. */
     split: z.any().optional(),
+    share: z.coerce.number().nonnegative().optional(),
+    refund: z.boolean().optional(),
     source: z.enum(['sms', 'notification', 'mail', 'dump', 'manual', 'cycle']).optional(),
     sourceRef: z.string().optional(),
     rawText: z.string().optional(),
@@ -148,6 +164,8 @@ export const transactionType: ObjectDef<TransactionData> = {
     { key: 'projectId', label: 'Project', type: 'link', linkTo: 'project', linkWord: 'project', section: 'Links' },
     { key: 'investmentId', label: 'Investment', type: 'link', linkTo: 'investment', linkWord: 'investment', section: 'Links' },
     { key: 'note', label: 'Note', type: 'longtext', section: 'Details' },
+    { key: 'share', label: 'Your share', type: 'money', section: 'Details', description: 'The part that is yours; empty means all of it. A split sets it; a payback is 0' },
+    { key: 'refund', label: 'Refund', type: 'boolean', section: 'Details', description: 'Money back for a purchase: comes off spending, not counted as income' },
     currencyField,
     { key: 'source', label: 'Source', type: 'select', section: 'Source', options: [{ value: 'sms', label: 'SMS' }, { value: 'notification', label: 'Notification' }, { value: 'mail', label: 'Mail' }, { value: 'dump', label: 'Dump' }, { value: 'manual', label: 'Typed' }, { value: 'cycle', label: 'Cycle' }] },
     { key: 'rawText', label: 'Original text', type: 'longtext', section: 'Source', description: 'Kept 60 days after filing' },
@@ -273,6 +291,12 @@ export interface SubscriptionData {
   currency?: string;
   /** Every price it has had, oldest first; the renewal appends when the amount changes. */
   priceHistory?: Array<{ amount: number; from: string }>;
+  /** Charged in another currency: the price in it, so the rupee rate is not taken for a price change. */
+  foreign?: { amount: number; currency: string };
+  /** A bill (electricity, water, an EMI) rather than something you subscribe to: its amount changes and you pay it (docs/MODEL.md, phase D, 5). */
+  bill?: boolean;
+  /** The word that names the biller in a payment ("MSEDCL"). */
+  payee?: string;
 }
 
 export const subscriptionType: ObjectDef<SubscriptionData> = {
@@ -292,6 +316,9 @@ export const subscriptionType: ObjectDef<SubscriptionData> = {
     url: z.string().optional(),
     currency: z.string().optional(),
     priceHistory: z.array(z.object({ amount: z.number(), from: z.string() })).optional(),
+    foreign: z.object({ amount: z.number(), currency: z.string() }).optional(),
+    bill: z.boolean().optional(),
+    payee: z.string().optional(),
   }),
   fields: [
     { key: 'name', label: 'Service', type: 'text', required: true, placeholder: 'Netflix, iCloud, Gym…' },

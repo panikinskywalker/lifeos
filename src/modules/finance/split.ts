@@ -103,7 +103,9 @@ export function applySplit(os: LifeOSContext, transactionId: string, input: Spli
     for (const d of os.records.query<DebtData>('debt', { filter: { and: [{ field: 'data.transactionId', op: 'eq', value: transactionId }, { field: 'data.kind', op: 'eq', value: 'split' }] } }, { limit: 1000 })) os.records.delete(d.id, 'system');
     const people = [...new Set([...shares.map((s) => s.party), input.payer].filter((p) => p !== 'me'))];
     const record: SplitRecord = { ...input, shares };
-    os.records.update(transactionId, { data: { split: record, personIds: [...new Set([...(tx.data.personIds ?? []), ...people])] } });
+    // Your share (MODEL layer 2): what you paid for is your part; a bill someone else paid is nothing of yours until you pay them back.
+    const share = input.payer === 'me' ? (shares.find((s) => s.party === 'me')?.amount ?? 0) : 0;
+    os.records.update(transactionId, { data: { split: record, share, personIds: [...new Set([...(tx.data.personIds ?? []), ...people])] } });
     const base = { reason, date: tx.data.date, kind: 'split' as const, transactionId, groupId: input.groupId ?? undefined, currency: tx.data.currency };
     if (input.payer === 'me') {
       for (const s of shares) {
@@ -122,7 +124,7 @@ export function applySplit(os: LifeOSContext, transactionId: string, input: Spli
 export function clearSplit(os: LifeOSContext, transactionId: string): void {
   os.db.transaction(() => {
     for (const d of os.records.query<DebtData>('debt', { filter: { and: [{ field: 'data.transactionId', op: 'eq', value: transactionId }, { field: 'data.kind', op: 'eq', value: 'split' }] } }, { limit: 1000 })) os.records.delete(d.id, 'system');
-    os.records.update(transactionId, { data: { split: undefined } });
+    os.records.update(transactionId, { data: { split: undefined, share: undefined } });
   });
 }
 
@@ -148,26 +150,91 @@ export function balances(os: LifeOSContext, groupId?: string): Array<{ personId:
  * whole balance is filed, and every open debt between us is marked settled.
  * Returns what Undo needs.
  */
-export function settleUp(os: LifeOSContext, personId: string, opts: { groupId?: string; date?: string } = {}): { paymentId: string | null; settled: string[] } {
+export function settleUp(os: LifeOSContext, personId: string, opts: { groupId?: string; date?: string } = {}): { paymentId: string | null; settled: string[]; payback: string | null } {
   const open = openDebts(os, { personId, groupId: opts.groupId });
   const bal = paise(open.reduce((a, d) => a + signed(d.data), 0)) / 100;
   let paymentId: string | null = null;
   const settled: string[] = [];
+  // The money that actually moved (MODEL layer 2, Your share): theirs in, or yours out, for the balance.
+  const tx = bal !== 0 ? settlingPayment(os, personId, bal) : null;
   os.db.transaction(() => {
     if (bal !== 0) {
-      paymentId = os.records.create<DebtData>({ object: 'debt', status: 'settled', data: { personId, direction: bal > 0 ? 'i_owe' : 'they_owe', amount: Math.abs(bal), reason: 'Settled up', date: opts.date ?? today(), kind: 'payment', groupId: opts.groupId } }).id;
+      paymentId = os.records.create<DebtData>({ object: 'debt', status: 'settled', data: { personId, direction: bal > 0 ? 'i_owe' : 'they_owe', amount: Math.abs(bal), reason: 'Settled up', date: opts.date ?? today(), kind: 'payment', groupId: opts.groupId, transactionId: tx ?? undefined } }).id;
+      if (tx) {
+        os.links.link(tx, paymentId, 'settles', {}, 'system');
+        // Their money back is a payback, not income; your money to them stays your spend.
+        if (bal > 0) os.records.update(tx, { data: { share: 0 } });
+      }
     }
     for (const d of open) {
       os.records.setStatus(d.id, 'settled');
       settled.push(d.id);
     }
   });
-  return { paymentId, settled };
+  return { paymentId, settled, payback: bal > 0 ? tx : null };
 }
 
-export function undoSettle(os: LifeOSContext, s: { paymentId: string | null; settled: string[] }): void {
+/**
+ * The payment that settles a balance: from them (they owed you) or to them (you
+ * owed), the balance's amount, in the last 45 days, linked to them, not already
+ * a payback or a refund. The newest.
+ */
+export function settlingPayment(os: LifeOSContext, personId: string, balance: number): string | null {
+  const kind = balance > 0 ? 'income' : 'expense';
+  const since = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+  const ids = new Set(os.links.forEntity(personId).filter((l) => l.other.object === 'transaction').map((l) => l.other.id));
+  const hits = [...ids]
+    .map((id) => os.records.get<{ amount: number; kind: string; date: string; share?: number; refund?: boolean }>(id))
+    .filter((t): t is NonNullable<typeof t> => !!t && t.data.kind === kind && Math.abs(t.data.amount - Math.abs(balance)) < 0.5 && t.data.date >= since && t.data.share == null && !t.data.refund)
+    .filter((t) => !os.links.forEntity(t.id, 'settles').length)
+    .sort((a, b) => b.data.date.localeCompare(a.data.date));
+  return hits[0]?.id ?? null;
+}
+
+export function undoSettle(os: LifeOSContext, s: { paymentId: string | null; settled: string[]; payback?: string | null }): void {
   os.db.transaction(() => {
     for (const id of s.settled) os.records.setStatus(id, 'open');
     if (s.paymentId) os.records.delete(s.paymentId);
+    if (s.payback && os.records.get(s.payback)) os.records.update(s.payback, { data: { share: undefined } });
   });
+}
+
+/**
+ * What you shared with someone over a period (the kit's donut, "Shared with
+ * Priya · this month"): across the split payments they are part of, each
+ * party's share added up, you first, then them, then the rest.
+ */
+export function sharedWith(os: LifeOSContext, personId: string, from: string, to: string): { total: number; shares: Array<{ party: Party; amount: number }> } {
+  const by = new Map<Party, number>();
+  let total = 0;
+  const txs = os.records.query<{ amount: number; date: string; split?: SplitRecord }>('transaction', { filter: { and: [{ field: 'data.date', op: 'gte', value: from }, { field: 'data.date', op: 'lte', value: to }] } }, { limit: 20000 });
+  for (const t of txs) {
+    const s = t.data.split;
+    if (!s?.shares?.some((x) => x.party === personId)) continue;
+    total += t.data.amount;
+    for (const x of s.shares) by.set(x.party, (by.get(x.party) ?? 0) + x.amount);
+  }
+  const rank = (p: Party) => (p === 'me' ? 0 : p === personId ? 1 : 2);
+  const shares = [...by.entries()].map(([party, amount]) => ({ party, amount: paise(amount) / 100 })).sort((a, b) => rank(a.party) - rank(b.party) || b.amount - a.amount);
+  return { total: paise(total) / 100, shares };
+}
+
+/**
+ * Once, on first start with Your share (14 Nov): splits saved before it get
+ * their share (your part when you paid, 0 when someone else did). Returns how
+ * many were folded.
+ */
+export function foldSplitShares(os: LifeOSContext): number {
+  if (os.settings.get<boolean>('finance.sharesFolded', false)) return 0;
+  let n = 0;
+  os.db.transaction(() => {
+    for (const t of os.records.query<{ split?: SplitRecord; share?: number }>('transaction', {}, { limit: 50_000 })) {
+      const s = t.data.split;
+      if (!s?.shares || typeof t.data.share === 'number') continue;
+      os.records.update(t.id, { data: { share: s.payer === 'me' ? (s.shares.find((x) => x.party === 'me')?.amount ?? 0) : 0 } }, 'system');
+      n++;
+    }
+    os.settings.set('finance.sharesFolded', true);
+  });
+  return n;
 }

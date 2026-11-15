@@ -2,7 +2,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { periodFromRRule } from '@core/cycles/schedule';
 import type { AccountData, SubscriptionData, TransactionData } from './types';
-import { dailySpend, incomeInRange, spendByCategory, spendInRange } from './lib';
+import { dailySpend, incomeInRange, netWorth, spendByCategory, spendInRange } from './lib';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -54,7 +54,8 @@ export interface RunRate {
 
 /** Active subscriptions by what they cost per month (Jio every 84 days → ₹399 × 30.44 / 84). */
 export function subscriptionRunRate(os: LifeOSContext): RunRate {
-  const subs = os.records.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 1000 });
+  // Bills (electricity, an EMI) are paid, not subscribed to: not in the run-rate.
+  const subs = os.records.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 1000 }).filter((s) => !s.data.bill);
   const rows = subs.map((sub) => {
     const m = perMonth(sub.data.amount, sub.data.rrule);
     return { sub, perMonth: m, perYear: m * 12 };
@@ -68,22 +69,31 @@ export function subscriptionRunRate(os: LifeOSContext): RunRate {
  * rebuilt from opening balances and dated transactions. Accounts left out of
  * net worth are skipped.
  */
+/**
+ * Net worth at each month's end (MODEL layer 5, Reports): today's net worth walked
+ * back by the payments after that month, so the line ends where the number above
+ * it does. A buy or SIP only moves money into a holding; holdings count at
+ * today's value. Starts the month before the first payment.
+ */
 export function netWorthSeries(os: LifeOSContext, months = 12, now = new Date()): Array<{ label: string; end: string; total: number }> {
   const accounts = os.records.query<AccountData>('account', {}, { limit: 1000 }).filter((a) => a.data.includeInNetWorth !== false);
   const ids = new Set(accounts.map((a) => a.id));
-  const opening = accounts.reduce((a, x) => a + (x.data.openingBalance ?? 0), 0);
-  const txs = os.records.query<TransactionData>('transaction', {}, { limit: 100000 });
+  const txs = os.records.query<TransactionData>('transaction', {}, { limit: 100000 }).filter((t) => t.data.date <= iso(now));
   const effect = (t: ObjectRecord<TransactionData>) => {
     const d = t.data;
+    if (d.kind === 'investment') return 0;
     let v = 0;
     if (d.accountId && ids.has(d.accountId)) v += d.kind === 'income' ? d.amount : -d.amount;
     if (d.kind === 'transfer' && d.toAccountId && ids.has(d.toAccountId)) v += d.amount;
     return v;
   };
+  const today = netWorth(os).total;
+  const first = txs.reduce<string | null>((a, t) => (a == null || t.data.date < a ? t.data.date : a), null);
   const out: Array<{ label: string; end: string; total: number }> = [];
   for (let i = months - 1; i >= 0; i--) {
     const m = monthOf(-i, now);
-    const total = opening + txs.filter((t) => t.data.date <= m.end).reduce((a, t) => a + effect(t), 0);
+    if (first && out.length === 0 && monthOf(-i + 1, now).end < first) continue;
+    const total = today - txs.filter((t) => t.data.date > m.end).reduce((a, t) => a + effect(t), 0);
     out.push({ label: m.short, end: m.end, total: Math.round(total * 100) / 100 });
   }
   return out;

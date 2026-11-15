@@ -8,11 +8,11 @@ import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
 import { useLive } from '@ui/hooks';
-import { Icon, Text, useToast } from '@ui/kit';
+import { Donut, Icon, Text, useToast } from '@ui/kit';
 import { ThemeProvider } from '@ui/theme/ThemeProvider';
 import { blocks, monoFonts } from '@ui/theme/tokens';
 import { birthdayParts, cadenceLabel, daysSince, listItems, type GroupData, type PersonData } from '@modules/crm';
-import { balanceWith, settleUp, undoSettle, type DebtData } from '@modules/finance/split';
+import { balanceWith, settleUp, sharedWith, undoSettle, type DebtData } from '@modules/finance/split';
 import { Face, FaceStack, faceColor, initials, KeepInTouchNudge, shortSpan } from './parts';
 import { birthdayIn, GiftIdeasSlot, useGiftIdeas, weekdayDay, WishCard } from './birthday';
 
@@ -600,6 +600,10 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
       const cover = os.attachments.cover(id)?.uri ?? null;
       const hasDebts = os.registry.objects.has('debt');
       const balance = hasDebts ? balanceWith(os, id) : 0;
+      // The kit's donut (NR-KitCharts): what you shared with them this month, from the splits they are in.
+      const now = new Date();
+      const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const sharedMonth = os.registry.objects.has('transaction') ? sharedWith(os, id, isoDay(new Date(now.getFullYear(), now.getMonth(), 1)), isoDay(now)) : { total: 0, shares: [] };
       const debts = hasDebts ? os.records.query<DebtData>('debt', { filter: { and: [{ field: 'status', op: 'neq', value: 'settled' }, { field: 'data.personId', op: 'eq', value: id }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 50 }) : [];
       const everDebts = hasDebts && (debts.length > 0 || os.records.count('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: id }] } }) > 0);
       // Groups they're in: a member row, or the record's member list.
@@ -635,7 +639,7 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
       const cycles = os.cycles.forEntity(id).filter((c) => c.enabled);
       const contact = cycles.find((c) => c.template === 'person.contact');
       const contactStatus = contact ? os.cycles.status(contact) : null;
-      return { rows, linked, facts, photos, cover, balance, debts, everDebts, groupRows, jobs, player, events, tags, worksAt, livesIn, contact, contactStatus, shared: seen.size };
+      return { rows, linked, facts, photos, cover, balance, sharedMonth, debts, everDebts, groupRows, jobs, player, events, tags, worksAt, livesIn, contact, contactStatus, shared: seen.size };
     },
     [id, entity.version],
   );
@@ -653,6 +657,12 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
   const open = (object: string, rid: string) => router.push(`/entity/${object}/${rid}`);
   const edit = () => controls?.edit();
   const fmt = (n: number) => ctx.format.currency(n);
+  // Short amounts for the donut's centre, as the kit writes them (₹3.2k, ₹1.3L).
+  const short = (n: number) => {
+    const sym = ctx.format.currency(0).replace(/[\d.,\s]/g, '') || '₹';
+    const v = n >= 1e5 ? `${(n / 1e5).toFixed(1)}L` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : `${Math.round(n)}`;
+    return `${sym}${v.replace('.0', '')}`;
+  };
 
   const logContact = () => {
     const prev = p.data.lastContactAt;
@@ -854,10 +864,18 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
           </View>
         </SheetCard>
 
-        {view.debts.length || view.balance !== 0 ? (
+        {view.debts.length || view.balance !== 0 || view.sharedMonth.total ? (
           <>
             <Hairline />
             <SectionHead title="Money" />
+            {view.sharedMonth.total ? (
+              <Donut
+                title={`Shared with ${first}`}
+                sub="this month"
+                centre={short(view.sharedMonth.total)}
+                parts={(view.sharedMonth.shares.length > 4 ? [...view.sharedMonth.shares.slice(0, 3), { party: 'others', amount: view.sharedMonth.shares.slice(3).reduce((a, x) => a + x.amount, 0) }] : view.sharedMonth.shares).map((x, i) => ({ label: x.party === 'me' ? 'You' : x.party === 'others' ? 'Others' : (ctx.records.get(x.party)?.title ?? 'Someone').split(' ')[0]!, value: x.amount, color: [blocks.lime, blocks.pink, blocks.sky, blocks.lilac][i]! }))}
+              />
+            ) : null}
             <Rows>
               {view.debts.slice(0, 6).map((d) => (
                 <Row

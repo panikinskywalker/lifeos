@@ -1,6 +1,9 @@
 import type { BoardManifest } from '@core/registry/types';
 import { financeOverview } from './overview';
-import { AccountSection, FinanceHome } from './screens';
+import { FinanceHome } from './screens';
+import { AccountPage } from './accountPage';
+import { DebtPage } from './debtPage';
+import { DebtsScreen, SubscriptionsScreen } from './lists';
 import { GroupBalanceSection, PersonBalanceSection } from './splitScreens';
 import { ReportsScreen } from './reportsScreen';
 import { SubscriptionPage } from './subscriptionPage';
@@ -9,8 +12,9 @@ import { TransactionForm } from './transactionForm';
 import { InvestmentHero } from './investmentHero';
 import { SpendScreen } from './spendScreen';
 import { financeTiles } from './tile';
+import { financeCheckCards } from './checkCards';
 
-/** Companion board of the finance module (Money on screen): Overview, the Money home, Spend and Reports screens, the Transaction and Subscription pages, the Transaction form, quick actions, record sections (also on Person and Group). */
+/** Companion board of the finance module (Money on screen): Overview, the Money home, Spend, Reports, Subscriptions and Who owes whom screens, the Account, Debt, Transaction and Subscription pages, the Transaction form, quick actions, record sections (also on Person and Group). */
 export const financeBoard: BoardManifest = {
   id: 'finance',
   module: 'finance',
@@ -20,18 +24,20 @@ export const financeBoard: BoardManifest = {
   placement: 'module',
   overview: financeOverview,
   tiles: financeTiles,
-  screens: [{ key: 'index', title: 'Money', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }],
+  screens: [{ key: 'index', title: 'Money', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }, { key: 'subscriptions', title: 'Subscriptions', component: SubscriptionsScreen }, { key: 'debts', title: 'Who owes whom', component: DebtsScreen }],
   quickActions: [
     { id: 'finance.addTransaction', label: 'Transaction', icon: 'arrow.up.arrow.down', route: '/entity/transaction/new', global: true },
     { id: 'finance.addAccount', label: 'Account', icon: 'creditcard', route: '/entity/account/new' },
     { id: 'finance.addSubscription', label: 'Subscription', icon: 'repeat', route: '/entity/subscription/new' },
     { id: 'finance.addInvestment', label: 'Investment', icon: 'chart.line', route: '/entity/investment/new' },
   ],
+  checkCards: financeCheckCards,
   overrides: [
-    { object: 'account', record: [{ entityType: 'account', key: 'finance.account', title: 'Balance', component: AccountSection, order: 10 }] },
+    { object: 'account', record: [{ entityType: 'account', key: 'finance.account', title: 'Account', component: AccountPage, order: 0, placement: 'page' }] },
     { object: 'subscription', record: [{ entityType: 'subscription', key: 'finance.subscription', title: 'Subscription', component: SubscriptionPage, order: 0, placement: 'page' }] },
     { object: 'investment', record: [{ entityType: 'investment', key: 'finance.investment', title: 'Holding', component: InvestmentHero, order: 10, placement: 'top' }] },
     { object: 'transaction', form: TransactionForm, record: [{ entityType: 'transaction', key: 'finance.transaction', title: 'Transaction', component: TransactionPage, order: 0, placement: 'page', ownLinks: true }] },
+    { object: 'debt', record: [{ entityType: 'debt', key: 'finance.debt', title: 'Debt', component: DebtPage, order: 0, placement: 'page' }] },
     { object: 'person', record: [{ entityType: 'person', key: 'finance.balance', title: 'Money', component: PersonBalanceSection, order: 20 }] },
     { object: 'group', record: [{ entityType: 'group', key: 'finance.group', title: 'Balances', component: GroupBalanceSection, order: 10 }] },
   ],

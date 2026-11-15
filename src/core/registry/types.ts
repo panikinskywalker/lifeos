@@ -102,6 +102,8 @@ export interface AiToolDef {
   confirm?: boolean | ((input: any, os: LifeOSContext) => boolean); // eslint-disable-line @typescript-eslint/no-explicit-any
   /** One line for the confirm card: what will happen, in the user's terms ("Split ₹1,800 at Toit: you and Arjun, ₹900 each"). */
   describe?: (input: any, os: LifeOSContext) => string; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** A question this tool can answer on the phone, no model: the input to run it with, or null. It returns `{ answer }`. */
+  answers?: (question: string, os: LifeOSContext) => Record<string, unknown> | null;
 }
 
 export interface EntityDetailSection {

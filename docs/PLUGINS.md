@@ -99,7 +99,7 @@ interface ModuleManifest {
   sources?: SourceDef[];               // see Sources below
   filing?: { parsers?: MessageParser[] }; // per-sender: { id, matches(msg), parse(msg) → filed records + confidence }
   filingTools?: (session: GraphSession) => AiToolDef[];
-  aiTools?: AiToolDef[];               // { name, description, input: zod, run, confirm?, describe? }; read and write
+  aiTools?: AiToolDef[];               // { name, description, input: zod, run, confirm?, describe?, answers? }; read and write. answers(question, os): the input to run it with when it can answer on the phone, no model, else null; it returns { answer }
   triggers?: TriggerDef[];             // automation contributions (no UI)
   actions?: ActionDef[];
   templates?: AutomationTemplate[];    // ready-made automations (R10; see Automations)

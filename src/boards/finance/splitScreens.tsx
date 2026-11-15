@@ -212,24 +212,22 @@ function SplitSheet({ visible, onClose, tx }: { visible: boolean; onClose: () =>
   );
 }
 
-function SettleButton({ personId, groupId, amount, label }: { personId: string; groupId?: string; amount: number; label: string }) {
+/** Settle everything with a person (or within a group): confirm, settle, a toast with Undo. */
+export function useSettle(personId: string, amount: number, groupId?: string): () => void {
   const os = useOS();
   const toast = useToast();
   const name = nameOf(os, personId);
   const body = amount > 0 ? `${name} paid you ${os.format.currency(amount)}. Mark everything between you as settled?` : `You paid ${name} ${os.format.currency(-amount)}. Mark everything between you as settled?`;
-  return (
-    <Button
-      title={label}
-      icon="check"
-      size="sm"
-      onPress={() =>
-        confirm('Settle up?', body, 'Settle', () => {
-          const s = settleUp(os, personId, { groupId });
-          toast.show({ message: `Settled with ${name}`, icon: 'check', undo: () => undoSettle(os, s) });
-        })
-      }
-    />
-  );
+  return () =>
+    confirm('Settle up?', body, 'Settle', () => {
+      const s = settleUp(os, personId, { groupId });
+      toast.show({ message: `Settled with ${name}`, icon: 'check', undo: () => undoSettle(os, s) });
+    });
+}
+
+export function SettleButton({ personId, groupId, amount, label, quiet }: { personId: string; groupId?: string; amount: number; label: string; /** A grey pill, where many sit in a list. */ quiet?: boolean }) {
+  const settle = useSettle(personId, amount, groupId);
+  return <Button title={label} icon="check" size="sm" variant={quiet ? 'secondary' : 'primary'} onPress={settle} />;
 }
 
 /** Person › Money: the running balance, open items, settle up. */

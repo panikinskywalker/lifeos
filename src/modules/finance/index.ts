@@ -8,7 +8,9 @@ import { financeParsers } from './filing/parser';
 import { financeSources } from './sources';
 import { financeFilingTools } from './filing/tools';
 import { linkMissingPayees } from './filing/payee';
+import { spotSubscriptions } from './filing/recurring';
 import { learnCategory, payeeOf } from './filing/rules';
+import { foldSplitShares } from './split';
 import { bus } from '@core/events/bus';
 
 export const financeModule: ModuleManifest = {
@@ -83,6 +85,13 @@ export const financeModule: ModuleManifest = {
     // R1: Budget records became monthly targets on their categories; a bank name becomes an Organisation. Both fold once.
     foldBudgetsIntoTargets(os);
     foldInstitutions(os);
+    // Your share (14 Nov): splits saved before it count your part from now on. Once.
+    foldSplitShares(os);
+    // Payments filed before subscriptions were spotted get looked at once (phase D).
+    if (!os.settings.get<boolean>('finance.spottedV1', false)) {
+      spotSubscriptions(os);
+      os.settings.set('finance.spottedV1', true);
+    }
     // You recategorised a payment: that payee keeps the category next time (SMS, notifications, mail).
     bus.on('entity.updated', ({ entity, previous, actor }) => {
       if (actor !== 'user' || entity.object !== 'transaction') return;

@@ -2,14 +2,15 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { format } from 'date-fns';
-import { spendQuery, type SpendKind, type SpendPeriod, type SpendSort } from '@modules/finance/spend';
+import { format, subDays } from 'date-fns';
+import { periodRange, spendByHour, spendQuery, type SpendKind, type SpendPeriod, type SpendSort } from '@modules/finance/spend';
+import { dailySpend } from '@modules/finance/lib';
 import { categoryOf, type TransactionData } from '@modules/finance/types';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { ChipRow, FilterChip, Icon, IconButton, ScreenHeader, Text } from '@ui/kit';
-import { Caps, Hairline, Rows, SmallPill, SplitBar, StatusPill, TxRow, catColor, day, kindWord, splitOf } from './parts';
+import { ChipRow, FilterChip, HourTicks, Icon, IconButton, ScreenHeader, Text, TrackColumns } from '@ui/kit';
+import { Caps, Hairline, Rows, SmallPill, SplitBar, StatusPill, TxRow, catColor, day, kindWord, shortMoney, splitOf } from './parts';
 
 const PERIODS: Array<[SpendPeriod, string]> = [['month', 'This month'], ['last_month', 'Last month'], ['3_months', '3 months'], ['year', 'This year'], ['all', 'All time']];
 const KINDS: Array<[SpendKind, string]> = [['spending', 'Spending'], ['income', 'Income'], ['investments', 'Investments'], ['all', 'Everything']];
@@ -38,6 +39,14 @@ export function SpendScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const r = useLive((o) => (o.registry.objects.has('transaction') ? spendQuery(o, { period, kind, categories: cats, accountIds: accounts, search, sort }) : null), [period, kind, cats.join(), accounts.join(), search, sort]);
   const names = useLive((o) => Object.fromEntries(o.records.query('account', {}, { limit: 500 }).map((a) => [a.id, a.title])), []);
+  // Kit charts under the total: this week in tracks (today white) and when in the day the money went.
+  const charts = useLive((o) => {
+    if (!o.registry.objects.has('transaction')) return null;
+    const now = new Date();
+    const week = dailySpend(o, format(subDays(now, 6), 'yyyy-MM-dd'), format(now, 'yyyy-MM-dd'));
+    const range = periodRange(period, now);
+    return { week, hours: spendByHour(o, range.from, range.to) };
+  }, [period]);
   const toggle = (list: string[], set: (x: string[]) => void, v: string) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const catWords = cats.map((c) => categoryOf(c).label).join(', ');
   const clear = () => {
@@ -65,7 +74,7 @@ export function SpendScreen() {
         </ChipRow>
         <View style={{ padding: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 14 }}>
           <Text variant="labelCaps" color="secondary" numberOfLines={2}>
-            {`${r.label} · ${r.count} transaction${r.count === 1 ? '' : 's'}${catWords ? ` · ${catWords}` : ''}`.toUpperCase()}
+            {`${r.label} · ${r.count} transaction${r.count === 1 ? '' : 's'}${catWords ? ` · ${catWords}` : ''}${kind === 'all' ? ' · in less out' : ''}`.toUpperCase()}
           </Text>
           <Text variant="display" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{os.format.currency(r.total)}</Text>
           {pct != null ? (
@@ -101,6 +110,12 @@ export function SpendScreen() {
             </Pressable>
           ) : null}
         </View>
+        {kind === 'spending' && charts ? (
+          <>
+            <TrackColumns label="This week" value={shortMoney(os, charts.week.reduce((a, d) => a + d.total, 0))} values={charts.week.map((d) => d.total)} labels={charts.week.map((d) => format(day(d.date), 'EEE'))} today={6} />
+            {charts.hours.some(Boolean) ? <HourTicks title="When it went" sub={`by hour, ${r.label.toLowerCase()}`} values={charts.hours} /> : null}
+          </>
+        ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, paddingLeft: 16, paddingRight: 6, borderRadius: 24, backgroundColor: t.c.bg.tile }}>
           <Icon name="search" size={16} color={t.c.fg.secondary} />
           <TextInput accessibilityLabel="Search merchant or note" value={search} onChangeText={setSearch} placeholder="Search merchant or note" placeholderTextColor={t.c.fg.tertiary} selectionColor={t.c.accent.mustard} style={{ flex: 1, minWidth: 0, height: 44, color: t.c.fg.primary, fontFamily: t.type.body.fontFamily, fontSize: 15 }} />
@@ -128,7 +143,7 @@ export function SpendScreen() {
         ) : null}
       </View>
     );
-  }, [r, period, kind, cats, accounts, sort, search, showFilters, t, os, catWords]);
+  }, [r, period, kind, cats, accounts, sort, search, showFilters, t, os, catWords, charts]);
   // Date sorts get day groups; amount sorts are one list.
   const byDate = sort === 'newest' || sort === 'oldest';
   const groups = useMemo(() => {

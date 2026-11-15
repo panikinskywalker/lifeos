@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { ObjectRecord } from '@core/domain/types';
+import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -40,6 +41,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   salary: blocks.lime,
   freelance: '#6FD3C8',
 };
+
+/** Amounts as the kit writes them on charts: ₹780, ₹9.2k, ₹1.3L. */
+export function shortMoney(os: LifeOSContext, n: number): string {
+  const sym = os.format.currency(0).replace(/[\d.,\s]/g, '') || '₹';
+  const a = Math.abs(n);
+  const v = a >= 1e5 ? `${(a / 1e5).toFixed(1)}L` : a >= 1e3 ? `${(a / 1e3).toFixed(1)}k` : `${Math.round(a)}`;
+  return `${n < 0 ? '−' : ''}${sym}${v.replace('.0', '')}`;
+}
 
 export const catColor = (value: string | undefined, t: Theme) => CATEGORY_COLORS[value ?? 'other'] ?? t.paletteColor(categoryOf(value)?.color) ?? t.c.fg.tertiary;
 
@@ -242,6 +251,39 @@ export function TxRow({ tx, line, minHeight = 60 }: { tx: ObjectRecord<Transacti
 
 const ACCOUNT_ICONS: Record<AccountData['kind'], string> = { bank: 'bank', credit: 'card', investment: 'trend', cash: 'cash', wallet: 'wallet', loan: 'receipt' };
 export const accountIcon = (kind: AccountData['kind']) => ACCOUNT_ICONS[kind] ?? 'card';
+
+/** One of the three numbers under the header: a caps label, 22/700, a 12 line. */
+export function Metric({ label, value, unit, line, color, grow = 1 }: { label: string; value: string; unit?: string; line?: string; color?: string; /** A wider share of the row, for a long figure. */ grow?: number }) {
+  return (
+    <View style={{ flex: grow, minWidth: 0, gap: 2 }}>
+      <Caps>{label}</Caps>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 22, lineHeight: 26, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'], color }}>
+        {value}
+        {unit ? <Text style={{ fontSize: 13, fontWeight: '600', color }}>{` ${unit}`}</Text> : null}
+      </Text>
+      {line ? <Text numberOfLines={1} color="secondary" style={{ fontSize: 12, lineHeight: 15 }}>{line}</Text> : null}
+    </View>
+  );
+}
+
+/** A 56 round action with its word under it. */
+export function Quick({ label, icon, color, onPress }: { label: string; icon: string; color?: string; onPress: () => void }) {
+  const t = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 8, opacity: pressed ? 0.7 : 1 })}>
+      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: t.c.bg.tile, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={20} color={color ?? t.c.accent.gold} />
+      </View>
+      <Text numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, fontWeight: '600' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** What a debt was for: "Turf · Playground Arena" reads "Turf at Playground Arena" (older ones carried the date too). */
+export const debtReason = (d: ObjectRecord<{ reason?: string }>) => (d.data.reason || d.title).replace(/^Turf · /, 'Turf at ').replace(/ · \d{4}-\d{2}-\d{2}$/, '');
+
+/** An account's kind in words. */
+export const KIND_WORD: Record<AccountData['kind'], string> = { bank: 'Bank', cash: 'Cash', credit: 'Credit card', investment: 'Investment', wallet: 'Wallet', loan: 'Loan' };
 
 /** "HDFC savings ··4821". */
 export const accountName = (a: ObjectRecord<AccountData>) => [a.title, a.data.last4 ? `··${a.data.last4}` : null].filter(Boolean).join(' ');

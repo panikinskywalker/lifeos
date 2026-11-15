@@ -4,6 +4,7 @@ import type { OutboxItem } from '@core/repo/outboxRepo';
 import { applyTurfSync, isSyncPage, SETTING_REV, type TurfSyncPage } from './sync';
 import { localMade, remapLocal, resolveLocal, undoRefused, type TurfAction } from './changes';
 import { SETTING_SUBMISSIONS, type TurfSubmission } from './inbox';
+import { linkVenuePayments } from './venuePay';
 
 /**
  * Turf web as a Source (docs/MODEL.md layer 4, *Turf web*; R9c). Address in
@@ -176,6 +177,8 @@ export async function reviewTurfSubmission(os: LifeOSContext, submissionId: stri
 export async function syncTurf(os: LifeOSContext, doFetch: typeof fetch = fetch) {
   const since = os.settings.get<number>(SETTING_REV, 0);
   const r = applyTurfSync(os, await fetchTurfSync(os, since, doFetch));
+  // Games that just came in may be what a booking payment paid for (Your share).
+  linkVenuePayments(os);
   console.log(`[turf] synced ${since} → ${r.rev}: ${r.created} new, ${r.updated} changed, ${r.archived} archived, ${r.payments} payment entries, people ${r.peopleMatched} matched / ${r.peopleCreated} added, ${r.debtsOpen} open debts`);
   return r;
 }
