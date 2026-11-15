@@ -10,7 +10,8 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, NumberField, Sheet, Text, TrackColumns, useToast } from '@ui/kit';
 import { accountBalance, accountFlows, setBalance } from '@modules/finance/lib';
 import type { AccountData, TransactionData } from '@modules/finance/types';
-import { FieldRow, FieldValue, Hairline, IconDisc, KIND_WORD, Metric, Quick, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, TxRow, accountIcon, day, kindWord, relDay, shortMoney } from './parts';
+import { FieldRow, FieldValue, Hairline, KIND_WORD, Metric, Quick, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, TxRow, day, kindWord, relDay, shortMoney } from './parts';
+import { AccountCard } from './wallet';
 
 /** An Account's page (docs/MODEL.md, Money pages with no artboard): who it is, three numbers, add or move money, money out by month, its payments, its Fields. Built from the kit. */
 export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectRecord<any>; ctx: LifeOSContext; controls?: RecordControls; say?: React.ReactNode }) { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -50,28 +51,20 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
       {controls ? <RecordBar label="Account" controls={controls} /> : null}
 
       <View style={{ gap: 14 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <IconDisc icon={accountIcon(d.kind)} size={56} />
-          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <Text numberOfLines={2} accessibilityRole="header" style={{ fontSize: 28, lineHeight: 32, fontWeight: '700', letterSpacing: -0.8 }}>{a.title}</Text>
-            <Text variant="caption" color="secondary" numberOfLines={1}>{[institution ?? KIND_WORD[d.kind], d.last4 ? `··${d.last4}` : null].filter(Boolean).join(' · ')}</Text>
-          </View>
-        </View>
+        <AccountCard account={a} balance={balance} money={money} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          <StatusPill label={KIND_WORD[d.kind]} lime />
+          <StatusPill label={[institution ?? KIND_WORD[d.kind], d.last4 ? `··${d.last4}` : null].filter(Boolean).join(' · ')} lime />
           <StatusPill label={d.includeInNetWorth === false ? 'Not in net worth' : 'In net worth'} />
           {d.currency && d.currency !== 'INR' ? <StatusPill label={d.currency} /> : null}
         </View>
         <View style={{ flexDirection: 'row', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderBottomWidth: 1, borderColor: t.c.line }}>
           {card ? (
             <>
-              <Metric label="OWED" value={money(owed)} line={balance > 0 ? `${money(balance)} in credit` : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : 'from its spends'} />
               <Metric label="BILL" value={st ? money(st.total) : '-'} line={st ? `${late ? 'was due' : 'due'} ${format(day(st.dueOn), 'EEE d MMM')}` : 'no statement yet'} color={late ? t.c.alert.coralText : undefined} />
               <Metric label="LIMIT USED" value={d.creditLimit ? `${Math.round((owed / d.creditLimit) * 100)}%` : '-'} line={d.creditLimit ? `of ${shortMoney(ctx, d.creditLimit)}` : 'no limit set'} />
             </>
           ) : (
             <>
-              <Metric label="BALANCE" value={money(balance)} line={typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : 'from opening balance'} color={balance < 0 ? t.c.alert.coralText : undefined} grow={1.7} />
               <Metric label={`IN · ${monthName}`} value={shortMoney(ctx, now?.in ?? 0)} />
               <Metric label={`OUT · ${monthName}`} value={shortMoney(ctx, now?.out ?? 0)} />
             </>

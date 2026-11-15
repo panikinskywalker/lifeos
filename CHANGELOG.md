@@ -7,6 +7,20 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.71 · 15 Nov 2026
+
+**Accounts look like their cards; Subscriptions and Reports follow.**
+- **An account's page** opens with the account drawn as its card: SBI in lime,
+  a credit card in lilac (coral once its bill is late), the balance or what
+  you owe on it, and where that figure came from ("bank said, 14 Nov"). Under
+  it: the bank and last digits, In and Out this month (or the bill and how
+  much of the limit is used), then Add, Transfer, Set balance or Set owed, and
+  Edit.
+- **Subscriptions** shows them as a row of logos under what they cost.
+- **Reports** opens with what came in and what you spent, then one line on how
+  this month compares with last ("8% less than last month").
+- Money's lists leave room for the bar at the bottom.
+
 ## v0.0.70 · 15 Nov 2026
 
 **Spend reads at a glance, and the form wears its kind.**

@@ -77,7 +77,12 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
 }
 
 /** One account as a card: its colour by kind, name and last digits, the balance (what you owe on a card) and where that figure came from. */
-function WalletCard({ account: a, balance, front, first, money }: { account: ObjectRecord<AccountData>; balance: number; front: boolean; first: boolean; money: (n: number, c?: string) => string }) {
+/** An account drawn as its card, on its own page (direction A). */
+export function AccountCard({ account, balance, money }: { account: ObjectRecord<AccountData>; balance: number; money: (n: number, c?: string) => string }) {
+  return <WalletCard account={account} balance={balance} front first money={money} still />;
+}
+
+function WalletCard({ account: a, balance, front, first, money, still }: { account: ObjectRecord<AccountData>; balance: number; front: boolean; first: boolean; money: (n: number, c?: string) => string; still?: boolean }) {
   const router = useRouter();
   const d = a.data;
   const card = d.kind === 'credit';
@@ -89,6 +94,7 @@ function WalletCard({ account: a, balance, front, first, money }: { account: Obj
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${a.title}${d.last4 ? ` ending ${d.last4}` : ''}, ${card ? 'you owe' : 'balance'} ${figure}${late ? ', bill late' : ''}`}
+      disabled={still}
       onPress={() => router.push(`/entity/account/${a.id}` as never)}
       style={({ pressed }) => ({ height: front ? 196 : 64, marginTop: first ? 0 : -16, borderRadius: 28, backgroundColor: bg, paddingHorizontal: 20, paddingTop: 16, paddingBottom: front ? 18 : 0, justifyContent: 'space-between', overflow: 'hidden', opacity: pressed ? 0.92 : 1, shadowColor: '#000', shadowOpacity: front ? 0.35 : 0, shadowRadius: 20, shadowOffset: { width: 0, height: -8 }, elevation: front ? 8 : 0 })}
     >

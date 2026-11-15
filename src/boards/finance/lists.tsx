@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { IconButton, ScreenHeader, Text } from '@ui/kit';
+import { IconButton, OnBar, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
 import { perMonth } from '@modules/finance/reports';
 import { balances, type DebtData } from '@modules/finance/split';
 import type { SubscriptionData } from '@modules/finance/types';
@@ -52,11 +52,33 @@ function ListScreen({ title, sub, right, children }: { title: string; sub: strin
   const t = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const onBar = useContext(OnBar);
+  const barInset = useBottomBarInset();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: insets.bottom + 32, gap: 24 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: onBar ? barInset : insets.bottom + 32, gap: 24 }}>
       <ScreenHeader title={title} subtitle={sub} onBack={() => (router.canGoBack() ? router.back() : router.replace('/module/finance/index' as never))} right={right} />
       {children}
     </ScrollView>
+  );
+}
+
+/** The subscriptions as a row of overlapping discs (direction B), with how many more. */
+function Logos({ names }: { names: Array<{ key: string; name: string }> }) {
+  const t = useTheme();
+  const shown = names.slice(0, 6);
+  return (
+    <View accessible accessibilityLabel={names.map((n) => n.name).join(', ')} style={{ flexDirection: 'row', paddingHorizontal: 4, marginTop: -8 }}>
+      {shown.map((n, i) => (
+        <View key={n.key} style={{ marginLeft: i ? -10 : 0, borderRadius: 25, borderWidth: 3, borderColor: t.c.bg.ground }}>
+          <Disc name={n.name} size={44} />
+        </View>
+      ))}
+      {names.length > shown.length ? (
+        <View style={{ marginLeft: -10, width: 50, height: 50, borderRadius: 25, borderWidth: 3, borderColor: t.c.bg.ground, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '700' }}>{`+${names.length - shown.length}`}</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -84,6 +106,7 @@ export function SubscriptionsScreen(_: { ctx: LifeOSContext; params: Record<stri
       {active.length ? (
         <>
           <Headline label="EVERY MONTH" value={os.format.currency(Math.round(monthly))} unit="/mo" line={`${os.format.currency(Math.round(monthly * 12))} a year`} />
+          <Logos names={live.map((s) => ({ key: s.id, name: s.data.name }))} />
           <View style={{ gap: 10 }}>
             <SectionHead title="Next to renew" />
             <Rows gap={4}>
