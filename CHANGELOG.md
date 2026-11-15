@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.33 · 15 Nov 2026
+
+**The Dump box files straight away again.** Opening Dump with nothing waiting
+left the filing run stuck as "running", so anything said after it sat on
+"Reading it…" until LifeOS was restarted. Everyday sentences ("spent 400 on
+auto") now file in a moment, and something said while a run is going is filed
+right after it.
+
 ## v0.0.32 · 15 Nov 2026
 
 **Ask Money.** An ask box on top of Money home opens it.
