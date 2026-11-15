@@ -22,7 +22,9 @@ export function LockGate({ children }: { children: React.ReactNode }) {
   const prompting = useRef(false);
 
   const tryUnlock = useCallback(async () => {
-    if (asking) return;
+    // Only ask while you are looking at the app: on Android the prompt brings the app to the front,
+    // so asking from the background made LifeOS open itself (15 Nov). Coming back asks then.
+    if (asking || AppState.currentState !== 'active') return;
     setAsking(true);
     prompting.current = true;
     const ok = await unlock();
@@ -31,6 +33,11 @@ export function LockGate({ children }: { children: React.ReactNode }) {
     setTimeout(() => (prompting.current = false), 800);
     if (ok) setLocked(false);
   }, [asking]);
+
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+  const unlockRef = useRef(tryUnlock);
+  unlockRef.current = tryUnlock;
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
@@ -44,6 +51,8 @@ export function LockGate({ children }: { children: React.ReactNode }) {
         const away = leftAt.current != null ? Date.now() - leftAt.current : 0;
         leftAt.current = null;
         if (away > p.afterMin * 60_000) setLocked(true);
+        // Already covered while you were away: ask now that you are back.
+        if (lockedRef.current) void unlockRef.current();
       }
     });
     return () => sub.remove();

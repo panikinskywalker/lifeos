@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.62 · 15 Nov 2026
+
+**LifeOS no longer opens itself.** With the app lock on, leaving the app asked
+for your fingerprint while it was in the background, and on Android that prompt
+brings the app back to the front. Now it covers the app as you leave and only
+asks once you open it again.
+
 ## v0.0.61 · 15 Nov 2026
 
 **Import and export.** Money has an *Import & export* screen: export your
