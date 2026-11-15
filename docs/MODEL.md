@@ -552,12 +552,13 @@ Tasks; papers stay Documents; spends, splits and paybacks stay finance's.
 | Daily allowance | money, in the local currency (`dailyAllowance`) | ¥8,000 a day: what the days still to come are estimated at |
 | Rate | number (`fxRate`) | ₹ for one of the local currency (¥1 = ₹0.6028); taken from the latest Transaction in that currency, yours to change |
 | Start from | link → Trip, word *copied from* (`fromTripId`) | hidden; a trip started from another copies its checklist (undated) and its packing list (Recap's *Keep for the next trip*) |
+| Look | select (`look`) | the trip's own touch, **designed per destination** (decided 15 Nov): *japan* is the station boards, eki stamps and stamp book, the hanko, kanji marks and seigaiha waves; every other trip is plain Noir until its place's look is designed and added here |
 
 **Stop** (Object id `stop`): one place on a trip's line, or a maybe.
 | Field | Type | Notes |
 |---|---|---|
 | Name | text (the title) | "Magome" |
-| Local name | text (`localName`) | "馬籠"; its first character is the stop's mark (東, 湖); without one, the name's first letter |
+| Local name | text (`localName`) | "馬籠", shown beside the name; in the *japan* look its first character is the stop's mark (東, 湖) and its stamp |
 | Trip | link → Trip, word *part_of* (`tripId`) | |
 | Kind | select | stop · idea (a maybe, not on the line: "Ideas, not on the line") · airport |
 | Order | number | its place on the line; ideas have none |
@@ -624,6 +625,10 @@ pending"). The emergency numbers come from a small table by country in code.
 **Money on a trip, derived** (no new Fields beyond the trip's):
 - **Your share**: for a Transaction on the trip with a split, your share; else
   its amount. *Spent* is the sum of your shares (R7d counted whole amounts).
+  **Paying for someone else** (decided 15 Nov): a payment you made wholly or
+  partly for another member ("Parth's flight, paid by Rutvij") is split, so
+  their part counts in **their** spent, not yours, and is what they borrowed
+  from you (finance's Debt, *they owe*) until they pay it back.
 - **Levels**: *paid* (your shares) · *booked* (stays' To pay, journeys' Fare
   each still unpaid, planned things that cost, each person's part) ·
   *estimates* (the daily allowance times the days still to come). **Projected**
@@ -636,7 +641,8 @@ pending"). The emergency numbers come from a small table by country in code.
 - **A payback** between you and someone is finance's settle up (a Debt of kind
   payment). One between two others ("Parth paid Rushikesh") is a Transaction
   of kind transfer on the trip with a split: the payer and the one paid, so it
-  moves the group's balances and never your spend.
+  moves the group's balances and never your spend. Settle up shows the whole
+  group, everyone's balance with everyone, not only yours (decided 15 Nov).
 - **A receipt photo** read into items: the items go into the Transaction's
   Note, the faces you tap become an exact split.
 
@@ -653,20 +659,28 @@ Not in the data, on purpose: **offline copies** (LifeOS keeps everything on
 the phone already); **crowd data, live Booking.com and weather** (asked for
 when shown, not stored).
 
-**To decide** (the simplest was written above):
-1. **Sharing a trip** (contributors, a view-only link, shared ticks on the
-   departure-day check, "Rushikesh ticked 18:02") needs a host both phones and
-   your friends reach, as Turf web is for Turf. Until one is chosen, a trip is
-   yours only and the view-only screen is a preview of what a link would show.
-2. **Budget each** replaces R7d's whole-trip budget, and *spent* becomes your
-   share. Old trips keep their number, now read as yours.
-3. **A payback between two others** as a transfer Transaction with a split:
-   or keep the group view to what involves you?
-4. **The Japan touches** (station boards, eki stamps, the hanko, kanji marks)
-   come from Local name; a trip with none shows letters. Keep them for every
-   trip, or only where a stop has a local name?
-5. **Thing to do** as its own Object, or Tasks with a kind? It has a stop, a
-   cost, a best time and its own statuses, so an Object was picked.
+**Trip members** (decided 15 Nov): you can **invite the trip's Group** to the
+trip. Members see it all (references and payment details stay yours), comment
+on anything, and **add new things** directly (a thing to do, a spend they
+paid, a checklist item, a note), each marked with who added it. A **change or
+removal** of something already there is a **suggestion**: it waits in your To
+check as a proposed change (the copilot's card: Save · Discard) and nothing
+changes until you accept. Comments are Facts on the record, with who said
+them. Ticks on the departure-day check are a member's own and show who ticked.
+This needs a host both your phone and theirs reach, as Turf web is for Turf:
+the trip's copy lives there, LifeOS keeps a synced one, members use a web page
+signed in by an emailed code. Where it is hosted is still to choose (a second
+app on Turf web's Cloudflare account is the obvious place).
+
+**Decided 15 Nov** (the questions this section first asked):
+1. **Sharing**: invite members, as above; built after a host is chosen.
+2. **Budget each**: yes; old trips' budgets are read as yours, *spent* is your
+   share, and what you paid for others is their spend and their borrowing.
+3. **Paybacks between others**: recorded, so the whole group's balances are right.
+4. **Looks**: the Japan touches only on the Japan trip; each destination gets
+   its own bespoke look (Trip's *Look*).
+5. **Thing to do** stays its own Object: each one is a record of it (as each
+   person is a record of Person), with its stop, cost, best time and statuses.
 
 ### Games (module `games`, agreed 17 Oct, revised 20 Oct; feeds the Turf board)
 The football you already run in **Turf Ledger**, your web app
@@ -1542,8 +1556,9 @@ screens checked on the phone → overrides only where the default is wrong)
 
 ### Boards and automations
 - [ ] **R7g the trip template** (planned 15 Nov): every trip gets the five sections of the *Trip template ·
-  Noir (Japan)* page, on the Objects and Fields in layer 2 (*The trip template*). Seven slices, each usable on
-  the phone when done; no migration in any. Order: 1 → 2 → 3 and 5 (either first) → 4 → 6 → 7.
+  Noir (Japan)* page, on the Objects and Fields in layer 2 (*The trip template*). Eight slices, each usable on
+  the phone when done; no migration in any. Order: 1 → 2 → 3 and 5 (either first) → 4 → 6 → 7; 8 once a host is
+  chosen.
   - [ ] **1. Stops and the line.** Stop; the fold (once): each trip's destination becomes its first stop, and
     each stay already filed makes or finds the stop for its city and nights. Plan › Line (stops in order with
     nights and stay, ideas with Add to the line), Plan › Days (the calendar, each night's stop, moving days,
@@ -1575,8 +1590,11 @@ screens checked on the phone → overrides only where the default is wrong)
     the trip copilot over the trip's records and your mail (the mail source finance reads), proposing
     changes that are saved only on Save, with Undo; by voice through R12's chain. Booking.com stays a slot
     until a connector is chosen.
-  *Not in R7g*: sharing (contributors, view-only links, shared ticks) until a host is chosen (layer 2, *To
-  decide* 1); live weather and crowd data; live Booking.com. The `JP-*` artboards are the design; the
+  - [ ] **8. Trip members** (after a host is chosen): invite the trip's Group; members see, comment, add new
+    things; their changes and removals wait in your To check as suggestions; their own ticks; references
+    and payment details stay yours. A synced copy on the host, as Turf web's.
+  The *japan* look ships with slices 1 and 6 for the Japan trip; another place's look is designed when a trip
+  there is planned. *Not in R7g*: live weather and crowd data; live Booking.com. The `JP-*` artboards are the design; the
   board's v3 Noir rebuild (`NR-Travel-*`) stays the Travel home and all trips.
 - [x] **R8 Today and Time** — Today tiles re-hung on module tools and core queries only; Time
   board from On this day; the route moves from `app/almanac/time.tsx` to
