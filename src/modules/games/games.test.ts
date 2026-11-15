@@ -229,6 +229,28 @@ describe('fetchTurfSync', () => {
   });
 });
 
+describe('votes, kit wishes and partner picks from Turf web (its migration 0029)', () => {
+  beforeEach(() => applyTurfSync(os, first()));
+
+  it('land on the match and the profile, and go when Turf web removes them', () => {
+    const game = (date: string) => q<{ date: string; potmVotes?: Record<string, string> }>('game').find((g) => g.data.date === date)!;
+    const page = (tables: Record<string, unknown[]>, deleted: Array<{ table: string; key: string; rev: number }> = []) => ({ since: 40, rev: 41, tables, deleted }) as unknown as TurfSyncPage;
+    applyTurfSync(os, page({
+      potm_votes: [{ game_id: 'g_sat', voter_id: 'p_karan', nominee_id: 'p_priya' }],
+      team_votes: [{ game_id: 'g_sat', voter_id: 'p_karan', nominee_id: 'p_rutvij' }],
+      kit_picks: [{ game_id: 'g_sat', player_id: 'p_priya', shade: 'dark' }],
+      match_rsvps: [{ game_id: 'g_sat', player_id: 'p_arjun', status: 'going', team_preference: 'A' }],
+      player_partners: [{ player_id: 'p_karan', partner_id: 'p_priya' }],
+    }));
+    expect(game('2026-10-17').data).toMatchObject({ potmVotes: { p_karan: 'p_priya' }, teamVotes: { p_karan: 'p_rutvij' }, kitPicks: { p_priya: 'dark' }, sides: { p_arjun: 'A' } });
+    const karan = () => q<{ name: string; partners?: string[] }>('player').find((p) => p.data.name === 'Karan')!;
+    expect(karan().data.partners).toEqual(['p_priya']);
+    applyTurfSync(os, page({}, [{ table: 'potm_votes', key: 'g_sat:p_karan', rev: 42 }, { table: 'player_partners', key: 'p_karan:p_priya', rev: 42 }]));
+    expect(game('2026-10-17').data.potmVotes).toBeUndefined();
+    expect(karan().data.partners).toBeUndefined();
+  });
+});
+
 describe('the bell: Turf web answers now', () => {
   const KEY = `tw_${'k'.repeat(30)}`;
   const answer = (status: number, body: unknown) => vi.fn(async (_url: unknown, _init?: RequestInit) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
@@ -704,6 +726,9 @@ describe('players, venues, friends and the money texts (R9c.5)', () => {
     const [sub] = pendingSubmissions(os);
     expect(sub).toMatchObject({ id: 'sub_1', name: 'Karan', status: 'pending' });
     expect(submissionChanges(sub!, q<never>('player').find((p) => (p as { title: string }).title === 'Karan')!.data, person('Karan').data).map((c) => c.label)).toEqual(['Position', 'Shirt number']);
+    // Their own ratings (1 to 5) show beside the profile's, read on the same scale.
+    const rated = { ...sub!, payload: { pace: 4, shooting: 3 } };
+    expect(submissionChanges(rated, { pace: 80, shooting: 80 } as never).map((c) => [c.label, c.was, c.next])).toEqual([['Shooting', '4', '3']]);
     expect(os.filings.toCheck().filter((f) => f.kind === 'turf-submission').map((f) => f.label)).toEqual(['Karan submitted their profile']);
     expect(auditLog(os).map((a) => a.summary)).toEqual(['Karan 4G · Sat 17 Oct', 'Arjun paid ₹200 · Sat 17 Oct']);
     applyTurfSync(os, delta(41, 42, { profile_submissions: [{ id: 'sub_1', player_id: 'p_karan', invite_id: 'inv_1', payload: '{}', status: 'approved' }] }));

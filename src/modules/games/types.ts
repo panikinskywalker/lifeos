@@ -72,6 +72,11 @@ export interface GameData {
   shareSlug?: string;
   /** RSVPs by Turf web player id ("in" / "maybe" / "out"): a player can answer before they're in the lineup. */
   rsvps?: Record<string, string>;
+  /** From Turf web (migration 0029), keyed by its player ids: who each voter picked, best on their own team, kit wished for, side wished for. */
+  potmVotes?: Record<string, string>;
+  teamVotes?: Record<string, string>;
+  kitPicks?: Record<string, 'dark' | 'light'>;
+  sides?: Record<string, 'A' | 'B'>;
   sourceKey?: string;
 }
 
@@ -107,6 +112,10 @@ export const gameObject: ObjectDef<GameData> = {
     goalData: z.enum(['complete', 'partial', 'inconsistent', 'missing']).optional(),
     shareSlug: z.string().optional(),
     rsvps: z.record(z.string(), z.string()).optional(),
+    potmVotes: z.record(z.string(), z.string()).optional(),
+    teamVotes: z.record(z.string(), z.string()).optional(),
+    kitPicks: z.record(z.string(), z.enum(['dark', 'light'])).optional(),
+    sides: z.record(z.string(), z.enum(['A', 'B'])).optional(),
     sourceKey: z.string().optional(),
   }),
   fields: [
@@ -250,6 +259,8 @@ export interface PlayerProfileData {
   availability: 'AVL' | 'INJ' | 'OOS';
   periods?: AvailabilityPeriod[];
   /** Turf web's photo key (fetched with the same key). */
+  /** "Plays well with" picks: Turf web player ids. */
+  partners?: string[];
   photoPath?: string;
   shareSlug?: string;
   notes?: string;
@@ -297,6 +308,7 @@ export const playerProfileObject: ObjectDef<PlayerProfileData> = {
     availability: z.enum(['AVL', 'INJ', 'OOS']).default('AVL'),
     periods: z.array(z.object({ id: z.string().optional(), status: z.enum(['AVL', 'INJ', 'OOS']), startsAt: z.string(), endsAt: z.string().nullable().optional(), note: z.string().nullable().optional() })).optional(),
     guest: z.boolean().optional(),
+    partners: z.array(z.string()).optional(),
     photoPath: z.string().optional(),
     shareSlug: z.string().optional(),
     notes: z.string().optional(),

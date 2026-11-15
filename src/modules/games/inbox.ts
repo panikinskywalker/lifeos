@@ -72,12 +72,23 @@ export const SUBMISSION_FIELDS: Array<{ key: string; label: string; profile?: ke
   { key: 'supportedCountries', label: 'Countries', profile: 'countries' },
   { key: 'kitColors', label: 'Kit colours', profile: 'kitColors' },
   { key: 'photoKey', label: 'Photo' },
+  // Their own ratings, 1 to 5 (Turf web's form); the profile may hold them out of 100.
+  { key: 'pace', label: 'Pace', profile: 'pace' },
+  { key: 'stamina', label: 'Stamina', profile: 'stamina' },
+  { key: 'defending', label: 'Defending', profile: 'defending' },
+  { key: 'passing', label: 'Passing', profile: 'passing' },
+  { key: 'dribbling', label: 'Dribbling', profile: 'dribbling' },
+  { key: 'shooting', label: 'Shooting', profile: 'shooting' },
 ];
+const RATINGS = new Set(['pace', 'stamina', 'defending', 'passing', 'dribbling', 'shooting']);
 
 /** What a submission would change: field, now, submitted. */
 export function submissionChanges(s: TurfSubmission, profile?: PlayerProfileData, person?: { phone?: string; email?: string; upi?: string }) {
   const now = (key: string, field?: keyof PlayerProfileData) => {
-    if (field && profile) return profile[field] as string | undefined;
+    if (field && profile) {
+      const v = profile[field] as string | number | undefined;
+      return RATINGS.has(key) && typeof v === 'number' && v > 5 ? String(Math.round(v / 20)) : (v as string | undefined);
+    }
     if (key === 'phone') return person?.phone;
     if (key === 'email') return person?.email;
     if (key === 'paymentId') return person?.upi;

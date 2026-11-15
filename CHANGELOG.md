@@ -7,6 +7,23 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.75 · 16 Nov 2026
+
+**Turf gets the votes, kit wishes and partner picks.** Turf web now sends them
+(its v0.0.71), so on the phone:
+- **The vote** shows once it closes: votes for player of the match, and best on
+  each team.
+- **Suggest teams** weighs "plays well with" picks, the side someone asked for
+  and the kit they wished for, as Turf web does (they only break ties).
+- **A player's page** says who they play well with.
+- **Part payment** on a player's page, as on Dues: oldest games first, anything
+  over waits as credit.
+- **Profile changes** show the ratings a player gave themselves, on their 1 to 5
+  scale.
+
+The first sync after this update reads Turf web from the start once, to pick
+these up.
+
 ## v0.0.74 · 15 Nov 2026
 
 **Turf's match screen catches up with Turf web.**

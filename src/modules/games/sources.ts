@@ -211,9 +211,15 @@ export async function decideTurf(os: LifeOSContext, what: 'paid' | 'stats' | 'jo
 }
 
 /** Sync from the last change number (0: everything). Returns what the page changed. */
+const SETTING_FULL_0029 = 'turf.full0029';
+
 export async function syncTurf(os: LifeOSContext, doFetch: typeof fetch = fetch) {
-  const since = os.settings.get<number>(SETTING_REV, 0);
+  // Once: from the start, for the votes, kit wishes and partner picks Turf web began sending (its
+  // migration 0029); an older build had already moved past them.
+  const full = !os.settings.get<boolean>(SETTING_FULL_0029, false);
+  const since = full ? 0 : os.settings.get<number>(SETTING_REV, 0);
   const r = applyTurfSync(os, await fetchTurfSync(os, since, doFetch));
+  if (full) os.settings.set(SETTING_FULL_0029, true);
   // Games that just came in may be what a booking payment paid for (Your share).
   linkVenuePayments(os);
   matchRecentPayments(os);

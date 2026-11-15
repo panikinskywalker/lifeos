@@ -110,6 +110,8 @@ export function TurfGame({ ctx, params }: Props) {
   const g = d.game.data;
   const kits = kitsOf(g);
   const names = new Map(d.lineup.map((l) => [l.appearance.data.personId, l.name]));
+  // Turf web's player ids (votes are kept by them), from each share's key.
+  const turfName = new Map(d.lineup.map((l) => [l.appearance.data.sourceKey?.split(':').pop() ?? '', l.name]));
   const played = g.scoreA != null && g.scoreB != null;
   // As Turf web: a match is upcoming until 90 minutes after kick-off (India time).
   const kickOff = Date.parse(`${g.date}T${g.time && /^\d{2}:\d{2}/.test(g.time) ? g.time.slice(0, 5) : '23:59'}:00+05:30`);
@@ -210,6 +212,19 @@ export function TurfGame({ ctx, params }: Props) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
           {[d.venue?.title ?? g.venueName, g.sideSize ? `${g.sideSize}-a-side` : null, upcoming ? `${d.lineup.length} in · ${g.expectedPlayers ?? d.lineup.length}` : `${d.sum.paidCount} of ${d.sum.players} paid`, upcoming ? PAYMENT_TERMS.find((x) => x.value === g.paymentTerms)?.label : null].filter((x): x is string => !!x).map(pill)}
         </View>
+        {g.potmSettled && Object.keys(g.potmVotes ?? {}).length ? (
+          <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
+            {(['potmVotes', 'teamVotes'] as const)
+              .map((field) => {
+                const n = new Map<string, number>();
+                for (const nominee of Object.values(g[field] ?? {})) n.set(nominee, (n.get(nominee) ?? 0) + 1);
+                const list = [...n.entries()].sort((a, b) => b[1] - a[1]).map(([id, c]) => `${firstName(turfName.get(id) ?? 'Someone')} ${c}`);
+                return list.length ? `${field === 'potmVotes' ? 'Votes' : 'Best on their team'}: ${list.join(' · ')}` : null;
+              })
+              .filter(Boolean)
+              .join('\n')}
+          </Text>
+        ) : null}
         {!upcoming && !g.motmId ? (
           <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>
             {g.potmSettled ? 'The vote tied. Pick player of the match from the team view.' : Date.now() < voteCloses ? `Player of the match: everyone who played can vote from their page until ${format(new Date(voteCloses), 'EEE h:mm a')}.` : 'No player of the match yet.'}

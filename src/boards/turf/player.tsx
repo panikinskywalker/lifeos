@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Polygon, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { format } from 'date-fns';
 import type { ObjectRecord } from '@core/domain/types';
-import { KIT_PRESETS, createPlayer, duesTexts, editPlayer, faceStats, isDone, mePersonId, playerInputOf, ratingPlayer, rupees, setAvailability, squadData, squadRatings, statsFor, turfBase, turfDues, type AvailabilityInput, type GameData, type PlayerInput, type PlayerProfileData } from '@modules/games';
+import { KIT_PRESETS, allAppearances, createPlayer, duesTexts, owedOn, payPart, editPlayer, faceStats, isDone, mePersonId, playerInputOf, ratingPlayer, rupees, setAvailability, squadData, squadRatings, statsFor, turfBase, turfDues, type AvailabilityInput, type GameData, type PlayerInput, type PlayerProfileData } from '@modules/games';
 import { statsCardText } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { OnBlock, useTheme } from '@ui/theme/ThemeProvider';
@@ -250,6 +250,23 @@ export function TurfPlayer({ ctx, params }: Props) {
   const insets = useSafeAreaInsets();
   const { busy, pull } = usePull();
   const profile = useProfile(params.player);
+  const os = useOS();
+  const toast = useToast();
+  const [part, setPart] = useState<number | undefined>(undefined);
+  // Part of what they owe, oldest games first (as on Dues); anything over waits as credit.
+  const payDown = (amount: number) => {
+    if (!profile) return;
+    const open = new Set(d?.dues.map(({ g }) => g.gameId) ?? []);
+    const apps = allAppearances(os).filter((a) => a.data.personId === profile.data.personId && open.has(a.data.gameId) && owedOn(a.data) > 0).sort((a, b) => a.data.gameDate.localeCompare(b.data.gameDate));
+    try {
+      payPart(os, apps.map((a) => a.id), amount);
+      setPart(undefined);
+      toast.show({ message: `${profile.data.name.split(/\s+/)[0]} paid ${rupees(amount * 100)} · sending`, icon: 'check' });
+      void pull(true);
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+    }
+  };
   const d = useLive(
     (o) => {
       if (!profile) return null;
@@ -263,6 +280,11 @@ export function TurfPlayer({ ctx, params }: Props) {
         dues: dues.flatMap((p) => p.games.map((g) => ({ p, g, fronted: o.records.get<GameData>(g.gameId)?.data.frontedById ?? null }))),
         meId: me,
         reminder: duesTexts(o).reminder(pid),
+        // "Plays well with" picks (Turf web player ids), by name.
+        partners: (() => {
+          const ids = new Set((profile.data.partners ?? []).map((id) => `turf:players:${id}`));
+          return ids.size ? o.records.query<PlayerProfileData>('player', {}, { limit: 100_000 }).filter((x) => ids.has(x.data.sourceKey ?? '')).map((x) => x.data.name) : [];
+        })(),
         nameOf: (id: string | null) => (id ? o.records.get(id)?.title ?? null : null),
       };
     },
@@ -276,7 +298,7 @@ export function TurfPlayer({ ctx, params }: Props) {
   const [given, ...rest] = p.name.trim().split(/\s+/);
   const kit = kitSwatches(p.kitColors);
   const fanOf = [p.clubs, p.countries].filter(Boolean).join(', ');
-  const extras = [p.boots ? `Boots: ${p.boots}` : null, p.favouritePlayer ? `Favourite player: ${p.favouritePlayer}` : null, p.startingLevel ? `Level: ${p.startingLevel}` : null].filter(Boolean).join(' · ');
+  const extras = [p.boots ? `Boots: ${p.boots}` : null, p.favouritePlayer ? `Favourite player: ${p.favouritePlayer}` : null, p.startingLevel ? `Level: ${p.startingLevel}` : null, d.partners.length ? `Plays well with: ${d.partners.join(', ')}` : null].filter(Boolean).join(' · ');
   const periods = [...(p.periods ?? [])].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   const f = (cents: number) => rupees(cents);
 
@@ -451,6 +473,14 @@ export function TurfPlayer({ ctx, params }: Props) {
                 </Pressable>
               );
             })}
+            {d.dues.length && !d.dues.some(({ p: due }) => due.direction === 'you_owe') ? (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <NumberField label="Part payment" value={part} onChange={setPart} unit="₹" />
+                </View>
+                <Button title="Record" variant="secondary" size="sm" style={{ height: 44 }} disabled={!(part && part > 0)} onPress={() => part && payDown(part)} />
+              </View>
+            ) : null}
             {d.dues.length ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                 <Button title="Settle up" variant="secondary" size="sm" style={{ height: 40 }} onPress={() => router.push('/board/turf/dues' as never)} />

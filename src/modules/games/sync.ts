@@ -321,6 +321,41 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
     };
     for (const r of rows('match_rsvps')) setRsvp(turfKey('games', String(r.game_id)), String(r.player_id), str(r, 'status') ?? null);
 
+    /* ---------- votes, kit and side wishes → the Game (Turf web migration 0029) ---------- */
+    type Wish = 'potmVotes' | 'teamVotes' | 'kitPicks' | 'sides';
+    const setWish = (field: Wish, gameKey: string, playerId: string, value: string | null | undefined) => {
+      const g = games.get(gameKey);
+      if (!g) return;
+      const map: Record<string, string> = { ...((g.data[field] as Record<string, string> | undefined) ?? {}) };
+      if (value) map[playerId] = value;
+      else delete map[playerId];
+      const next = { ...g.data, [field]: Object.keys(map).length ? map : undefined } as GameData;
+      if (same(g.data as unknown as Record<string, unknown>, next as unknown as Record<string, unknown>)) return;
+      res.updated++;
+      g.data = os.records.update<GameData>(g.id, { data: next }, ACTOR).data;
+    };
+    for (const r of rows('match_rsvps')) {
+      const side = str(r, 'team_preference');
+      setWish('sides', turfKey('games', String(r.game_id)), String(r.player_id), side === 'A' || side === 'B' ? side : null);
+    }
+    for (const r of rows('potm_votes')) setWish('potmVotes', turfKey('games', String(r.game_id)), String(r.voter_id), str(r, 'nominee_id'));
+    for (const r of rows('team_votes')) setWish('teamVotes', turfKey('games', String(r.game_id)), String(r.voter_id), str(r, 'nominee_id'));
+    for (const r of rows('kit_picks')) setWish('kitPicks', turfKey('games', String(r.game_id)), String(r.player_id), str(r, 'shade'));
+
+    /* ---------- "plays well with" → the player's profile ---------- */
+    const setPartner = (playerId: string, partnerId: string, on: boolean) => {
+      const p = profiles.get(turfKey('players', playerId));
+      if (!p) return;
+      const now = new Set(p.data.partners ?? []);
+      if (on) now.add(partnerId);
+      else now.delete(partnerId);
+      const partners = now.size ? [...now].sort() : undefined;
+      if (JSON.stringify(partners ?? null) === JSON.stringify(p.data.partners ?? null)) return;
+      res.updated++;
+      p.data = os.records.update<PlayerProfileData>(p.id, { data: { ...p.data, partners } }, ACTOR).data;
+    };
+    for (const r of rows('player_partners')) setPartner(String(r.player_id), String(r.partner_id), true);
+
     /* ---------- game_players → Appearances ---------- */
     const appearanceData = (gameKey: string, playerId: string, tp: TurfRow | null, prev?: ObjectRecord<AppearanceData>): AppearanceData | null => {
       const g = games.get(gameKey);
@@ -409,9 +444,17 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
       else if (d.table === 'games') archive(games.get(turfKey('games', d.key)) as ObjectRecord<unknown> | undefined);
       else if (d.table === 'game_players') archive(apps.get(turfKey('game_players', d.key)) as ObjectRecord<unknown> | undefined);
       else if (d.table === 'payments') dropEntry(d.key);
+      else if (d.table === 'potm_votes' || d.table === 'team_votes' || d.table === 'kit_picks') {
+        const [gid, pid] = d.key.split(':');
+        setWish(d.table === 'potm_votes' ? 'potmVotes' : d.table === 'team_votes' ? 'teamVotes' : 'kitPicks', turfKey('games', gid!), pid!, null);
+      } else if (d.table === 'player_partners') {
+        const [pid, partner] = d.key.split(':');
+        setPartner(pid!, partner!, false);
+      }
       else if (d.table === 'match_rsvps') {
         const [gid, pid] = d.key.split(':');
         setRsvp(turfKey('games', gid!), pid!, null);
+        setWish('sides', turfKey('games', gid!), pid!, null);
         const a = apps.get(turfKey('game_players', d.key));
         if (a && !a.archived) upsert<AppearanceData>('appearance', a, appearanceData(turfKey('games', gid!), pid!, null, a)!);
       } else if (d.table === 'player_availability_periods') {

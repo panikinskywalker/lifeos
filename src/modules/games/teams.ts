@@ -9,9 +9,8 @@ import { DEFAULT_KITS, defaultFormation, kitOf, type Kit } from './kits';
  * Teams (docs/MODEL.md layer 3, *Match*; R9c.4): Turf web's ratings and team
  * generator (copied in ratings.ts / balance.ts) fed from the records here, so
  * Suggest teams works offline and gives the split Turf web would. Players are
- * keyed by their Person. Turf web doesn't sync "play well with" picks, side
- * wishes or kit votes yet, so here the generator balances on ratings,
- * positions and chemistry alone.
+ * keyed by their Person. "Plays well with" picks, side wishes and kit wishes
+ * come from Turf web's sync (its migration 0029) and break ties, as there.
  */
 
 const live = <T>(rs: ObjectRecord<T>[]) => rs.filter((r) => !r.archived);
@@ -112,8 +111,19 @@ export function suggestTeams(os: LifeOSContext, gameId: string, random?: () => n
   const squad = side.map((a) => byPerson.get(a.data.personId)).filter((p): p is RatingPlayer => !!p);
   if (squad.length < 2) return null;
   const rated = rateSquad(players, history).players;
+  // Wishes, as Turf web feeds its generator: "plays well with", the side asked for, the kit wished for; they only break ties.
+  const profiles = live(os.records.query<PlayerProfileData>('player', {}, { limit: 100_000 }));
+  const personOf = new Map(profiles.map((p) => [p.data.sourceKey?.replace('turf:players:', '') ?? '', p.data.personId]));
+  const byTurf = <V,>(m: Record<string, V> | undefined) => Object.fromEntries(Object.entries(m ?? {}).flatMap(([id, v]) => (personOf.get(id) ? [[personOf.get(id)!, v]] : []))) as Record<string, V>;
+  const wishes = profiles.flatMap((p) => (p.data.partners ?? []).flatMap((id): Array<[string, string]> => (personOf.get(id) ? [[p.data.personId, personOf.get(id)!]] : [])));
+  const kits = kitsOf(g.data);
+  const darkSide = kits.A.ink === 'light' && kits.B.ink === 'dark' ? 'A' : kits.B.ink === 'light' && kits.A.ink === 'dark' ? 'B' : null;
   const result = generateBestBalance(squad, history, {}, {
     ratings: new Map(squad.map((p) => [p.id, { overall: rated.get(p.id)?.overall ?? 60, provisional: rated.get(p.id)?.provisional ?? true }])),
+    wishes,
+    sides: byTurf(g.data.sides),
+    kits: byTurf(g.data.kitPicks),
+    darkSide,
     random,
   });
   if (!result) return null;
