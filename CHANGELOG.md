@@ -7,6 +7,22 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.31 · 15 Nov 2026
+
+**Links, as designed** (R11's second pass, merged from
+`claude/r11-activity-links`). Links read the way you would say them (works
+at, with, played in) and are drawn as in the *Links · Noir* design: the
+record in the middle, what it links to round it in module colours, the word
+on each line; one or two hops; it draws out, glides when you re-centre, and
+zooms with two fingers. Each thing shows once: a game is one game, not also
+each player's appearance and share; a player profile is the person, a venue
+the place. Payments no longer crowd Links: each is an event on the card,
+payee and people it touches. Hold a link to see where it came from, confirm
+a guess, set its dates, change its word or remove it; adding one can start a
+new record and go both ways. Browse › Links shows everything you have linked,
+with a time-lapse. Turf and Home show once in Browse. **Activity** is redrawn
+to its design: tap any day of a tracker to see what made it count.
+
 ## v0.0.30 · 5 Nov 2026
 
 **The app now looks like its design files.** Money, Habits, Health, Deliveries,
