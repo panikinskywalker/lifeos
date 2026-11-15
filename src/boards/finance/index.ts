@@ -1,6 +1,7 @@
 import type { BoardManifest } from '@core/registry/types';
 import { financeOverview } from './overview';
 import { FinanceHome } from './screens';
+import { WalletScreen } from './wallet';
 import { AccountPage } from './accountPage';
 import { DebtPage } from './debtPage';
 import { DebtsScreen, SubscriptionsScreen } from './lists';
@@ -26,7 +27,17 @@ export const financeBoard: BoardManifest = {
   placement: 'module',
   overview: financeOverview,
   tiles: financeTiles,
-  screens: [{ key: 'index', title: 'Money', component: FinanceHome }, { key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }, { key: 'subscriptions', title: 'Subscriptions', component: SubscriptionsScreen }, { key: 'debts', title: 'Who owes whom', component: DebtsScreen }, { key: 'ask', title: 'Ask Money', component: AskScreen, noBar: true }, { key: 'proof', title: 'The payments behind it', component: ProofScreen }, { key: 'files', title: 'Import & export', component: FilesScreen }],
+  // Money's own bar (docs/MODEL.md, The bar inside a board): its sections, and Ask Money in the raised button.
+  bar: {
+    tabs: [
+      { screen: 'index', label: 'Money home', icon: 'home', also: ['reports', 'files', 'debts'] },
+      { screen: 'spend', label: 'Spend', icon: 'pie' },
+      { screen: 'wallet', label: 'Accounts and cards', icon: 'card' },
+      { screen: 'subscriptions', label: 'Subscriptions', icon: 'repeat' },
+    ],
+    action: { label: 'Ask Money', icon: 'sparkle', screen: 'ask' },
+  },
+  screens: [{ key: 'index', title: 'Money', component: FinanceHome }, { key: 'wallet', title: 'Accounts and cards', component: WalletScreen },{ key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }, { key: 'subscriptions', title: 'Subscriptions', component: SubscriptionsScreen }, { key: 'debts', title: 'Who owes whom', component: DebtsScreen }, { key: 'ask', title: 'Ask Money', component: AskScreen, noBar: true }, { key: 'proof', title: 'The payments behind it', component: ProofScreen }, { key: 'files', title: 'Import & export', component: FilesScreen }],
   quickActions: [
     { id: 'finance.addTransaction', label: 'Transaction', icon: 'arrow.up.arrow.down', route: '/entity/transaction/new', global: true },
     { id: 'finance.addAccount', label: 'Account', icon: 'creditcard', route: '/entity/account/new' },

@@ -2,12 +2,13 @@ import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { ChipRow, Icon, IconButton, ProgressBar, RingBadges, Sheet, Text, useToast } from '@ui/kit';
+import { Icon, IconButton, ProgressBar, RingBadges, ScreenHeader, Sheet, Text, TrackColumns, useBottomBarInset, useToast } from '@ui/kit';
+import { blocks } from '@ui/theme/tokens';
 import { sortWithAI, undoSort } from '@modules/finance/aiSort';
 import { suggestBudget, undoBudget, adoptBudget } from '@modules/finance/budget';
 import { dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange, targetStatuses } from '@modules/finance/lib';
@@ -18,122 +19,230 @@ import { PAYEE_WHO } from '@modules/finance/filing/payee';
 import { categoryOf, INSTRUMENTS, type TransactionData } from '@modules/finance/types';
 import { ToCheckBell } from '../../screens/ToCheckBell';
 import { PayeeGuess } from './payeeGuess';
-import { AskBox, YourViews } from './ask';
+import { YourViews } from './ask';
+import { walletTotals } from './wallet';
 import { Caps, Disc, KIND_WORD, SectionHead, Hairline, IconDisc, Rows, Spark, TxRow, accountIcon, catColor, shortMoney, day, kindWord, relDay, splitOf } from './parts';
 
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
-/** Money's home (NR-Money-Home): this month, subscriptions and net worth, what needs you, where it went, targets, accounts, investments, recent. */
+/**
+ * Money's home (docs/MODEL.md, Money redesign: direction C): where it went (the
+ * kit's ring), the pace, this week in tracks, what needs you, before payday as
+ * day cards, your views, one line each for accounts and who owes whom, recent.
+ * Money's own bar holds Spend, Accounts and cards, Subscriptions and Ask.
+ */
 export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, string> }) {
+  const os = useOS();
   const router = useRouter();
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const scroll = useRef<ScrollView>(null);
-  const anchors = useRef<{ accounts?: number; investments?: number }>({});
-  const [offset, setOffset] = useState(0);
-  const [openDay, setOpenDay] = useState<string | null>(null);
-  const m = monthRange(offset);
+  const bottom = useBottomBarInset();
+  const [menu, setMenu] = useState(false);
+  const [budget, setBudget] = useState(false);
+  const m = monthRange(0);
   const data = useLive(
-    (os) => {
-      const usualMonths = [1, 2, 3].map((k) => { const r = monthRange(offset - k); return spendInRange(os, r.start, r.end); }).filter((x) => x > 0);
+    (o) => {
+      const now = new Date();
       const inMonth = { filter: { and: [{ field: 'data.date', op: 'gte' as const, value: m.start }, { field: 'data.date', op: 'lte' as const, value: m.end }] } };
-      const salary = os.records.query<TransactionData>('transaction', { filter: { and: [...inMonth.filter.and, { field: 'data.kind', op: 'eq', value: 'income' }, { field: 'data.category', op: 'eq', value: 'salary' }] }, sort: [{ field: 'data.date', dir: 'asc' }] }, { limit: 1 })[0];
-      const incomes = os.records.count('transaction', { filter: { and: [...inMonth.filter.and, { field: 'data.kind', op: 'eq', value: 'income' }] } });
       return {
-        spent: spendInRange(os, m.start, m.end),
-        usual: usualMonths.length ? usualMonths.reduce((a, b) => a + b, 0) / usualMonths.length : null,
-        income: incomeInRange(os, m.start, m.end),
-        incomeLine: salary ? `salary on the ${ordinal(day(salary.data.date).getDate())}` : incomes ? `${incomes} payment${incomes === 1 ? '' : 's'}` : null,
-        byCat: spendByCategory(os, m.start, m.end).sort((a, b) => b.total - a.total),
-        days: dailySpend(os, m.start, m.end),
-        monthCount: os.records.count('transaction', inMonth),
-        count: os.records.count('transaction'),
-        recent: os.records.query<TransactionData>('transaction', { sort: [{ field: 'data.date', dir: 'desc' }, { field: 'createdAt', dir: 'desc' }] }, { limit: 5 }),
-        nw: netWorth(os),
-        subs: subscriptionRunRate(os),
-        targets: targetStatuses(os, day(m.start)),
-        pace: offset === 0 ? pace(os) : null,
-        owes: balances(os).map((b) => ({ ...b, name: os.records.get(b.personId)?.title ?? 'Someone' })),
-        coming: comingUp(os),
-        close: offset === 0 ? monthClose(os) : null,
+        spent: spendInRange(o, m.start, m.end),
+        byCat: spendByCategory(o, m.start, m.end).sort((a, b) => b.total - a.total),
+        week: dailySpend(o, format(subDays(now, 6), 'yyyy-MM-dd'), format(now, 'yyyy-MM-dd')),
+        monthCount: o.records.count('transaction', inMonth),
+        count: o.records.count('transaction'),
+        recent: o.records.query<TransactionData>('transaction', { sort: [{ field: 'data.date', dir: 'desc' }, { field: 'createdAt', dir: 'desc' }] }, { limit: 5 }),
+        nw: netWorth(o),
+        subs: subscriptionRunRate(o),
+        targets: targetStatuses(o, day(m.start)),
+        pace: pace(o),
+        owes: balances(o).map((b) => ({ ...b, name: o.records.get(b.personId)?.title ?? 'Someone' })),
+        coming: comingUp(o),
+        close: monthClose(o),
       };
     },
     [m.start],
   );
   const isEmpty = !data.count && !data.nw.accounts.length && !data.nw.holdings.length && !data.subs.rows.length;
-  const goAnchor = (key: 'accounts' | 'investments') => scroll.current?.scrollTo({ y: Math.max(0, (anchors.current[key] ?? 0) - 12), animated: true });
-  const add = (
-    <IconButton icon="plus" accessibilityLabel="Add a transaction" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} onPress={() => router.push('/entity/transaction/new' as never)} />
+  const monthName = m.label.split(' ')[0]!;
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/browse' as never));
+  const header = (
+    <ScreenHeader
+      title="Money"
+      subtitle={isEmpty ? 'No payments yet' : `${monthName} · ${data.monthCount} payment${data.monthCount === 1 ? '' : 's'}`}
+      onBack={back}
+      right={
+        <>
+          <IconButton icon="grid" accessibilityLabel="Money screens" filled onPress={() => setMenu(true)} />
+          <ToCheckBell />
+          <IconButton icon="plus" accessibilityLabel="Add a payment" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} onPress={() => router.push('/entity/transaction/new' as never)} />
+        </>
+      }
+    />
   );
-  const header = (sub: string, right: React.ReactNode) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
-      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-        <Text variant="caption" color="secondary" numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>{sub}</Text>
-        <Text variant="title" accessibilityRole="header">Money</Text>
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>{right}</View>
-    </View>
+  const sheets = (
+    <>
+      <MoneyScreens visible={menu} onClose={() => setMenu(false)} />
+      <Sheet visible={budget} onClose={() => setBudget(false)} title="A budget for you">
+        <SuggestedBudget bare onDone={() => setBudget(false)} />
+      </Sheet>
+    </>
   );
 
   if (isEmpty) {
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: t.layout.gutter, paddingBottom: insets.bottom + 32, gap: 20 }}>
-        {header('No payments yet', add)}
+      <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 20 }}>
+        {header}
         <EmptyHome />
+        {sheets}
       </ScrollView>
     );
   }
 
-  const monthName = m.label.split(' ')[0];
+  const weekTotal = data.week.reduce((n, d) => n + d.total, 0);
   return (
-    <ScrollView ref={scroll} style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: t.layout.gutter, paddingBottom: insets.bottom + 32, gap: 24 }}>
-      {header(`${monthName} · ${data.monthCount} transaction${data.monthCount === 1 ? '' : 's'}`, <><ToCheckBell />{add}</>)}
-
-      <AskBox />
-
-      <ChipRow>
-        <NavChip label="Spend" icon="pie" onPress={() => router.push('/spend' as never)} />
-        <NavChip label="Transactions" icon="arrow.up.arrow.down" onPress={() => router.push({ pathname: '/spend', params: { period: 'all', kind: 'all' } } as never)} />
-        <NavChip label="Accounts" icon="card" onPress={() => goAnchor('accounts')} />
-        <NavChip label="Subscriptions" icon="repeat" onPress={() => router.push('/module/finance/subscriptions' as never)} />
-        <NavChip label="Investments" icon="trend" onPress={() => goAnchor('investments')} />
-        <NavChip label="Reports" icon="chart" onPress={() => router.push('/module/finance/reports' as never)} />
-        <NavChip label="Import & export" icon="file" onPress={() => router.push('/module/finance/files' as never)} />
-      </ChipRow>
+    <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 22 }}>
+      {header}
 
       {data.close ? <MonthClosed c={data.close} /> : null}
 
-      <MonthCard label={m.label} offset={offset} setOffset={setOffset} spent={data.spent} usual={data.usual} income={data.income} incomeLine={data.incomeLine} days={data.days} onDay={setOpenDay} pace={data.pace} />
+      {data.byCat.length ? <WhereItWent byCat={data.byCat} total={data.spent} month={monthName} offset={0} onBudget={data.targets.length ? undefined : () => setBudget(true)} /> : null}
+
+      {data.pace ? <PaceLine p={data.pace} /> : null}
+
+      <TrackColumns
+        label="ANALYTICS"
+        period="This week"
+        value={shortMoney(os, weekTotal)}
+        values={data.week.map((d) => d.total)}
+        labels={data.week.map((d) => format(day(d.date), 'EEE'))}
+        today={data.week.length - 1}
+        axis={(n) => shortMoney(os, n)}
+      />
 
       <NeedsYou />
       <SortOther />
-
-      {data.owes.length ? <WhoOwes owes={data.owes} /> : null}
 
       {data.coming.items.length ? <ComingUp coming={data.coming} /> : null}
 
       <YourViews />
 
-      <SummaryTiles subs={data.subs} nw={data.nw} onNetWorth={() => goAnchor('accounts')} />
+      {data.nw.accounts.length ? <AccountsLine nw={data.nw} /> : null}
+      {data.owes.length ? <OwesLine owes={data.owes} /> : null}
 
-      {data.byCat.length ? <WhereItWent byCat={data.byCat} total={data.spent} month={monthName!} offset={offset} /> : null}
-
-      {data.targets.length ? <Targets targets={data.targets} /> : <SuggestedBudget />}
-
-      <View onLayout={(e) => (anchors.current.accounts = e.nativeEvent.layout.y)}>
-        <Accounts nw={data.nw} />
-      </View>
-
-      {data.nw.holdings.length ? (
-        <View onLayout={(e) => (anchors.current.investments = e.nativeEvent.layout.y)}>
-          <Investments holdings={data.nw.holdings} />
-        </View>
-      ) : null}
+      {data.targets.length ? <Targets targets={data.targets} /> : null}
 
       <Recent items={data.recent} count={data.count} />
-
-      <DaySheet date={openDay} onClose={() => setOpenDay(null)} />
+      {sheets}
     </ScrollView>
+  );
+}
+
+/** The pace in one line: what a day can be and stay under your line, or how far over it you are. */
+function PaceLine({ p }: { p: Pace }) {
+  const os = useOS();
+  const t = useTheme();
+  const money = os.format.currency;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 24, backgroundColor: t.c.bg.tileRaised, marginTop: -8 }}>
+      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.over ? t.c.alert.coralText : t.c.accent.mustard }} />
+      <Text style={{ flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '600' }}>
+        {p.over ? (
+          <>
+            <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.alert.coralText }}>{money(-p.left)} over</Text> your {p.yours ? 'line' : 'usual month'} of {shortMoney(os, p.line)}
+          </>
+        ) : (
+          <>
+            <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.accent.gold }}>{money(p.perDay)} a day</Text> keeps it under {shortMoney(os, p.line)}
+            {p.yours ? '' : ', your usual month'}
+          </>
+        )}
+      </Text>
+    </View>
+  );
+}
+
+/** The other Money screens, from the grid button in the header. */
+function MoneyScreens({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const go = (to: string | { pathname: string; params: Record<string, string> }) => {
+    onClose();
+    router.push(to as never);
+  };
+  const rows: Array<[string, string, string | { pathname: string; params: Record<string, string> }]> = [
+    ['Spend', 'pie', '/module/finance/spend'],
+    ['Transactions', 'arrow.up.arrow.down', { pathname: '/module/finance/spend', params: { period: 'all', kind: 'all' } }],
+    ['Accounts and cards', 'card', '/module/finance/wallet'],
+    ['Subscriptions', 'repeat', '/module/finance/subscriptions'],
+    ['Who owes whom', 'people', '/module/finance/debts'],
+    ['Reports', 'chart', '/module/finance/reports'],
+    ['Import & export', 'file', '/module/finance/files'],
+    ['Ask Money', 'sparkle', '/module/finance/ask'],
+  ];
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Money">
+      <View>
+        {rows.map(([label, icon, to], i) => (
+          <React.Fragment key={label}>
+            {i ? <Hairline /> : null}
+            <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => go(to)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, opacity: pressed ? 0.7 : 1 })}>
+              <IconDisc icon={icon} />
+              <Text variant="rowTitle" style={{ flex: 1 }}>{label}</Text>
+              <Icon name="chevron-right" size={16} />
+            </Pressable>
+          </React.Fragment>
+        ))}
+      </View>
+    </Sheet>
+  );
+}
+
+/** One line for the accounts: what is in them and what the cards owe; opens Accounts and cards. */
+function AccountsLine({ nw }: { nw: ReturnType<typeof netWorth> }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const w = walletTotals(nw);
+  const money = (n: number) => os.format.currency(Math.round(n));
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${money(w.inAccounts)} in accounts${w.owe ? `, you owe ${money(w.owe)} on cards` : ''}. Opens Accounts and cards`} onPress={() => router.push('/module/finance/wallet' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
+      <View style={{ flexDirection: 'row' }}>
+        {[blocks.lime, blocks.lilac, blocks.orange].map((c, i) => (
+          <View key={c} style={{ width: 28, height: 40, borderRadius: 8, backgroundColor: c, marginLeft: i ? -14 : 0, borderWidth: i ? 2 : 0, borderColor: t.c.bg.tile }} />
+        ))}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text numberOfLines={1} style={{ fontSize: 17, lineHeight: 22, fontWeight: '700', color: blocks.sky, fontVariant: ['tabular-nums'] }}>{money(w.inAccounts)} in accounts</Text>
+        <Text variant="caption" color="secondary" numberOfLines={1}>{w.owe ? `you owe ${money(w.owe)} on ${w.cards} card${w.cards === 1 ? '' : 's'}` : `${nw.accounts.length} account${nw.accounts.length === 1 ? '' : 's'}`}</Text>
+      </View>
+      <Icon name="chevron-right" size={16} color={t.c.fg.secondary} />
+    </Pressable>
+  );
+}
+
+/** One line for who owes whom: owed to you in lime, what you owe after it; opens the list. */
+function OwesLine({ owes }: { owes: Array<{ personId: string; amount: number; name: string }> }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const toYou = owes.filter((o) => o.amount > 0).reduce((a, o) => a + o.amount, 0);
+  const youOwe = owes.filter((o) => o.amount < 0);
+  const money = (n: number) => os.format.currency(Math.round(n));
+  const line = youOwe.length === 1 ? `you owe ${youOwe[0]!.name.split(' ')[0]} ${money(-youOwe[0]!.amount)}` : youOwe.length ? `you owe ${money(youOwe.reduce((a, o) => a - o.amount, 0))}` : `${owes.length} ${owes.length === 1 ? 'person' : 'people'}`;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${money(toYou)} owed to you, ${line}. Opens Who owes whom`} onPress={() => router.push('/module/finance/debts' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, marginTop: -10, opacity: pressed ? 0.85 : 1 })}>
+      <View style={{ flexDirection: 'row' }}>
+        {owes.slice(0, 3).map((o, i) => (
+          <View key={o.personId} style={{ marginLeft: i ? -10 : 0, borderRadius: 22, borderWidth: 3, borderColor: t.c.bg.tile }}>
+            <Disc name={o.name} colorKey={o.personId} size={36} />
+          </View>
+        ))}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text numberOfLines={1} style={{ fontSize: 17, lineHeight: 22, fontWeight: '700', color: toYou ? t.c.accent.gold : t.c.alert.coralText, fontVariant: ['tabular-nums'] }}>{toYou ? `${money(toYou)} owed to you` : 'You owe'}</Text>
+        <Text variant="caption" color="secondary" numberOfLines={1}>{line}</Text>
+      </View>
+      <Icon name="chevron-right" size={16} color={t.c.fg.secondary} />
+    </Pressable>
   );
 }
 
@@ -408,7 +517,7 @@ function WhoOwes({ owes }: { owes: Array<{ personId: string; amount: number; nam
   );
 }
 
-/** Coming up before payday: card bills (late first, coral), renewals and SIPs, soonest first, with their total. */
+/** Before payday as day cards you swipe: card bills (a late one first, in coral), renewals and SIPs, soonest first, with their total. */
 function ComingUp({ coming }: { coming: ReturnType<typeof comingUp> }) {
   const os = useOS();
   const t = useTheme();
@@ -417,19 +526,23 @@ function ComingUp({ coming }: { coming: ReturnType<typeof comingUp> }) {
   const until = format(new Date(`${coming.until}T12:00:00`), 'EEE d MMM');
   return (
     <View style={{ gap: 10 }}>
-      <SectionHead title="Coming up" sub={`${coming.payday ? `before payday, ${until}` : `by ${until}`} · ${shortMoney(os, total)}`} />
-      <Rows padding={14} gap={4}>
-        {coming.items.slice(0, 6).map((i) => (
-          <Pressable key={i.key} accessibilityRole="button" accessibilityLabel={`${i.title}, ${os.format.currency(i.amount)}, ${i.late ? 'late' : `due ${i.due}`}`} onPress={() => router.push(`/entity/${i.object}/${i.id}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, opacity: pressed ? 0.7 : 1 })}>
-            <IconDisc icon={i.kind === 'card' ? 'card' : i.kind === 'sip' ? 'trend' : 'repeat'} />
-            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-              <Text variant="rowTitle" numberOfLines={1}>{i.title}</Text>
-              <Text variant="caption" numberOfLines={1} style={{ color: i.late ? t.c.alert.coralText : t.c.fg.secondary, fontWeight: i.late ? '600' : '400' }}>{i.late ? `was due ${format(new Date(`${i.due}T12:00:00`), 'EEE d MMM')}` : format(new Date(`${i.due}T12:00:00`), 'EEE d MMM')}</Text>
-            </View>
-            <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{os.format.currency(i.amount)}</Text>
-          </Pressable>
-        ))}
-      </Rows>
+      <SectionHead title={coming.payday ? 'Before payday' : 'Coming up'} sub={`${coming.payday ? until : `by ${until}`} · ${shortMoney(os, total)}`} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -t.layout.gutter }} contentContainerStyle={{ paddingHorizontal: t.layout.gutter, gap: 10 }}>
+        {coming.items.map((i) => {
+          const d = new Date(`${i.due}T12:00:00`);
+          const ink = i.late ? '#0B0B0D' : t.c.fg.primary;
+          const sub = i.late ? 'rgba(11,11,13,0.68)' : t.c.fg.secondary;
+          return (
+            <Pressable key={i.key} accessibilityRole="button" accessibilityLabel={`${i.title}, ${os.format.currency(i.amount)}, ${i.late ? 'late, was due' : 'due'} ${format(d, 'EEE d MMM')}`} onPress={() => router.push(`/entity/${i.object}/${i.id}` as never)} style={({ pressed }) => ({ width: 140, padding: 14, borderRadius: 24, gap: 18, backgroundColor: i.late ? t.c.alert.coralText : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
+              <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: i.late ? '#0B0B0D' : t.c.fg.secondary }}>{`${i.late ? 'LATE · ' : ''}${format(d, 'EEE d').toUpperCase()}`}</Text>
+              <View style={{ gap: 1 }}>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 20, lineHeight: 24, fontWeight: '700', letterSpacing: -0.4, color: ink, fontVariant: ['tabular-nums'] }}>{os.format.currency(Math.round(i.amount))}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, color: sub }}>{i.title.replace(/ bill$/, '').replace(/ SIP$/, ' SIP')}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -480,7 +593,7 @@ function NeedsYou() {
   );
 }
 
-function WhereItWent({ byCat, total, month, offset }: { byCat: Array<{ category: string; total: number; count: number }>; total: number; month: string; offset: number }) {
+function WhereItWent({ byCat, total, month, offset, onBudget }: { byCat: Array<{ category: string; total: number; count: number }>; total: number; month: string; offset: number; onBudget?: () => void }) {
   const os = useOS();
   const router = useRouter();
   const t = useTheme();
@@ -489,13 +602,13 @@ function WhereItWent({ byCat, total, month, offset }: { byCat: Array<{ category:
   const short = (n: number) => shortMoney(os, n);
   return (
     <View style={{ gap: 10 }}>
-      <SectionHead title="Where it went" sub={`${month} · ${byCat.length} categor${byCat.length === 1 ? 'y' : 'ies'}`} action="Spend" chevron onAction={() => router.push({ pathname: '/spend', params: { period } } as never)} />
+      <SectionHead title="Where it went" sub={`${month} · ${byCat.length} categor${byCat.length === 1 ? 'y' : 'ies'}`} action="Spend" chevron onAction={() => router.push({ pathname: '/module/finance/spend', params: { period } } as never)} />
       <RingBadges
         total={short(total)}
         caption={`spent in ${month.split(' ')[0]}`}
         format={short}
-        action={hasTargets ? undefined : { label: 'Set a budget', onPress: () => router.push('/settings/categories' as never) }}
-        parts={byCat.map((c) => ({ key: c.category, label: categoryOf(c.category).label, value: c.total, color: catColor(c.category, t), icon: categoryOf(c.category).icon, onPress: () => router.push({ pathname: '/spend', params: { category: c.category, period } } as never) }))}
+        action={hasTargets ? undefined : { label: 'Set a budget', onPress: onBudget ?? (() => router.push('/settings/categories' as never)) }}
+        parts={byCat.map((c) => ({ key: c.category, label: categoryOf(c.category).label, value: c.total, color: catColor(c.category, t), icon: categoryOf(c.category).icon, onPress: () => router.push({ pathname: '/module/finance/spend', params: { category: c.category, period } } as never) }))}
       />
     </View>
   );
@@ -529,7 +642,7 @@ function Targets({ targets }: { targets: ReturnType<typeof targetStatuses> }) {
 }
 
 /** No targets yet: a budget from your last 3 months, and what it leaves to save; one tap makes it yours (docs/MODEL.md, Suggested budget). */
-function SuggestedBudget() {
+function SuggestedBudget({ bare, onDone }: { bare?: boolean; onDone?: () => void } = {}) {
   const os = useOS();
   const t = useTheme();
   const toast = useToast();
@@ -539,11 +652,12 @@ function SuggestedBudget() {
   const take = () => {
     const before = adoptBudget(os, s);
     toast.show({ message: `Budget set · ${money(s.total)} a month across ${s.items.length} categories`, icon: 'check', undo: () => undoBudget(os, s, before) });
+    onDone?.();
   };
   return (
     <View style={{ gap: 10 }}>
-      <SectionHead title="A budget for you" sub="From your last 3 months" />
-      <View style={{ padding: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 12 }}>
+      {bare ? <Text variant="caption" color="secondary">From your last 3 months</Text> : <SectionHead title="A budget for you" sub="From your last 3 months" />}
+      <View style={{ padding: bare ? 0 : 18, borderRadius: 28, backgroundColor: bare ? 'transparent' : t.c.bg.tile, gap: 12 }}>
         {s.items.map((i) => (
           <View key={i.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: catColor(i.category, t) }} />
@@ -667,7 +781,7 @@ function Recent({ items, count }: { items: Array<ObjectRecord<TransactionData>>;
   if (!items.length) return null;
   return (
     <View style={{ gap: 10 }}>
-      <SectionHead title="Recent" action={`All ${count}`} chevron onAction={() => router.push({ pathname: '/spend', params: { period: 'all', kind: 'all' } } as never)} />
+      <SectionHead title="Recent" action={`All ${count}`} chevron onAction={() => router.push({ pathname: '/module/finance/spend', params: { period: 'all', kind: 'all' } } as never)} />
       <Rows padding={14} gap={8}>
         {items.map((x) => {
           const split = splitOf(x.data);

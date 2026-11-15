@@ -7,6 +7,22 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.69 · 15 Nov 2026
+
+**Money's new home, its own bar, and Accounts and cards.**
+- **Money has its own bottom bar:** Money home · Spend · Accounts and cards ·
+  Subscriptions, with Ask Money's sparkle as the raised button.
+- **Money home leads with where it went:** the ring with your categories and
+  Set a budget (which opens the suggested budget), the pace line, this week as
+  the orange Analytics chart, what needs you, Before payday as day cards you
+  swipe (a late bill in coral), your views, then one line each for your
+  accounts and for who owes whom, and Recent. A back button goes to Browse;
+  the grid button opens the other Money screens.
+- **Accounts and cards** is a new screen: what is in your accounts, what the
+  cards owe and your net worth, the accounts drawn as a stacked wallet (each
+  kind its own colour, a late card in coral), this month in and out, and your
+  investments.
+
 ## v0.0.68 · 15 Nov 2026
 
 **Turf catches up with Turf web on money and lists.**

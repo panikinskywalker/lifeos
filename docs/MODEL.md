@@ -1223,7 +1223,7 @@ model as before, with every read-only money tool now open to it.
 ### Ask Money (proposed 6 Nov, drawn in the Money design file; not built)
 Money you can talk to, on the idea of Personal Finance in Claude. Claude's own
 feature is US only and reaches banks through Plaid, so LifeOS builds it on its own
-Sources. Read-only, always.
+Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
 - **Where**: an ask box at the top of Money home, opening its own screen with
   starter questions from your data. Every existing Money screen stays below it.
 - **Who does the sums**: the phone's code computes every figure. A model only picks
@@ -1241,6 +1241,40 @@ Sources. Read-only, always.
   candidates in the morning brief (layer 8).
 - **Limits**: it never moves money and gives no investment advice; asked, it says so
   and shows what you hold.
+- **Ask Money is an agent** (15 Nov, Rutvij: "an actual AI agent", "smart af,
+  the Finance Guru", "Make changes"). It replaces the one-sentence-one-block
+  shape:
+  - **A conversation**: answers stream in its own words, in steps it shows
+    ("Looked at 64 November payments · compared with October"), and it asks
+    back. Every figure still comes from the phone's sums and opens its
+    payments; its own arithmetic is never shown.
+  - **A finance guru**: it reads your real numbers and says what to do about
+    them (pay this card in full, its interest is about 42% a year; Netflix went
+    up and you use it twice a month, pause it?), on its own when something is
+    worth saying. No buy or sell calls on a fund or stock: it explains what you
+    hold and the general rules (an emergency fund first, stepping a SIP up).
+  - **It changes things**: recategorise, split, set a budget, mark a bill
+    paid, track or pause a subscription, settle up, fix what it read wrong.
+    Each change shows as a card with Undo ("Changed 2 things · Undo all"); a
+    bigger one (a monthly line, a budget) asks first. It never moves money:
+    "I can't move money. When you pay Rohan ₹450, I'll mark it settled."
+  - **It builds on screen**: "put a card on my home that tracks Swiggy" makes
+    a component from the kit's blocks and places it on Money home (Move ·
+    Remove · Undo). Kept views are these components.
+  - The privacy gate stays. With no AI connected, it offers Connect
+    OpenRouter, and the quick answers keep working on the phone.
+  - **How it runs** (15 Nov, Rutvij): a Claude Managed Agent on **Claude Haiku
+    5.5**, with the Claude key already in You › Agent. The app creates the
+    agent and its environment once, keeps their IDs, and updates the agent when
+    its definition changes. Each Ask conversation is a session; every tool is
+    one the phone answers (no sandbox tools, no web; the environment's network
+    is closed). Web search can be switched on later.
+- **Add a payment** (15 Nov, Rutvij): the **+** opens a sheet: Snap a bill,
+  Attach, Type it, or say it ("₹640 at Shree Sagar, paid in cash, half is
+  Arjun's"). What is read from the bill fills the payment; *Paid with* is Cash,
+  an account or card, or someone else paid; the split and the bill stay on it.
+  The photo stays on the phone; only what was read leaves it, if your AI reads
+  it.
 - **Privacy** (decided 11 Nov): money questions may go to any provider in the chain,
   OpenRouter's free models included, knowing some free providers log or train on
   what they are sent. Only the records needed leave (payee, amount, date,
@@ -1343,6 +1377,24 @@ Built from the v3 Noir kit; top to bottom:
    before payday?" answers from the same list.
 Then the rest as before: subscriptions and net worth, where it went, targets,
 accounts, investments, recent.
+
+**Money redesign (15 Nov, Rutvij; Money design file, three directions from his
+references).** Each screen takes the direction that suits it:
+- **Home** leads with where it went (direction C): the kit's ring with badges
+  ("₹24k spent in November", breakdown bars, Set a budget), the pace line, the
+  kit's orange Analytics chart (columns in tracks, the week), Needs you as
+  one-tap rows with Sort with AI, Before payday as day cards, then one line each
+  for accounts ("₹54,480 in accounts · you owe ₹19,679 on 2 cards") and who owes
+  whom, then Recent. A grid button opens the other Money screens.
+- **Accounts and cards** (new screen, direction B): what is in your accounts,
+  the cards owed, net worth, the accounts and cards as a stacked wallet, Came in
+  and Spent, investments.
+- **An account's or card's page** (direction A): the account drawn as its card
+  (balance or what you owe on it), then round-icon buttons Add · Transfer · Set
+  balance (Set owed) · Edit.
+- **Subscriptions** (direction B): a month and a year, the logos in a row, then
+  the list. **Reports** (direction A): Came in and Spent tiles, how this month
+  compares, and the Analytics chart.
 
 ### Money pages with no artboard, from the kit (14 Nov, phase C)
 No screen stays on the generic layout; each is put together from v3 Noir kit parts.
@@ -1471,9 +1523,12 @@ place of Dump: in **Turf**, Home · Games · **+** (New match) · Players ·
 Venues, which replaced Turf's switcher at the top. A section stays lit on its
 deeper pages (Players on Leaders and a player). The back button at the top
 leaves the board. A screen with its own box at the bottom (Ask Money) shows no
-bar. Every other board and module page (Money for now) keeps the
-app's own bar, and its buttons lead back out to Today, Upkeep, Dump, Browse
-and You. A board declares its sections as `bar` (`docs/PLUGINS.md` contract:
+bar. In **Money** (15 Nov, Rutvij): Money home · Spend · Accounts and cards ·
+Subscriptions, and the raised button is Ask Money's sparkle, which opens Ask
+Money.
+Every page has a back button, Money home's going back to Browse. Every other
+board and module page keeps the app's own bar, and its buttons lead back out
+to Today, Upkeep, Dump, Browse and You. A board declares its sections as `bar` (`docs/PLUGINS.md` contract:
 `BoardManifest.bar`).
 
 ### You (settings)
