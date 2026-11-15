@@ -321,6 +321,19 @@ Came in is money you earned, so it is not inflated by friends paying you back.
 - Sorted as each payment is filed, and once (`finance.moneyInV1`) for money in
   filed before, leaving alone payments you changed yourself.
 
+**Duplicates: the same payment seen twice (15 Nov, Rutvij).** Never matched on
+amount alone. A message is the same payment as an earlier one when:
+- both carry the same bank reference (UPI ref, UTR), within 3 days; or
+- one is the bank's text and the other its app's notification (or mail), within
+  30 minutes, and they do not name different accounts; or
+- it is the same text again (banks send one text from two sender ids).
+Anything else is its own payment: three friends each sending ₹161 are three. A
+message about a payment you typed (same amount and kind, that day or the day
+before) confirms it. A receipt mail confirms a payment for the same amount within
+a day only if their names share a word, or the payment has no real name (a code,
+a payment gateway). The second sighting fills in what the first lacked: the
+account, the name, and the bank's stated balance.
+
 **Balances follow the bank (14 Nov, phase A).** A bank text's balance ("Avl Bal")
 becomes the account's known balance for its day; the account adds only payments
 dated after it, so every new text corrects it (an older text never overwrites a

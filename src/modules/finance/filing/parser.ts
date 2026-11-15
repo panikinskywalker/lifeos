@@ -77,7 +77,7 @@ function file(os: LifeOSContext, m: RawMessage, r: ParserRead, ctx: FileContext)
   setDedupeKey(os, ctx.id, dedupeKey(t));
   if (m.source === 'email') {
     // The bank SMS (or you) may have filed this payment already: confirm it instead of counting it twice.
-    const same = sameMoneyFor(os, t.amount, t.direction === 'credit' ? 'income' : 'expense', t.date ?? iso(m.receivedAt));
+    const same = sameMoneyFor(os, t.amount, t.direction === 'credit' ? 'income' : 'expense', t.date ?? iso(m.receivedAt), t.counterparty);
     if (same) {
       enrichFrom(os, same, t, m);
       const e = os.records.get<{ merchant?: string }>(same)!;
@@ -89,7 +89,7 @@ function file(os: LifeOSContext, m: RawMessage, r: ParserRead, ctx: FileContext)
     }
     return fileTxn(os, m, t, ctx);
   }
-  const dup = findDuplicateFor(os, ctx.id, t, m.receivedAt);
+  const dup = findDuplicateFor(os, ctx.id, t, m);
   if (dup?.ingestId) {
     // The second sighting may know more (the SMS has the account, the app has the name).
     if (dup.entityId) enrichFrom(os, dup.entityId, t, m);

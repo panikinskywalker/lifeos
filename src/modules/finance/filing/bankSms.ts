@@ -391,8 +391,3 @@ export function parsePaymentNotification(pkg: string, title: string, text: strin
   // Bank apps post the same text as their SMS.
   return parseBankSms(both, PAYMENT_APPS[pkg] ?? pkg);
 }
-
-/** Same money movement seen twice (SMS + app notification, or two SMS): amount, direction, within 10 minutes. */
-export function dedupeKey(t: Pick<ParsedTxn, 'amount' | 'direction'>, at: number): string {
-  return `${t.direction}:${t.amount.toFixed(2)}:${Math.floor(at / (10 * 60_000))}`;
-}

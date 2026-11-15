@@ -1,5 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
-import { findTwin, sourceLabel, type RawMessage } from '@core/filing/queue';
+import { sourceLabel, type RawMessage } from '@core/filing/queue';
 import type { FileContext, FileOutcome } from '@core/filing/contract';
 import { toInr } from './fx';
 import { askWhoIs, isMyName, linkPayee, payeeFor } from './payee';
@@ -19,18 +19,51 @@ import type { ParsedTxn } from './bankSms';
  */
 
 const DAY = 86_400_000;
-const WINDOW = 10 * 60_000;
+const WINDOW = 30 * 60_000;
 const iso = (t: number) => {
   const d = new Date(t);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
-/** The same money already seen: another message within 10 minutes, or a transaction you already filed that day. */
+/** Messages that could be about the same money share this ("debit:161.00"); `twinOf` decides if one is. */
 export const dedupeKey = (t: ParsedTxn) => `${t.direction}:${t.amount.toFixed(2)}`;
 
-export function findDuplicateFor(os: LifeOSContext, itemId: string, t: ParsedTxn, at: number): { ingestId?: string; entityId?: string } | null {
-  const twin = findTwin(os, itemId, dedupeKey(t), at, WINDOW);
+const REF_WINDOW = 3 * DAY;
+const sameText = (a: string, b: string) => a.toLowerCase().replace(/\s+/g, ' ').trim() === b.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * The same payment seen again (docs/MODEL.md, Duplicates, 15 Nov), never on
+ * amount alone: the same bank reference within 3 days; the bank's text and its
+ * app's notification within 30 minutes, unless they name different accounts;
+ * or the same text twice (banks send one text from two sender ids). Three
+ * friends each sending ₹161 are three payments.
+ */
+function twinOf(os: LifeOSContext, itemId: string, t: ParsedTxn, m: RawMessage): { id: string; recordId: string | null } | null {
+  const at = m.receivedAt;
+  const rows = os.db.all<{ id: string; source: string; received_at: number; raw_text: string; parsed: string | null; record_id: string | null }>(
+    `SELECT id, source, received_at, raw_text, parsed, record_id FROM ingest_queue WHERE dedupe_key=? AND id<>? AND received_at BETWEEN ? AND ? AND status IN ('confirmed','proposed','duplicate') ORDER BY received_at`,
+    [dedupeKey(t), itemId, at - REF_WINDOW, at + REF_WINDOW],
+  );
+  for (const r of rows) {
+    let o: Partial<ParsedTxn> | null = null;
+    try {
+      o = r.parsed ? (JSON.parse(r.parsed) as { read?: { txn?: ParsedTxn } }).read?.txn ?? null : null;
+    } catch {
+      o = null;
+    }
+    const twin = { id: r.id, recordId: r.record_id };
+    if (t.ref && o?.ref && t.ref === o.ref) return twin;
+    if (Math.abs(r.received_at - at) > WINDOW) continue;
+    if (t.last4 && o?.last4 && t.last4 !== o.last4) continue;
+    if (r.source !== m.source || sameText(r.raw_text, m.body)) return twin;
+  }
+  return null;
+}
+
+export function findDuplicateFor(os: LifeOSContext, itemId: string, t: ParsedTxn, m: RawMessage): { ingestId?: string; entityId?: string } | null {
+  const at = m.receivedAt;
+  const twin = twinOf(os, itemId, t, m);
   if (twin) return { ingestId: twin.id, entityId: twin.recordId ?? undefined };
   if (!os.registry.objects.has('transaction')) return null;
   // Said it before the SMS came ("spent 450 on lunch"): same amount, same kind, same or previous day, not from a message.
@@ -58,6 +91,9 @@ export function enrichFrom(os: LifeOSContext, entityId: string, t: ParsedTxn, m:
   }
   if (!e.data.merchant && t.counterparty) patch.merchant = t.counterparty;
   if (Object.keys(patch).length) os.records.update(entityId, { data: patch }, 'assistant');
+  // The second sighting may be the one with the balance ("Avl Bal").
+  const acc = (patch.accountId ?? e.data.accountId) as string | undefined;
+  if (acc && t.balance != null && t.currency === 'INR') noteBalance(os, acc, t.balance, (e.data.date as string | undefined) ?? iso(m.receivedAt), m.receivedAt);
   os.records.timeline.add({ entityId, kind: m.source, title: `Seen in ${sourceLabel(os, m)}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingest: true } });
 }
 
@@ -295,15 +331,25 @@ function cashAccount(os: LifeOSContext, created: string[]): string | null {
   return a.id;
 }
 
-/** A transaction for this amount within a day either side (from any source). */
-export function sameMoneyFor(os: LifeOSContext, amount: number, kind: string, day: string): string | null {
+/**
+ * A transaction for this amount within a day either side (from any source),
+ * nearest first. With a name (a receipt mail's "Adobe"), one whose payee or
+ * merchant shares a word with it, or one with no name to compare; never a
+ * different named shop that happens to cost the same.
+ */
+export function sameMoneyFor(os: LifeOSContext, amount: number, kind: string, day: string, name?: string | null): string | null {
   if (!os.registry.objects.has('transaction')) return null;
   const d = new Date(`${day}T12:00:00`).getTime();
-  return (
-    os.db.get<{ id: string }>(
-      `SELECT id FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')=? AND ABS(json_extract(data,'$.amount') - ?) < 0.5
-         AND json_extract(data,'$.date') BETWEEN ? AND ? ORDER BY ABS(julianday(json_extract(data,'$.date')) - julianday(?)) LIMIT 1`,
-      [kind, amount, iso(d - DAY), iso(d + DAY), day],
-    )?.id ?? null
+  const rows = os.db.all<{ id: string; title: string | null; merchant: string | null }>(
+    `SELECT id, title, json_extract(data,'$.merchant') AS merchant FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')=? AND ABS(json_extract(data,'$.amount') - ?) < 0.5
+       AND json_extract(data,'$.date') BETWEEN ? AND ? ORDER BY ABS(julianday(json_extract(data,'$.date')) - julianday(?))`,
+    [kind, amount, iso(d - DAY), iso(d + DAY), day],
   );
+  const words = (s: string | null | undefined) => new Set(norm(s ?? '').split(' ').filter((w) => w.length >= 3 && !/^\d+$/.test(w)));
+  const want = words(name);
+  if (!want.size) return rows[0]?.id ?? null;
+  const named = (r: (typeof rows)[number]) => words(`${r.title ?? ''} ${r.merchant ?? ''}`);
+  // A code or a payment gateway ("PYU*00412", PayU, Razorpay) is not the shop's name: nothing to compare.
+  const nameless = (r: (typeof rows)[number]) => !r.merchant || /\d{4,}|\*|\b(payu|razorpay|ccavenue|billdesk|cashfree|juspay|pine ?labs|stripe|paypal)\b/i.test(r.merchant);
+  return (rows.find((r) => [...named(r)].some((w) => want.has(w))) ?? rows.find(nameless))?.id ?? null;
 }

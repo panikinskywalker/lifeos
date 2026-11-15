@@ -51,6 +51,26 @@ describe('counting money', () => {
     expect(incomeInRange(os, '2026-10-01', '2026-10-31')).toBe(196958);
   });
 
+  it('duplicates are never matched on amount alone: three friends each sending ₹161 are three payments', () => {
+    const at = Date.parse('2026-08-22T10:00:00');
+    ['ABEL MANOJ MATH', 'PRATIK PRAVIN G', 'ADITYA SHEKHAR'].forEach((name, i) =>
+      fileMessage(os, { source: 'sms', from: 'AX-ICICIT-S', body: `Dear Customer, Acct XX123 is credited with Rs 161.00 on 22-Aug-26 from ${name}. UPI:61234567891${i}-ICICI Bank.`, receivedAt: at + i * 60_000 }),
+    );
+    expect(txs()).toHaveLength(3);
+  });
+
+  it('the same text from two of the bank’s sender ids, or its app’s notification 20 minutes later, is one payment', () => {
+    const at = Date.parse('2026-11-02T13:00:00');
+    const body = 'ICICI Bank Acct XX123 debited for Rs 450.00 on 02-Nov-26; SWIGGY credited. UPI:612345678920. Call 18002662 for dispute.';
+    fileMessage(os, { source: 'sms', from: 'AX-ICICIT-S', body, receivedAt: at });
+    fileMessage(os, { source: 'sms', from: 'AD-ICICIT-S', body, receivedAt: at + 30_000 });
+    fileMessage(os, { source: 'notification', from: 'com.google.android.apps.nbu.paisa.user', title: 'Payment successful', body: '₹450 paid to Swiggy', receivedAt: at + 20 * 60_000 });
+    expect(txs()).toHaveLength(1);
+    // A second, separate ₹450 an hour later is its own payment.
+    fileMessage(os, { source: 'sms', from: 'AX-ICICIT-S', body: body.replace('612345678920', '612345678921'), receivedAt: at + 60 * 60_000 });
+    expect(txs()).toHaveLength(2);
+  });
+
   it('a card bill paid through CRED ("…; CRED credited") is a transfer, not spending', () => {
     sms('AD-ICICIT-S', 'ICICI Bank Acct XX123 debited for Rs 8305.44 on 19-Sep-26; CRED credited. UPI:612345678904. Call 18002662 for dispute.', '2026-09-19');
     expect(txs()[0]!.data.kind).toBe('transfer');

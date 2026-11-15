@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.54 · 15 Nov 2026
+
+**No more merged or doubled payments.** Two payments used to become one
+whenever they had the same amount within 10 minutes, so three friends each
+sending ₹161 showed as one. Now a payment is a repeat only when it is the same
+bank reference, the bank's text and its app's notification within half an hour,
+or the very same text sent twice. A text that arrives late no longer doubles a
+payment, a receipt email only confirms a payment with a matching name, and a
+repeat text still updates the account's balance.
+
 ## v0.0.53 · 15 Nov 2026
 
 **Came in is money you earned.** Friends paying you back no longer count as
