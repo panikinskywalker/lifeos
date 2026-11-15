@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.85 · 16 Nov 2026
+
+**The card wheel opens on your main account on Android too.** It had started
+on whichever card came first, because Android ignored where it was told to
+start.
+
 ## v0.0.84 · 16 Nov 2026
 
 **Upload a statement and Money updates itself from it.** In the + sheet, the

@@ -62,6 +62,7 @@ export function CardWheel({ cards, onOpen, onFocus, initial = 0 }: { cards: Whee
   const scroll = useRef<ScrollView>(null);
   const [front, setFront] = useState(initial);
   const [width, setWidth] = useState(350);
+  const placed = useRef(false);
   const height = CARD_H + 2 * SHOWN * STEP;
   const top = (height - CARD_H) / 2;
 
@@ -82,7 +83,17 @@ export function CardWheel({ cards, onOpen, onFocus, initial = 0 }: { cards: Whee
   };
 
   return (
-    <View style={{ height }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+    <View
+      style={{ height }}
+      onLayout={(e) => {
+        setWidth(e.nativeEvent.layout.width);
+        // Android ignores contentOffset: start on the card asked for once laid out.
+        if (!placed.current) {
+          placed.current = true;
+          requestAnimationFrame(() => scroll.current?.scrollTo({ y: initial * STEP, animated: false }));
+        }
+      }}
+    >
       <Animated.ScrollView ref={scroll} nestedScrollEnabled showsVerticalScrollIndicator={false} snapToInterval={STEP} decelerationRate="fast" contentOffset={{ x: 0, y: initial * STEP }} onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={{ height: (cards.length - 1) * STEP + height }}>
         {cards.map((c, i) => (
           <WheelSlot key={c.key} card={c} index={i} y={y} top={top} width={width} isFront={i === front} depth={Math.abs(i - front)} onPress={() => (i === front ? onOpen(c.key) : goTo(i))} />
