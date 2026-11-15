@@ -35,7 +35,9 @@ export default function BrowseTab() {
   void shown;
   const cards = useLive((o) => Object.fromEntries(modules.map((m) => {
     try {
-      return [m.id, o.registry.boardFor(m.id)?.overview?.(o, Date.now(), { cardOnly: true }).card ?? null];
+      // Its companion board's card, else the cross-module board shown with it (Turf for games).
+      const board = o.registry.boardFor(m.id) ?? [...o.registry.boards.values()].find((b) => b.shownWith === m.id);
+      return [m.id, board?.overview?.(o, Date.now(), { cardOnly: true }).card ?? null];
     } catch {
       return [m.id, null];
     }
@@ -69,10 +71,10 @@ export default function BrowseTab() {
             const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
             const n = types.reduce((sum, ty) => sum + (counts[ty.id] ?? 0), 0);
             const unit = types.length === 1 ? types[0]!.labelPlural.toLowerCase() : 'records';
-            // The open card says what matters now (its Overview's line), with the number in dot numerals ("41 DAYS").
+            // The open card says what matters now (its Overview's line), with its dots: the card's own (a name, a place, a day), else the number ("41 DAYS").
             const card = cards[m.id];
             const line = card?.headline ?? `${n.toLocaleString('en-IN')} ${unit}`;
-            return { key: m.id, title: shortNameForModule(m.id, m.name), line, headline: dotHeadline(line) ?? undefined, icon: m.icon, tint: tintForModule(m.id), onPress: () => router.push(`/module/${m.id}`) };
+            return { key: m.id, title: shortNameForModule(m.id, m.name), line, headline: card?.dots?.toUpperCase().slice(0, 8) ?? dotHeadline(line) ?? undefined, icon: m.icon, tint: tintForModule(m.id), onPress: () => router.push(`/module/${m.id}`) };
           })}
         />
       </Section>

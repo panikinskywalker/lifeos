@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.48 · 15 Nov 2026
+
+**Module cards can say a word, not just a number.** The dot letters on a
+Browse card can be a name, a place or a day. Turf's card now shows the next
+match's day ("SAT 21", with the venue under it), or with no match booked, the
+name of whoever owes most ("KARAN", with what everyone owes under it).
+
 ## v0.0.47 · 15 Nov 2026
 
 **The last module card really shows its number now.** v0.0.46 said it did, but

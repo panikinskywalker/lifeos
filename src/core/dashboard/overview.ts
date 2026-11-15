@@ -25,7 +25,15 @@ export type OverviewBlock =
 
 export interface ModuleOverview {
   /** One line for Today's area card: the number that matters, and a 7-point trend. */
-  card?: { headline: string; sub?: string | null; series?: Array<number | null>; seriesFormat?: ValueFormat; alert?: boolean };
+  card?: {
+    headline: string;
+    sub?: string | null;
+    series?: Array<number | null>;
+    seriesFormat?: ValueFormat;
+    alert?: boolean;
+    /** What Browse's module card writes in dot letters: a number, a name, a place, a day ("SAT 21", "KARAN"); 8 characters at most. Without it, the number in the headline. */
+    dots?: string;
+  };
   blocks: OverviewBlock[];
 }
 

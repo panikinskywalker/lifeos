@@ -1345,7 +1345,12 @@ what they are, each opening the thing itself. Then two sections:
   later; a grid of tiles, yours first, pinned before the rest. Today and Upkeep
   are boards too but sit in the bottom bar, so they are not repeated here.
 - **Modules** — the twelve, in their tints, each opening its Overview → Lists →
-  Records (as the grid is today).
+  Records. Drawn as the module stack: the open card (and the last, which
+  nothing covers) shows its Overview's line and, in dot letters, whatever says
+  it best: a number, a name, a place or a day (`card.dots`, 8 characters; else
+  the number in the line). 15 Nov, Rutvij: Turf's card shows the next match's
+  day ("SAT 21", the venue under it), or with none booked the name of whoever
+  owes most ("KARAN", what everyone owes under it).
 Then **everything else lives here too**: Links, Facts (the Second Brain's), Recent, Tags, Reminders,
 To check history, Data sources status, the component gallery (dev). If it is a
 screen and not a tab, Browse reaches it. Any board can also be pinned to Today as a

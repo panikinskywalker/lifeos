@@ -14,6 +14,7 @@ import { TurfLeaders } from './leaders';
 import { TurfLogStats } from './stats';
 import { TurfVenueEdit } from './venue-edit';
 import { SmsAskCard, SmsPaidCard, TurfBookingCard, SubmissionCard } from './checkcards';
+import { turfOverview } from './overview';
 
 /** Turf (docs/MODEL.md layer 3; R9): the first user board, over games + crm + places + finance. A Browse › Boards tile. */
 export const turfBoard: BoardManifest = {
@@ -24,6 +25,8 @@ export const turfBoard: BoardManifest = {
   placement: 'browse',
   shownWith: 'games',
   tiles: turfTiles,
+  // Its card on Browse's module stack, as the games module's (it has no companion board).
+  overview: turfOverview,
   // The bottom bar inside Turf (docs/MODEL.md, The bar inside a board): Home · Games · + New match · Players · Venues.
   bar: {
     tabs: [
