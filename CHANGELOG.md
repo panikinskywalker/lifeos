@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.38 · 15 Nov 2026
+
+**Browse's module stack moves.** Tap a module's strip and it springs open in
+place (the cards below slide down) with what matters now and its number in dot
+numerals ("PUNE IN 10 DAYS" · 10 DAYS, Money's 81.5K); tap the open card to go
+in. A press squeezes the card a little and gives a light tick. Games is called
+Turf.
+
 ## v0.0.37 · 15 Nov 2026
 
 **Payee names cleaned up.** Payees an older version named with a reference

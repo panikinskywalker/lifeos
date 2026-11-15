@@ -8,6 +8,17 @@ import { shortNameForModule, tintForModule } from '@ui/theme/moduleTint';
 import { Icon, IconBox, IconButton, ModuleStack, RowList, Screen, Section, Text, RowItem } from '@ui/kit';
 import { RecordRow } from '@ui/components/RecordRow';
 
+/** The number in a line, for dot numerals: "Pune in 41 days" → "41 DAYS", "₹77,445 spent" → "77.4K". At most 8 characters. */
+function dotHeadline(line: string): string | null {
+  const m = /(\d[\d,]*(?:\.\d+)?)\s*([kKlL%])?\s*([A-Za-z]+)?/.exec(line);
+  if (!m) return null;
+  const n = Number(m[1]!.replace(/,/g, ''));
+  const num = m[2] ? `${m[1]}${m[2].toUpperCase()}` : n >= 1e5 ? `${(n / 1e5).toFixed(1).replace(/\.0$/, '')}L` : n >= 1e4 ? `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}K` : m[1]!;
+  const unit = m[3] ? ({ d: 'days', h: 'hrs', m: 'min', w: 'wks' } as Record<string, string>)[m[3].toLowerCase()] ?? m[3] : '';
+  const word = unit ? ` ${unit.toUpperCase()}` : '';
+  return (num + word).length <= 8 ? num + word : num.slice(0, 8);
+}
+
 /** Browse (docs/MODEL.md §5): search, Boards, the module stack (NR-KitComponents), Facts (the Second Brain's), Recent. */
 export default function BrowseTab() {
   const os = useOS();
@@ -18,6 +29,13 @@ export default function BrowseTab() {
   const recent = useLive((o) => o.records.recent(6), []);
   const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core');
   const boards = [...os.registry.boards.values()].filter((b) => b.placement === 'browse');
+  const cards = useLive((o) => Object.fromEntries(modules.map((m) => {
+    try {
+      return [m.id, o.registry.boardFor(m.id)?.overview?.(o, Date.now(), { cardOnly: true }).card ?? null];
+    } catch {
+      return [m.id, null];
+    }
+  })), []);
   return (
     <Screen tab title="Browse" right={<View style={{ flexDirection: 'row', gap: 8 }}><ToCheckBell /><IconButton icon="user-circle" accessibilityLabel="You" filled onPress={() => router.navigate('/you')} /></View>}>
       <Pressable accessibilityRole="search" accessibilityLabel="Search everything" onPress={() => router.push('/search')} style={{ minHeight: 48, borderRadius: 16, borderWidth: 1, borderColor: t.c.line, backgroundColor: t.c.bg.tileRaised, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18 }}>
@@ -43,13 +61,14 @@ export default function BrowseTab() {
       ) : null}
       <Section title="Modules">
         <ModuleStack
-          items={modules.map((m, i) => {
+          items={modules.map((m) => {
             const types = os.registry.objectsForModule(m.id).filter((x) => !x.hidden);
             const n = types.reduce((sum, ty) => sum + (counts[ty.id] ?? 0), 0);
             const unit = types.length === 1 ? types[0]!.labelPlural.toLowerCase() : 'records';
-            // Strips show the name alone; the last card, the open one, says what is in it.
-            const line = i === modules.length - 1 ? `${n.toLocaleString('en-IN')} ${unit}` : undefined;
-            return { key: m.id, title: shortNameForModule(m.id, m.name), line, icon: m.icon, tint: tintForModule(m.id), onPress: () => router.push(`/module/${m.id}`) };
+            // The open card says what matters now (its Overview's line), with the number in dot numerals ("41 DAYS").
+            const card = cards[m.id];
+            const line = card?.headline ?? `${n.toLocaleString('en-IN')} ${unit}`;
+            return { key: m.id, title: shortNameForModule(m.id, m.name), line, headline: dotHeadline(line) ?? undefined, icon: m.icon, tint: tintForModule(m.id), onPress: () => router.push(`/module/${m.id}`) };
           })}
         />
       </Section>
