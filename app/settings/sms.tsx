@@ -23,7 +23,7 @@ export default function SmsSendersScreen() {
           <Section title="Read as money">
             <RowList>
               {trusted.map((s) => (
-                <SwitchField key={s.address} label={`${s.address}${s.bank ? ` · ${BANK_NAMES[s.bank]}` : ''}`} hint={`${s.count} message${s.count === 1 ? '' : 's'}${s.sample ? ` · “${s.sample.slice(0, 60)}…”` : ''}`} value onChange={() => setSenderTrusted(os, s.address, false)} />
+                <SwitchField key={s.address} label={`${s.address}${s.bank && s.bank !== 'undefined' ? ` · ${BANK_NAMES[s.bank] ?? s.bank}` : ''}`} hint={`${s.count} message${s.count === 1 ? '' : 's'}${s.sample ? ` · “${s.sample.slice(0, 60)}…”` : ''}`} value onChange={() => setSenderTrusted(os, s.address, false)} />
               ))}
             </RowList>
           </Section>

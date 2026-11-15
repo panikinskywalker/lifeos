@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { isModuleShown } from '@core/registry/shown';
+import { shortNameForModule } from '@ui/theme/moduleTint';
 import { Alert, Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLive, useOS, useSettings } from '@ui/hooks';
@@ -20,7 +22,7 @@ export default function YouTab() {
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const counts = useLive((o) => o.records.countsByType(), []);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  const modules = useLive((o) => o.modules.installed(), []).filter((m) => m.id !== 'core');
+  const shownNames = useLive((o) => [...o.registry.modules.values()].filter((m) => m.id !== 'core' && isModuleShown(o, m.id)).map((m) => shortNameForModule(m.id, m.name)), []);
   const confirm = (title: string, body: string, fn: () => void) => (Platform.OS === 'web' ? fn() : Alert.alert(title, body, [{ text: 'Cancel', style: 'cancel' }, { text: 'Continue', onPress: fn }]));
   const demo = isDemo();
   const schema = os.db.get<{ v: number }>('SELECT MAX(version) v FROM _migrations')?.v;
@@ -58,7 +60,7 @@ export default function YouTab() {
 
       <Section title="Setup">
         <RowList>
-          <RowItem icon="grid" tint="tasks" title="Modules" subtitle={`${modules.length} on · ${modules.map((m) => os.registry.modules.get(m.id)?.name).filter(Boolean).slice(0, 3).join(', ')}…`} onPress={() => router.push('/browse')} />
+          <RowItem icon="grid" tint="tasks" title="Modules" subtitle={`${shownNames.length} shown · ${shownNames.slice(0, 3).join(', ')}${shownNames.length > 3 ? '…' : ''}`} onPress={() => router.push('/settings/modules' as never)} />
           <RowItem icon="sparkle" iconTone="accent" title="Agent" subtitle={`On the phone · then ${s.aiChain.filter((c) => c.enabled !== false).map((c) => PROVIDER_PRESETS[c.kind].label).join(' → ') || 'no providers'}`} onPress={() => router.push('/settings/ai')} />
           <RowItem icon="signal" tint="health" title="Data sources" subtitle="Bank SMS, payment apps, screen time, Health Connect" onPress={() => router.push('/settings/sources' as never)} />
           <RowItem icon="bell" tint="tasks" title="Notifications" subtitle="Morning brief, reminders, quiet hours" onPress={() => router.push('/settings/notifications' as never)} />

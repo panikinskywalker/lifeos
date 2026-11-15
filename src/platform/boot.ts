@@ -12,6 +12,7 @@ export { syncReminderNotifications };
 import { openDatabase, openDemoDatabase } from './openDatabase';
 import { demoIsFresh, isDemo, markDemoOpened } from './demo';
 import { demoFolders, seedDemo } from './seed';
+import { startShownModules } from '@core/registry/shown';
 import { buildAgentFromSettings } from './agentProvider';
 import { deviceBridge } from './sources';
 import { brainModel, runBrainPass } from './brain';
@@ -70,7 +71,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   if (demo) {
     await seedDemo(os).catch((e) => console.warn('demo seed failed', e));
     markDemoOpened();
-  }
+  } else startShownModules(os); // Money and Turf only, until more are finished (You › Modules).
 
   // Settings: DB → zustand, and zustand → DB on change.
   const stored = os.settings.all();

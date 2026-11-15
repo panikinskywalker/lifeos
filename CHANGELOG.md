@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.41 · 15 Nov 2026
+
+**Only what is finished is shown.** Money and Turf for now: other modules stay
+out of Browse, Today, Upkeep, the brief and search, while still collecting in
+the background. You › Modules has a switch for each and "Show every module";
+demo data shows everything. The SMS senders list no longer says "undefined".
+
 ## v0.0.40 · 15 Nov 2026
 
 **A friend's payment marks their Turf share paid right away.** Money in from a

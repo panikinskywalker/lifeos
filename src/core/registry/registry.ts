@@ -42,7 +42,8 @@ export class Registry {
     if (b.module && !this.modules.has(b.module)) throw new Error(`Board "${b.id}" is the companion of "${b.module}" which is not registered`);
     this.boards.set(b.id, b);
     for (const t of b.tiles ?? []) this.tiles.set(t.type, { ...t, board: b.id });
-    for (const q of b.quickActions ?? []) {
+    for (const q0 of b.quickActions ?? []) {
+      const q = { ...q0, board: b.id };
       const i = this.quickActions.findIndex((x) => x.id === q.id);
       if (i >= 0) this.quickActions[i] = q;
       else this.quickActions.push(q);

@@ -7,6 +7,7 @@ import { ToCheckBell } from '../../src/screens/ToCheckBell';
 import { shortNameForModule, tintForModule } from '@ui/theme/moduleTint';
 import { Icon, IconBox, IconButton, ModuleStack, RowList, Screen, Section, Text, RowItem } from '@ui/kit';
 import { RecordRow } from '@ui/components/RecordRow';
+import { isBoardShown, isModuleShown, shownModules } from '@core/registry/shown';
 
 /** The number in a line, for dot numerals: "Pune in 41 days" → "41 DAYS", "₹77,445 spent" → "77.4K". At most 8 characters. */
 function dotHeadline(line: string): string | null {
@@ -27,8 +28,11 @@ export default function BrowseTab() {
   const counts = useLive((o) => o.records.countsByType(), []);
   const facts = useLive((o) => o.facts.list({ limit: 10000 }).length, []);
   const recent = useLive((o) => o.records.recent(6), []);
-  const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core');
-  const boards = [...os.registry.boards.values()].filter((b) => b.placement === 'browse');
+  // Only modules and boards that are shown (You › Modules; docs/MODEL.md, Modules shown).
+  const shown = useLive((o) => [...(shownModules(o) ?? ['*'])].join(), []);
+  const modules = [...os.registry.modules.values()].filter((m) => m.id !== 'core' && isModuleShown(os, m.id));
+  const boards = [...os.registry.boards.values()].filter((b) => b.placement === 'browse' && isBoardShown(os, b.id));
+  void shown;
   const cards = useLive((o) => Object.fromEntries(modules.map((m) => {
     try {
       return [m.id, o.registry.boardFor(m.id)?.overview?.(o, Date.now(), { cardOnly: true }).card ?? null];

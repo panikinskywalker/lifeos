@@ -1352,6 +1352,16 @@ tile, and opened by name from the Dump box ("open turf"). A new board is one
 folder under `src/boards/<id>` registered in one list, like a module; later a
 board may come from a package (the plugin story), which changes nothing here.
 
+### Modules shown (15 Nov, Rutvij)
+While modules are finished one by one, the app shows only the finished ones:
+**Money and Turf** (games) on a phone's first start. A hidden module is left
+out of Browse (the module stack and its boards), Today's tiles, Upkeep, the
+brief, the morning notification and search's actions, but keeps running, so
+nothing it collects is lost, and a linked record (a payee in People) still
+opens. You › Modules has a switch per module and **Show every module**; demo
+data shows every module too. A cross-module board is shown with its module
+(Turf with games, `shownWith`); Today and Upkeep always are.
+
 ### You (settings)
 Data sources (each source: permission, enabled, last sync, today's count; SMS
 senders; Export texts for the parser; Sync all) · Agent (providers, keys, daily

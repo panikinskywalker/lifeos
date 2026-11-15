@@ -22,6 +22,7 @@ export const turfBoard: BoardManifest = {
   icon: 'target',
   color: 'green',
   placement: 'browse',
+  shownWith: 'games',
   tiles: turfTiles,
   screens: [
     { key: 'index', title: 'Turf', component: TurfHome },

@@ -28,6 +28,8 @@ export interface QuickAction {
   run?: (ctx: LifeOSContext) => void | Promise<void>;
   /** Show in the global "+" menu. */
   global?: boolean;
+  /** The board that added it (set when boards register). */
+  board?: string;
 }
 
 /** Automation trigger a module contributes (beyond the generic entity events). */
@@ -206,6 +208,8 @@ export interface BoardManifest {
   placement: 'bar' | 'browse' | 'module';
   /** The module this board is the companion of (its overrides); absent for cross-module boards (today, turf). */
   module?: string;
+  /** A cross-module board is shown when this module is (Turf with games; docs/MODEL.md, Modules shown). */
+  shownWith?: string;
   tiles?: TileDef[];
   screens?: BoardScreen[];
   /** Companion boards: the module's Overview (Browse › module, Today's area card). */

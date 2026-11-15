@@ -4,6 +4,7 @@ import { upkeep } from '../cycles/upkeep';
 import { daily, formatMetric, isoDay, spendPace } from '../dashboard/metrics';
 import { goals, myDay } from '../dashboard/day';
 import { briefOff } from '../brain/brief';
+import { isModuleShown } from '../registry/shown';
 
 /**
  * What the phone should notify, and when (M5): reminders, upkeep nudges and
@@ -76,7 +77,7 @@ export function morningBrief(os: LifeOSContext, at: number): { title: string; bo
   const g = Object.fromEntries(goals(os, at).map((x) => [x.id, x]));
   const lines: string[] = [];
   const off = briefOff(os);
-  if (os.registry.objects.has('measurement') && !off.has('health')) {
+  if (os.registry.objects.has('measurement') && !off.has('health') && isModuleShown(os, 'health')) {
     const slept = daily(os, 'sleep', day, day).get(day);
     if (slept != null) lines.push(`Slept ${fmtH(slept)}${g.sleep ? ` (goal ${fmtH(g.sleep.target)})` : ''}`);
     if (g.steps) lines.push(`Steps goal: ${formatMetric('steps', g.steps.target, os.format.currency)}`);

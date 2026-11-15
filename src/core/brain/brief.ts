@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '../registry/context';
 import { brains, lastPassToday, type PassName } from './runner';
 import { startOfDay } from './store';
+import { isModuleShown } from '../registry/shown';
 
 /**
  * The Morning brief on Today (docs/MODEL.md layer 8): today's nudges in a few
@@ -54,13 +55,13 @@ export function brief(os: LifeOSContext, now = Date.now(), max = 6): Brief {
     if (n.state === 'no' || n.state === 'undone') continue;
     const rec = n.recordId ? os.records.get(n.recordId) : undefined;
     // A routine is Upkeep's, whichever module keeps it.
-    if (off.has(rec?.object === 'routine' ? 'upkeep' : n.module)) continue;
+    if (off.has(rec?.object === 'routine' ? 'upkeep' : n.module) || !isModuleShown(os, n.module)) continue;
     lines.push({ id: n.id, text: n.line, module: rec?.object === 'routine' ? 'upkeep' : n.module, urgent: n.urgent, when: n.urgent ? urgentWhen(n.line) : null, route: n.route ?? (rec ? `/entity/${rec.object}/${rec.id}` : '/check'), answered: n.state !== 'open' });
   }
   lines.sort((a, b) => Number(b.urgent) - Number(a.urgent) || Number(a.answered) - Number(b.answered));
   const out = lines.slice(0, max);
   for (const b of brains(os)) {
-    if (off.has(b.module)) continue;
+    if (off.has(b.module) || !isModuleShown(os, b.module)) continue;
     let asks: ReturnType<NonNullable<typeof b.def.asks>> = [];
     try {
       asks = b.def.asks?.(os, now) ?? [];

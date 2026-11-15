@@ -1,4 +1,5 @@
 import type { ObjectRecord, ObjectDef } from '../domain/types';
+import { isModuleShown } from '../registry/shown';
 import type { LifeOSContext } from '../registry/context';
 import type { Cycle } from './cycleRepo';
 import { addPeriod, startOfDay, type CycleStatus, type UpkeepBucket } from './schedule';
@@ -40,6 +41,8 @@ export function upkeep(os: LifeOSContext, filter: UpkeepFilter = 'All', now = Da
   for (const cycle of os.cycles.all()) {
     const entity = os.records.get(cycle.entityId);
     if (!entity || (types && !types.includes(entity.object) && !types.includes(kindOf(entity)))) continue;
+    // A hidden module's renewals and chores wait until it is shown (docs/MODEL.md, Modules shown).
+    if (!isModuleShown(os, os.registry.objects.get(entity.object)?.module)) continue;
     items.push({ cycle, entity, def: os.registry.objects.get(entity.object), status: os.cycles.status(cycle, now) });
   }
   const rank = (i: UpkeepItem) => (i.status.daysLeft ?? (i.status.meterLeft != null && i.cycle.meterEvery ? (i.status.meterLeft / i.cycle.meterEvery) * 180 : 9999));

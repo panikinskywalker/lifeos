@@ -1,4 +1,5 @@
 import type { LifeOSContext } from '@core/registry/context';
+import { isBoardShown } from '@core/registry/shown';
 import type { TileDef } from '@core/registry/types';
 
 /**
@@ -17,7 +18,8 @@ export interface TileSetting {
 
 /** Every registered tile, default order first. */
 export function todayTiles(os: LifeOSContext): TileDef[] {
-  const all = [...os.registry.tiles.values()];
+  // Only tiles from boards that are shown (docs/MODEL.md, Modules shown).
+  const all = [...os.registry.tiles.values()].filter((t) => isBoardShown(os, t.board));
   const rank = (t: TileDef) => (TILE_ORDER.includes(t.type) ? TILE_ORDER.indexOf(t.type) : TILE_ORDER.length);
   return all.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i).map((x) => x.t);
 }
