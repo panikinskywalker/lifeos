@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.43 · 15 Nov 2026
+
+**Old Turf questions answer themselves.** Payments that came in before
+v0.0.40, like a friend's ₹472 for a Friday game, were still asking "paid for
+this?" in To check, because each payment was only ever looked at once. Now,
+when the app starts and after each Turf sync, open questions are looked at
+again. If the sender is known and the amount is exactly what they owe, the
+share is marked paid and the question goes. If the share was paid some other
+way, the question goes too.
+
 ## v0.0.42 · 15 Nov 2026
 
 **The bottom bar stays when you open a board or module.** Inside Turf it turns

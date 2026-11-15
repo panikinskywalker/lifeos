@@ -1856,7 +1856,9 @@ screens checked on the phone → overrides only where the default is wrong)
       the Person finance linked, counts as known; exact amount within 30 days of
       the game is recorded on its own and the sender learned; only part payments
       and names two players share are asked; unmatched money in is looked at
-      again on start and after each sync); boards can now give To check their own cards
+      again on start and after each sync, and so are open questions: one asked
+      under the older rule is recorded once its sender is known and the amount
+      exact, and one whose share was paid some other way goes); boards can now give To check their own cards
       (`BoardManifest.checkCards`). Gaps: squad-invite requests (new players
       asking to join) and photos aren't in the sync yet; undoing a change
       from the audit log stays on Turf web.

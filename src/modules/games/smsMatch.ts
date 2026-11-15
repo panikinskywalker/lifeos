@@ -149,6 +149,47 @@ function pay(os: LifeOSContext, txId: string, appearanceIds: string[], amount: n
   return items;
 }
 
+/** A known sender paying exactly: recorded, the sender learned, filed in To check with Undo. */
+function recordSure(os: LifeOSContext, txId: string, tx: Tx, personId: string, exact: Array<ObjectRecord<AppearanceData>>): Filing | null {
+  const name = os.records.get(personId)?.title ?? 'Someone';
+  const sender = senderOf(tx);
+  let filing: Filing | null = null;
+  os.db.transaction(() => {
+    const items = pay(os, txId, exact.map((a) => a.id), tx.amount, sender.key);
+    if (sender.key && !os.aliases.lookup(sender.key).some((a) => a.entityId === personId)) os.aliases.learn(sender.key, personId);
+    filing = os.filings.add({ source: 'turf', sourceRef: txId, kind: SMS_PAID, action: 'logged', entityId: exact[0]!.id, label: `${name} paid ${os.format.currency(tx.amount)} · ${exact.map((a) => shortDay(a.data.gameDate)).join(', ')}`, flag: null, before: { items, appearanceIds: exact.map((a) => a.id), amount: tx.amount } });
+  });
+  return filing;
+}
+
+/**
+ * Open questions looked at again (each payment is otherwise looked at once):
+ * one asked under an older rule whose sender is known now and paid exactly is
+ * recorded, and a question whose shares were paid some other way goes.
+ */
+function reaskOpen(os: LifeOSContext): number {
+  let n = 0;
+  for (const f of os.filings.ofKind(SMS_ASK, { open: true, limit: 500 })) {
+    const ask = f.before as unknown as SmsAsk | null;
+    if (!ask || smsConfirmed(os, f.id)) continue;
+    const tx = os.records.get<Tx>(ask.txId);
+    const owed = ask.appearanceIds.some((id) => {
+      const a = os.records.get<AppearanceData>(id);
+      return a && !a.archived && owedOn(a.data) > 0;
+    });
+    if (!tx || !owed || os.links.forEntity(ask.txId, 'pays').length) {
+      os.filings.setChecked(f.id);
+      continue;
+    }
+    const who = whoSent(os, tx.data, tx.id);
+    const exact = who.known && who.personId ? exactly(openShares(os, who.personId, tx.data.date), tx.data.amount) : null;
+    if (!exact || !recordSure(os, tx.id, tx.data, who.personId!, exact)) continue;
+    os.filings.setChecked(f.id);
+    n++;
+  }
+  return n;
+}
+
 /** Look at a newly filed Transaction; record, ask, or leave it. Returns what happened. */
 export function matchTransaction(os: LifeOSContext, txId: string): 'paid' | 'asked' | null {
   const seen = os.settings.get<string[]>(SEEN, []);
@@ -160,19 +201,11 @@ export function matchTransaction(os: LifeOSContext, txId: string): 'paid' | 'ask
   const shares = openShares(os, who.personId, tx.data.date);
   if (!shares.length) return null;
   os.settings.set(SEEN, [...seen.slice(-500), txId]);
+  const exact = exactly(shares, tx.data.amount);
+  if (who.known && exact) return recordSure(os, txId, tx.data, who.personId, exact) ? 'paid' : null;
   const name = os.records.get(who.personId)?.title ?? 'Someone';
   const sender = senderOf(tx.data);
   const money = os.format.currency(tx.data.amount);
-  const exact = exactly(shares, tx.data.amount);
-  if (who.known && exact) {
-    let filing!: Filing;
-    os.db.transaction(() => {
-      const items = pay(os, txId, exact.map((a) => a.id), tx.data.amount, sender.key);
-      if (sender.key && !os.aliases.lookup(sender.key).some((a) => a.entityId === who.personId)) os.aliases.learn(sender.key, who.personId!);
-      filing = os.filings.add({ source: 'turf', sourceRef: txId, kind: SMS_PAID, action: 'logged', entityId: exact[0]!.id, label: `${name} paid ${money} · ${exact.map((a) => shortDay(a.data.gameDate)).join(', ')}`, flag: null, before: { items, appearanceIds: exact.map((a) => a.id), amount: tx.data.amount } });
-    });
-    return filing ? 'paid' : null;
-  }
   const target = exact ?? [shares[0]!];
   const owed = target.reduce((s, a) => s + owedOn(a.data), 0);
   const part = tx.data.amount < owed - 0.5;
@@ -234,11 +267,11 @@ export function undoSmsPayment(os: LifeOSContext, filingId: string): void {
   });
 }
 
-/** Money in not yet matched to a share, once on start and after a sync (payments filed before this rule, or before the game synced). */
+/** Money in not yet matched to a share, once on start and after a sync (payments filed before this rule, or before the game synced), and open questions looked at again. */
 export function matchRecentPayments(os: LifeOSContext, days = 60): number {
   if (!os.registry.objects.has('transaction')) return 0;
   const since = new Date(Date.now() - days * DAY).toISOString().slice(0, 10);
-  let n = 0;
+  let n = reaskOpen(os);
   for (const t of os.records.query<Tx>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'income' }, { field: 'data.date', op: 'gte', value: since }] }, sort: [{ field: 'data.date', dir: 'asc' }] }, { limit: 20000 })) {
     if (os.links.forEntity(t.id, 'pays').length) continue;
     if (matchTransaction(os, t.id) === 'paid') n++;

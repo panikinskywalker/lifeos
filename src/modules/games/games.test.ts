@@ -741,6 +741,29 @@ describe('shares paid by SMS (R9c.6)', () => {
     expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(0);
   });
 
+  it('questions asked under an older rule are looked at again: a known sender paying exactly is recorded, a share paid some other way closes its question', async () => {
+    const { matchRecentPayments } = await import('./smsMatch');
+    // A payment looked at once already, and asked about then (as before 15 Nov).
+    const legacyAsk = (amount: number, date: string, merchant: string, name: string) => {
+      const tx = os.records.create({ object: 'transaction', data: { amount, kind: 'transfer', category: 'other', date, merchant, rawText: `Rs.${amount}.00 credited` } });
+      os.records.update(tx.id, { data: { kind: 'income' } });
+      os.settings.set('turf.smsSeen', [...os.settings.get<string[]>('turf.smsSeen', []), tx.id]);
+      const ap = appearance(name, '2026-10-17');
+      os.filings.add({ source: 'turf', sourceRef: tx.id, kind: SMS_ASK, entityId: tx.id, label: `${name} paid ₹${amount} for Sat, 17 Oct?`, before: { txId: tx.id, personId: person(name).id, appearanceIds: [ap.id], amount, sender: merchant } });
+      return tx;
+    };
+    legacyAsk(450, '2026-10-18', 'KARAN MEHTA', 'Karan');
+    legacyAsk(250, '2026-10-18', 'ARJUN RAO', 'Arjun');
+    markPaid(os, appearance('Arjun', '2026-10-17').id); // paid by hand meanwhile
+    const arjunPaid = appearance('Arjun', '2026-10-17').data.amountPaid;
+    expect(asks()).toHaveLength(2);
+    matchRecentPayments(os, 3650);
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹450 · Sat, 17 Oct/)]);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(450);
+    expect(appearance('Arjun', '2026-10-17').data.amountPaid).toBe(arjunPaid); // not paid twice
+  });
+
   it('one of several UPI ids on their Person is known at once (core identity)', () => {
     os.records.update(person('Karan').id, { data: { upi: 'karan@ybl, karan.m@okhdfc' } });
     sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited from VPA karan.m@okhdfc');
