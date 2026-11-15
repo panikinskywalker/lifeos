@@ -308,6 +308,9 @@ export interface MatchInput {
   frontedById?: string;
   /** A match a player suggested (Turf web's id), booked by this one: Turf web closes it. */
   suggestionId?: string;
+  /** The two kits (hex); Lime and Sky when not picked. */
+  colorA?: string;
+  colorB?: string;
 }
 
 /** What a venue fills in for a new match. */
@@ -347,6 +350,8 @@ function matchBody(os: LifeOSContext, m: MatchInput, c: ReturnType<typeof checkM
     expectedPlayers: expectedFor(m.expectedPlayers, m.sideSize, m.playerIds.length),
     frontedByPlayerId: fronted ? turfPlayerId(fronted.data) ?? '' : '',
     ...(m.suggestionId ? { suggestionId: m.suggestionId } : {}),
+    teamAColor: m.colorA ?? DEFAULT_KITS.A,
+    teamBColor: m.colorB ?? DEFAULT_KITS.B,
   };
 }
 
@@ -378,7 +383,7 @@ export function createMatch(os: LifeOSContext, m: MatchInput): { gameId: string;
   let gameId!: string;
   let item!: OutboxItem<TurfAction>;
   os.db.transaction(() => {
-    const g = os.records.create<GameData>({ object: 'game', data: gameData(os, m, c, { colorA: DEFAULT_KITS.A, colorB: DEFAULT_KITS.B, goalData: 'missing' }, `turf:games:${local}`) }, ACTOR);
+    const g = os.records.create<GameData>({ object: 'game', data: gameData(os, m, c, { colorA: m.colorA ?? DEFAULT_KITS.A, colorB: m.colorB ?? DEFAULT_KITS.B, goalData: 'missing' }, `turf:games:${local}`) }, ACTOR);
     gameId = g.id;
     const made = [g.id];
     for (const p of c.players) {
@@ -433,6 +438,13 @@ export function editMatch(os: LifeOSContext, gameId: string, m: MatchInput) {
     follow(os, g.id, true);
     refreshTurfDebts(os);
     item = queueTurf(os, { label: `Match edited · ${shortDay(m.date)} · ${c.venue.data.name}`, recordId: g.id, action: { method: 'PUT', body: { ...matchBody(os, m, c), id }, undo } });
+    // Kits are their own change on Turf web (its edit doesn't take them).
+    const colorA = m.colorA ?? g.data.colorA ?? DEFAULT_KITS.A;
+    const colorB = m.colorB ?? g.data.colorB ?? DEFAULT_KITS.B;
+    if (colorA !== (g.data.colorA ?? DEFAULT_KITS.A) || colorB !== (g.data.colorB ?? DEFAULT_KITS.B)) {
+      replaceData<GameData>(os, g.id, { ...os.records.get<GameData>(g.id)!.data, colorA, colorB });
+      queueTurf(os, { label: `Kits · ${shortDay(m.date)}`, recordId: g.id, action: { method: 'PATCH', body: { action: 'teamColors', gameId: id, teamAColor: colorA, teamBColor: colorB } } });
+    }
   });
   return item;
 }
@@ -464,6 +476,8 @@ export function matchInputOf(os: LifeOSContext, gameId: string): MatchInput | nu
     expectedPlayers: g.data.expectedPlayers,
     playerIds: liveApps(os, g.id).map((a) => profileOf(a.data.personId)).filter((x): x is string => !!x),
     frontedById: profileOf(g.data.frontedById),
+    colorA: g.data.colorA,
+    colorB: g.data.colorB,
   };
 }
 

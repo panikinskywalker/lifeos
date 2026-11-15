@@ -40,6 +40,8 @@ export interface AuditEntry {
   playerId: string | null;
   undone: boolean;
   undoOf: string | null;
+  /** False when Turf web can't undo it (a change logged with no target, like a match edit). */
+  undoable?: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -120,7 +122,7 @@ export function applyInbox(os: LifeOSContext, page: { tables: Partial<Record<str
   const byId = new Map(audit.map((a) => [a.id, a]));
   for (const r of page.tables.change_log ?? []) {
     const id = String(r.id);
-    byId.set(id, { id, at: str(r, 'created_at') ?? '', kind: (str(r, 'kind') ?? 'match') as AuditEntry['kind'], summary: str(r, 'summary') ?? '', actor: str(r, 'actor'), device: str(r, 'device'), gameId: str(r, 'game_id'), playerId: str(r, 'player_id'), undone: !!r.undone_at, undoOf: str(r, 'undo_of') });
+    byId.set(id, { id, at: str(r, 'created_at') ?? '', kind: (str(r, 'kind') ?? 'match') as AuditEntry['kind'], summary: str(r, 'summary') ?? '', actor: str(r, 'actor'), device: str(r, 'device'), gameId: str(r, 'game_id'), playerId: str(r, 'player_id'), undone: !!r.undone_at, undoOf: str(r, 'undo_of'), undoable: !String(r.target ?? '').includes('"none"') });
   }
   for (const d of page.deleted) if (d.table === 'change_log') byId.delete(d.key);
   os.settings.set(SETTING_AUDIT, [...byId.values()].sort((a, b) => b.at.localeCompare(a.at)).slice(0, AUDIT_MAX));

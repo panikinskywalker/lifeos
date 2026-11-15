@@ -1,17 +1,18 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Image, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, ClipPath, Defs, G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import { format } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { sourceState } from '@core/sources/deviceData';
-import { FORMATIONS, formationOf, isSending, kitsOf, rows as formationRows, saveTeams, setFormation, shuffleTeams, suggestTeams, type AppearanceData, type GameData, type Kit, type PlayerProfileData, type TeamSuggestion } from '@modules/games';
+import { FORMATIONS, TURF_KEY, allPlayers, formationOf, isSending, kitsOf, turfBase, turfPlayerId, rows as formationRows, saveTeams, setFormation, shuffleTeams, suggestTeams, type AppearanceData, type GameData, type Kit, type PlayerProfileData, type TeamSuggestion } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { displayFont, monoFonts } from '@ui/theme/tokens';
 import { Button, ChipRow, EmptyState, FilterChip, Icon, Screen, Sheet, Text, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
+import { SearchBox, found } from './search';
 
 /**
  * Turf · Noir team screens (Claude Design canvas, page *Turf · Noir*):
@@ -71,13 +72,42 @@ export function Crest({ kit, size = 36 }: { kit: Kit; size?: number }) {
   );
 }
 
-/** A player's face: initials on their colour. */
+/** This phone's key for Turf web, read once: photos need it (they aren't public). */
+let keyOnce: Promise<string | null> | null = null;
+export function useTurfPhoto(path: string | null | undefined) {
+  const os = useOS();
+  const [key, setKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!path) return;
+    let live = true;
+    keyOnce ??= os.device?.secrets?.get(TURF_KEY).catch(() => null) ?? Promise.resolve(null);
+    void keyOnce.then((k) => live && setKey(k));
+    return () => {
+      live = false;
+    };
+  }, [os, path]);
+  const base = turfBase(os);
+  return path && base && key ? { uri: `${base}${path}`, headers: { Authorization: `Bearer ${key}` } } : null;
+}
+
+/** A player's face: their Turf web photo when there is one (and it loads), else initials on their colour. */
 export function Face({ id, name, size = 32 }: { id: string; name: string; size?: number }) {
+  const path = useLive((o) => {
+    const p = allPlayers(o).find((x) => x.data.personId === id);
+    const turfId = p ? turfPlayerId(p.data) : null;
+    return p?.data.photoPath && turfId ? `/api/players/${encodeURIComponent(turfId)}/photo?v=${encodeURIComponent(p.data.photoPath)}` : null;
+  }, [id]);
+  const photo = useTurfPhoto(path);
+  const [failed, setFailed] = useState(false);
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colourFor(id), alignItems: 'center', justifyContent: 'center' }}>
-      <Text variant="labelMicro" color={INK} style={{ fontSize: Math.round(size * 0.37), lineHeight: Math.round(size * 0.5), fontWeight: '700' }}>
-        {initials(name)}
-      </Text>
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: colourFor(id), alignItems: 'center', justifyContent: 'center' }}>
+      {photo && !failed ? (
+        <Image source={photo} onError={() => setFailed(true)} resizeMode="cover" accessibilityIgnoresInvertColors style={{ width: size, height: size }} />
+      ) : (
+        <Text variant="labelMicro" color={INK} style={{ fontSize: Math.round(size * 0.37), lineHeight: Math.round(size * 0.5), fontWeight: '700' }}>
+          {initials(name)}
+        </Text>
+      )}
     </View>
   );
 }
@@ -339,6 +369,7 @@ export function TurfPickTeams({ ctx, params }: Props) {
     return { g, apps, players: pitchPlayers(o, gameId).filter((p) => !p.noShow) };
   }, [gameId]);
   const [draft, setDraft] = useState<Record<string, 'A' | 'B' | null> | null>(null);
+  const [q, setQ] = useState('');
   const [suggestion, setSuggestion] = useState<TeamSuggestion | null>(null);
   const [shape, setShape] = useState<'A' | 'B' | null>(null);
   const teams = useMemo(() => draft ?? Object.fromEntries((d?.apps ?? []).map((a) => [a.id, a.data.team ?? null])), [draft, d]);
@@ -431,7 +462,8 @@ export function TurfPickTeams({ ctx, params }: Props) {
           </Text>
           <Mono>{keepers ? `${keepers} keeper${keepers === 1 ? '' : 's'}` : 'no keeper'}</Mono>
         </View>
-        {d.apps.map((a, i) => {
+        {d.apps.length > 8 ? <SearchBox value={q} onChange={setQ} placeholder="Find a player" /> : null}
+        {d.apps.filter((a) => found(q, nameFor(a.id)?.name)).map((a, i) => {
           const p = nameFor(a.id);
           const side = teams[a.id] ?? null;
           const where = [p?.position, side ? kits[side].name : 'not assigned'].filter(Boolean).join(' · ');

@@ -19,6 +19,7 @@ export { rateSquad, nightsFor, matchRating, baseOverall, faceStats, band, positi
 export * from './kits';
 export { matchVenuePayment, linkVenuePayments, undoVenuePayment, TURF_BOOKING } from './venuePay';
 export * from './teams';
+export * from './captains';
 export * from './leaders';
 export * from './money';
 export * from './inbox';

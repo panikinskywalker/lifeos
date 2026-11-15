@@ -151,7 +151,7 @@ export async function sendTurfActions(os: LifeOSContext, items: OutboxItem[], do
  * A call that needs Turf web to answer now: reviews happen outside the changes
  * queue (their results arrive with the next sync). Errors in plain words.
  */
-async function turfNow<T>(os: LifeOSContext, method: 'GET' | 'PATCH', path: string, body?: Record<string, unknown>, doFetch: typeof fetch = fetch): Promise<T> {
+async function turfNow<T>(os: LifeOSContext, method: 'GET' | 'PATCH' | 'POST', path: string, body?: Record<string, unknown>, doFetch: typeof fetch = fetch): Promise<T> {
   const base = turfBase(os);
   const key = await os.device?.secrets?.get(TURF_KEY);
   if (!base || !key) throw new Error('Add Turf web’s address and this phone’s key first');
@@ -191,6 +191,9 @@ export interface TurfInbox {
   replies?: Array<{ playerId: string; playerName: string; status: string; respondedAt: string; promoted?: boolean; gameId: string; date: string; venue: string }>;
   count: number;
 }
+
+/** Undo a change in Turf web's audit log, as its Undo button does; the reversal and the strike-through come with the next sync. */
+export const undoTurfChange = (os: LifeOSContext, changeId: string, doFetch: typeof fetch = fetch) => turfNow(os, 'POST', '/api/changes', { undo: changeId }, doFetch);
 
 export const fetchTurfInbox = (os: LifeOSContext, doFetch: typeof fetch = fetch) => turfNow<TurfInbox>(os, 'GET', '/api/inbox', undefined, doFetch);
 

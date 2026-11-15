@@ -11,7 +11,7 @@ import { Face, SyncPill } from './teams';
 import { useCopyShare } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
 import { RiseIn } from './motion';
-import { SearchBox, found } from './dues';
+import { SearchBox, found } from './search';
 
 /**
  * Turf · Noir 5b Players · Leaders (TF-Leaders): Turf web's thirteen tables

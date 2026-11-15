@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Linking, Pressable, RefreshControl, View } from 'react-native';
+import { Image, Linking, Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Defs, Ellipse, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import type { ObjectRecord } from '@core/domain/types';
-import { allGames, allVenues, type VenueData } from '@modules/games';
+import { allGames, allVenues, turfVenueId, type VenueData } from '@modules/games';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, EmptyState, Icon, Screen, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { NotConnectedCard, SyncBanners, TurfSyncPill, useTurfStatus } from './states';
 import { shortDay, useBack, type Props } from './common';
-import { SearchBox, found } from './dues';
+import { SearchBox, found } from './search';
+import { useTurfPhoto } from './teams';
 
 /**
  * Turf · Noir 7 Venues (TF-Venues): your turfs with their defaults — a card
@@ -196,10 +197,14 @@ function VenueCard({ row, money, onOpen }: { row: VenueRow; money: (n: number) =
     { icon: 'clock', value: kickOff(d.defaultTime), label: 'kick-off' },
     { icon: 'wallet', value: TERMS.find((x) => x.value === d.paymentTerms)?.label ?? null, label: 'terms' },
   ];
+  const turfId = turfVenueId(v.data);
+  const photo = useTurfPhoto(v.data.photoPath && turfId ? `/api/venues/${encodeURIComponent(turfId)}/photo?v=${encodeURIComponent(v.data.photoPath)}` : null);
+  const [failed, setFailed] = useState(false);
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${d.name}, edit`} onPress={onOpen} style={({ pressed }) => ({ padding: 12, gap: 10, borderRadius: 28, backgroundColor: t.c.bg.tile, opacity: pressed ? 0.9 : 1 })}>
       <View style={{ height: 140, borderRadius: 22, overflow: 'hidden' }}>
         <VenuePhoto id={v.id} look={lookOf(v.id)} w={326} h={140} />
+        {photo && !failed ? <Image source={photo} onError={() => setFailed(true)} resizeMode="cover" accessibilityIgnoresInvertColors style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }} /> : null}
         {row.area ? (
           <View style={{ position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 8, height: 30, paddingHorizontal: 10, borderRadius: 999, backgroundColor: onPhoto.chip, borderWidth: 1, borderColor: onPhoto.rim }}>
             <Icon name="location" size={14} color="#F5F5F7" />

@@ -12,6 +12,7 @@ import { usePull } from './useTurfSync';
 import { ScoreSheet } from './match';
 import { Crest, Display, Face, Mono, SyncPill } from './teams';
 import { type Props, useBack } from './common';
+import { SearchBox, found } from './search';
 
 /**
  * Turf · Noir, 4c Log stats (TF-MatchStats): every player's goals, assists,
@@ -55,6 +56,7 @@ export function TurfLogStats({ params }: Props) {
   const [captains, setCaptains] = useState<{ A?: string | null; B?: string | null }>({});
   const [motm, setMotmDraft] = useState<string | null | undefined>(undefined);
   const [open, setOpen] = useState<string | null>(null);
+  const [q, setQ] = useState('');
   const [scoring, setScoring] = useState(false);
   if (!d) {
     return (
@@ -150,8 +152,9 @@ export function TurfLogStats({ params }: Props) {
         <Mono>G goals · A assists · S saves</Mono>
       </View>
 
+      {d.apps.length > 8 ? <SearchBox value={q} onChange={setQ} placeholder="Find a player" /> : null}
       {sides.map(({ key, kit }) => {
-        const list = d.apps.filter((a) => (a.data.team ?? null) === key);
+        const list = d.apps.filter((a) => (a.data.team ?? null) === key && found(q, d.names.get(a.data.personId)));
         if (!list.length) return null;
         const captain = key ? captainOf(key) : null;
         const goals = key && score ? (key === 'A' ? score.scoreA : score.scoreB) : list.reduce((s, a) => s + line(a).goals, 0);

@@ -7,6 +7,29 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.74 · 15 Nov 2026
+
+**Turf's match screen catches up with Turf web.**
+- **The header** reads as Turf web's: "Kick-off · tomorrow" with the big
+  kick-off time before a match, "Full time" after it, the chips centred
+  (who's in before, who's paid after), captains under the crests, and player
+  of the match with goals, assists and saves.
+- **Player of the match:** while the vote is open it says until when; a tied
+  vote says to pick from the team view.
+- **Payment summary** shows the whole WhatsApp text, with Copy details and
+  Copy short.
+- **Add players** from the match: who said In or Maybe first, then who's free,
+  then everyone else, with a search; the shares split again.
+- **Suggest captains:** last match's player of the match, else the regular who
+  has led least lately, as Turf web picks them.
+- **Match history** on each match (goals, sides, captains, edits) with **Undo**;
+  the **audit log** is now money only, with Undo, like Turf web's.
+- **Kits** can be picked in New match and Edit match.
+- **Photos:** players' and venues' Turf web photos show (initials and the
+  painted turf while there are none).
+- **Search** on the payment checklist, Pick teams and Log stats once a match has
+  more than 8 players.
+
 ## v0.0.73 · 15 Nov 2026
 
 **The + in Money takes a bill, or just your words.** Tap + on Money home or

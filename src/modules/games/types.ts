@@ -66,6 +66,8 @@ export interface GameData {
   captainAId?: string;
   captainBId?: string;
   motmId?: string;
+  /** Turf web counted the player-of-the-match vote (its window closed). */
+  potmSettled?: boolean;
   goalData?: 'complete' | 'partial' | 'inconsistent' | 'missing';
   shareSlug?: string;
   /** RSVPs by Turf web player id ("in" / "maybe" / "out"): a player can answer before they're in the lineup. */
@@ -101,6 +103,7 @@ export const gameObject: ObjectDef<GameData> = {
     captainAId: z.string().optional(),
     captainBId: z.string().optional(),
     motmId: z.string().optional(),
+    potmSettled: z.boolean().optional(),
     goalData: z.enum(['complete', 'partial', 'inconsistent', 'missing']).optional(),
     shareSlug: z.string().optional(),
     rsvps: z.record(z.string(), z.string()).optional(),

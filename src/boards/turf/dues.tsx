@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
-import { allAppearances, allPlayers, auditLog, duesTexts, isSending, markPaid, owedOn, payPart, recordPayment, rupees, turfDues, youPersonId, type AuditEntry, type DueGame, type DuePerson, type Dues } from '@modules/games';
+import { allAppearances, allPlayers, auditLog, duesTexts, undoTurfChange, isSending, markPaid, owedOn, payPart, recordPayment, rupees, turfDues, youPersonId, type AuditEntry, type DueGame, type DuePerson, type Dues } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { fonts, monoFonts } from '@ui/theme/tokens';
-import { ChipRow, FilterChip, Icon, IconButton, NumberField, Screen, Text, useToast } from '@ui/kit';
+import { monoFonts } from '@ui/theme/tokens';
+import { FilterChip, Icon, IconButton, NumberField, Screen, Text, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Face, Mono, SyncPill } from './teams';
 import { useCopyShare } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
+import { SearchBox, found } from './search';
 
 /**
  * Turf · Noir money screens: 1b Dues (TF-Dues) and 1c Audit log (TF-Audit),
@@ -133,21 +134,6 @@ export function Tick({ on, size = 26, onPress, label, busy }: { on: boolean; siz
 }
 
 /** A charcoal card (r24, p14). */
-/** A list's search box (as the Games list has it); `found` matches a query against any of a row's words. */
-export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
-  const t = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingHorizontal: 18, borderRadius: 16, backgroundColor: t.c.bg.tile, borderWidth: 1, borderColor: t.c.line }}>
-      <Icon name="search" size={18} color={t.c.fg.tertiary} />
-      <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={t.c.fg.tertiary} style={{ flex: 1, height: 48, color: t.c.fg.primary, fontFamily: fonts[500], fontSize: 15 }} accessibilityLabel={placeholder} returnKeyType="search" />
-    </View>
-  );
-}
-export const found = (query: string, ...texts: Array<string | null | undefined>) => {
-  const q = query.trim().toLowerCase();
-  return !q || texts.some((x) => x?.toLowerCase().includes(q));
-};
-
 export function TurfCard({ children, gap = 10, padding = 14, radius = 24, style }: { children: React.ReactNode; gap?: number; padding?: number; radius?: number; style?: StyleProp<ViewStyle> }) {
   const t = useTheme();
   return <View style={[{ padding, gap, borderRadius: radius, backgroundColor: t.c.bg.tile }, style]}>{children}</View>;
@@ -508,17 +494,9 @@ export function TurfDues(_props: Props) {
 /* 1c · Audit log                                                      */
 /* ------------------------------------------------------------------ */
 
-type AuditFilter = 'all' | AuditEntry['kind'];
-const AUDIT_FILTERS: Array<{ key: AuditFilter; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'dues', label: 'Dues' },
-  { key: 'teams', label: 'Teams' },
-  { key: 'stats', label: 'Stats' },
-  { key: 'match', label: 'Matches' },
-];
 const KIND_WORD: Record<AuditEntry['kind'], string> = { dues: 'Dues', teams: 'Teams', stats: 'Stats', match: 'Match' };
 
-function AuditRows({ entries }: { entries: AuditEntry[] }) {
+export function AuditRows({ entries, onUndo }: { entries: AuditEntry[]; onUndo?: (c: AuditEntry) => void }) {
   const t = useTheme();
   return (
     <>
@@ -548,6 +526,12 @@ function AuditRows({ entries }: { entries: AuditEntry[] }) {
                 <Text variant="labelCaps" color="tertiary" style={{ textTransform: 'uppercase' }}>
                   Undone
                 </Text>
+              ) : onUndo && c.undoable !== false && !c.undoOf ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={`Undo: ${c.summary}`} hitSlop={8} onPress={() => onUndo(c)}>
+                  <Text variant="label" color={t.c.accent.gold} style={{ fontWeight: '700' }}>
+                    Undo
+                  </Text>
+                </Pressable>
               ) : null}
             </View>
           </View>
@@ -557,11 +541,27 @@ function AuditRows({ entries }: { entries: AuditEntry[] }) {
   );
 }
 
+/** Undo a logged change on Turf web, then sync so the reversal shows. */
+export function useUndo(pull: (quiet?: boolean) => Promise<void>) {
+  const os = useOS();
+  const toast = useToast();
+  return async (c: AuditEntry) => {
+    try {
+      await undoTurfChange(os, c.id);
+      toast.show({ message: `Undone · ${c.summary}`, icon: 'check' });
+      await pull(true);
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+    }
+  };
+}
+
 export function TurfAudit(_props: Props) {
   const back = useBack();
   const { busy, pull } = usePull();
-  const [filter, setFilter] = useState<AuditFilter>('all');
-  const entries = useLive((o) => auditLog(o, filter === 'all' ? undefined : filter), [filter]);
+  const undo = useUndo(pull);
+  // Money only, as Turf web's audit log: payments, marked paid and undone, credit. Each match keeps its own history.
+  const entries = useLive((o) => auditLog(o, 'dues'), []);
   const today = todayIso();
   const yesterday = format(new Date(Date.now() - 86_400_000), 'yyyy-MM-dd');
   const byDay = new Map<string, AuditEntry[]>();
@@ -571,13 +571,8 @@ export function TurfAudit(_props: Props) {
   }
   return (
     <Screen title="Audit log" subtitle="Turf · Dues" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
-      <ChipRow>
-        {AUDIT_FILTERS.map((f) => (
-          <FilterChip key={f.key} label={f.label} selected={filter === f.key} onPress={() => setFilter(f.key)} />
-        ))}
-      </ChipRow>
       <Text variant="caption" color="tertiary">
-        What Turf web logged, newest first. Undo stays on Turf web for now: a change undone there shows here struck through.
+        Money only: payments, marked paid and undone, credit, newest first. Goals, sides and edits are in each match’s history.
       </Text>
       {byDay.size ? (
         [...byDay.entries()].map(([d, items]) => (
@@ -585,13 +580,13 @@ export function TurfAudit(_props: Props) {
             <Text variant="labelCaps" color="tertiary" style={{ textTransform: 'uppercase' }}>
               {d === today ? 'Today' : d === yesterday ? 'Yesterday' : d ? day(d) : 'Undated'}
             </Text>
-            <AuditRows entries={items} />
+            <AuditRows entries={items} onUndo={(c) => void undo(c)} />
           </TurfCard>
         ))
       ) : (
         <TurfCard>
           <Text variant="caption" color="secondary">
-            {filter === 'all' ? 'No changes yet. Payments, stats, teams and matches changed in Turf web or here show up after the next sync.' : `No ${AUDIT_FILTERS.find((f) => f.key === filter)!.label.toLowerCase()} changes yet.`}
+            No money changes yet. Payments changed in Turf web or here show up after the next sync.
           </Text>
         </TurfCard>
       )}

@@ -21,6 +21,9 @@ import {
   toggleCaptain,
   turfPlayerId,
   turfVenueId,
+  kitOf,
+  DEFAULT_KITS,
+  KIT_PRESETS,
   ATTENDANCE,
   PAYMENT_TERMS,
   type AppearanceData,
@@ -246,6 +249,26 @@ export function TurfMatchForm({ ctx, params }: Props) {
             <PillStepper value={m.sideSize ?? 0} onChange={(v) => set({ sideSize: v || undefined })} label="Players a side" min={0} max={11} />
           </View>
         </>,
+      )}
+
+      {card(
+        'Kits',
+        <>
+          {(['A', 'B'] as const).map((side) => {
+            const now = side === 'A' ? m.colorA ?? DEFAULT_KITS.A : m.colorB ?? DEFAULT_KITS.B;
+            return (
+              <View key={side} style={{ gap: 6 }}>
+                <Text variant="caption" color="secondary">{`Team ${side} · ${kitOf(now, side === 'A' ? DEFAULT_KITS.A : DEFAULT_KITS.B).name}`}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {KIT_PRESETS.map((k) => (
+                  <Pressable key={k.hex} accessibilityRole="radio" accessibilityState={{ checked: now === k.hex }} accessibilityLabel={`Team ${side} kit ${k.name}`} onPress={() => set(side === 'A' ? { colorA: k.hex } : { colorB: k.hex })} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: k.hex, borderWidth: now === k.hex ? 3 : 1, borderColor: now === k.hex ? '#F5F5F7' : 'rgba(245,245,247,0.22)' }} />
+                ))}
+                </View>
+              </View>
+            );
+          })}
+        </>,
+        <Text variant="caption" color="secondary">{`${kitOf(m.colorA, DEFAULT_KITS.A).name} v ${kitOf(m.colorB, DEFAULT_KITS.B).name}`}</Text>,
       )}
 
       {card(

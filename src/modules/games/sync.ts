@@ -298,6 +298,7 @@ export function applyTurfSync(os: LifeOSContext, page: TurfSyncPage): SyncResult
         captainAId: personOf(tg.captain_a_player_id),
         captainBId: personOf(tg.captain_b_player_id),
         motmId: personOf(tg.motm_player_id),
+        potmSettled: tg.potm_settled_at ? true : undefined,
         goalData: (['complete', 'partial', 'inconsistent', 'missing'].includes(String(quality)) ? quality : 'missing') as GameData['goalData'],
         shareSlug: str(tg, 'public_slug'),
         sourceKey: key,

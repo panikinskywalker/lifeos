@@ -4,13 +4,16 @@ import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import type { LifeEvent } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
-import { allGames, duesTexts, isSending, kitsOf, lineup, markPaid, matchTexts, mePersonId, owedOn, recordPayment, summarise, ATTENDANCE_WORDS, PAYMENT_TERMS, SETTING_UPI, type AppearanceData, type PaymentKind } from '@modules/games';
+import { allGames, auditLog, duesTexts, isSending, kitsOf, lineup, pickCaptains, markPaid, matchTexts, mePersonId, owedOn, recordPayment, summarise, ATTENDANCE_WORDS, PAYMENT_TERMS, SETTING_UPI, type AppearanceData, type PaymentKind } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { fonts } from '@ui/theme/tokens';
 import { Button, EmptyState, FilterChip, Icon, IconButton, RowItem, RowList, Screen, Section, Sheet, Text, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { MatchPlayerSheet, ScoreSheet } from './match';
+import { AddPlayersSheet } from './add-players';
+import { AuditRows, useUndo } from './dues';
+import { SearchBox, found } from './search';
 import { Crest, Display, Face, GoalBall, Mono, Pitch, SideLists, SyncPill, pitchPlayers } from './teams';
 import { CopyShare, useCopyShare } from './switcher';
 import { type Props, TINT, shortDay, useBack } from './common';
@@ -72,6 +75,28 @@ export function TurfGame({ ctx, params }: Props) {
   const [paying, setPaying] = useState<string | null>(null);
   const [player, setPlayer] = useState<string | null>(null);
   const [scoring, setScoring] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const os = useOS();
+  const toast = useToast();
+  const undo = useUndo(async (quiet) => pull(quiet));
+  // This match's own history (goals, sides, captains, edits), as Turf web's Match history; money is in the audit log.
+  const history = useLive((o) => {
+    const g = o.records.get<{ sourceKey?: string }>(params.game ?? '');
+    const turfId = g?.data.sourceKey?.replace('turf:games:', '');
+    return turfId ? auditLog(o).filter((a) => a.gameId === turfId && a.kind !== 'dues') : [];
+  }, [params.game]);
+  const captains = () => {
+    if (!d) return;
+    try {
+      const r = pickCaptains(os, d.game.id);
+      const k = kitsOf(d.game.data);
+      const name = (id?: string) => d.lineup.find((l) => l.appearance.data.personId === id)?.name.split(/\s+/)[0] ?? '?';
+      toast.show({ message: [r.A ? `${k.A.name}: ${name(r.A.personId)} (${r.A.why})` : null, r.B ? `${k.B.name}: ${name(r.B.personId)} (${r.B.why})` : null].filter(Boolean).join(' · ') || 'Pick the sides first', icon: 'check' });
+      void pull(true);
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+    }
+  };
   const theme = useTheme();
   const { pull } = usePull();
   const d = useLive((o) => readGame(o, params.game), [params.game]);
@@ -86,13 +111,22 @@ export function TurfGame({ ctx, params }: Props) {
   const kits = kitsOf(g);
   const names = new Map(d.lineup.map((l) => [l.appearance.data.personId, l.name]));
   const played = g.scoreA != null && g.scoreB != null;
-  const upcoming = g.date >= new Date().toISOString().slice(0, 10) && !played;
+  // As Turf web: a match is upcoming until 90 minutes after kick-off (India time).
+  const kickOff = Date.parse(`${g.date}T${g.time && /^\d{2}:\d{2}/.test(g.time) ? g.time.slice(0, 5) : '23:59'}:00+05:30`);
+  const upcoming = !played && Date.now() < kickOff + 90 * 60_000;
+  // Turf web's vote window: from kick-off, the match plus 24 hours (72 for matches up to 21 Oct).
+  const voteCloses = kickOff + (90 * 60 + (g.date <= '2026-10-21' ? 72 : 24) * 3600) * 1000;
+  const days = Math.round((Date.parse(`${g.date}T12:00:00`) - Date.parse(`${format(new Date(), 'yyyy-MM-dd')}T12:00:00`)) / 86_400_000);
+  const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : days > 1 ? `in ${days} days` : format(new Date(`${g.date}T12:00:00`), 'EEE d MMM');
+  const [hh = 0, mm = 0] = (g.time ?? '').split(':').map(Number);
+  const clock = g.time ? `${String(hh % 12 === 0 ? 12 : hh % 12).padStart(2, '0')}:${String(mm).padStart(2, '0')}` : '--:--';
   const scorers = (side: 'A' | 'B') => d.lineup.filter((l) => l.appearance.data.team === side && (l.appearance.data.goals ?? 0) > 0).sort((a, b) => (b.appearance.data.goals ?? 0) - (a.appearance.data.goals ?? 0));
   const captainName = (side: 'A' | 'B') => {
     const id = side === 'A' ? g.captainAId : g.captainBId;
     return id ? names.get(id)?.split(/\s+/)[0] : undefined;
   };
-  const motmLine = d.motm ? [d.motm, (() => { const a = d.lineup.find((l) => l.appearance.data.personId === g.motmId)?.appearance.data; return a?.goals ? `${a.goals} goal${a.goals === 1 ? '' : 's'}` : null; })()].filter(Boolean).join(' · ') : null;
+  const motmApp = d.lineup.find((l) => l.appearance.data.personId === g.motmId)?.appearance.data;
+  const motmLine = d.motm ? [d.motm, motmApp?.goals ? `${motmApp.goals} goal${motmApp.goals === 1 ? '' : 's'}` : null, motmApp?.assists ? `${motmApp.assists}A` : null, motmApp?.saves ? `${motmApp.saves} saves` : null].filter(Boolean).join(' · ') : null;
   const crestColumn = (side: 'A' | 'B') => (
     <View style={{ width: 96, alignItems: 'center', gap: 8 }}>
       <Crest kit={kits[side]} size={64} />
@@ -123,27 +157,36 @@ export function TurfGame({ ctx, params }: Props) {
     >
       {/* 4b hero (TF-MatchTeams): crests, the Bebas score, scorers, pills, player of the match. */}
       <View style={{ backgroundColor: theme.c.bg.tile, borderRadius: 28, padding: 16, gap: 14 }}>
-        <View style={{ alignSelf: 'flex-start', height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: played ? theme.c.accent.mustard : theme.c.bg.dim }}>
-          <Text variant="labelMicro" color={played ? theme.c.accent.mustardInk : 'secondary'}>
-            {played ? 'Full time' : upcoming ? 'Upcoming' : 'No score yet'}
+        <View style={{ alignSelf: 'center', height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: upcoming ? theme.c.bg.dim : theme.c.accent.mustard }}>
+          <Text variant="labelMicro" color={upcoming ? 'secondary' : theme.c.accent.mustardInk}>
+            {upcoming ? `${g.paymentTerms === 'tentative' ? 'Tentative' : 'Kick-off'} · ${when}` : 'Full time'}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           {crestColumn('A')}
           <Pressable accessibilityRole="button" accessibilityLabel={played ? `Score ${g.scoreA} to ${g.scoreB}. Change score` : 'Add the score'} onPress={() => setScoring(true)} style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Display size={64} color={kits.A.text}>
-                {played ? String(g.scoreA) : '–'}
-              </Display>
-              <Display size={40} color="#F5F5F738">
-                –
-              </Display>
-              <Display size={64} color={kits.B.text}>
-                {played ? String(g.scoreB) : '–'}
-              </Display>
-            </View>
+            {upcoming ? (
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                <Display size={56}>{clock}</Display>
+                <Display size={20} color="#F5F5F79E">
+                  {g.time ? (hh >= 12 ? 'PM' : 'AM') : ''}
+                </Display>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Display size={64} color={kits.A.text}>
+                  {played ? String(g.scoreA) : '–'}
+                </Display>
+                <Display size={40} color="#F5F5F738">
+                  –
+                </Display>
+                <Display size={64} color={kits.B.text}>
+                  {played ? String(g.scoreB) : '–'}
+                </Display>
+              </View>
+            )}
             <Text variant="caption" color="secondary">
-              {[format(new Date(`${g.date}T12:00:00`), 'EEE d MMM'), g.time].filter(Boolean).join(' · ')}
+              {format(new Date(`${g.date}T12:00:00`), 'EEE d MMM')}
             </Text>
           </Pressable>
           {crestColumn('B')}
@@ -164,9 +207,14 @@ export function TurfGame({ ctx, params }: Props) {
             ))}
           </View>
         ) : null}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {[d.venue?.title ?? g.venueName, g.sideSize ? `${g.sideSize}-a-side` : null, PAYMENT_TERMS.find((x) => x.value === g.paymentTerms)?.label, `${d.sum.paidCount} of ${d.sum.players} paid`].filter((x): x is string => !!x).map(pill)}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+          {[d.venue?.title ?? g.venueName, g.sideSize ? `${g.sideSize}-a-side` : null, upcoming ? `${d.lineup.length} in · ${g.expectedPlayers ?? d.lineup.length}` : `${d.sum.paidCount} of ${d.sum.players} paid`, upcoming ? PAYMENT_TERMS.find((x) => x.value === g.paymentTerms)?.label : null].filter((x): x is string => !!x).map(pill)}
         </View>
+        {!upcoming && !g.motmId ? (
+          <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>
+            {g.potmSettled ? 'The vote tied. Pick player of the match from the team view.' : Date.now() < voteCloses ? `Player of the match: everyone who played can vote from their page until ${format(new Date(voteCloses), 'EEE h:mm a')}.` : 'No player of the match yet.'}
+          </Text>
+        ) : null}
         {motmLine ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 18, backgroundColor: theme.c.bg.dim }}>
             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: theme.c.accent.mustard, alignItems: 'center', justifyContent: 'center' }}>
@@ -208,9 +256,18 @@ export function TurfGame({ ctx, params }: Props) {
             </Text>
           ) : null}
           <Button title="Pick teams" icon="people" variant="secondary" block onPress={() => router.push(`/board/turf/teams?game=${d.game.id}` as never)} />
+          {d.lineup.some((l) => l.appearance.data.team) ? <Button title="Suggest captains" icon="star" variant="ghost" block onPress={captains} /> : null}
         </>
       )}
+      <Button title="Add players" icon="plus" variant="secondary" block onPress={() => setAdding(true)} />
       <Button title="Log stats" icon="edit" variant="secondary" block onPress={() => router.push(`/board/turf/stats?game=${d.game.id}` as never)} />
+      {history.length ? (
+        <Section title="Match history">
+          <View style={{ padding: 14, gap: 8, borderRadius: 24, backgroundColor: theme.c.bg.tile }}>
+            <AuditRows entries={history.slice(0, 20)} onUndo={(c) => void undo(c)} />
+          </View>
+        </Section>
+      ) : null}
       {d.venue ? (
         <Section title="Venue">
           <RowList>
@@ -221,6 +278,7 @@ export function TurfGame({ ctx, params }: Props) {
       <PaymentSheet appearanceId={paying} onClose={() => setPaying(null)} onRecorded={() => void pull(true)} />
       <MatchPlayerSheet appearanceId={player} onClose={() => setPlayer(null)} onChanged={() => void pull(true)} />
       <ScoreSheet gameId={scoring ? d.game.id : null} onClose={() => setScoring(false)} onChanged={() => void pull(true)} />
+      <AddPlayersSheet gameId={adding ? d.game.id : null} onClose={() => setAdding(false)} onChanged={() => void pull(true)} />
     </Screen>
   );
 }
@@ -232,6 +290,7 @@ export function TurfGame({ ctx, params }: Props) {
 type GameView = NonNullable<ReturnType<typeof readGame>>;
 
 function Checklist({ d, f, onPay, onChanged }: { d: GameView; f: (n: number) => string; onPay: (appearanceId: string) => void; onChanged: () => void }) {
+  const [q, setQ] = useState('');
   const os = useOS();
   const t = useTheme();
   const toast = useToast();
@@ -254,7 +313,6 @@ function Checklist({ d, f, onPay, onChanged }: { d: GameView; f: (n: number) => 
     }
   };
   const ratio = d.sum.players ? d.sum.paidCount / d.sum.players : 0;
-  const paidNames = d.lineup.filter((l) => paidOf(l.appearance.data)).map((l) => firstName(l.name));
   const pending = d.lineup.filter((l) => !paidOf(l.appearance.data));
   return (
     <>
@@ -273,8 +331,9 @@ function Checklist({ d, f, onPay, onChanged }: { d: GameView; f: (n: number) => 
           </View>
         </View>
         <View style={{ height: 1, backgroundColor: HAIR }} />
+        {d.lineup.length > 8 ? <SearchBox value={q} onChange={setQ} placeholder="Find a player" /> : null}
         <View style={{ gap: 8 }}>
-          {d.lineup.map((l, i) => (
+          {d.lineup.filter((l) => found(q, l.name)).map((l, i) => (
             <React.Fragment key={l.appearance.id}>
               {i ? <View style={{ height: 1, backgroundColor: HAIR }} /> : null}
               <PayRow
@@ -299,29 +358,17 @@ function Checklist({ d, f, onPay, onChanged }: { d: GameView; f: (n: number) => 
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text variant="tileTitle">Payment summary</Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '500' }}>
-                what copy and share send
+                as it reads on WhatsApp
               </Text>
             </View>
             <CopyShare text={d.texts.summary} what="Payment status copied" />
           </View>
-          <View style={{ borderRadius: 16, backgroundColor: DIM, paddingVertical: 12, paddingHorizontal: 14, gap: 3 }}>
-            <Text variant="caption" style={{ fontWeight: '600', lineHeight: 18 }}>
-              {[d.venue?.title ?? g.venueName, shortDay(g.date), g.sideSize ? `${g.sideSize}-a-side` : null].filter(Boolean).join(' · ')}
+          <View style={{ borderRadius: 16, backgroundColor: DIM, paddingVertical: 12, paddingHorizontal: 14 }}>
+            <Text variant="caption" color="secondary" selectable style={{ fontWeight: '500', lineHeight: 19 }}>
+              {d.texts.summary.replace(/\*/g, '')}
             </Text>
-            {[
-              `${f(g.totalCost)}${d.lineup.length ? ` ÷ ${d.lineup.length} = ${f(each)} each` : ''}${d.fronted ? ` · ${firstName(d.fronted)} fronted` : ''}`,
-              tentative ? 'Tentative · no dues yet' : paidNames.length ? `Paid ${paidNames.length}: ${paidNames.join(', ')}` : 'Nobody has paid yet',
-              tentative ? null : pending.length ? `Pending ${pending.length}: ${pending.map((l) => `${firstName(l.name)} ${f(owedOn(l.appearance.data))}`).join(' · ')}` : 'All paid',
-              !tentative && pending.length && d.upi ? `UPI ${d.upi}` : null,
-            ]
-              .filter((x): x is string => !!x)
-              .map((line) => (
-                <Text key={line} variant="caption" color="secondary" style={{ fontWeight: '500', lineHeight: 18 }}>
-                  {line}
-                </Text>
-              ))}
           </View>
-          <SummaryButtons short={d.texts.summaryShort} pending={pending.length && !tentative ? d.texts.pending : null} />
+          <SummaryButtons long={d.texts.summary} short={d.texts.summaryShort} pending={pending.length && !tentative ? d.texts.pending : null} />
         </View>
       ) : null}
 
@@ -353,12 +400,13 @@ function Checklist({ d, f, onPay, onChanged }: { d: GameView; f: (n: number) => 
   );
 }
 
-/** Copy the short status; share the still-to-pay nudge. */
-function SummaryButtons({ short, pending }: { short: string; pending: string | null }) {
+/** Copy the status, long or short (as Turf web's Copy details / Copy short); share the still-to-pay nudge. */
+function SummaryButtons({ long, short, pending }: { long: string; short: string; pending: string | null }) {
   const { copy, share } = useCopyShare();
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
-      <Button title="Copy short" icon="file" variant="secondary" size="sm" style={{ flex: 1 }} onPress={() => void copy(short, 'Short status copied')} />
+      <Button title="Copy details" icon="file" variant="secondary" size="sm" style={{ flex: 1 }} onPress={() => void copy(long, 'Payment status copied')} />
+      <Button title="Copy short" variant="secondary" size="sm" style={{ flex: 1 }} onPress={() => void copy(short, 'Short status copied')} />
       <Button title="Remind unpaid" variant="ghost" size="sm" style={{ flex: 1 }} disabled={!pending} onPress={() => pending && share(pending)} />
     </View>
   );
