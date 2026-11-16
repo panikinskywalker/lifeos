@@ -33,7 +33,7 @@ const snap: TripAppSnapshot = {
     { id: 'kyoto', name: 'Kyoto', jp: '京都', kind: 'stop', order: 2 },
   ],
   bookings: [
-    { id: 's1', kind: 'stay', status: 'Confirmed', title: 'Magome Chaya', placeId: 'magome', start: '2026-12-26', end: '2026-12-27' },
+    { id: 's1', kind: 'stay', status: 'Confirmed', title: 'Post Town Inn', placeId: 'magome', start: '2026-12-26', end: '2026-12-27' },
     { id: 's2', kind: 'stay', status: 'Confirmed', title: 'Kyoto inn', placeId: 'kyoto', start: '2026-12-27', end: '2027-01-02' },
   ],
   things: [

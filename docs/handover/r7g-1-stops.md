@@ -65,10 +65,10 @@ the same file. On the phone: Travel › + › Import a trip, pick the file, pick
 
 ## What you must decide
 
-1. **Fujitaya BnB** is *Cancelled* in the Japan app but still confirmed in the
-   mail tracker (15 Nov), overlapping K's House Kyoto until its 27 Dec
+1. **one BnB** is *Cancelled* in the Japan app but still confirmed in the
+   mail tracker (15 Nov), overlapping a Kyoto hostel until its 27 Dec
    free-cancellation deadline. The import follows the app and leaves it out.
-2. **OMO Kansai Airport** checks out at 11:00 on 7 Jan, after VN335 leaves KIX at
+2. **the airport hotel** checks out at 11:00 on 7 Jan, after the flight home leaves KIX at
    10:00: shown in slice 2's Needs attention, not yet.
 
 ## Patch notes for the merge

@@ -91,7 +91,7 @@ bump, no CHANGELOG edit.
   ledger, prep). The web export builds.
 - Checked in the web build with the real Japan file: the import (14 expenses,
   46 checklist items, 22 notes), Budget (you ₹2,44,156 projected of
-  ₹2,50,000), Settle up (you owe Rushikesh, Parth owes you), a Bill's page, Log
+  ₹2,50,000), Settle up (you owe Ben, Cy owes you), a Bill's page, Log
   a spend, Prep (18% ready, 2 overdue, 19 open notes), Docs with Japan's
   numbers, the trip page's Money and Prep tiles.
 

@@ -18,6 +18,13 @@ export * from './booked';
 export * from './outings';
 export * from './money';
 export * from './prep';
+export * from './weather';
+export * from './overview';
+export * from './today';
+export * from './planview';
+export * from './search';
+export * from './copilot';
+export * from './travelhome';
 export { travelBrain, AIRLINE_SITES } from './brain';
 export { parseFlight, parseStay, type ParsedFlight, type ParsedStay } from './filing/bookings';
 

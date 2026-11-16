@@ -1,3 +1,4 @@
+// own-glyphs: this screen draws the trip template's inline icons (JP-Parts), not the kit's icon set.
 import React, { useEffect, useState } from 'react';
 import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';

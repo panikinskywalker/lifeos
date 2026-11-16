@@ -15,6 +15,14 @@ import { DayScreen } from './day';
 import { MoneyScreen } from './money';
 import { BillScreen } from './bill';
 import { PrepScreen } from './prep';
+import { StayScreen } from './jp/stay';
+import { SpendScreen } from './jp/spend';
+import { ReceiptScreen } from './jp/receipt';
+import { PaybackScreen } from './jp/payback';
+import { SearchScreen } from './jp/search';
+import { CopilotScreen } from './jp/copilot';
+import { ListenScreen } from './jp/listen';
+import { ViewOnlyScreen } from './jp/viewonly';
 
 /**
  * Companion board of the travel module, drawn to the NR-Travel-* artboards
@@ -43,14 +51,22 @@ export const travelBoard: BoardManifest = {
     { key: 'money', title: 'Money', component: MoneyScreen },
     { key: 'bill', title: 'Expense', component: BillScreen },
     { key: 'prep', title: 'Prep', component: PrepScreen },
+    { key: 'stay', title: 'Stay', component: StayScreen },
+    { key: 'spend', title: 'Log a spend', component: SpendScreen },
+    { key: 'receipt', title: 'Split a receipt', component: ReceiptScreen },
+    { key: 'payback', title: 'Pay back', component: PaybackScreen },
+    { key: 'search', title: 'Search', component: SearchScreen },
+    { key: 'copilot', title: 'Copilot', component: CopilotScreen },
+    { key: 'listen', title: 'Copilot · voice', component: ListenScreen },
+    { key: 'viewonly', title: 'View-only', component: ViewOnlyScreen },
   ],
   quickActions: [
     { id: 'travel.addTrip', label: 'Trip', icon: 'airplane', route: '/entity/trip/new' },
     { id: 'travel.import', label: 'Import a trip', icon: 'download', route: '/module/travel/import' },
   ],
   overrides: [
-    { object: 'trip', form: TripForm, record: [{ entityType: 'trip', key: 'travel.trip', title: 'Trip', component: TripPage, order: 0, placement: 'page' }] },
-    { object: 'stop', record: [{ entityType: 'stop', key: 'travel.stop', title: 'Stop', component: StopPage, order: 0, placement: 'page' }] },
+    { object: 'trip', form: TripForm, record: [{ entityType: 'trip', key: 'travel.trip', title: 'Trip', component: TripPage, order: 0, placement: 'page', fullScreen: true, ownLinks: true }] },
+    { object: 'stop', record: [{ entityType: 'stop', key: 'travel.stop', title: 'Stop', component: StopPage, order: 0, placement: 'page', fullScreen: true, ownLinks: true }] },
     { object: 'place', record: [{ entityType: 'place', key: 'travel.tripsHere', title: 'Trips here', component: TripsHere, order: 40 }] },
   ],
 };

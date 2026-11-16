@@ -270,13 +270,13 @@ function Walked({ d }: { d: D }) {
       </View>
       <View>
         <Anim k="jroll" key={unit}>
-          <Text style={{ color: C.white, fontSize: 52, lineHeight: 54, letterSpacing: -2, fontVariant: ['tabular-nums'], fontFamily: 'PlusJakartaSans_700Bold' }}>{value != null ? Math.round(value).toLocaleString('en-IN') : '—'}</Text>
+          <Text style={{ color: C.white, fontSize: 52, lineHeight: 54, letterSpacing: -2, fontVariant: ['tabular-nums'], fontFamily: 'PlusJakartaSans_700Bold' }}>{value != null ? Math.round(value).toLocaleString('en-IN') : '–'}</Text>
         </Anim>
         <Text style={{ color: C.mid, fontSize: 14, fontFamily: 'PlusJakartaSans_600SemiBold' }}>{s ? (unit === 'D' ? 'steps a day' : unit === 'W' ? 'steps a week' : 'steps on the trip') : 'steps show up here from Health'}</Text>
       </View>
       {s ? (
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          {[[`${Math.round(s.total * 0.00075)}`, 'km', 'walked'], [compactN(s.perDay), '', 'a day'], [top ?? '—', '', 'most steps']].map(([v, u, l]) => (
+          {[[`${Math.round(s.total * 0.00075)}`, 'km', 'walked'], [compactN(s.perDay), '', 'a day'], [top ?? '–', '', 'most steps']].map(([v, u, l]) => (
             <View key={l} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>
               <Text numberOfLines={1} style={{ color: C.white, fontSize: 22, letterSpacing: -0.5, fontVariant: ['tabular-nums'], fontFamily: 'PlusJakartaSans_700Bold' }}>
                 {v}
@@ -327,7 +327,7 @@ function PhotoAndSteps({ d }: { d: D }) {
         </View>
       </Pressable>
       <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: 2, paddingTop: 14, paddingHorizontal: 14, backgroundColor: C.tile, borderRadius: 26, overflow: 'hidden' }}>
-        <Text style={{ color: C.white, fontSize: 26, letterSpacing: -0.5, fontVariant: ['tabular-nums'], fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{s ? compactN(s.perDay) : '—'}</Text>
+        <Text style={{ color: C.white, fontSize: 26, letterSpacing: -0.5, fontVariant: ['tabular-nums'], fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{s ? compactN(s.perDay) : '–'}</Text>
         <Text style={{ color: C.mid, fontSize: 10, letterSpacing: 0.6, fontFamily: MONO }}>STEPS A DAY</Text>
         <View style={{ marginTop: 6, marginHorizontal: -14 }}>
           <Svg width="100%" height={70} viewBox="0 0 150 70" preserveAspectRatio="none">

@@ -10,7 +10,7 @@ import { financeModule, makeBill, makePayment, billBalanceWith } from '../financ
 import { balanceWith, settleUp, undoSettle } from '../finance/split';
 import { projectsModule } from '../projects';
 import { placesModule } from '../places';
-import { byCategory, checklistOf, emergencyFor, filterChecklist, importTripApp, notesOf, notInSettleUp, projectedOf, readyToFly, sectionsOf, travelModule, tripBalances, tripLedger, TRIP_APP_FORMAT, type TripAppSnapshot, type TripData } from '.';
+import { byCategory, categoryLines, checklistOf, costByDay, JR_PASS_7, moneyInsights, pendingRefunds, thingsCost, emergencyFor, filterChecklist, importTripApp, notesOf, notInSettleUp, projectedOf, readyToFly, sectionsOf, travelModule, tripBalances, tripLedger, TRIP_APP_FORMAT, type TripAppSnapshot, type TripData } from '.';
 
 /**
  * The trip template, slices 4 and 5: money shared Splitwise's way (core's
@@ -135,6 +135,80 @@ describe('money on a trip', () => {
     importTripApp(os, snap, { me: 'Asha' });
     expect(os.records.query('bill')).toHaveLength(3);
     expect(os.records.query('group')).toHaveLength(1);
+  });
+});
+
+const road: TripAppSnapshot = {
+  format: TRIP_APP_FORMAT,
+  key: 'road',
+  destination: 'Japan',
+  meta: { travellers: ['Asha', 'Ben'], start: '2026-12-18', end: '2026-12-21', fx: { JPY: 0.5 }, budgetPP: 100000, dailyPP: 4000 },
+  places: [{ id: 'a', name: 'Alpha', kind: 'stop', order: 1 }, { id: 'b', name: 'Beta', kind: 'stop', order: 2 }],
+  bookings: [
+    { id: 's1', kind: 'stay', status: 'Confirmed', title: 'Alpha inn', placeId: 'a', start: '2026-12-18', end: '2026-12-20', total: 40000, outstanding: 40000, currency: 'JPY', forWho: ['Asha', 'Ben'] },
+    { id: 's2', kind: 'stay', status: 'Confirmed', title: 'Beta inn', placeId: 'b', start: '2026-12-20', end: '2026-12-21', total: 10000, outstanding: 4000, currency: 'JPY', forWho: ['Asha', 'Ben'] },
+    { id: 's3', kind: 'stay', status: 'Cancelled', title: 'Old inn', placeId: 'b', start: '2026-12-20', end: '2026-12-21', total: 6000, outstanding: 0, currency: 'JPY', forWho: ['Asha', 'Ben'] },
+  ],
+  transport: [
+    { id: 'j1', date: '2026-12-20', from: 'Alpha', fromId: 'a', to: 'Beta', toId: 'b', mode: 'Train', costPP: 30000, costCur: 'JPY' },
+    { id: 'j2', date: '2026-12-21', from: 'Beta', fromId: 'b', to: 'Gamma', mode: 'Bus', costPP: 26000, costCur: 'JPY' },
+  ],
+  things: [
+    { id: 't1', title: 'Tower', place: 'a', kind: 'See', status: 'Planned', cost: 2000, day: '2026-12-19' },
+    { id: 't2', title: 'Garden', place: 'a', kind: 'See', status: 'Want to', cost: 600 },
+    { id: 't3', title: 'Market', place: 'b', kind: 'Shop', status: 'Want to' },
+    { id: 't4', title: 'Shrine', place: 'b', kind: 'See', status: 'Want to', cost: 0 },
+  ],
+  expenses: [{ id: 'x1', what: 'Lunch', amount: 3000, currency: 'JPY', inr: 1500, date: '2026-12-19', category: 'Food', payers: { Ben: 3000 }, split: 'equal', shares: { Asha: 1, Ben: 1 } }],
+};
+
+describe('the Budget page’s reading of the ledger', () => {
+  it('cost by day: the allowance, each night’s stay, the fares and things planned, and what was spent; for one person or everyone', () => {
+    const t = os.records.get<TripData>(importTripApp(os, road, { me: 'Asha' }).tripId)!;
+    const mine = costByDay(os, t, 'me');
+    expect(mine.map((d) => d.day)).toEqual(['2026-12-18', '2026-12-19', '2026-12-20', '2026-12-21']);
+    // 18th: allowance 2,000 + half of one Alpha night (20,000 yen × 0.5 / 2) = 5,000.
+    expect(mine.map((d) => [Math.round(d.allowance), Math.round(d.stay), Math.round(d.fares), Math.round(d.things), Math.round(d.spent)])).toEqual([
+      [2000, 5000, 0, 0, 0],
+      [2000, 5000, 0, 1000, 750],
+      [2000, 2500, 15000, 0, 0],
+      [2000, 0, 13000, 0, 0],
+    ]);
+    expect(mine[2]).toMatchObject({ moving: true, projected: 19500 });
+    expect(mine[3]!.stopId).toBeNull();
+    const all = costByDay(os, t);
+    expect(Math.round(all[2]!.projected)).toBe(39000);
+    expect(Math.round(all[1]!.spent)).toBe(1500);
+  });
+
+  it('insights only when the data supports them: the priciest day, the rail pass check, the dearest stop, what is spare', () => {
+    const t = os.records.get<TripData>(importTripApp(os, road, { me: 'Asha' }).tripId)!;
+    const now = new Date('2026-11-16T09:00:00').getTime();
+    const days = costByDay(os, t, 'me');
+    const items = tripLedger(os, t, now);
+    const ins = moneyInsights(os, t, days, items, 'me', now);
+    expect(ins.map((i) => i.kind)).toEqual(['priciest', 'railpass', 'stops', 'spare']);
+    expect(ins[0]).toMatchObject({ kind: 'priciest', day: '2026-12-20', fares: 15000 });
+    expect(ins[1]).toEqual({ kind: 'railpass', pass: JR_PASS_7, fares: 56000, payOff: true, buses: 1 });
+    const beta = ins[2]!.kind === 'stops' ? ins[2]! : null;
+    expect(os.records.get(beta!.dearStopId)!.title).toBe('Beta');
+    expect(os.records.get(beta!.cheapStopId!)!.title).toBe('Alpha');
+    // A trip with no dates and no journeys has nothing to say.
+    const bare = os.records.create<TripData>({ object: 'trip', data: { destination: 'Goa' } });
+    expect(moneyInsights(os, bare, costByDay(os, bare), [], 'me', now)).toEqual([]);
+  });
+
+  it('lines per booking with how much is paid, things that cost, refunds still to come', () => {
+    const t = os.records.get<TripData>(importTripApp(os, road, { me: 'Asha' }).tripId)!;
+    const items = tripLedger(os, t, new Date('2026-11-16T09:00:00').getTime());
+    expect(categoryLines(items.filter((i) => i.cat === 'stays'), 'me').map((l) => [l.label, l.sub, l.word, Math.round(l.inr)])).toEqual([
+      ['Alpha inn', '2 nights', 'To pay', 10000],
+      ['Beta inn', '1 night', 'Part paid', 2500],
+    ]);
+    const c = thingsCost(os, t.id);
+    expect(c.planned).toMatchObject({ count: 1, names: ['Tower'], cost: 2000 });
+    expect(c.want).toMatchObject({ count: 2, names: ['Garden', 'Market'], cost: 600, unknown: 1 });
+    expect(pendingRefunds(os, t).map((r) => [r.e.title, r.inr, r.each])).toEqual([['Stay · Old inn', 3000, 1500]]);
   });
 });
 

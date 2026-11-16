@@ -37,7 +37,7 @@ version bump, no CHANGELOG edit.
 ## Mail
 
 The Gmail connected to this Claude session is the work account
-(rutvij@unifyapps.com); the trip's mails are in your personal accounts, so
+(your work account); the trip's mails are in your personal accounts, so
 nothing could be read here. On the phone, LifeOS reads the mailboxes you added
 under You › Data sources and files booking mails on its own (slice 2 added
 check-in times, totals and free cancellation). The trip copilot searching your

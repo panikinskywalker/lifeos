@@ -72,8 +72,8 @@ describe('nights, from the stays', () => {
     const fuji = ensureStop(os, t.id, 'Kawaguchiko').stop;
     const f = os.records.create({ object: 'event', title: 'Flight BOM → HAN', data: { kind: 'flight', startAt: at('2026-12-17T23:05:00') } });
     os.links.link(f.id, t.id, 'part_of');
-    stay(t.id, 'Oyado Kien', '2026-12-18', '2026-12-21', tokyo.id);
-    stay(t.id, 'Ururun', '2026-12-22', '2026-12-23', fuji.id);
+    stay(t.id, 'Hotel Sumida', '2026-12-18', '2026-12-21', tokyo.id);
+    stay(t.id, 'Lakeside Inn', '2026-12-22', '2026-12-23', fuji.id);
     const nights = nightsOf(os, os.records.get<TripData>(t.id)!);
     expect(nights.map((n) => n.kind)).toEqual(['air', 'stay', 'stay', 'stay', 'gap', 'stay', 'gap']);
     expect(segmentsOf(nights).map((g) => [g.kind, g.from, g.nights])).toEqual([
@@ -90,11 +90,11 @@ describe('nights, from the stays', () => {
   it('the calendar file: the trip, and each run of nights with its stay', () => {
     const t = trip('Japan', { startDate: '2026-12-18', endDate: '2026-12-22' });
     const tokyo = ensureStop(os, t.id, 'Tokyo').stop;
-    stay(t.id, 'Oyado Kien, Ryogoku', '2026-12-18', '2026-12-22', tokyo.id);
+    stay(t.id, 'Hotel Sumida, Sumida', '2026-12-18', '2026-12-22', tokyo.id);
     const ics = tripIcs(os, os.records.get<TripData>(t.id)!, at('2026-11-15T10:00:00Z'));
     expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
     expect(ics).toContain('DTSTART;VALUE=DATE:20261218\r\nDTEND;VALUE=DATE:20261223\r\nSUMMARY:Japan');
-    expect(ics).toContain('SUMMARY:Tokyo · Oyado Kien\\, Ryogoku\r\nDESCRIPTION:4 nights · Japan');
+    expect(ics).toContain('SUMMARY:Tokyo · Hotel Sumida\\, Sumida\r\nDESCRIPTION:4 nights · Japan');
     expect(ics.trimEnd().endsWith('END:VCALENDAR')).toBe(true);
   });
 });
@@ -143,7 +143,7 @@ describe('importing a trip app', () => {
       { id: 'fl-a', kind: 'flight', status: 'Confirmed', title: 'Asha', start: '2026-12-17', end: '2026-12-24' },
     ],
     transport: [
-      { id: 'leg-1', mode: 'Flight', date: '2026-12-17', time: '23:05', from: 'Mumbai BOM T2', to: 'Hanoi HAN T2', details: 'VN972, lands 05:05.' },
+      { id: 'leg-1', mode: 'Flight', date: '2026-12-17', time: '23:05', from: 'Mumbai BOM T2', to: 'Hanoi HAN T2', details: 'VN123, lands 05:05.' },
       { id: 'leg-2', mode: 'Train', date: '2026-12-22', time: '10:30', from: 'Tokyo', to: 'Kawaguchiko' },
     ],
     days: [{ id: '2026-12-18', place: 'Tokyo', plan: 'Land at Haneda, check in, dinner nearby.' }],
@@ -166,7 +166,7 @@ describe('importing a trip app', () => {
     const nights = nightsOf(os, t);
     expect(nights.map((n) => n.kind)).toEqual(['air', 'stay', 'stay', 'stay', 'stay', 'stay', 'stay']);
     expect(stopSpan(nights, tokyo.id)).toMatchObject({ nights: 4 });
-    expect(os.records.query('event').find((e) => e.title === 'Flight BOM → HAN')!.data).toMatchObject({ flightNo: 'VN972', airline: 'Vietnam Airlines' });
+    expect(os.records.query('event').find((e) => e.title === 'Flight BOM → HAN')!.data).toMatchObject({ flightNo: 'VN123', airline: 'Vietnam Airlines' });
     expect(dayPlans(os, t.id).get('2026-12-18')).toBe('Land at Haneda, check in, dinner nearby.');
 
     const again = importTripApp(os, snap, { me: 'Asha' });

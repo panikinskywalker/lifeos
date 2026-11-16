@@ -681,7 +681,7 @@ A Transaction stays *your* money moving, as your bank tells it; a Bill is who
 paid and who owes, whoever paid. They meet by a Link when your money paid it.
 | Field | Type | Notes |
 |---|---|---|
-| What | text (the title) | "Dinner at Magome Chaya"; a payback reads "Parth paid Rushikesh" |
+| What | text (the title) | "Dinner at the post-town inn"; a payback reads "Cy paid Ben" |
 | Kind | select | spend · payment |
 | Group | link → Group, word *group* (`groupId`) | a trip's Group, your flat, any Group |
 | Trip | link → Trip, word *trip* (`tripId`) | when it was on a trip |
@@ -709,7 +709,7 @@ Derived, not Fields:
 - **You owe / you're owed** with each person is the same numbers from your
   side; **Settle up** makes a payment Bill (Pay back: swipe to record; logged,
   never sent; Remind opens WhatsApp with the amount).
-- **Paid for someone else**: a Bill you paid that is wholly theirs ("Parth's
+- **Paid for someone else**: a Bill you paid that is wholly theirs ("Cy's
   flight") puts it all in their share: their spend, and what they borrowed
   from you until a payment evens it.
 - **Not in Settle up yet**: a booking's paid part that no Bill covers, offered
@@ -1698,17 +1698,28 @@ screens checked on the phone → overrides only where the default is wrong)
     Add an item; Packing (the trip's packing Tasks, and R7d's Packing for clothes, a tap away); Docs (the shelf
     from Documents and the documents Tasks, the emergency card by country with tap to call). Money and Prep sit
     side by side on the trip page.
-  - [ ] **6. Overview, Today and Recap.** The stage stepper, Needs attention, Coming up with the deadline rail,
+  - [x] **6. Overview, Today and Recap.** *Built 16 Nov in the design pass (below).* The stage stepper, Needs attention, Coming up with the deadline rail,
     the line as nights, stays as station boards, money, stamps, weather by stop (normals), Ready to fly, your
     balance; Today in the morning (leave-by countdown, the next train, last connection, the day, show the
     driver, cash with a quick add, the stamp collected) and the afternoon (the rest of today, bring and pack,
     tomorrow); Recap (spent by stop, steps, settled up, back home, Keep for the next trip). The trip bar on
     every trip screen, the ₹ / local currency switch, the *japan* look (the app's posters, photos and maps).
-  - [ ] **7. Search and the copilot.** The trip's search (records, actions, views); a helper in every section; the
+  - [x] **7. Search and the copilot.** *Built 16 Nov in the design pass (below); Booking.com and Gmail finds stay labelled slots until they are connected.* The trip's search (records, actions, views); a helper in every section; the
     trip copilot over the trip's records, your mail (finance's mail source) and a receipt photo, proposing
     changes (add a thing, a day line, a Task, a note, a Bill from a receipt, a payback; change a booking or a
     journey; move a thing; set a thing's status; tick a Task), saved only on Save, with Undo; by voice through
     R12's chain; it grows with every tool a module adds. Booking.com stays a slot until a connector is chosen.
+  - [x] **The design pass** (16 Nov; `docs/handover/r7g-design-pass.md`). Every trip screen is drawn to its
+    `JP-*` artboard on the *Trip template · Noir (Japan)* page and runs on live data: Travel (all trips), the
+    trip page by phase (Overview before, Today morning and afternoon while away, Recap after), Plan (Line,
+    Days, Map), a stop and its edit sheet, the stay, a day (Overview, Itinerary, Stay & pay, Travel), Bookings
+    and a booking, Money (Budget, Settle up), Log a spend, Split a receipt, Pay back, a spend's page, Prep
+    (Checklist, Packing, Docs), Search, the copilot and its voice screen, and the view-only trip. One frame
+    for all of them (`src/boards/travel/jp/shell.tsx`): the trip header with the ₹ / local switch, the stage
+    stepper, the trip bar (Overview · Plan · Bookings · Money · Prep and the copilot), the dot-matrix board;
+    the motion and the seigaiha in `jp/kit.tsx`. The Japan touches (the name in its script, mincho station
+    names, the hanko, stamps, seigaiha) show only on a trip in Japan. Weather is each stop's month normals
+    (`weather.ts`) until live weather is chosen. A Trip gains hidden `wallet` (cash and IC) and `keep`.
   - [ ] **8. Trip members** (once a host is chosen): invite the trip's Group; members see, comment and add new
     things; their changes and removals wait in your To check as suggestions; their own ticks; references,
     payment notes and papers stay yours. A synced copy on the host, as Turf web's.

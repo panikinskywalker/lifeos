@@ -56,13 +56,13 @@ version bump, no CHANGELOG edit.
   the web export builds.
 - Checked in the web build with the real Japan file: Bookings (4 flights, 3
   tickets, 2 airports, 10 stays, ¥2,83,018 to pay, ¥4,214 paid, 4 without a
-  check-in time), K's House Kyoto, and 26 Dec (Overview and Travel).
+  check-in time), a Kyoto hostel, and 26 Dec (Overview and Travel).
 
 ## Notes
 
 - The tracker you pasted holds nothing the Japan app's data lacks for the
   bookings (references, links, payment notes and the same cancellation
-  deadlines); the only disagreement is still Fujitaya BnB (cancelled in the app,
+  deadlines); the only disagreement is still one BnB (cancelled in the app,
   confirmed in the mail tracker).
 - A day's number counts from the trip's first day (17 Dec, the flight out), so
   26 Dec is day 10; the design counted from landing (day 9).
@@ -71,7 +71,7 @@ version bump, no CHANGELOG edit.
 ## Phone checks
 
 - Import the Japan file again over slice 1's import: the same trip updates.
-- Bookings shows 10 stays; K's House shows part paid; Plan › Days › 26 Dec opens
+- Bookings shows 10 stays; the hostel shows part paid; Plan › Days › 26 Dec opens
   the moving day with its last bus and steps; Reserve the Shinano opens the
   rail site.
 - A hotel mail with times and a total fills the stay.

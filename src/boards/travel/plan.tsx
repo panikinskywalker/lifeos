@@ -1,3 +1,4 @@
+// own-glyphs: this screen draws the trip template's inline icons (JP-Parts), not the kit's icon set.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, ScrollView, Text as RNText, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';

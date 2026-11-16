@@ -127,19 +127,20 @@ export interface BillInput {
   groupId?: string;
   eventId?: string;
   notes?: string;
+  receipt?: BillData['receipt'];
 }
 
 /** A new Bill; its ₹ value is fixed now. */
 export function makeBill(os: LifeOSContext, title: string, input: BillInput, actor: 'user' | 'assistant' = 'user'): ObjectRecord<BillData> {
   const currency = input.currency ?? 'INR';
-  const data: BillData = { kind: input.kind ?? 'spend', amount: input.amount, currency, date: input.date, split: input.split, ...(input.rate ? { rate: input.rate } : {}), inr: input.inr ?? billInr({ amount: input.amount, currency, rate: input.rate }), ...(input.category ? { category: input.category } : {}), ...(input.tripId ? { tripId: input.tripId } : {}), ...(input.groupId ? { groupId: input.groupId } : {}), ...(input.eventId ? { eventId: input.eventId } : {}), ...(input.notes ? { notes: input.notes } : {}) };
+  const data: BillData = { kind: input.kind ?? 'spend', amount: input.amount, currency, date: input.date, split: input.split, ...(input.rate ? { rate: input.rate } : {}), inr: input.inr ?? billInr({ amount: input.amount, currency, rate: input.rate }), ...(input.category ? { category: input.category } : {}), ...(input.tripId ? { tripId: input.tripId } : {}), ...(input.groupId ? { groupId: input.groupId } : {}), ...(input.eventId ? { eventId: input.eventId } : {}), ...(input.notes ? { notes: input.notes } : {}), ...(input.receipt ? { receipt: input.receipt } : {}) };
   return os.records.create<BillData>({ object: 'bill', title: title.trim(), data }, actor);
 }
 
 /** A payback from one party to another, in ₹ unless said. */
-export function makePayment(os: LifeOSContext, from: Party, to: Party, amount: number, opts: { date: string; tripId?: string; groupId?: string; name?: (p: Party) => string; currency?: string; rate?: number }): ObjectRecord<BillData> {
+export function makePayment(os: LifeOSContext, from: Party, to: Party, amount: number, opts: { date: string; tripId?: string; groupId?: string; name?: (p: Party) => string; currency?: string; rate?: number; notes?: string }): ObjectRecord<BillData> {
   const name = opts.name ?? ((p: Party) => (p === 'me' ? 'You' : os.records.get(p)?.title ?? 'Someone'));
-  return makeBill(os, `${name(from)} paid ${name(to)}`, { kind: 'payment', amount, currency: opts.currency ?? 'INR', rate: opts.rate, date: opts.date, split: { payers: { [from]: amount }, method: 'exact', shares: { [to]: amount } }, tripId: opts.tripId, groupId: opts.groupId });
+  return makeBill(os, `${name(from)} paid ${name(to)}`, { kind: 'payment', amount, currency: opts.currency ?? 'INR', rate: opts.rate, date: opts.date, split: { payers: { [from]: amount }, method: 'exact', shares: { [to]: amount } }, tripId: opts.tripId, groupId: opts.groupId, notes: opts.notes });
 }
 
 /* ------------------------------------------------------------------ */
