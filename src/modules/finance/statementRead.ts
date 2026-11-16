@@ -14,7 +14,7 @@ import type { AccountData, InvestmentData } from './types';
 export interface ReadAccount {
   bank: string;
   last4: string;
-  kind: 'bank' | 'credit';
+  kind: 'bank' | 'credit' | 'loan';
   balance: number;
   owed: number;
   minDue: number;
@@ -49,7 +49,7 @@ const ACCOUNT = {
   properties: {
     bank: { type: 'string' },
     last4: { type: 'string' },
-    kind: { type: 'string', enum: ['bank', 'credit'] },
+    kind: { type: 'string', enum: ['bank', 'credit', 'loan'] },
     balance: { type: 'number' },
     owed: { type: 'number' },
     minDue: { type: 'number' },
@@ -66,7 +66,7 @@ const HOLDING = {
 export const STATEMENT_SCHEMA = { type: 'object', additionalProperties: false, required: ['accounts', 'holdings'], properties: { accounts: { type: 'array', items: ACCOUNT }, holdings: { type: 'array', items: HOLDING } } } as const;
 
 const SYSTEM = `You read a statement or a screenshot from an Indian bank, credit card, mutual fund app (CAMS, KFintech, Groww, Zerodha Coin, Kuvera) or broker. Answer with JSON only.
-accounts: each bank account or credit card shown. bank: the bank's short name (SBI, ICICI, HDFC, Axis). last4: its last 4 digits, "" if not shown. kind: bank or credit. For a bank account, balance is the closing or available balance; for a card, owed is the total amount due (or outstanding), minDue the minimum due and dueOn the payment due date. asOf: the statement or screenshot date. Dates YYYY-MM-DD, "" if not shown; numbers 0 when not shown.
+accounts: each bank account or credit card shown. bank: the bank's short name (SBI, ICICI, HDFC, Axis). last4: its last 4 digits, "" if not shown. kind: bank, credit or loan (an education, home, car or personal loan account). For a bank account, balance is the closing or available balance; for a card, owed is the total amount due (or outstanding), minDue the minimum due and dueOn the payment due date; for a loan, owed is the outstanding, cleared or closing balance (marked DR) and minDue the EMI. asOf: the statement or screenshot date. Dates YYYY-MM-DD, "" if not shown; numbers 0 when not shown.
 holdings: each fund, stock or deposit with its name as printed, units, current value, amount invested, and a monthly SIP amount and its day of the month if one is shown (0 if not). On a SIP screen (Groww, Coin, Kuvera, a CAMS mandate) the day is the day of the month of the next instalment date ("Next SIP 5 Dec" is 5); a fund shown only with its SIP still counts, with value and invested 0.
 Leave out anything you cannot read clearly. Never invent figures.`;
 
@@ -80,7 +80,7 @@ const date = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.tes
 /** What Claude read, kept to what makes sense. */
 export function readStatement(answer: unknown): StatementRead {
   const a = (answer ?? {}) as { accounts?: unknown; holdings?: unknown };
-  const accounts = (Array.isArray(a.accounts) ? a.accounts : []).map((x: Record<string, unknown>) => ({ bank: String(x.bank ?? '').trim().slice(0, 40), last4: String(x.last4 ?? '').replace(/\D/g, '').slice(-4), kind: x.kind === 'credit' ? ('credit' as const) : ('bank' as const), balance: typeof x.balance === 'number' ? Math.round(x.balance * 100) / 100 : 0, owed: num(x.owed), minDue: num(x.minDue), dueOn: date(x.dueOn), asOf: date(x.asOf) })).filter((x) => x.bank || x.last4);
+  const accounts = (Array.isArray(a.accounts) ? a.accounts : []).map((x: Record<string, unknown>) => ({ bank: String(x.bank ?? '').trim().slice(0, 40), last4: String(x.last4 ?? '').replace(/\D/g, '').slice(-4), kind: x.kind === 'credit' ? ('credit' as const) : x.kind === 'loan' ? ('loan' as const) : ('bank' as const), balance: typeof x.balance === 'number' ? Math.round(x.balance * 100) / 100 : 0, owed: num(x.owed), minDue: num(x.minDue), dueOn: date(x.dueOn), asOf: date(x.asOf) })).filter((x) => x.bank || x.last4);
   const holdings = (Array.isArray(a.holdings) ? a.holdings : []).map((x: Record<string, unknown>) => ({ name: String(x.name ?? '').trim().slice(0, 80), units: num(x.units), value: num(x.value), invested: num(x.invested), sip: num(x.sip), sipDay: Math.min(31, Math.round(num(x.sipDay))) })).filter((x) => x.name && (x.value || x.invested || x.sip));
   return { accounts, holdings };
 }
@@ -116,6 +116,26 @@ export function proposeChanges(os: LifeOSContext, read: StatementRead, now = Dat
     const found = byDigits.length === 1 ? byDigits[0]! : byDigits.find(bankOk) ?? (!r.last4 && byBank.length === 1 ? byBank[0]! : null);
     const at = r.asOf ? Date.parse(`${r.asOf}T23:59:00`) : now;
     const when = r.asOf ? ` (${r.asOf})` : '';
+    // A loan: what you owe on it. Its last digits find it whatever its type was, and it becomes a loan (17 Nov, Rutvij's SBI education loan was filed as a bank account).
+    if (r.kind === 'loan') {
+      if (!r.owed) return;
+      const mine = r.last4 ? accounts.filter((a) => a.data.last4 === r.last4) : [];
+      const loan = mine.length === 1 ? mine[0]! : mine.find(bankOk) ?? (!r.last4 ? accounts.filter((a) => a.data.kind === 'loan' && bankOk(a)).find((_, i, all) => all.length === 1) ?? null : null);
+      if (loan) {
+        out.push({ id: `a${k}`, label: `${nameOf(loan)}${loan.data.kind === 'loan' ? '' : ' is a loan'}: you owe ${money(r.owed)}`, detail: `was ${typeof loan.data.knownBalance === 'number' ? money(loan.data.knownBalance) : 'from its payments'}${r.minDue ? ` · EMI ${money(r.minDue)}` : ''}${when}`, apply: () => {
+          const kind = loan.data.kind;
+          const before = setBalance(os, loan.id, -r.owed, at);
+          if (kind !== 'loan') os.records.update(loan.id, { data: { kind: 'loan' } }, 'user');
+          return () => os.records.update(loan.id, { data: { ...before, kind } }, 'user');
+        } });
+      } else {
+        out.push({ id: `a${k}`, label: `New loan: ${r.bank}${r.last4 ? ` ••${r.last4}` : ''}`, detail: `you owe ${money(r.owed)}${r.minDue ? ` · EMI ${money(r.minDue)}` : ''}${when}`, apply: () => {
+          const a = os.records.create<AccountData>({ object: 'account', title: `${r.bank} loan`, data: { kind: 'loan', institution: r.bank, last4: r.last4 || undefined, currency: 'INR', openingBalance: 0, knownBalance: -r.owed, knownOn: r.asOf || new Date(now).toISOString().slice(0, 10), knownAt: at } as AccountData }, 'user');
+          return () => os.records.delete(a.id, 'user');
+        } });
+      }
+      return;
+    }
     if (r.kind === 'credit') {
       if (!r.owed && !r.dueOn) return;
       if (found) {

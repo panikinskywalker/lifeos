@@ -1313,6 +1313,12 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   A SIP read from a dashboard or SIP screen (its day from the next instalment
   date) sets the holding's SIP, so its monthly SIP cycle follows (Subscriptions ›
   SIPs, Before payday, Upkeep); an account is matched by its last digits first.
+  A **loan statement** (education, home, car, personal; 17 Nov, Rutvij's SBI
+  education loan) is read as a loan: what you owe is its outstanding balance
+  (DR), and its EMI is shown. Its last digits find it whatever type it was filed
+  as, and it becomes a Loan ("SBI ••1176 is a loan: you owe ₹5,04,583.36"), with
+  Undo; with no match it is a new loan. A loan's card says *Loan · you owe* and
+  shows the amount owed, which counts against net worth.
 - **Photos and PDFs are read by Haiku** (17 Nov, Rutvij): a snapped or attached
   bill, an uploaded statement and Snap the fridge go to Claude Haiku 5.5
   (`PHOTO_MODEL`), whatever model the brain's other passes use; same key, budget

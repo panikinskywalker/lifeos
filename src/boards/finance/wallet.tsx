@@ -93,14 +93,15 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
           cards={[...above, cards[0]!, ...below].map(({ account: acc, balance }) => {
             const d = acc.data;
             const card = d.kind === 'credit';
+            const owes = card || d.kind === 'loan';
             const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
             const unset = needsBalance(d.kind, balance);
             return {
               key: acc.id,
               alert: late,
               title: acc.title.replace(/\s*[•·]+\s*\d{3,4}$/, ''),
-              corner: card ? 'You owe' : KIND_WORD[d.kind],
-              amount: unset ? 'Set balance' : card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
+              corner: card ? 'You owe' : d.kind === 'loan' ? 'Loan · you owe' : KIND_WORD[d.kind],
+              amount: unset ? 'Set balance' : owes ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
               tail: d.last4 ? `•••• ${d.last4}` : undefined,
               uses: cardUses(d.useFor, d.kind),
               note: unset ? 'what is on it? open to set' : d.kind === 'forex' && d.pockets?.length ? pocketLine(os, acc) : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
@@ -153,9 +154,10 @@ function WalletCard({ account: a, balance, front, first, money, still }: { accou
   const router = useRouter();
   const d = a.data;
   const card = d.kind === 'credit';
+  const owes = card || d.kind === 'loan';
   const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
   const unset = needsBalance(d.kind, balance);
-  const figure = unset ? 'Set balance' : card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency);
+  const figure = unset ? 'Set balance' : owes ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency);
   const source = unset ? 'tap Set balance below' : d.kind === 'forex' && d.pockets?.length ? 'in rupees, today’s rates' : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? 'from its spends' : 'from opening balance';
   const bg = late ? '#FF8A7A' : CARD[d.kind] ?? blocks.sky;
   return (
@@ -169,12 +171,12 @@ function WalletCard({ account: a, balance, front, first, money, still }: { accou
       <View pointerEvents="none" style={{ position: 'absolute', right: -50, bottom: -80, width: 220, height: 220, borderRadius: 110, borderWidth: 28, borderColor: 'rgba(11,11,13,0.06)' }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 15, lineHeight: 20, fontWeight: '700', color: INK }}>{a.title}</Text>
-        <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: INK, letterSpacing: 1, fontVariant: ['tabular-nums'] }}>{front ? (d.last4 ? `•••• ${d.last4}` : KIND_WORD[d.kind]) : `${card ? 'owe ' : ''}${figure}`}</Text>
+        <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: INK, letterSpacing: 1, fontVariant: ['tabular-nums'] }}>{front ? (d.last4 ? `•••• ${d.last4}` : KIND_WORD[d.kind]) : `${owes ? 'owe ' : ''}${figure}`}</Text>
       </View>
       {front ? (
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
           <View style={{ gap: 2, flexShrink: 1 }}>
-            <Text style={{ fontSize: 12, lineHeight: 15, fontWeight: '600', color: 'rgba(11,11,13,0.68)' }}>{card ? 'You owe' : 'Balance'}</Text>
+            <Text style={{ fontSize: 12, lineHeight: 15, fontWeight: '600', color: 'rgba(11,11,13,0.68)' }}>{owes ? 'You owe' : 'Balance'}</Text>
             <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: 32, lineHeight: 34, fontWeight: '700', letterSpacing: -1, color: INK, fontVariant: ['tabular-nums'] }}>{figure}</Text>
           </View>
           <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: 'rgba(11,11,13,0.68)', textAlign: 'right' }}>{source}</Text>

@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.104 · 17 Nov 2026
+
+**Loan statements.** An uploaded loan statement is read as a loan, not a bank
+balance: it finds the loan by its last digits, makes it a Loan if it was filed
+as something else, and sets what you owe (with Undo). A loan's card says *Loan ·
+you owe*.
+
 ## v0.0.103 · 17 Nov 2026
 
 **A bill says how it was paid.** A snapped or attached bill is read for "Paid:

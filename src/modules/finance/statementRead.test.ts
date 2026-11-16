@@ -89,6 +89,17 @@ describe('Upload a statement', () => {
     expect(new Date(sipOf(fresh.id)!.nextDueAt!).getDate()).toBe(12);
   });
 
+  it('a loan statement finds the loan by its last digits, makes it a loan and sets what you owe; Undo puts it back', () => {
+    const l = os.records.create<AccountData>({ object: 'account', title: 'SBI', data: { kind: 'bank', institution: 'SBI', last4: '1176', currency: 'INR', openingBalance: 0, knownBalance: 20000, knownOn: '2026-11-10', knownAt: 1 } as AccountData });
+    const ps = proposeChanges(os, readStatement({ accounts: [{ bank: 'SBI', last4: '43283101176', kind: 'loan', balance: 0, owed: 504583.36, minDue: 49747, dueOn: '', asOf: '2026-11-05' }], holdings: [] }));
+    expect(ps.map((p) => p.label)).toEqual(['SBI ••1176 is a loan: you owe ₹5,04,583.36']);
+    const undo = ps[0]!.apply();
+    expect(os.records.get<AccountData>(l.id)!.data.kind).toBe('loan');
+    expect(accountBalance(os, os.records.get<AccountData>(l.id)!)).toBeCloseTo(-504583.36, 2);
+    undo();
+    expect(os.records.get<AccountData>(l.id)!.data).toMatchObject({ kind: 'bank', knownBalance: 20000 });
+  });
+
   it('keeps only what makes sense from a reading', () => {
     expect(readStatement({ accounts: [{ bank: '', last4: '', kind: 'bank', balance: 1, owed: 0, minDue: 0, dueOn: 'soon', asOf: '' }], holdings: [{ name: 'X', units: 0, value: 0, invested: 0, sip: 0, sipDay: 0 }] })).toEqual({ accounts: [], holdings: [] });
   });
