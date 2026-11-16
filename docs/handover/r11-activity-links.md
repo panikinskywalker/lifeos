@@ -1,109 +1,209 @@
 # R11 Activity and Links · hand-over
 
-Branch `claude/r11-activity-links`, from `m1-design-system` at 0c3a9b3
-(v0.0.17). No migration, no version bump, no CHANGELOG edit.
+Two passes on branch `claude/r11-activity-links`:
 
-## What was built
+1. **First pass** (2 Nov, from `m1-design-system` at 0c3a9b3, v0.0.17;
+   merged as **v0.0.21**): Activity became a board; one Links card on every
+   record; the Links screen and Browse › Links from the kit.
+2. **Second pass** (15 Nov, from `m1-design-system` at bb0de54, v0.0.30;
+   merged as **v0.0.31**): better Links logic, one thing once, Turf named
+   once, Links built to the *Links · Noir* artboards, payments as an audit
+   trail, and Activity rebuilt to its new artboards.
 
-- **Model first** (`docs/MODEL.md`): layer 3 gains the *Activity* board; layer 5's
-  *Links* and *Activity* bullets say what the Links card, the Links screen,
-  Browse › Links and the Activity board are; R11 marked built in layer 6.
-- **Activity is a board** (`src/boards/activity`, placement `browse`, registered
-  in `src/boards/index.ts`):
-  - `home.tsx` (was `app/activity/index.tsx`): every tracker's row, "2 of 4 done
-    today" in the header, an empty state, New tracker, On Today (show, hide,
-    reorder).
-  - `tracker.tsx` (was `app/activity/[id].tsx`) at `/board/activity/tracker?tracker=<id>`.
-  - `edit.tsx` (was `app/activity/edit.tsx`) at `/board/activity/edit` (`?tracker=<id>` to edit).
-  - `grid.tsx` (was `src/screens/ActivityGrid.tsx`): the grid and the row.
-  - `tile.tsx`: the Today Activity tile, moved out of `app/(tabs)/index.tsx`
-    unchanged apart from its routes (one at a time or all, as You › Home sets).
-  - Core's trackers (`src/core/activity/trackers.ts`) are untouched: a tracker
-    stays a setting (`activity.trackers`), not an Object.
-- **Links**:
-  - Core (`src/core/graph/read.ts`): `linkGroups(os, id)` groups a record's Links
-    by the word as read from it, with each Link's id, ends, module, date and a
-    signed amount for payments; `linkWord` picks the word; `mostLinked(os, n)`.
-  - `src/ui/components/LinksCard.tsx`: the **Links card** (small map when two or
-    more are linked, groups with four rows and *N more*, rows tinted by the
-    other record's module, payments summed, long-press Open · Show in Links ·
-    Remove link with Undo, Link to add, an empty state) and **LinkSheet** (word
-    pills, your own word, the record picker; Undo removes exactly that Link).
-  - `RecordScreen.tsx`: the old Links card, the "Around this record" map card and
-    the inline LinkSheet are replaced by the shared ones (the map is now inside
-    the card). A board that draws the whole page (Task, Project, Event, Group,
-    Stock) gets the card below its page; Person draws its own.
-  - `app/links/[id].tsx`: the network as before plus a legend of the modules on
-    it, "Back to …", and the centre's Links card in full (add and remove here
-    too, so Person's links can be removed).
-  - `app/links/index.tsx` and a **Links** row in Browse: the most linked records.
-- **Tests**: `src/core/linkGroups.test.ts`, 3 tests (words from each side,
-  same-Object direction, signed payments, remove and put back the same way
-  round, most linked leaves out mentions and deleted records). 489 tests green;
-  typecheck green; `npx expo export --platform web` builds.
-- **Design prompt**: `docs/design/LINKS-BRIEF.md` (`NR-Links-*`, `NR-Activity-*`).
+No migration in either pass. MODEL.md layers 3, 5 and 6 say what is built;
+this file says how, what was decided, and what to check on the phone.
 
-## Decisions (where the model was silent; the simplest was picked)
+Design canvas: https://claude.ai/artifact/RVT9hLfcQ7tvgXvZN1x6cF, page
+*Links · Noir*: `L-*` (L1 one hop, L2 two hops, L3 a link tapped, L4 the
+record's Links card, L5 add a link, L6 everything, L7 the parts) and, in a
+second row added this pass, `A-*` (A1 Activity home, A2 a tracker, A3 new
+tracker, A4 the Today tile).
 
-- **Activity's screens move under the board** (`/board/activity/...`); the old
-  `/activity` routes are removed rather than kept as redirects (nothing else
-  linked to them). The tracker's query parameter is `tracker`, since `id` is
-  taken by the board route (PLUGINS.md).
-- **No board quick action** for a new tracker: the home's button is enough.
-- **The link word** reads from the record you are on: this Object's own label
-  when it declares the word towards the other Object; else the other Object's
-  inverse label for an incoming Link; else core's word in that direction
-  (`works at` normalised to `works_at`, so the Organisation reads "People here").
-  Between two records of one Object only the direction counts (Koramangala
-  "In" Bengaluru, Bengaluru "Contains" Koramangala).
-- **Groups** are ordered by size, then word; inside a group dated things newest
-  first, then by title. Four rows a group on the card, all on the Links screen.
-- **Remove** removes the one Link by its id; Undo links the same two records
-  the same way round with the same word.
-- **Board pages get the card below them** unless a section says `ownLinks`
-  (only Person, whose NR-People card already lists links and opens Links,
-  where removing is possible).
-- **Browse › Links** is a plain list of the most linked records (30), not a
-  search; search already opens any record, and its card opens Links.
-- The design prompt asks for a few things not built (guessed links with Right /
-  Not this on the card, tapping a day to see what made it count, a search on
-  Browse › Links); they wait for the artboards.
+## Links, as built
 
-## Shared core edits (small; for the merge)
+**How a Link reads** (`src/core/graph/words.ts`). Words are lower case, as
+the record would say them: Karan *works at* Zomato, was *with* the dinner,
+*paid*, *member of* Football, *played in* a game, *captain of* another. Most
+Links come from a link Field, so the Field decides: from the record holding
+it, the Field's label ("project", "venue"); from the record it points at, a
+verb where the Field names a part someone plays, else the other Object's
+records ("tasks", "debts"), never the Field's word read backwards. Then the
+Object's declared words, core's words, the other Object's name. Between two
+records of one Object only the direction tells ("in" / "contains").
 
-- `src/core/graph/read.ts`: three new exports appended (`linkWord`, `linkGroups`,
-  `mostLinked`) and one type import; nothing existing changed.
-- `src/core/registry/types.ts`: `EntityDetailSection.ownLinks?: boolean`.
-- `src/ui/theme/moduleTint.ts`: `activity: 'tasks'` (the Browse tile tint).
-- `src/ui/screens/RecordScreen.tsx`: the Links card and LinkSheet now come from
-  `src/ui/components/LinksCard.tsx`; the card is added below `page` sections.
-- `src/boards/crm/index.ts`: `ownLinks: true` on the Person page.
-- `src/boards/index.ts`: `activityBoard` registered (one import, one line).
-- `app/(tabs)/index.tsx`: `ActivityTile` moved to `@boards/activity/tile`
-  (import swapped, function removed).
-- `app/(tabs)/browse.tsx`: one Links row above Memory.
+**One thing once** (`src/core/graph/view.ts`, `ObjectDef.linkRole`). An
+Object can say how Links shows its records:
+- `{ aspectOf: field }`: another face of the record in that Field; folds into
+  it. Player profile → its Person; Venue → its Place.
+- `{ joins: [a, b], words? }`: the meeting of two records, shown as one link
+  between them, carrying its line; what is about it folds in. Appearance =
+  a person in a game, so Priya has "played in" games with "₹450 · paid · 1
+  goal · Owes you ₹450" on each row, and a game has "players"; the share's
+  Debt is in that row, not its own.
+- `{ trail: true }`: **payments are an audit trail, not Links** (Rutvij, 15
+  Nov: a monthly Claude charge made a line and a row every month and slowed
+  things). Transaction declares it. A payment is never a Link on the card,
+  the map, Browse › Links or the add sheet; it is an Event in the Recent
+  timeline of each record it touches (`trailOf`), replacing its "Linked
+  from" line. The Links stay stored: finance and its boards read them, and a
+  payment's own page still shows its card and payee.
 
-## Phone checks
+`viewLinks` reads every Link through these rules; `linkGroups`, `egoGraph`,
+`mostLinked` and `linkOverview` all read through it. `isDetail` keeps joins,
+their parts and payments off the map.
 
-1. Browse › Boards shows **Activity**; it opens the home with every tracker, the
-   "done today" line, New tracker and On Today; a tracker opens, edits and
-   deletes; back from a tracker returns to the home.
-2. The **Activity tile** on Today still swipes between trackers, both styles,
-   and opens the board / the tracker.
-3. A generic record (a Place, a Transaction): the **Links card** with its map,
-   groups by word, tints by module, *N more*; hold a row → Remove link → Undo
-   puts it back; Link adds one with a word and the toast's Undo removes it.
-4. A Task, Project, Event, Group and Stock page: the Links card below the page.
-   A Person: only its own Links card (no second one).
-5. **Links screen** from a card: legend matches the tints, tap walks, hold
-   opens, Back to …, the card in full below works for the current centre.
-6. Browse › **Links**: the most linked records, each opening its Links screen.
+**Screens** (each drawn to its artboard, Noir colours per module from
+`linkColorForModule` in `src/ui/theme/moduleTint.ts`):
+- **The Links card** (L4, `src/ui/components/LinksCard.tsx`) on every record;
+  below a board's own page unless the page sets `ownLinks` (Person, whose
+  NR-People card takes its rows from `linkGroups` too). Small map with Open
+  Links; groups by word in a left column (84 wide, not the design's 66, so
+  ORGANISATIONS stays whole); discs in module colours; *to check* on guesses;
+  four a group then *N more*; tap opens, hold opens the link sheet.
+- **A link, tapped** (L3, `src/ui/components/LinkSheets.tsx`): since / until,
+  **Set dates**, where it came from (`linkInfo`: a dump with its sentence
+  while kept, a message, the agent, a Field, you), confidence with *Right*,
+  change the word (`changeLinkWord`, keeps provenance; not a Field's), Open,
+  Remove with Undo; through a meeting, *Open the appearance* instead.
+- **Add a link** (L5, same file): search, or *New record "…"* (that Object's
+  form, linked on save); words = this record's link Fields (which fill the
+  Field) then knows · family of · works with · with · at · part of · owns ·
+  paid for · about, or your own; since; **Both ways?** (not for symmetric
+  words like knows, or a Field's word). Faces, meetings and payments are not
+  offered. Saved as yours (source manual).
+- **The Links screen** (L1, L2, `app/links/[id].tsx`, `src/ui/components/LinkMap.tsx`):
+  1 hop · 2 hops, counts, module chips, the map (lime-ringed centre, rings
+  in module colours, word pills on bent lines, +N, dashed "?" for guesses,
+  dotted quieter second ring, a tapped line lime with the rest at 20%), the
+  centre card (Open record, hop switch, Back to), the full card. Ring two is
+  ranked by shared connections, at most four of one Object. **Motion**: lines
+  draw out (300 ms), the tapped record glides to the middle (420 ms); reduced
+  motion skips. **Zoom**: pinch and two-finger pan, Reset zoom, double-tap.
+- **Browse › Links** (L6, `app/links/index.tsx`, `src/ui/components/LinkCloud.tsx`,
+  `src/core/graph/overview.ts`): find a record; Clusters or Free; counts;
+  module chips; a time-lapse (Play, drag); *Joins up the most*, ranked by
+  breadth (each kind of linked record counts up to five) then modules.
 
-## Patch notes (for the version this becomes)
+**Removing and adding keep Fields in step** (`removeLink`, `addLink` in
+`src/core/links.ts`): a Link a Field made is taken out of (or put into) that
+Field, so it does not come back on the next edit.
 
-- Activity is now a board in Browse › Boards, with its home, trackers and the
-  Today tile.
-- Every record has a Links card: grouped by link word, coloured by module,
-  with Remove link and Undo, and Link to add one.
-- The Links screen shows which colour is which module and lists every link
-  under the network; Browse has a Links list of your most connected records.
+**Turf, once**: the Turf board is the games module's (`module: 'games'`), its
+short name is Turf everywhere modules are named, and Browse no longer lists a
+module whose board is already under Boards (Turf, and Home for inventory).
+
+## Activity, as built
+
+A Browse board (`src/boards/activity`) over core's trackers (a setting,
+`activity.trackers`, not an Object), drawn to A1 to A4:
+- `grid.tsx`: tracker colours (the Noir module colours over the stored tints),
+  disc, today's tick, a tappable grid with month names, card and mini rows.
+- `home.tsx` (A1): how many counted today, a card per tracker, New tracker,
+  On Today (show or hide each, hold to reorder via `SortableList`).
+- `tracker.tsx` (A2): this week / month / streak with the longest, 26 weeks,
+  a day tapped shows **what made it count** (`dayMatches` in
+  `src/core/activity/trackers.ts`: each payment, message, event, workout,
+  health number, app time or habit that matched, opening its record), the
+  rules, Edit rules, Delete (asks first).
+- `edit.tsx` (A3): name, icon, colour, rules, the seven kinds of rule.
+- `tile.tsx` (A4): one tracker at a time with page dots, or all stacked small.
+
+Routes: `/board/activity`, `/board/activity/tracker?tracker=<id>`,
+`/board/activity/edit` (`?tracker=<id>` to edit); the old `/activity` routes
+went in the first pass.
+
+## Decisions (where the design or the model was silent)
+
+- Words: *with* for a Task's or Trip's People; *transfers in* for a
+  transfer's to-account; *player of the match*; *member of* for a group.
+- Payments: Events on the timeline, not Links (above); the Links stay stored.
+- A Delivery shows its order's payment from its Order Field (it used to come
+  through Links).
+- A guessed link's *Right* sets confidence to 1; there is no "Not this" on the
+  sheet (Remove does that).
+- Both ways stores a second Link the other way round; symmetric words are
+  already stored once.
+- Activity's colours: a tracker keeps its stored tint key; only the drawing
+  changed to the Noir module colours.
+
+## Shared edits (outside my own folders, for anyone merging after)
+
+- `src/core/domain/types.ts`: `ObjectDef.linkRole`.
+- `src/core/registry/types.ts`: `EntityDetailSection.ownLinks`.
+- `src/core/repo/sideRepos.ts`: `LinkRepo.setValidity` (the `valid_from` /
+  `valid_to` columns already existed).
+- `src/core/graph/read.ts` (rewritten Links readers), `words.ts`, `view.ts`,
+  `overview.ts` (new), `src/core/links.ts` (add, remove, info, word, dates).
+- `src/core/activity/trackers.ts`: `dayMatches` appended.
+- `src/modules/finance/types.ts`: Transaction `linkRole: { trail: true }`.
+- `src/modules/games/types.ts`: Appearance joins, Player profile and Venue
+  faces.
+- `src/boards/crm/index.ts` (`ownLinks`) and `profile.tsx` (rows from
+  `linkGroups`); `src/boards/turf/index.ts` (`module: 'games'`);
+  `src/boards/deliveries/record.tsx` (order payment from its Field).
+- `src/ui/screens/RecordScreen.tsx`: the shared Links card and sheet; payments
+  in Recent.
+- `src/ui/theme/moduleTint.ts`: `linkColorForModule`, games → Turf, activity
+  tint.
+- `app/(tabs)/browse.tsx`: the Links row; modules with a Browse board left out.
+- `app/dev/components.tsx`: the gallery's Links demo uses the new map.
+- Removed: `src/ui/components/LinksView.tsx` (the force layout). `d3-force`
+  and `@types/d3-force` are now unused in `package.json`; left in, since
+  dropping them changes the lockfile.
+
+## Checks
+
+- Typecheck green. 637 of 638 tests pass; the one failure,
+  `src/modules/deliveries/deliveries.test.ts` (*a parcel arriving today*),
+  fails on the base too (a second demo parcel now counts as today) and is not
+  touched here.
+- New and changed tests: `src/core/linkGroups.test.ts` (9: words both ways,
+  named Fields, remove and add keeping Fields, breadth ranking, hidden Objects
+  off the map, faces and joins, payments on the trail, link info, word change,
+  dates, both ways, the overview); `src/modules/activity.golden.test.ts` gains
+  *what made a day count*. Test expectations changed only where the word rules
+  or the payments rule changed by Rutvij's decision.
+- `npx expo export --platform web` builds. Checked in the browser on the demo,
+  no console errors: Browse › Links (clusters, free, time-lapse), Priya's map
+  (one and two hops, draw out, re-centre glide, a line's sheet), Toit's and
+  Amex Platinum's cards and Recent, the add sheet, the Activity home, tracker
+  and edit.
+
+## Phone checks (none done yet)
+
+1. Links screen on a person: rings and words, +N, module chips, tap to
+   re-centre (the glide), hold to open, tap a word for its sheet, Back to.
+2. Pinch and two-finger pan on the map; Reset zoom; double-tap (web can't).
+3. A record's card: hold a row → Set dates, Right on a guess, change word,
+   Remove with Undo.
+4. Link on a Task: Project and People offered, Project's picker only
+   Projects, the form then shows it; Both ways on a hand word.
+5. A card, payee or person: payments in Recent as Events, none in Links.
+6. Priya (Turf): "played in" games with her share and what's owed; a game
+   lists its players; Playground Arena once, as the Place.
+7. Browse: Turf and Home only under Boards; Browse › Links clusters and the
+   time-lapse.
+8. Activity: On Today toggles and hold-to-reorder; a tracker's day tapped
+   shows its matches (needs real SMS, screen time or calendar data); the
+   Today tile both ways.
+
+## Not built
+
+- The Activity artboards' motion (none was drawn) and any Activity nudges.
+- Dropping `d3-force` from `package.json`.
+
+## Patch notes (v0.0.31)
+
+- Links read the way you would say them (works at, with, played in) and are
+  drawn as in the design: the record in the middle, what it links to round
+  it in module colours, one or two hops, zoom with two fingers.
+- Each thing shows once: a game is one game, not also each player's
+  appearance and share; a player profile is the person, a venue the place;
+  Turf is one name.
+- Payments no longer crowd Links: each is an event on the card, payee and
+  people it touches.
+- Hold a link to see where it came from, confirm a guess, set its dates,
+  change its word or remove it; adding one can start a new record and go
+  both ways.
+- Browse › Links shows everything you have linked, with a time-lapse.
+- Activity is redrawn: tap any day of a tracker to see what made it count.

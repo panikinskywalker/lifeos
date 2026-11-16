@@ -69,6 +69,12 @@ export class LinkRepo {
     this.changes.record('links', id, 'update', 1);
   }
 
+  /** When a Link was and stopped being true (Karan works at Zomato since Mar 2025); null clears either. */
+  setValidity(id: string, validFrom: number | null, validTo: number | null) {
+    this.db.run(`UPDATE links SET valid_from=?, valid_to=?, version=version+1 WHERE id=?`, [validFrom, validTo, id]);
+    this.changes.record('links', id, 'update', 1);
+  }
+
   /** Remove one edge by id (cancelling an agent's link). */
   remove(id: string, actor: Actor = 'user') {
     const r = this.db.get<Row>(`SELECT * FROM links WHERE id=? AND deleted_at IS NULL`, [id]);

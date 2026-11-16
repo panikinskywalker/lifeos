@@ -85,8 +85,9 @@ describe('a photo sent on purpose', () => {
     expect(bodies[1]!.messages[0]!.content).toBe('Text only');
     // A statement read asks for little thought, so a long list has room; the default stays medium.
     await claude.complete({ system: 's', user: 'Read this.', maxTokens: 8000, effort: 'low' });
-    expect(bodies[2]!.output_config.effort).toBe('low');
-    expect(bodies[1]!.output_config.effort).toBe('medium');
+    const effort = (b: unknown) => (b as { output_config: { effort: string } }).output_config.effort;
+    expect(effort(bodies[2])).toBe('low');
+    expect(effort(bodies[1])).toBe('medium');
   });
 });
 

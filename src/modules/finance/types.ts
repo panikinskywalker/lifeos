@@ -134,6 +134,8 @@ export const transactionType: ObjectDef<TransactionData> = {
   label: 'Transaction',
   labelPlural: 'Transactions',
   icon: 'arrow.up.arrow.down',
+  // Payments are not Links (MODEL.md layer 5): each is an Event on the card, the payee and the people it touches, their audit trail.
+  linkRole: { trail: true },
   schema: z.object({
     amount: z.coerce.number().nonnegative(),
     kind: z.enum(['expense', 'income', 'transfer', 'investment']).default('expense'),

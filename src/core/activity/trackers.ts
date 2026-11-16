@@ -223,3 +223,99 @@ export function ruleText(r: TrackerRule, os?: LifeOSContext): string {
       return `Habit “${os?.records.get(r.habitId)?.title ?? 'habit'}” ticked`;
   }
 }
+
+/** One thing that made a day count (A2 "What made a day count"): which rule, what it was, when. */
+export interface DayMatch {
+  rule: number;
+  kind: TrackerRule['kind'];
+  title: string;
+  line: string;
+  at: number | null;
+  /** The record it was, to open (a payment, an event, a workout). */
+  recordId: string | null;
+}
+
+const hm = (t: number) => new Date(t).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+
+/** Everything that matched a tracker's rules on one day (ISO), in time order; what the tracker page lists for a tapped day. */
+export function dayMatches(os: LifeOSContext, t: Tracker, day: string): DayMatch[] {
+  const out: DayMatch[] = [];
+  const has = (x: string) => os.registry.objects.has(x);
+  const from = startMs(day);
+  const to = endMs(day);
+  t.rules.forEach((r, rule) => {
+    const push = (m: Omit<DayMatch, 'rule' | 'kind'>) => out.push({ rule, kind: r.kind, ...m });
+    switch (r.kind) {
+      case 'message': {
+        const re = wordRe(r.words);
+        if (!re) return;
+        for (const m of os.db.all<{ at: number; source: string; from: string | null; title: string | null; text: string }>(`SELECT received_at AS at, source, package AS "from", raw_title AS title, raw_text AS text FROM ingest_queue WHERE received_at BETWEEN ? AND ? ORDER BY received_at`, [from, to]))
+          if (re.test(`${m.from ?? ''} ${m.title ?? ''} ${m.text}`)) push({ title: (m.title || m.text).slice(0, 80), line: `${m.source === 'sms' ? 'An SMS' : m.source === 'email' ? 'A mail' : 'A notification'} · ${hm(m.at)}`, at: m.at, recordId: null });
+        return;
+      }
+      case 'payment': {
+        if (!has('transaction')) return;
+        const re = r.words?.length ? wordRe(r.words) : null;
+        const dir = r.direction ?? 'spent';
+        for (const x of os.db.all<{ id: string; title: string; at: number | null; amount: number | null; merchant: string | null; note: string | null; category: string | null; kind: string }>(
+          `SELECT id, title, occurred_at AS at, json_extract(data,'$.amount') AS amount, json_extract(data,'$.merchant') AS merchant, json_extract(data,'$.note') AS note, json_extract(data,'$.category') AS category, json_extract(data,'$.kind') AS kind
+           FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date') = ?`,
+          [day],
+        )) {
+          if (dir !== 'any' && x.kind !== (dir === 'received' ? 'income' : 'expense')) continue;
+          if (r.category && x.category !== r.category) continue;
+          if (re && !re.test(`${x.merchant ?? ''} ${x.note ?? ''}`)) continue;
+          if (!re && !r.category) continue;
+          push({ title: `${x.merchant || x.title}${x.amount != null ? ` · ${os.format.currency(x.amount)}` : ''}`, line: `${x.kind === 'income' ? 'Money in' : 'A payment out'}${x.at ? ` · ${hm(x.at)}` : ''}`, at: x.at, recordId: x.id });
+        }
+        return;
+      }
+      case 'record': {
+        if (!has(r.type)) return;
+        const label = os.registry.objects.get(r.type)?.label ?? r.type;
+        for (const x of os.db.all<{ id: string; title: string; at: number }>(`SELECT id, title, COALESCE(occurred_at, created_at) AS at FROM records WHERE object=? AND deleted_at IS NULL AND COALESCE(occurred_at, created_at) BETWEEN ? AND ? ORDER BY at`, [r.type, from, to]))
+          push({ title: x.title, line: `A ${label.toLowerCase()} · ${hm(x.at)}`, at: x.at, recordId: x.id });
+        return;
+      }
+      case 'metric': {
+        if (!has('measurement')) return;
+        const line = r.goal ? goals(os).find((g) => g.id === r.metric)?.target : r.min;
+        const v = daily(os, r.metric, day, day).get(day);
+        if (line == null || v == null || v < line) return;
+        const name = r.metric === 'steps' ? 'steps' : r.metric === 'sleep' ? 'h of sleep' : r.metric === 'resting_hr' ? 'resting heart rate' : 'weight';
+        push({ title: `${Math.round(v * 10) / 10} ${name}`, line: `${r.goal ? 'Your goal' : 'The line'}: ${line}`, at: null, recordId: null });
+        return;
+      }
+      case 'screen': {
+        const words = r.apps.map((a) => a.trim().toLowerCase()).filter(Boolean);
+        let ms = 0;
+        const apps: string[] = [];
+        for (const u of os.db.all<{ package: string; label: string | null; ms: number }>(`SELECT package, label, ms FROM usage_app_daily WHERE day = ?`, [day])) {
+          const name = `${u.package} ${u.label ?? ''}`.toLowerCase();
+          if (words.some((w) => name.includes(w))) (ms += u.ms, apps.push(u.label ?? u.package));
+        }
+        if (ms >= r.minutes * 60_000) push({ title: `${Math.round(ms / 60_000)} min in ${apps.slice(0, 3).join(', ')}`, line: `Time in apps · ${r.minutes}+ min counts`, at: null, recordId: null });
+        return;
+      }
+      case 'calendar': {
+        if (!has('event')) return;
+        const re = r.words?.length ? wordRe(r.words) : null;
+        const cals = new Set((r.calendars ?? []).map((c) => c.toLowerCase()));
+        for (const e of os.db.all<Row>(`SELECT id, title, occurred_at, data FROM records WHERE object='event' AND deleted_at IS NULL AND occurred_at BETWEEN ? AND ? ORDER BY occurred_at`, [from, to])) {
+          const d = JSON.parse(e.data as string) as { calendars?: string[] };
+          const onCal = cals.size > 0 && (d.calendars ?? []).some((c) => cals.has(c.toLowerCase()));
+          if (onCal || (re?.test(String(e.title)) ?? false)) push({ title: String(e.title), line: `A calendar event · ${hm(e.occurred_at as number)}`, at: e.occurred_at as number, recordId: e.id as string });
+        }
+        return;
+      }
+      case 'habit': {
+        if (!has('habit_log')) return;
+        const name = os.records.get(r.habitId)?.title ?? 'A habit';
+        for (const l of os.db.all<{ id: string; at: number }>(`SELECT id, created_at AS at FROM records WHERE object='habit_log' AND deleted_at IS NULL AND json_extract(data,'$.habitId')=? AND json_extract(data,'$.date') = ?`, [r.habitId, day]))
+          push({ title: `${name} ticked`, line: `A habit · ${hm(l.at)}`, at: l.at, recordId: r.habitId });
+        return;
+      }
+    }
+  });
+  return out.sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+}

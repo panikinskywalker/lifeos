@@ -8,7 +8,7 @@ import { bus } from '@core/events/bus';
 import { fileMessage } from '@core/filing/messages';
 import { saveUsageDays } from '@core/sources/deviceData';
 import { saveHealthDays } from '@modules/health/healthConnect';
-import { DEFAULT_TRACKERS, knownCalendars, trackerDays, trackerSummary, trackers, upsertTracker, type Tracker } from '@core/activity/trackers';
+import { DEFAULT_TRACKERS, dayMatches, knownCalendars, trackerDays, trackerSummary, trackers, upsertTracker, type Tracker } from '@core/activity/trackers';
 import { measurementType, workoutType } from './health/types';
 import { accountType, transactionType } from './finance/types';
 import { eventType } from './projects/types';
@@ -62,5 +62,18 @@ describe('activity trackers', () => {
     expect(s.days).toHaveLength(28);
     expect(s.days.at(-1)).toEqual({ day: day(0), value: 1 }); // Sunday ends the week
     expect(s).toMatchObject({ thisWeek: 5, streak: 3, longest: 4, total: 7 });
+  });
+
+  it('what made a day count (A2): each match that day, which rule, in time order', () => {
+    fileMessage(os, { source: 'sms', from: 'AX-ZOMATO', body: 'Your Zomato order from Truffles is on its way!', receivedAt: at(-1, 21) });
+    os.records.create({ object: 'event', title: 'Quarterly planning', data: { startAt: at(-1, 11), calendars: ['Work'] } });
+    const t: Tracker = { id: 'y', name: 'Mix', icon: 'grid', tint: 'tasks', rules: [{ kind: 'message', words: ['zomato'] }, { kind: 'calendar', calendars: ['Work'] }] };
+    const m = dayMatches(os, t, day(-1));
+    expect(m.map((x) => [x.rule, x.kind, x.title])).toEqual([
+      [1, 'calendar', 'Quarterly planning'],
+      [0, 'message', 'Your Zomato order from Truffles is on its way!'],
+    ]);
+    expect(m[0]!.recordId).toBeTruthy();
+    expect(dayMatches(os, t, day(-2))).toEqual([]);
   });
 });

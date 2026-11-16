@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LinksView } from '@ui/components/LinksView';
+import { LinkMap } from '@ui/components/LinkMap';
 import { ConfirmCard, ReplyCardView } from '@ui/components/ReplyCard';
 import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -663,7 +663,8 @@ function TodayChartsDemo() {
 }
 
 function GraphDemo() {
-  return <LinksView nodes={DEMO_GRAPH.nodes} edges={DEMO_GRAPH.edges} height={340} />;
+  const [centre, ...rest] = DEMO_GRAPH.nodes;
+  return <LinkMap width={340} height={420} centre={centre!} nodes={rest} lines={DEMO_GRAPH.edges.map((e, i) => ({ key: String(i), from: e.from, to: e.to, word: e.kind }))} />;
 }
 
 /** NR-KitCharts and NR-KitInstruments, with the kit's own sample figures. */
@@ -697,7 +698,7 @@ function NoirChartsDemo() {
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
   ['Noir charts', 'NR-KitCharts · NR-KitInstruments · the kit\'s sample figures', NoirChartsDemo],
   ['Today charts', 'mini bars · delta chip (good/bad by metric) · heat map', TodayChartsDemo],
-  ['Links', 'the network around a record · 2 hops · module tints · link words (d3-force)', GraphDemo],
+  ['Links', 'the map around a record · 2 hops · module colours · link words (NR Links L1, L2)', GraphDemo],
   ['Progress bar', '8 tall · pill · optional target tick', Progress],
   ['Charts', 'sparkline · line · columns · legend (Stitch)', ChartsDemo],
   ['Record insights', 'stat trio · attention · quick actions · day timeline (Stitch)', InsightDemo],

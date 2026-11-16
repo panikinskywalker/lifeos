@@ -6,9 +6,9 @@ import type { TileDef, TileProps } from '@core/registry/types';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Text, Tile } from '@ui/kit';
-import { ActivityRow } from './grid';
+import { ActivityMiniRow, ActivityRow } from './grid';
 
-/** The Activity board's Today tile: one tracker at a time (swipe for the next), its last 18 weeks as a grid of days like GitHub's; tap for all of them. Two looks: one at a time or all stacked. */
+/** The Activity board's Today tile (the A4 artboard): wide only; one tracker at a time (swipe for the next, page dots), or all of them stacked small with this week each. Tap opens the board, a stacked row its tracker. */
 function ActivityTodayTile({ config }: TileProps) {
   const router = useRouter();
   const t = useTheme();
@@ -18,10 +18,10 @@ function ActivityTodayTile({ config }: TileProps) {
   const open = () => router.push('/board/activity' as never);
   if (config.style === 'all')
     return (
-      <Tile size="2x1" tint="tasks" icon="grid" label="Activity" onPress={open}>
-        <View style={{ gap: 22 }}>
+      <Tile size="2x1" tint="tasks" icon="grid" label="Activity" meta={rows.length ? `${rows.length} tracker${rows.length === 1 ? '' : 's'}` : undefined} onPress={open}>
+        <View style={{ gap: 14 }}>
           {rows.map((s) => (
-            <ActivityRow key={s.tracker.id} s={s} onPress={() => router.push(`/board/activity/tracker?tracker=${s.tracker.id}` as never)} />
+            <ActivityMiniRow key={s.tracker.id} s={s} onPress={() => router.push(`/board/activity/tracker?tracker=${s.tracker.id}` as never)} />
           ))}
         </View>
       </Tile>

@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.116 · 17 Nov 2026
+
+**Links, second pass, merged in (from claude/r11-activity-links).** Payments are an audit trail, not Links: they are never a Link on a card, the map, Browse › Links or the add sheet, but an Event on the timeline of each record they touch. Links read as the record would say them, one thing shows once (a player is their person, a game share is one row), the Links · Noir design (the card, a link's sheet with dates and how sure it is, the map that draws out with pinch and pan, Browse › Links showing everything), and Activity rebuilt to A1 to A4. Turf stays the games card in Browse.
+
 ## v0.0.115 · 17 Nov 2026
 
 **Funds and SIPs from screenshots, for real.** Statements and fund screens are now read by Claude Sonnet 5.5, asked to think little and given room for a long list (Haiku's thinking used up the space, so lists came back cut off). It is told which figures on a fund app's holdings screen are the value and the amount invested. When nothing can be updated, the sheet says what was read and which screen to try. The CAMS / KFintech CAS PDF is suggested for all your funds at once.

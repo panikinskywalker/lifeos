@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import type { TintKey } from '@ui/theme/tokens';
 import { useRouter } from 'expo-router';
 import { activeHabits } from '@core/habits/habits';
 import { knownApps, knownCalendars, ruleText, trackers, upsertTracker, type MetricRuleId, type Tracker, type TrackerRule } from '@core/activity/trackers';
 import { CATEGORIES } from '@modules/finance/types';
 import { useLive, useOS } from '@ui/hooks';
-import { Button, ChipRow, FilterChip, IconButton, NumberField, RowItem, RowList, Screen, Section, Segmented, SwitchField, Text, TextField } from '@ui/kit';
+import { Button, ChipRow, FilterChip, Icon, IconButton, NumberField, Screen, Segmented, SwitchField, Text, TextField } from '@ui/kit';
+import { TRACKER_TINTS, TrackerDisc, trackerColor } from './grid';
+import { RULE_ICON } from './tracker';
 
 type Kind = TrackerRule['kind'];
 const KINDS: Array<{ value: Kind; label: string; icon: string }> = [
@@ -20,10 +21,15 @@ const KINDS: Array<{ value: Kind; label: string; icon: string }> = [
   { value: 'habit', label: 'A habit ticked', icon: 'flame' },
 ];
 const ICONS = ['grid', 'briefcase', 'activity', 'shoe', 'food', 'wallet', 'book', 'moon', 'heart', 'cart', 'car', 'flame', 'phone', 'film', 'leaf', 'bolt'];
-const TINTS = ['tasks', 'health', 'finance', 'people', 'memory', 'travel', 'upkeep', 'documents'];
 const words = (s: string) => s.split(/[,/]+/).map((w) => w.trim()).filter(Boolean);
 
-/** New tracker or edit one: a name, an icon, and the rules: a day counts when any of them matches. */
+const COLOR_NAMES: Record<string, string> = { tasks: 'Events', health: 'Body', finance: 'Money', people: 'People', memory: 'Notes', travel: 'Trips', upkeep: 'Things', documents: 'Places' };
+
+/**
+ * New tracker or edit one (the A3 artboard): a name, an icon, a colour, and
+ * the rules (a day counts when any of them matches what LifeOS already
+ * filed; nothing is typed in by hand). Save tracker.
+ */
 export function ActivityEdit({ params }: { params: Record<string, string> }) {
   const id = params.tracker;
   const os = useOS();
@@ -38,41 +44,68 @@ export function ActivityEdit({ params }: { params: Record<string, string> }) {
     upsertTracker(os, { ...t, name: t.name.trim() || 'Tracker' });
     back();
   };
+  const color = trackerColor(t.tint);
+  const label = (text: string) => <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '600', color: theme.c.fg.secondary }}>{text}</Text>;
+  const head = (title: string, meta?: string) => (
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingTop: 10, paddingHorizontal: 4 }}>
+      <Text accessibilityRole="header" style={{ flex: 1, fontSize: 17, lineHeight: 22, fontWeight: '600', color: theme.c.fg.primary }}>{title}</Text>
+      {meta ? <Text style={{ fontSize: 13, lineHeight: 17, color: theme.c.fg.secondary }}>{meta}</Text> : null}
+    </View>
+  );
+  const ok = !!t.name.trim() && t.rules.length > 0;
   return (
-    <Screen title={existing ? 'Edit tracker' : 'New tracker'} onBack={back}>
+    <Screen title={existing ? 'Edit tracker' : 'New tracker'} subtitle="Activity" right={<IconButton icon="x" accessibilityLabel="Close" filled onPress={back} />}>
       <TextField label="Name" value={t.name} onChange={(name) => setT({ ...t, name })} placeholder="Ordered food, Gym, Days in office…" autoFocus={!existing} />
-      <Text variant="label" color="secondary">Icon</Text>
-      <ChipRow>
-        {ICONS.map((i) => (
-          <FilterChip key={i} label="" icon={i} selected={t.icon === i} onPress={() => setT({ ...t, icon: i })} />
-        ))}
-      </ChipRow>
-      <Text variant="label" color="secondary">Colour</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {TINTS.map((c) => (
-          <Pressable key={c} accessibilityRole="radio" accessibilityState={{ selected: t.tint === c }} accessibilityLabel={`Colour ${c}`} onPress={() => setT({ ...t, tint: c })} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: theme.tints[c as TintKey].ink, borderWidth: t.tint === c ? 3 : 0, borderColor: theme.c.fg.primary }} />
-        ))}
+      <View style={{ gap: 6 }}>
+        {label('Icon')}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {ICONS.map((i) => (
+            <Pressable key={i} accessibilityRole="radio" accessibilityState={{ selected: t.icon === i }} accessibilityLabel={`Icon ${i}`} onPress={() => setT({ ...t, icon: i })} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: t.icon === i ? theme.c.accent.mustard : theme.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name={i as never} size={18} color={t.icon === i ? theme.c.accent.mustardInk : theme.c.fg.secondary} />
+            </Pressable>
+          ))}
+        </View>
+      </View>
+      <View style={{ gap: 8 }}>
+        {label('Colour')}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {TRACKER_TINTS.map((c) => (
+            <Pressable key={c} accessibilityRole="radio" accessibilityState={{ selected: t.tint === c }} accessibilityLabel={`Colour ${COLOR_NAMES[c] ?? c}`} onPress={() => setT({ ...t, tint: c })} style={{ width: 40, height: 40, borderRadius: 20, borderWidth: t.tint === c ? 2 : 0, borderColor: theme.c.fg.primary, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: trackerColor(c) }} />
+            </Pressable>
+          ))}
+        </View>
       </View>
 
-      <Section title="A day counts when any of these happen">
+      {head('A day counts when any of these happen', t.rules.length ? `${t.rules.length} rule${t.rules.length === 1 ? '' : 's'}` : undefined)}
+      <View style={{ padding: 16, borderRadius: 28, backgroundColor: theme.c.bg.tile, gap: 4 }}>
         {t.rules.length ? (
-          <RowList>
-            {t.rules.map((r, i) => (
-              <RowItem key={i} title={ruleText(r, os)} chevron={false} trailing={<IconButton icon="trash" size={34} accessibilityLabel="Remove rule" onPress={() => setRules(t.rules.filter((_, k) => k !== i))} />} />
-            ))}
-          </RowList>
+          t.rules.map((r, i) => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, borderTopWidth: i ? 1 : 0, borderTopColor: 'rgba(255,255,255,0.08)' }}>
+              <TrackerDisc icon={RULE_ICON[r.kind]} color={color} />
+              <Text style={{ flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '600', color: theme.c.fg.primary }}>{ruleText(r, os)}</Text>
+              <IconButton icon="trash" size={36} accessibilityLabel="Remove rule" onPress={() => setRules(t.rules.filter((_, k) => k !== i))} />
+            </View>
+          ))
         ) : (
-          <Text variant="caption" color="secondary">No rules yet. Add one below.</Text>
+          <Text style={{ fontSize: 13, lineHeight: 17, color: theme.c.fg.secondary }}>No rules yet. Add one below.</Text>
         )}
-      </Section>
+      </View>
 
-      <Section title="Add a rule">
-        <ChipRow>
-          {KINDS.map((k) => (
-            <FilterChip key={k.value} label={k.label} icon={k.icon} selected={adding === k.value} onPress={() => setAdding(adding === k.value ? null : k.value)} />
-          ))}
-        </ChipRow>
-        {adding ? (
+      {head('Add a rule')}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {KINDS.map((k) => {
+          const on = adding === k.value;
+          return (
+            <Pressable key={k.value} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setAdding(on ? null : k.value)} style={{ height: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: on ? theme.c.accent.mustard : theme.c.bg.tileRaised, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name={k.icon as never} size={14} color={on ? theme.c.accent.mustardInk : theme.c.fg.secondary} />
+              <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '700', color: on ? theme.c.accent.mustardInk : theme.c.fg.secondary }}>{k.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {adding ? (
+        <View style={{ padding: 16, borderRadius: 28, backgroundColor: theme.c.bg.tile }}>
           <RuleForm
             kind={adding}
             onAdd={(r) => {
@@ -80,9 +113,13 @@ export function ActivityEdit({ params }: { params: Record<string, string> }) {
               setAdding(null);
             }}
           />
-        ) : null}
-      </Section>
-      <Button title="Save tracker" icon="check" disabled={!t.name.trim() || !t.rules.length} onPress={save} />
+        </View>
+      ) : null}
+      <Text style={{ fontSize: 13, lineHeight: 17, color: theme.c.fg.secondary }}>Nothing is typed in by hand: a day counts from what LifeOS already filed.</Text>
+      <Pressable disabled={!ok} onPress={save} accessibilityRole="button" accessibilityState={{ disabled: !ok }} style={{ height: 52, borderRadius: 999, backgroundColor: theme.c.accent.mustard, opacity: ok ? 1 : 0.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <Icon name="check" size={18} color={theme.c.accent.mustardInk} />
+        <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', color: theme.c.accent.mustardInk }}>Save tracker</Text>
+      </Pressable>
     </Screen>
   );
 }

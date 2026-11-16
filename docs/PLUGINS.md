@@ -74,6 +74,7 @@ interface ObjectDef<T = Record<string, unknown>> {
   cycleFields?: Record<string, { nextDueAt?: string; lastDoneAt?: string; nextDueMeter?: string }>;
   cycleActiveStatuses?: string[];
   meters?: Array<{ meter: string; field: string; label: string; unit: string }>;
+  linkRole?: { aspectOf: string } | { joins: [string, string]; words?: Record<string, string> }; // how Links shows it (R11): a face of the record in that Field (Player profile → Person), or the meeting of two (Appearance: person ↔ game)
 }
 ```
 
