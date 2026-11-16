@@ -92,10 +92,13 @@ export const needsBalance = (kind: string, balance: number) => (kind === 'forex'
  * its payments, transfers and subscriptions move to the real one, which keeps its
  * own balance and learns the copy's digits; the copy goes. Returns the Undo.
  */
-export function mergeAccount(os: LifeOSContext, fromId: string, intoId: string): () => void {
+export function mergeAccount(os: LifeOSContext, fromId: string, intoId: string, now = Date.now()): () => void {
   const from = os.records.get<AccountData>(fromId);
   const into = os.records.get<AccountData>(intoId);
   if (!from || !into || fromId === intoId) return () => {};
+  // The real account's figure now, so the copy's payments (already in it) are not added on top.
+  const figure = accountBalance(os, into);
+  const known = { knownBalance: into.data.knownBalance, knownOn: into.data.knownOn, knownAt: into.data.knownAt };
   const moved: Array<{ id: string; field: 'accountId' | 'toAccountId' }> = [];
   const objects = ['transaction', ...(os.registry.objects.has('subscription') ? ['subscription'] : [])];
   for (const object of objects)
@@ -107,11 +110,12 @@ export function mergeAccount(os: LifeOSContext, fromId: string, intoId: string):
   const before = { last4: into.data.last4, alsoLast4: into.data.alsoLast4 };
   const digits = [from.data.last4, ...(from.data.alsoLast4 ?? [])].filter((d): d is string => !!d && d !== into.data.last4);
   if (digits.length) os.records.update<AccountData>(intoId, { data: into.data.last4 ? { alsoLast4: [...new Set([...(into.data.alsoLast4 ?? []), ...digits])] } : { last4: digits[0], alsoLast4: digits.length > 1 ? digits.slice(1) : into.data.alsoLast4 } }, 'user');
+  setBalance(os, intoId, figure, now);
   os.records.delete(fromId, 'user');
   return () => {
     os.records.restore(fromId, 'user');
     for (const m of moved) os.records.update(m.id, { data: { [m.field]: fromId } }, 'user');
-    os.records.update(intoId, { data: before }, 'user');
+    os.records.update(intoId, { data: { ...before, ...known } }, 'user');
   };
 }
 

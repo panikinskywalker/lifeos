@@ -133,6 +133,8 @@ describe('Upload a statement', () => {
     const real = os.records.create<AccountData>({ object: 'account', title: 'HSBC', data: { kind: 'bank', institution: 'HSBC', last4: '3006', currency: 'INR', openingBalance: 0, knownBalance: 163424.4, knownOn: '2026-11-16', knownAt: Date.parse('2026-11-16T15:00:00') } as AccountData });
     const copy = os.records.create<AccountData>({ object: 'account', title: 'HSBC ••355', data: { kind: 'bank', institution: 'HSBC', last4: '355', currency: 'INR', openingBalance: 0, knownBalance: 296958 } as AccountData });
     const tx = os.records.create({ object: 'transaction', title: 'Swiggy', data: { amount: 300, kind: 'expense', category: 'food', date: '2026-11-10', accountId: copy.id } });
+    // The salary the bank's figure already holds: on the copy, heard after that figure was read.
+    os.records.create({ object: 'transaction', title: 'Tech Uniapps', data: { amount: 196958, kind: 'income', category: 'salary', date: '2026-11-16', accountId: copy.id } });
     const undo = mergeAccount(os, copy.id, real.id);
     expect(os.records.get(copy.id)).toBeUndefined();
     expect((os.records.get(tx.id)!.data as { accountId: string }).accountId).toBe(real.id);

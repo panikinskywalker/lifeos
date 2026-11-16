@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.113 · 17 Nov 2026
+
+**A merge keeps the real account's balance.** Merging a copy added its payments on top of the real account's figure (HSBC showed ₹3,60,382 instead of ₹1,63,424). The real account's figure is now kept as it was; the copy's payments join its history only.
+
 ## v0.0.112 · 17 Nov 2026
 
 **Merge a copied account.** An account's page has *This is a copy of another account*: its payments move to the real one, which keeps its balance and learns the copy's digits, and the copy goes, with Undo.
