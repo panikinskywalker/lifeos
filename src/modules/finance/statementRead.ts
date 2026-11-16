@@ -67,7 +67,7 @@ export const STATEMENT_SCHEMA = { type: 'object', additionalProperties: false, r
 
 const SYSTEM = `You read a statement or a screenshot from an Indian bank, credit card, mutual fund app (CAMS, KFintech, Groww, Zerodha Coin, Kuvera) or broker. Answer with JSON only.
 accounts: each bank account or credit card shown. bank: the bank's short name (SBI, ICICI, HDFC, Axis). last4: its last 4 digits, "" if not shown. kind: bank or credit. For a bank account, balance is the closing or available balance; for a card, owed is the total amount due (or outstanding), minDue the minimum due and dueOn the payment due date. asOf: the statement or screenshot date. Dates YYYY-MM-DD, "" if not shown; numbers 0 when not shown.
-holdings: each fund, stock or deposit with its name as printed, units, current value, amount invested, and a monthly SIP amount and its day of the month if one is shown (0 if not).
+holdings: each fund, stock or deposit with its name as printed, units, current value, amount invested, and a monthly SIP amount and its day of the month if one is shown (0 if not). On a SIP screen (Groww, Coin, Kuvera, a CAMS mandate) the day is the day of the month of the next instalment date ("Next SIP 5 Dec" is 5); a fund shown only with its SIP still counts, with value and invested 0.
 Leave out anything you cannot read clearly. Never invent figures.`;
 
 export function statementAsk(): Omit<PhotoAsk, 'image'> {
@@ -160,7 +160,7 @@ export function proposeChanges(os: LifeOSContext, read: StatementRead, now = Dat
       } });
     } else {
       out.push({ id: `h${k}`, label: `New holding: ${h.name}`, detail: bits, apply: () => {
-        const rec = os.records.create<InvestmentData>({ object: 'investment', title: h.name, data: { instrument: 'mutual_fund', invested: h.invested || h.value, currency: 'INR', ...patch } as InvestmentData }, 'user');
+        const rec = os.records.create<InvestmentData>({ object: 'investment', title: h.name, status: 'active', data: { instrument: 'mutual_fund', invested: h.invested || h.value, currency: 'INR', ...patch } as InvestmentData }, 'user');
         return () => os.records.delete(rec.id, 'user');
       } });
     }

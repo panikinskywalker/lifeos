@@ -73,6 +73,22 @@ describe('Upload a statement', () => {
     expect(c.id).toBeTruthy();
   });
 
+  it('a SIP from a dashboard or SIP screenshot becomes the monthly SIP, on its day, for a new fund and a known one', () => {
+    const known = os.records.create<InvestmentData>({ object: 'investment', title: 'Parag Parikh Flexi Cap', status: 'active', data: { instrument: 'mutual_fund', invested: 540000 } as InvestmentData });
+    expect(os.cycles.forEntity(known.id)).toHaveLength(0);
+    const ps = proposeChanges(os, readStatement({ accounts: [], holdings: [
+      { name: 'Parag Parikh Flexi Cap Fund', units: 0, value: 0, invested: 0, sip: 5000, sipDay: 5 },
+      { name: 'Motilal Oswal Midcap Fund', units: 0, value: 0, invested: 0, sip: 3000, sipDay: 12 },
+    ] }));
+    ps.forEach((p) => p.apply());
+    const sipOf = (id: string) => os.cycles.forEntity(id).find((c) => c.template === 'investment.sip');
+    expect(sipOf(known.id)).toBeTruthy();
+    expect(new Date(sipOf(known.id)!.nextDueAt!).getDate()).toBe(5);
+    const fresh = os.records.query<InvestmentData>('investment').find((i) => i.title.startsWith('Motilal'))!;
+    expect(fresh.data.sip).toBe(3000);
+    expect(new Date(sipOf(fresh.id)!.nextDueAt!).getDate()).toBe(12);
+  });
+
   it('keeps only what makes sense from a reading', () => {
     expect(readStatement({ accounts: [{ bank: '', last4: '', kind: 'bank', balance: 1, owed: 0, minDue: 0, dueOn: 'soon', asOf: '' }], holdings: [{ name: 'X', units: 0, value: 0, invested: 0, sip: 0, sipDay: 0 }] })).toEqual({ accounts: [], holdings: [] });
   });

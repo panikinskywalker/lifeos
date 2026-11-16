@@ -1300,6 +1300,9 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   in their names) and lists each change, ticked: a bank's balance, what a card
   owes with its bill and due day, a fund's value, what went in and its SIP, or a
   new account, card or holding. Apply does the ticked ones, with Undo for all.
+  A SIP read from a dashboard or SIP screen (its day from the next instalment
+  date) sets the holding's SIP, so its monthly SIP cycle follows (Subscriptions ›
+  SIPs, Before payday, Upkeep); an account is matched by its last digits first.
 - **Privacy** (decided 11 Nov): money questions may go to any provider in the chain,
   OpenRouter's free models included, knowing some free providers log or train on
   what they are sent. Only the records needed leave (payee, amount, date,

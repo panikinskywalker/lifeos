@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.88 · 16 Nov 2026
+
+**A SIP screenshot sets up your SIP.** Upload a screenshot of your fund
+dashboard or SIP list (Groww, Coin, Kuvera, a CAMS mandate) and each SIP becomes
+the monthly SIP on that fund, on its day (taken from the next instalment date
+when that is what the screen shows): it then shows under Subscriptions › SIPs,
+in Before payday and in Upkeep. A fund the app does not know yet is added with
+its SIP.
+
 ## v0.0.87 · 16 Nov 2026
 
 **Uploads match the right card.** A statement or screenshot is matched by the
