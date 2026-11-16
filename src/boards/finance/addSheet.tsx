@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
 import { askWithPhoto } from '@core/brain';
+import { PHOTO_MODEL } from '@core/ai/brainModel';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
@@ -74,7 +75,7 @@ export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onC
       return setPhase({ at: 'failed', why: 'That photo is too big to send. Try a closer one.' });
     }
     setPhase({ at: 'reading' });
-    const model = (await os.device?.brain?.model()) ?? null;
+    const model = (await os.device?.brain?.model(PHOTO_MODEL)) ?? null;
     const mediaType = a.mimeType === 'image/png' || a.mimeType === 'image/webp' ? a.mimeType : 'image/jpeg';
     const res = await askWithPhoto(os, model, { ...billAsk(), image: { mediaType, data: a.base64 } });
     if (camera) dropFile(a.uri);

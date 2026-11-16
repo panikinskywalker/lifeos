@@ -11,9 +11,9 @@ import { syncReminderNotifications } from './notifySync';
  * the app opens. One pass at a time.
  */
 
-export async function brainModel(os: LifeOSContext): Promise<BrainModel | null> {
+export async function brainModel(os: LifeOSContext, id?: string): Promise<BrainModel | null> {
   const apiKey = await getProviderKey('claude').catch(() => null);
-  return apiKey ? createClaudeBrain({ apiKey, model: brainModelId(os) }) : null;
+  return apiKey ? createClaudeBrain({ apiKey, model: id ?? brainModelId(os) }) : null;
 }
 
 let running: Promise<PassResult> | null = null;

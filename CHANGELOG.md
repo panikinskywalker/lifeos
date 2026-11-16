@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.101 · 17 Nov 2026
+
+**Bills, statements and the fridge are read by Haiku.** A snapped or attached
+bill, an uploaded statement and Snap the fridge now go to Claude Haiku 5.5,
+whatever model the brain uses for its other work: quicker and cheaper.
+
 ## v0.0.100 · 17 Nov 2026
 
 **A forex card in several currencies.** Set balance on a forex card asks what

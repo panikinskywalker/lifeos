@@ -213,7 +213,8 @@ export interface DeviceBridge {
    * a time with the scheduled ones. Boards reach it here, never platform code.
    */
   brain?: {
-    model(): Promise<BrainModel | null>;
+    /** The brain's model, or another one by id (a photo is read by `PHOTO_MODEL`). */
+    model(id?: string): Promise<BrainModel | null>;
     pass(why: string): Promise<PassResult>;
   };
   /**

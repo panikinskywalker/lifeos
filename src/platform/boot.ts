@@ -62,7 +62,7 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     },
   });
   // The brain's Claude for boards (Snap the fridge, Another idea): the saved key, passes one at a time.
-  const brain = { model: () => brainModel(os), pass: (why?: string) => runBrainPass(os, 'manual', why) };
+  const brain = { model: (id?: string) => brainModel(os, id), pass: (why?: string) => runBrainPass(os, 'manual', why) };
   // The demo reads nothing from the phone, and with no secrets Turf web and Notion stay switched off.
   os.device = demo ? { folders: demoFolders, brain } : { ...deviceBridge(os), brain, agent: () => buildAgentFromSettings(os), claudeKey: () => getProviderKey('claude').catch(() => null) };
   // The automations' Ask Claude step: the brain's key and model (R10).

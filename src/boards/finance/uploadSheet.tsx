@@ -4,6 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
 import { askWithPhoto } from '@core/brain';
+import { PHOTO_MODEL } from '@core/ai/brainModel';
 import type { BrainImage } from '@core/brain/model';
 import { useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -61,7 +62,7 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
     const mediaType = typeOf(data) ?? (file.mimeType === 'application/pdf' ? 'application/pdf' : 'image/jpeg');
     const limit = mediaType === 'application/pdf' ? MAX_BASE64 : MAX_IMAGE_BASE64;
     if (data.length > limit) return setPhase({ at: 'failed', why: mediaType === 'application/pdf' ? 'That PDF is too big to send. Try the statement for one month.' : 'That image is too big to send. Crop it to the part with the balances, or take a smaller screenshot.' });
-    const model = (await os.device?.brain?.model()) ?? null;
+    const model = (await os.device?.brain?.model(PHOTO_MODEL)) ?? null;
     const res = await askWithPhoto(os, model, { ...statementAsk(), image: { mediaType, data } });
     if (!res.ok) return setPhase({ at: 'failed', why: `${WHY[res.note] ?? WHY.error!}${res.note === 'error' && res.error ? ` (${res.error.slice(0, 160)})` : ''}` });
     const proposals = proposeChanges(os, readStatement(res.answer));

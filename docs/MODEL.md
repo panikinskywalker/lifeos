@@ -1313,6 +1313,10 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   A SIP read from a dashboard or SIP screen (its day from the next instalment
   date) sets the holding's SIP, so its monthly SIP cycle follows (Subscriptions ›
   SIPs, Before payday, Upkeep); an account is matched by its last digits first.
+- **Photos and PDFs are read by Haiku** (17 Nov, Rutvij): a snapped or attached
+  bill, an uploaded statement and Snap the fridge go to Claude Haiku 5.5
+  (`PHOTO_MODEL`), whatever model the brain's other passes use; same key, budget
+  and Sent to Claude log.
 - **Privacy** (decided 11 Nov): money questions may go to any provider in the chain,
   OpenRouter's free models included, knowing some free providers log or train on
   what they are sent. Only the records needed leave (payee, amount, date,

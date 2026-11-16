@@ -19,6 +19,8 @@ export const BRAIN_MODELS = [
   { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
 ] as const;
 export const DEFAULT_BRAIN_MODEL = 'claude-opus-5-5';
+/** Reading a photo or PDF you sent (a bill, a statement, the fridge) goes to Haiku, whatever the brain's model (17 Nov, Rutvij). */
+export const PHOTO_MODEL = 'claude-haiku-5-5';
 
 export interface ClaudeBrainOptions {
   apiKey: string;
