@@ -38,6 +38,7 @@ import { Button, DateField, EmptyState, FilterChip, Icon, NumberField, RowItem, 
 import { usePull } from './useTurfSync';
 import { Face, SyncPill } from './teams';
 import { Pop } from './motion';
+import { BellButton } from './bell-button';
 
 /**
  * The Turf board's match screens (docs/MODEL.md layer 3, *Match*; R9c.3):
@@ -180,7 +181,7 @@ export function TurfMatchForm({ ctx, params }: Props) {
   );
   const divider = <View style={{ height: 1, backgroundColor: HAIR }} />;
   return (
-    <Screen title={editing ? 'Edit match' : 'New match'} subtitle="Turf" onBack={back} right={<SyncPill />}>
+    <Screen title={editing ? 'Edit match' : 'New match'} subtitle="Turf" onBack={back} right={<><SyncPill /><BellButton /></>}>
       {card(
         'Venue',
         <>

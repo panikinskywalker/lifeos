@@ -16,6 +16,7 @@ import { Face, SyncPill } from './teams';
 import { CopyShare } from './switcher';
 import { type Props, shortDay, useBack } from './common';
 import { availabilityColour } from './players';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir 6 Player profile (TF-Player), 6b the stats card (TF-StatsCard)
@@ -596,7 +597,7 @@ export function TurfStatsCard({ params }: Props) {
   );
 
   return (
-    <Screen title="Stats card" subtitle={`Player · ${p.name}`} onBack={back} right={<SyncPill />}>
+    <Screen title="Stats card" subtitle={`Player · ${p.name}`} onBack={back} right={<><SyncPill /><BellButton /></>}>
       <View style={{ padding: 18, gap: 12, borderRadius: 28, backgroundColor: blocks.lime }}>
         <OnBlock>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -802,7 +803,7 @@ export function TurfPlayerEdit({ params }: Props) {
   const toggleSwatch = (name: string) => set('kitColors', (swatchOn(name) ? list(v.kitColors).filter((x) => x.toLowerCase() !== name.toLowerCase()) : [...list(v.kitColors), name]).join(', ') || undefined);
 
   return (
-    <Screen title={id ? 'Edit player' : 'Add player'} subtitle="Turf › Players" onBack={back} right={<SyncPill />} contentStyle={{ gap: 14 }}>
+    <Screen title={id ? 'Edit player' : 'Add player'} subtitle="Turf › Players" onBack={back} right={<><SyncPill /><BellButton /></>} contentStyle={{ gap: 14 }}>
       <Field label="Name">
         <TextField value={v.name} onChange={(s) => set('name', s)} placeholder="As the squad calls them" autoCapitalize="words" error={error ?? undefined} />
       </Field>

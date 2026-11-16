@@ -14,6 +14,19 @@ import type { PlayerProfileData } from './types';
 
 export const SETTING_SUBMISSIONS = 'turf.submissions';
 export const SETTING_AUDIT = 'turf.audit';
+export const SETTING_SEASONS = 'turf.seasons';
+
+/** Turf web's seasons (its migration 0030), oldest first: "Monsoon 2026" from a day, to a day or still running. */
+export interface TurfSeason {
+  id: string;
+  name: string;
+  startsOn: string;
+  endsOn: string | null;
+}
+const todayIndia = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+/** Seasons that have started, and the one running today (Turf web's startedSeasons / currentSeason). */
+export const startedSeasons = (os: LifeOSContext) => os.settings.get<TurfSeason[]>(SETTING_SEASONS, []).filter((s) => s.startsOn <= todayIndia());
+export const currentSeason = (seasons: TurfSeason[]) => seasons.find((s) => s.startsOn <= todayIndia() && (!s.endsOn || s.endsOn >= todayIndia())) ?? null;
 const AUDIT_MAX = 300;
 
 export interface TurfSubmission {
@@ -128,6 +141,14 @@ export function applyInbox(os: LifeOSContext, page: { tables: Partial<Record<str
     delete subs[d.key];
   }
   os.settings.set(SETTING_SUBMISSIONS, subs);
+
+  const seasons = new Map(os.settings.get<TurfSeason[]>(SETTING_SEASONS, []).map((x) => [x.id, x]));
+  for (const r of page.tables.seasons ?? []) {
+    const id = String(r.id);
+    seasons.set(id, { id, name: str(r, 'name') ?? 'Season', startsOn: str(r, 'starts_on') ?? '', endsOn: str(r, 'ends_on') });
+  }
+  for (const d of page.deleted) if (d.table === 'seasons') seasons.delete(d.key);
+  os.settings.set(SETTING_SEASONS, [...seasons.values()].sort((a, b) => a.startsOn.localeCompare(b.startsOn)));
 
   const audit = os.settings.get<AuditEntry[]>(SETTING_AUDIT, []);
   const byId = new Map(audit.map((a) => [a.id, a]));

@@ -17,7 +17,7 @@ import { NotConnected, type Props, TINT, useBack } from './common';
 import { CopyAllRow, Disc, DueRows, HeaderRight, PillButton, SectionHead, StatTile, TurfCard, day, todayIso } from './dues';
 import { SmsAskCard, SmsPaidCard, SubmissionCard, answeredAsks } from './checkcards';
 import { FlipCard, Pulse } from './motion';
-import { BellButton } from './bell';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir 1 · Home (TF-Home): the section switcher, money at a glance,

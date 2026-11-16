@@ -9,6 +9,7 @@ import { ChipRow, EmptyState, FilterChip, Icon, IconButton, Screen, Segmented, T
 import { usePull } from './useTurfSync';
 import { Face, SyncPill } from './teams';
 import { NotConnected, type Props, useBack } from './common';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir 5a Players · Squad (TF-Squad): the section switcher, Squad /
@@ -67,6 +68,7 @@ export function TurfPlayers({ ctx }: Props) {
       right={
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <SyncPill />
+          <BellButton />
           <IconButton icon="plus" accessibilityLabel="Add player" filled onPress={() => router.push('/board/turf/player-edit' as never)} />
         </View>
       }

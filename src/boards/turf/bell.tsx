@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { allGames, decideTurf, fetchTurfInbox, rupees, type TurfInbox } from '@modules/games';
 import { useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Icon, IconButton, NumberField, Screen, Text, useToast } from '@ui/kit';
+import { Icon, NumberField, Screen, Text, useToast } from '@ui/kit';
+import { sawCount } from './bell-button';
 import { usePull } from './useTurfSync';
 import { Face } from './teams';
 import { type Props, shortDay, useBack } from './common';
@@ -31,7 +32,9 @@ function useInbox() {
   const load = useCallback(async () => {
     setBusy(true);
     try {
-      setInbox(await fetchTurfInbox(os));
+      const fresh = await fetchTurfInbox(os);
+      sawCount(fresh.count);
+      setInbox(fresh);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -42,36 +45,6 @@ function useInbox() {
     void load();
   }, [load]);
   return { inbox, error, busy, load };
-}
-
-/** The bell on Turf's Home: a count of what waits for you, every minute while it's on screen. */
-export function BellButton() {
-  const os = useOS();
-  const router = useRouter();
-  const t = useTheme();
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    let live = true;
-    const look = () => void fetchTurfInbox(os).then((i) => live && setCount(i.count), () => {});
-    look();
-    const timer = setInterval(look, 60_000);
-    return () => {
-      live = false;
-      clearInterval(timer);
-    };
-  }, [os]);
-  return (
-    <View>
-      <IconButton icon="bell" filled accessibilityLabel={count ? `${count} to check` : 'Nothing to check'} onPress={() => router.push('/board/turf/bell' as never)} />
-      {count ? (
-        <View pointerEvents="none" style={{ position: 'absolute', top: -2, right: -2, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, backgroundColor: t.c.alert.coral, alignItems: 'center', justifyContent: 'center' }}>
-          <Text variant="labelMicro" color="#F5F5F7" style={{ fontWeight: '800' }}>
-            {String(count)}
-          </Text>
-        </View>
-      ) : null}
-    </View>
-  );
 }
 
 export function TurfBell(_: Props) {

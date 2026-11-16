@@ -11,6 +11,7 @@ import { Button, FilterChip, Icon, Screen, Segmented, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Crest, Display, Face, Mono, SyncPill } from './teams';
 import { NotConnected, type Props, useBack } from './common';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir, Games (TF-MatchCentre, TF-MatchHistory): Match centre — the
@@ -134,7 +135,7 @@ export function TurfGames({ ctx }: Props) {
   const { rows } = useMatches();
   const f = ctx.format.currency;
   return (
-    <Screen title="Turf" subtitle="Browse" onBack={back} right={<SyncPill />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Turf" subtitle="Browse" onBack={back} right={<><SyncPill /><BellButton /></>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <Segmented
         options={[
           { value: 'centre', label: 'Match centre' },

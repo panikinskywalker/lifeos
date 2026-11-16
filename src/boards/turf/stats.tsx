@@ -13,6 +13,7 @@ import { ScoreSheet } from './match';
 import { Crest, Display, Face, Mono, SyncPill } from './teams';
 import { type Props, useBack } from './common';
 import { SearchBox, found } from './search';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir, 4c Log stats (TF-MatchStats): every player's goals, assists,
@@ -118,7 +119,7 @@ export function TurfLogStats({ params }: Props) {
     ...(d.apps.some((a) => !a.data.team) ? [{ key: null, kit: null }] : []),
   ];
   return (
-    <Screen title="Log stats" subtitle={`Match · ${format(new Date(`${g.date}T12:00:00`), 'EEE d MMM')}`} onBack={back} right={<SyncPill />}>
+    <Screen title="Log stats" subtitle={`Match · ${format(new Date(`${g.date}T12:00:00`), 'EEE d MMM')}`} onBack={back} right={<><SyncPill /><BellButton /></>}>
       <View style={{ padding: 16, gap: 10, borderRadius: 28, backgroundColor: t.c.bg.tile }}>
         <View style={{ alignSelf: 'flex-start', height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: played ? LIME : DIM }}>
           <Text variant="labelMicro" color={played ? INK : 'secondary'}>

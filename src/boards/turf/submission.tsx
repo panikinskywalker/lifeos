@@ -10,6 +10,7 @@ import { usePull } from './useTurfSync';
 import { Face } from './teams';
 import { type Props, useBack } from './common';
 import { HeaderRight, PillButton, TurfCard } from './dues';
+import { BellButton } from './bell-button';
 
 /**
  * To check · Profile submission (TF-Submission): what a friend has now beside
@@ -207,7 +208,7 @@ export function TurfSubmission({ params }: Props) {
     );
   }
   return (
-    <Screen title="Submission" subtitle="Turf · To check · profile" onBack={back} right={<HeaderRight />}>
+    <Screen title="Submission" subtitle="Turf · To check · profile" onBack={back} right={<HeaderRight><BellButton /></HeaderRight>}>
       {body}
     </Screen>
   );

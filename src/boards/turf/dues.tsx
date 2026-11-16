@@ -13,6 +13,7 @@ import { Face, Mono, SyncPill } from './teams';
 import { useCopyShare } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
 import { SearchBox, found } from './search';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir money screens: 1b Dues (TF-Dues) and 1c Audit log (TF-Audit),
@@ -484,7 +485,7 @@ export function TurfDues(_props: Props) {
     );
   }
   return (
-    <Screen title="Dues" subtitle="Turf · Home" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Dues" subtitle="Turf · Home" onBack={back} right={<HeaderRight><BellButton /></HeaderRight>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       {body}
     </Screen>
   );
@@ -571,7 +572,7 @@ export function TurfAudit(_props: Props) {
     byDay.set(d, [...(byDay.get(d) ?? []), e]);
   }
   return (
-    <Screen title="Audit log" subtitle="Turf · Dues" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Audit log" subtitle="Turf · Dues" onBack={back} right={<HeaderRight><BellButton /></HeaderRight>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <Text variant="caption" color="tertiary">
         Money only: payments, marked paid and undone, credit, newest first. Goals, sides and edits are in each match’s history.
       </Text>

@@ -211,11 +211,11 @@ export async function decideTurf(os: LifeOSContext, what: 'paid' | 'stats' | 'jo
 }
 
 /** Sync from the last change number (0: everything). Returns what the page changed. */
-const SETTING_FULL_0029 = 'turf.full0029';
+const SETTING_FULL_0029 = 'turf.full0030';
 
 export async function syncTurf(os: LifeOSContext, doFetch: typeof fetch = fetch) {
-  // Once: from the start, for the votes, kit wishes and partner picks Turf web began sending (its
-  // migration 0029); an older build had already moved past them.
+  // Once: from the start, for what Turf web began sending (votes, kit wishes and partner picks in its
+  // migration 0029, seasons in 0030); an older build had already moved past them.
   const full = !os.settings.get<boolean>(SETTING_FULL_0029, false);
   const since = full ? 0 : os.settings.get<number>(SETTING_REV, 0);
   const r = applyTurfSync(os, await fetchTurfSync(os, since, doFetch));

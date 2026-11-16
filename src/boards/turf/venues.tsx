@@ -12,6 +12,7 @@ import { NotConnectedCard, SyncBanners, TurfSyncPill, useTurfStatus } from './st
 import { shortDay, useBack, type Props } from './common';
 import { SearchBox, found } from './search';
 import { useTurfPhoto } from './teams';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir 7 Venues (TF-Venues): your turfs with their defaults — a card
@@ -168,7 +169,7 @@ export function TurfVenues({ ctx }: Props) {
   const [q, setQ] = useState('');
   const shown = venues.filter((row) => found(q, row.v.title, row.area));
   return (
-    <Screen title="Turf" subtitle="Browse" onBack={back} right={<TurfSyncPill busy={busy} />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Turf" subtitle="Browse" onBack={back} right={<><TurfSyncPill busy={busy} /><BellButton /></>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <SyncBanners onRetry={() => void pull()} />
       {!venues.length && status.kind === 'off' ? (
         <NotConnectedCard />

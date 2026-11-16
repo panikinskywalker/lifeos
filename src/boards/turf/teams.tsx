@@ -13,6 +13,7 @@ import { displayFont, monoFonts } from '@ui/theme/tokens';
 import { Button, ChipRow, EmptyState, FilterChip, Icon, Screen, Sheet, Text, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { SearchBox, found } from './search';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir team screens (Claude Design canvas, page *Turf · Noir*):
@@ -418,7 +419,7 @@ export function TurfPickTeams({ ctx, params }: Props) {
   );
   const nameFor = (id: string) => d.players.find((p) => p.id === id);
   return (
-    <Screen title="Pick teams" subtitle={`Match · ${format(new Date(`${d.g.data.date}T12:00:00`), 'EEE d MMM')}`} onBack={back} right={<SyncPill />}>
+    <Screen title="Pick teams" subtitle={`Match · ${format(new Date(`${d.g.data.date}T12:00:00`), 'EEE d MMM')}`} onBack={back} right={<><SyncPill /><BellButton /></>}>
       <View style={{ backgroundColor: t.c.bg.tile, borderRadius: 28, padding: 16, gap: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           {sideHead('A')}

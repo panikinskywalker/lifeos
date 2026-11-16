@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, fetchTurfInbox, decideTurf, payPart, owedOn, autoPick, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, fetchTurfInbox, decideTurf, payPart, owedOn, autoPick, startedSeasons, currentSeason, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -248,6 +248,20 @@ describe('votes, kit wishes and partner picks from Turf web (its migration 0029)
     applyTurfSync(os, page({}, [{ table: 'potm_votes', key: 'g_sat:p_karan', rev: 42 }, { table: 'player_partners', key: 'p_karan:p_priya', rev: 42 }]));
     expect(game('2026-10-17').data.potmVotes).toBeUndefined();
     expect(karan().data.partners).toBeUndefined();
+  });
+
+  it('keeps Turf web’s seasons for Leaders: started ones, and the one running now', () => {
+    const page = (tables: Record<string, unknown[]>, deleted: Array<{ table: string; key: string; rev: number }> = []) => ({ since: 40, rev: 41, tables, deleted }) as unknown as TurfSyncPage;
+    applyTurfSync(os, page({ seasons: [
+      { id: 's1', name: 'Summer 2026', starts_on: '2026-03-01', ends_on: '2026-05-31' },
+      { id: 's2', name: 'Monsoon 2026', starts_on: '2026-06-01', ends_on: null },
+      { id: 's3', name: 'Winter 2099', starts_on: '2099-12-01', ends_on: null },
+    ] }));
+    const started = startedSeasons(os);
+    expect(started.map((x) => x.name)).toEqual(['Summer 2026', 'Monsoon 2026']);
+    expect(currentSeason(started)?.name).toBe('Monsoon 2026');
+    applyTurfSync(os, page({}, [{ table: 'seasons', key: 's1', rev: 42 }]));
+    expect(startedSeasons(os).map((x) => x.name)).toEqual(['Monsoon 2026']);
   });
 });
 

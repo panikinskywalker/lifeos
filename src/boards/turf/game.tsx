@@ -17,6 +17,7 @@ import { SearchBox, found } from './search';
 import { Crest, Display, Face, GoalBall, Mono, Pitch, SideLists, SyncPill, pitchPlayers } from './teams';
 import { CopyShare, useCopyShare } from './switcher';
 import { type Props, TINT, shortDay, useBack } from './common';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir, the match (TF-MatchTeams, TF-MatchChecklist, TF-PaySheet): the
@@ -153,6 +154,7 @@ export function TurfGame({ ctx, params }: Props) {
       right={
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <SyncPill />
+          <BellButton />
           <IconButton icon="edit" accessibilityLabel="Edit match" filled onPress={() => router.push(`/board/turf/match?game=${d.game.id}` as never)} />
         </View>
       }

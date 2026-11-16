@@ -7,6 +7,18 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.92 · 16 Nov 2026
+
+**Turf's Leaders is Turf web's Leaders.** The page is rebuilt from Turf web's,
+piece for piece: the season picker ("Monsoon 2026 · now", each past season, All
+time; Turf web now sends its seasons), the thirteen tables, the position
+control, search, the table's title and how it ranks, the podium (crown, medal
+rings, steps 2 · 1 · 3), the table from 4th with ▲▼ since the last match and
+form, Not ranked yet, and Share. Best overall opens it, as on Turf web.
+
+**The bell is on every Turf screen**, as on Turf web's headers; all of them
+share one look a minute.
+
 ## v0.0.91 · 16 Nov 2026
 
 **Ask Money calls your cards by name.** The agent writes a card's ref and the
