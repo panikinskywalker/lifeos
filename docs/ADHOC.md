@@ -19,6 +19,7 @@ What the app couldn't handle goes through a nightly Claude run and comes back fi
 A friendly "LifeOS import" file (records + links, not raw backup rows) that goes through normal filing, opened via Share → LifeOS or the file picker. The results file above is a superset; build them together.
 
 ## Offered, waiting on a decision
+- **Splitwise's group screens in LifeOS** (17 Nov, Rutvij: "we will find a way to integrate this in the future"): groups, members and their balances as Splitwise shows them, beyond what Who owes whom, Turf and trips cover. Needs its own design.
 
 - **Ideas from broke** (15 Nov; an open-source Rocket Money clone, github.com/nextwork-projects/broke, read only, nothing copied):
   - *Suggested budget:* from your history, a limit per category and "this leaves ₹X to save" against your usual income; one tap **Use these**. Ours has targets and a monthly line but no suggestion.

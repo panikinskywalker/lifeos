@@ -1809,6 +1809,39 @@ Component gallery (dev).
   *Instrument* (Money · live: the last 7 days in dots, against the 7 before), the
   week bars staying the default.
 
+### Splitwise and settling up (agreed 17 Nov, Rutvij; designs first)
+From Splitware (a Splitwise client Rutvij uses, read 17 Nov): sign in to Splitwise
+inside the app, then read and write Splitwise as you. In the order to build, each
+drawn first on the Money design canvas (*Splitwise* row):
+1. **Connect Splitwise** (Money's grid menu and You › Agent): Splitwise's own
+   sign-in page inside LifeOS (a WebView: one new app build); the session stays
+   in the phone's cookie store, which LifeOS's calls share; Sign out clears it.
+   Calls go to Splitwise's API as the website does (the session, with its CSRF
+   token for writes).
+2. **Link people once**: Splitwise friends matched to People by name or email,
+   each confirmed; only linked people sync. Their Splitwise balance shows beside
+   LifeOS's on their page, so a difference stands out.
+3. **Shares go to Splitwise**: a Debt for a linked person (a Turf share, a trip
+   split, a split payment) becomes a Splitwise expense (you paid, they owe their
+   share; same description and date); the Debt keeps its Splitwise id, so delete
+   and Undo remove it there too. A Turf group or trip may map to a Splitwise group.
+4. **Settled, both ways**: money from a linked person in a bank text settles their
+   Debts in LifeOS and records the payment on Splitwise; a payment they record on
+   Splitwise settles them in LifeOS at the next sync.
+5. **Pay by UPI** from Settle up: the UPI app opens with the friend's UPI ID,
+   amount and note (`upi://pay`); a friend's UPI ID is kept on their Person, on
+   the phone only.
+6. **Type an expense with a split** in Money's +: "1200 dinner with Arjun and
+   Priya, Arjun paid" (Haiku) fills the payment, who paid and each share, and goes
+   to Splitwise for linked people.
+7. **Remind**: on someone who owes you, a short friendly message with the amount
+   (Haiku), ready to send on WhatsApp.
+Bills, statements and fund screens are read by Haiku (bills already; statements
+back from Sonnet once it has room). Left out: Splitware's UPI directory (it sends
+your email and UPI ID to a third party) and a copy of Splitwise's group screens
+(parked in ADHOC). Only the linked people's Debts go to Splitwise: their
+Splitwise id, amount, description and date.
+
 ## 6. Milestones — proposed 4 Oct
 
 Thin slices, each usable on the phone when done. `docs/MILESTONES.md` M1–M4 stay
