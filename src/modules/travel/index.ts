@@ -16,6 +16,8 @@ export * from './stops';
 export * from './importApp';
 export * from './booked';
 export * from './outings';
+export * from './money';
+export * from './prep';
 export { travelBrain, AIRLINE_SITES } from './brain';
 export { parseFlight, parseStay, type ParsedFlight, type ParsedStay } from './filing/bookings';
 
@@ -46,6 +48,11 @@ export const travelModule: ModuleManifest = {
       foldStops(os);
       os.settings.set('travel.foldedR7g1', true);
     }
+    // R7g slice 5, once: tasks linked to a trip by Plan a trip before the Trip Field existed get it, so an edit keeps the Link.
+    if (!os.settings.get<boolean>('travel.foldedR7g5', false) && os.registry.objects.has('task')) {
+      for (const t of trips(os)) for (const r of os.links.forEntity(t.id, 'trip')) if (r.direction === 'in' && r.other.object === 'task' && !os.records.get<{ tripId?: string }>(r.other.id)?.data.tripId) os.records.update(r.other.id, { data: { tripId: t.id } }, 'assistant');
+      os.settings.set('travel.foldedR7g5', true);
+    }
     // A trip saved without a Place gets the one its destination names.
     bus.on('entity.created', ({ entity }) => {
       if (entity.object === 'trip') linkTripPlace(os, entity as unknown as ObjectRecord<TripData>);
@@ -65,8 +72,8 @@ export const travelModule: ModuleManifest = {
         const made: string[] = [];
         if (os.registry.objects.has('task')) {
           for (const t of i.todos ?? []) {
-            const task = os.records.create({ object: 'task', title: t, data: { priority: 'medium', dueDate: i.startDate }, status: 'todo' }, 'assistant');
-            os.links.link(task.id, trip.id, 'trip', {}, 'assistant');
+            // The Trip Field makes the Link, so editing the task later keeps it (R7g slice 5).
+            const task = os.records.create({ object: 'task', title: t, data: { priority: 'medium', dueDate: i.startDate, tripId: trip.id, section: 'to-do' }, status: 'todo' }, 'assistant');
             made.push(task.id);
           }
         }

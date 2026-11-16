@@ -718,6 +718,9 @@ Derived, not Fields:
 Finance's split today becomes a Bill: the fold (once) makes a Bill from each
 Transaction with a split, linked to it (*same as*), and its split Debts go,
 since balances are derived from Bills. Loans, and Turf's shares, stay Debts.
+*Not folded yet (16 Nov):* Bills are built and a person's balance and Settle up
+add them to the Debts; the fold and switching finance's split to make Bills
+are a follow-up.
 
 **Money on a trip, derived** (as the Japan app's ledger, one source of truth
 for Overview, Money and Recap):
@@ -1678,16 +1681,23 @@ screens checked on the phone → overrides only where the default is wrong)
   - [x] **3. Things to do.** *Built 16 Nov (no migration; see `docs/handover/r7g-3-things.md`).* Thing to do; a stop's things (All · Planned · Want to · Ideas · Free; how busy,
     quietest time, Google Maps); events on the route (festivals and what to be aware of: closures, holidays,
     crowds, weather) with how sure and the source, and the copilot finding them for each stop's dates.
-  - [ ] **4. Bill and money on a trip.** Bill in finance (Splitwise's payers and five ways to split, the ₹ value
-    fixed, part payments toward a booking, a payback between any two, Simplify debts on the Group) and the fold
-    of today's splits; the trip's ledger (paid · booked · estimates), each person's projected against Budget
-    each, Daily allowance, Rate, where the money goes, the journeys table, cost by day, the insights in code;
-    Log a spend; Split a receipt (the photo read through the brain's photo path, items assigned by tapping
-    faces); a Bill's page showing how it split (`JP-Bill`); Settle up (everyone's balance, who owes whom, not
-    in Settle up yet); Pay back.
-  - [ ] **5. Prep.** The checklist as the trip's Tasks with Section, its filters, the notes as alerts, Ready to
-    fly; Docs (the shelf from Documents and the documents Tasks, the viewer, the emergency card by country);
-    R7d's packing moved under Prep with the departure-day check.
+  - [x] **4. Bill and money on a trip.** *Built 16 Nov (no migration; see `docs/handover/r7g-4-5-money-prep.md`).*
+    Bill in finance (Splitwise's payers and five ways to split, the ₹ value
+    fixed, part payments toward a booking, a payback between any two, Simplify debts on the Group); the split
+    arithmetic in core (`src/core/money/split.ts`, used by finance and travel alike); the trip's ledger (paid ·
+    booked · estimates), each person's projected against Budget each, Daily allowance, Rate (edit it), where
+    the money goes, the journeys table; Log a spend; Split a receipt (the photo read through the brain's photo
+    path, items assigned by tapping names); a Bill's page showing how it split (`JP-Bill`), edit and delete with
+    Undo; Settle up (everyone's balance, who owes whom, not in Settle up yet with Add); Pay back. On the trip
+    page, spend against the budget is your projected share, and Money shows your balance. *Still to do:* the
+    fold of today's splits (finance's Debts stay as they are; balances and Settle up add the Bills on top, so
+    nothing counts twice), cost by day and the insights in code (slice 6), Remind on WhatsApp.
+  - [x] **5. Prep.** *Built 16 Nov (no migration; see `docs/handover/r7g-4-5-money-prep.md`).* The checklist as the
+    trip's Tasks with Trip and Section (a Task gains both, and a hidden source key), its filters, the notes as
+    alerts (Tasks in *notes* by priority, Handled ticks them), Ready to fly by section, the departure-day check,
+    Add an item; Packing (the trip's packing Tasks, and R7d's Packing for clothes, a tap away); Docs (the shelf
+    from Documents and the documents Tasks, the emergency card by country with tap to call). Money and Prep sit
+    side by side on the trip page.
   - [ ] **6. Overview, Today and Recap.** The stage stepper, Needs attention, Coming up with the deadline rail,
     the line as nights, stays as station boards, money, stamps, weather by stop (normals), Ready to fly, your
     balance; Today in the morning (leave-by countdown, the next train, last connection, the day, show the

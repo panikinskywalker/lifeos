@@ -54,10 +54,10 @@ export function ImportTripScreen({ ctx }: { ctx: LifeOSContext; params: Record<s
     }
   };
 
-  const count = (k: 'places' | 'bookings' | 'days') => snap?.[k]?.length ?? 0;
+  const count = (k: 'places' | 'bookings' | 'days' | 'expenses' | 'checklist' | 'alerts') => snap?.[k]?.length ?? 0;
   return (
     <Screen title="Import a trip" subtitle="From its own trip app" onBack={back} contentStyle={{ gap: 14 }}>
-      <Note icon="download">Pick the trip app’s export file. LifeOS brings in the trip, its stops, stays, flights and day plans; importing the same file again updates them. The file stays on this phone.</Note>
+      <Note icon="download">Pick the trip app’s export file. LifeOS brings in the trip, its stops, stays, flights, day plans, expenses, checklist and notes; importing the same file again updates them. The file stays on this phone.</Note>
       <Button title={snap ? 'Pick another file' : 'Pick the file'} icon="folder" variant={snap ? 'secondary' : 'primary'} onPress={pick} />
       {error ? <Text style={{ color: t.c.alert.coralText, paddingHorizontal: 4 }}>{error}</Text> : null}
       {snap ? (
@@ -65,7 +65,9 @@ export function ImportTripScreen({ ctx }: { ctx: LifeOSContext; params: Record<s
           <RowCard>
             <Row title={snap.destination} sub={datesLabel({ startDate: snap.meta.start, endDate: snap.meta.end })} />
             <Row title={plural(count('places'), 'place')} sub="Stops, ideas and airports" />
-            <Row title={plural(count('bookings'), 'booking')} sub="Stays and flights (their money comes later)" />
+            <Row title={plural(count('bookings'), 'booking')} sub="Stays and flights, with what is paid" />
+            {count('expenses') ? <Row title={plural(count('expenses'), 'expense')} sub="Into Settle up, split as they were" /> : null}
+            {count('checklist') || count('alerts') ? <Row title={`${plural(count('checklist'), 'checklist item')} · ${plural(count('alerts'), 'note')}`} sub="Into Prep" /> : null}
             <Row title={plural(count('days'), 'day plan')} sub="Kept on the trip, day by day" />
           </RowCard>
           {snap.meta.travellers?.length ? (
@@ -87,7 +89,7 @@ export function ImportTripScreen({ ctx }: { ctx: LifeOSContext; params: Record<s
       {done ? (
         <View style={{ gap: 10 }}>
           <RowCard>
-            <Row title={done.createdTrip ? 'A new trip' : 'The trip, updated'} sub={[plural(done.stops, 'stop'), plural(done.stays, 'stay'), plural(done.flights, 'flight'), done.days ? plural(done.days, 'day plan') : null].filter(Boolean).join(' · ')} />
+            <Row lines={3} title={done.createdTrip ? 'A new trip' : 'The trip, updated'} sub={[plural(done.stops, 'stop'), plural(done.stays, 'stay'), plural(done.flights, 'flight'), done.days ? plural(done.days, 'day plan') : null, done.bills ? plural(done.bills, 'expense') : null, done.tasks ? plural(done.tasks, 'checklist item') : null, done.notes ? plural(done.notes, 'note') : null].filter(Boolean).join(' · ')} />
           </RowCard>
           <Button title="Open the trip" icon="arrow-right" onPress={() => router.replace(`/entity/trip/${done.tripId}` as never)} />
         </View>

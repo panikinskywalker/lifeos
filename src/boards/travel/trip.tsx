@@ -11,9 +11,10 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks, monoFonts } from '@ui/theme/tokens';
 import { Icon, ProgressBar, Text, useToast, type IconName } from '@ui/kit';
 import { categoryOf } from '@modules/finance/types';
-import { addToTrip, backHome, daysToStart, hasPacked, linkedTo, spentWhileAway, stillPacked, tripBookings, tripDays, tripPhase, tripSpend, tripsTo, type Booking, type TripData } from '@modules/travel';
+import { addToTrip, backHome, byCategory, CATEGORY_LABEL, daysToStart, hasPacked, linkedTo, projectedOf, spentWhileAway, stillPacked, tripBookings, tripDays, tripLedger, tripPhase, tripSpend, tripsTo, type Booking, type TripData } from '@modules/travel';
 import { airlineBadge, Chip28, companions, Dash, datesLabel, dayOf, Disc, Face, firstName, GlassPill, HERO_GLOWS, longDates, plural, purposeLabel, Row, RowCard, routes, SectionHead, SerifName, shortDay, shortIso, statusLabel, timeOf, TripPhoto, weekdayShort, WHITE, whenShort } from './parts';
 import { LineCard } from './plan';
+import { MoneyPrepCard } from './prep';
 import { OnRouteCard } from './things';
 
 /**
@@ -63,7 +64,13 @@ export function TripPage({ entity, ctx, controls, say }: Props) {
       const parent = place ? (place.data as { parentId?: string }).parentId : undefined;
       const eventIds = new Set(events.map((e) => e.id));
       const accountOf = (id: string | undefined) => (id ? os.records.get(id)?.title ?? null : null);
-      const spend = tripSpend(os, trip, now);
+      // Spend against the budget: your projected share from the trip's ledger (bookings, Bills, estimates) once it has one, else the bank's Transactions linked to the trip.
+      const base = tripSpend(os, trip, now);
+      const ledger = tripLedger(os, trip, now);
+      const mine = projectedOf(ledger, 'me').total;
+      const spend = ledger.length
+        ? { ...base, projected: true, spent: Math.round(mine), left: base.budget != null ? base.budget - mine : null, over: base.budget != null && mine > base.budget, perDay: null, leftPerDay: null, byCategory: byCategory(ledger, 'me').map((c) => ({ category: CATEGORY_LABEL[c.cat] ?? c.cat, amount: c.inr })) }
+        : { ...base, projected: false };
       const docs = [...(os.registry.objects.has('document') ? linkedTo(os, trip.id, 'document') : []), ...(os.registry.objects.has('note') ? linkedTo(os, trip.id, 'note') : [])];
       return {
         trip,
@@ -176,7 +183,7 @@ export function TripPage({ entity, ctx, controls, say }: Props) {
           <View style={{ flexDirection: 'row', gap: 16 }}>
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 26, lineHeight: 30, fontWeight: '700', letterSpacing: -0.5, color: spend.over ? t.c.alert.coralText : t.c.fg.primary, fontVariant: ['tabular-nums'] }}>{money(spend.spent)}</Text>
-              <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, fontWeight: '500', color: t.c.fg.secondary, fontVariant: ['tabular-nums'] }}>{spend.budget != null ? `of ${money(spend.budget)} budget` : 'spent · no budget'}</Text>
+              <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, fontWeight: '500', color: t.c.fg.secondary, fontVariant: ['tabular-nums'] }}>{spend.projected ? (spend.budget != null ? `of ${money(spend.budget)}, yours` : 'projected, yours') : spend.budget != null ? `of ${money(spend.budget)} budget` : 'spent · no budget'}</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text numberOfLines={1} style={{ fontSize: 26, lineHeight: 30, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
@@ -197,7 +204,7 @@ export function TripPage({ entity, ctx, controls, say }: Props) {
                 {spend.byCategory.map((c, i) => (
                   <View key={c.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 26 }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
-                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, lineHeight: 18, fontWeight: '600' }}>{categoryOf(c.category)?.label ?? c.category}</Text>
+                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, lineHeight: 18, fontWeight: '600' }}>{spend.projected ? c.category : categoryOf(c.category)?.label ?? c.category}</Text>
                     <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{money(c.amount)}</Text>
                   </View>
                 ))}
@@ -213,6 +220,7 @@ export function TripPage({ entity, ctx, controls, say }: Props) {
         </View>
 
         <LineCard tripId={trip.id} />
+        <MoneyPrepCard tripId={trip.id} />
         <OnRouteCard tripId={trip.id} />
 
         <View style={{ gap: 10 }}>

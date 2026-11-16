@@ -37,6 +37,11 @@ export interface TaskData {
   estimateMin?: number;
   completedAt?: number;
   personIds?: string[];
+  /** Travel (R7g slice 5): the trip whose checklist it is on (word `trip`), and its section there. */
+  tripId?: string;
+  section?: string;
+  /** Hidden: where an imported task came from, so a second import updates it. */
+  sourceKey?: string;
 }
 
 export const taskType: ObjectDef<TaskData> = {
@@ -45,12 +50,14 @@ export const taskType: ObjectDef<TaskData> = {
   label: 'Task',
   labelPlural: 'Tasks',
   icon: 'checkmark.circle',
-  schema: z.object({ notes: z.string().optional(), priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'), dueDate: z.string().optional(), repeat: z.string().optional(), projectId: z.string().optional(), estimateMin: z.coerce.number().optional(), completedAt: z.number().optional(), personIds: z.array(z.string()).optional() }),
+  schema: z.object({ notes: z.string().optional(), priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'), dueDate: z.string().optional(), repeat: z.string().optional(), projectId: z.string().optional(), estimateMin: z.coerce.number().optional(), completedAt: z.number().optional(), personIds: z.array(z.string()).optional(), tripId: z.string().optional(), section: z.string().optional(), sourceKey: z.string().optional() }),
   fields: [
     { key: 'dueDate', label: 'Due', type: 'date', summary: true },
     { key: 'repeat', label: 'Repeats', type: 'select', options: REPEATS.map(({ value, label }) => ({ value, label })), description: 'Done moves Due on; the task stays open' },
     { key: 'priority', label: 'Priority', type: 'select', default: 'medium', options: PRIORITIES },
     { key: 'projectId', label: 'Project', type: 'link', linkTo: 'project', linkWord: 'project', summary: true },
+    { key: 'tripId', label: 'Trip', type: 'link', linkTo: 'trip', linkWord: 'trip', section: 'Trip' },
+    { key: 'section', label: 'On the checklist under', type: 'text', section: 'Trip', placeholder: 'documents, money, packing, to-do, notes' },
     { key: 'personIds', label: 'People', type: 'link', linkTo: 'person', linkWord: 'person', section: 'Links', default: [] },
     { key: 'estimateMin', label: 'Estimate (minutes)', type: 'number', section: 'Details' },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },

@@ -32,6 +32,9 @@ export interface TripAppSnapshot {
   days?: Doc[];
   things?: Doc[];
   events?: Doc[];
+  expenses?: Doc[];
+  checklist?: Doc[];
+  alerts?: Doc[];
 }
 
 export function isTripAppSnapshot(x: unknown): x is TripAppSnapshot {
@@ -51,6 +54,9 @@ export interface TripAppImport {
   others: number;
   things: number;
   events: number;
+  bills: number;
+  tasks: number;
+  notes: number;
 }
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
@@ -101,7 +107,7 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
   const travellers = (m.travellers ?? []).filter((x) => typeof x === 'string' && x.trim());
   const me = opts.me ?? travellers[0];
   const local = Object.keys(m.fx ?? {}).find((c) => c !== 'INR' && c !== 'USD') ?? Object.keys(m.fx ?? {})[0];
-  const out: TripAppImport = { tripId: '', createdTrip: false, stops: 0, stays: 0, flights: 0, days: 0, tickets: 0, journeys: 0, others: 0, things: 0, events: 0 };
+  const out: TripAppImport = { tripId: '', createdTrip: false, stops: 0, stays: 0, flights: 0, days: 0, tickets: 0, journeys: 0, others: 0, things: 0, events: 0, bills: 0, tasks: 0, notes: 0 };
   os.db.transaction(() => {
     // The trip.
     const tripKey = `tripapp:${snap.key}`;
@@ -226,6 +232,62 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
       if (!title) continue;
       upsertThing(`${tripKey}:event:${x.id}`, title, { kind: 'event', stopId: stopOf.get(String(x.place ?? '')), day: str(x.start), until: str(x.end), happening: (str(x.type)?.toLowerCase() as Happening) ?? 'seasonal', sure: SURE[String(x.conf)], link: str(x.link), notes: [str(x.where), str(x.note)].filter(Boolean).join('\n') || undefined }, 'idea');
       out.events++;
+    }
+
+    // The group, and the expenses and paybacks as Bills, Splitwise's way (R7g slice 4).
+    if (os.registry.objects.has('group') && trip.data.personIds?.length) {
+      const current = os.records.get<TripData>(trip.id)!;
+      if (!current.data.groupId) {
+        const g = os.records.create({ object: 'group', title: `${snap.destination} trip`, data: { name: `${snap.destination} trip`, kind: 'trip', memberIds: current.data.personIds } }, 'assistant');
+        os.records.update<TripData>(trip.id, { data: { groupId: g.id } }, 'assistant');
+      }
+    }
+    if (os.registry.objects.has('bill')) {
+      const groupId = os.records.get<TripData>(trip.id)!.data.groupId;
+      const CAT: Record<string, string> = { Food: 'food', Transport: 'transport', Stay: 'stays', Activities: 'fun', Shopping: 'shopping', Flights: 'flights', Other: 'other' };
+      const asParty = (name: string) => (name === me ? 'me' : personFor(os, name));
+      const map = (o: unknown) => Object.fromEntries(Object.entries((o ?? {}) as Record<string, unknown>).map(([k, v]) => [asParty(k), Number(v) || 0]).filter(([k]) => !!k)) as Record<string, number>;
+      for (const x of snap.expenses ?? []) {
+        const amount = num(x.amount);
+        if (!amount || !str(x.date)) continue;
+        const payment = x.payment === true || x.category === 'Settlement';
+        const payers = Object.keys(map(x.payers)).length ? map(x.payers) : str(x.paidBy) ? { [asParty(String(x.paidBy))!]: amount } : {};
+        let shares = map(x.shares);
+        if (!Object.keys(shares).length) shares = Object.fromEntries((Array.isArray(x.forWho) ? x.forWho : travellers).map((p) => [asParty(String(p))!, 1]));
+        const method = (['equal', 'exact', 'percent', 'shares', 'adjust'].includes(String(x.split)) ? x.split : payment ? 'exact' : 'equal') as 'equal';
+        const key = `${tripKey}:expense:${x.id}`;
+        const data = { kind: payment ? 'payment' : 'spend', amount, currency: str(x.currency) ?? 'INR', inr: num(x.inr), date: String(x.date), category: payment ? undefined : CAT[String(x.category)] ?? 'other', split: { payers, method, shares }, tripId: trip.id, groupId, eventId: str(x.booking) ? bySourceKey(os, 'event', `${tripKey}:booking:${x.booking}`)?.id : undefined, notes: str(x.notes), sourceKey: key };
+        const same = bySourceKey(os, 'bill', key);
+        if (same) os.records.update(same.id, { title: String(x.what ?? 'Spend'), data }, 'assistant');
+        else os.records.create({ object: 'bill', title: String(x.what ?? 'Spend'), data }, 'assistant');
+        out.bills++;
+      }
+    }
+
+    // The checklist and the notes (alerts), as Tasks on the trip (R7g slice 5).
+    if (os.registry.objects.has('task')) {
+      const SECTION: Record<string, string> = { 'To-do': 'to-do', Documents: 'documents', Money: 'money', Packing: 'packing' };
+      const PRIO: Record<string, string> = { critical: 'urgent', warning: 'high', info: 'low' };
+      const upsertTask = (key: string, title: string, data: Record<string, unknown>, done: boolean) => {
+        const same = bySourceKey(os, 'task', key);
+        const full = { ...data, tripId: trip.id, sourceKey: key };
+        const status = done ? 'done' : 'todo';
+        if (same) os.records.update(same.id, { title, data: full, status }, 'assistant');
+        else os.records.create({ object: 'task', title, data: full, status }, 'assistant');
+      };
+      for (const c of snap.checklist ?? []) {
+        const title = str(c.text);
+        if (!title) continue;
+        const who = str(c.who);
+        upsertTask(`${tripKey}:check:${c.id}`, title, { priority: 'medium', dueDate: str(c.due), section: SECTION[String(c.group)] ?? 'to-do', notes: str(c.notes), personIds: who && who !== 'Everyone' && who !== me ? [personFor(os, who)].filter(Boolean) : undefined }, c.done === true);
+        out.tasks++;
+      }
+      for (const a of snap.alerts ?? []) {
+        const title = str(a.title);
+        if (!title) continue;
+        upsertTask(`${tripKey}:alert:${a.id}`, title, { priority: PRIO[String(a.level)] ?? 'low', section: 'notes', notes: str(a.body) }, a.resolved === true);
+        out.notes++;
+      }
     }
 
     // Each day's plan, as a Fact on the trip dated that day.

@@ -12,12 +12,15 @@ import { ImportTripScreen } from './importTrip';
 import { BookingsScreen } from './bookings';
 import { BookingScreen } from './booking';
 import { DayScreen } from './day';
+import { MoneyScreen } from './money';
+import { BillScreen } from './bill';
+import { PrepScreen } from './prep';
 
 /**
  * Companion board of the travel module, drawn to the NR-Travel-* artboards
  * (v3 Noir): the Travel home, all trips, packing, the Trip page (the whole
  * record page), the trip form, the Today tile, Trips here on a Place, and the
- * trip template's Plan (the line, the days, the map), a stop's page and Import a trip.
+ * trip template's Plan (the line, the days, the map), a stop's page, Import a trip, Bookings, Money (Budget, Settle up, a Bill) and Prep.
  */
 export const travelBoard: BoardManifest = {
   id: 'travel',
@@ -37,6 +40,9 @@ export const travelBoard: BoardManifest = {
     { key: 'bookings', title: 'Bookings', component: BookingsScreen },
     { key: 'booking', title: 'Booking', component: BookingScreen },
     { key: 'day', title: 'A day', component: DayScreen },
+    { key: 'money', title: 'Money', component: MoneyScreen },
+    { key: 'bill', title: 'Expense', component: BillScreen },
+    { key: 'prep', title: 'Prep', component: PrepScreen },
   ],
   quickActions: [
     { id: 'travel.addTrip', label: 'Trip', icon: 'airplane', route: '/entity/trip/new' },
