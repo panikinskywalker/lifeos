@@ -9,7 +9,7 @@ import { crmModule } from '../crm';
 import { financeModule } from '../finance';
 import { projectsModule } from '../projects';
 import { placesModule } from '../places';
-import { dayView, deadlines, importTripApp, missingCheckIn, moneyOf, nightsOf, payWord, seatsOpen, stayMoney, statusOf, stepsOf, stopsOf, travelBrain, travelModule, tripJourneys, tripStays, tripTickets, TRIP_APP_FORMAT, type TripAppSnapshot, type TripData } from '.';
+import { airportEnd, connectionMargin, dayView, deadlines, flightTrips, longLeg, overlappingStays, stayNights, importTripApp, missingCheckIn, moneyOf, nightsOf, payWord, seatsOpen, stayMoney, statusOf, stepsOf, stopsOf, travelBrain, travelModule, tripJourneys, tripStays, tripTickets, TRIP_APP_FORMAT, type TripAppSnapshot, type TripData } from '.';
 
 /**
  * The trip template, slice 2: bookings with their money and status, tickets,
@@ -131,5 +131,45 @@ describe('what a stay mail says', () => {
     expect(seatsOpen('Shinano seats open 26 Nov; reserve.', '2026-12-26')).toBe(at('2026-11-26T10:00:00'));
     expect(seatsOpen('seats open on 1 Dec', '2027-01-03')).toBe(at('2026-12-01T10:00:00'));
     expect(seatsOpen('no booking needed', '2026-12-26')).toBeUndefined();
+  });
+});
+
+describe('flights, the long leg and overlapping stays', () => {
+  const ev = (id: string, data: Record<string, unknown>, title = id) => ({ id, object: 'event', title, data }) as never;
+  it('an airport end: city, code and terminal', () => {
+    expect(airportEnd('Mumbai BOM T2')).toEqual({ city: 'Mumbai', code: 'BOM', terminal: 'T2' });
+    expect(airportEnd('Tokyo Haneda HND')).toEqual({ city: 'Tokyo Haneda', code: 'HND', terminal: null });
+    expect(airportEnd('Somewhere')).toEqual({ city: 'Somewhere', code: null, terminal: null });
+  });
+
+  it('legs join into a way there and a way home, landing times read from the notes', () => {
+    const trips = flightTrips([
+      ev('a', { kind: 'flight', startAt: at('2026-12-17T23:05:00'), location: 'Pune PNQ T1 → Hanoi HAN T2', flightNo: 'XX1', notes: 'XX1, lands 05:05 on 18 Dec.' }),
+      ev('b', { kind: 'flight', startAt: at('2026-12-18T08:40:00'), location: 'Hanoi HAN T2 → Tokyo Haneda HND T3', flightNo: 'XX2', notes: 'XX2, lands 15:05.' }),
+      ev('c', { kind: 'flight', startAt: at('2027-01-07T10:00:00'), location: 'Osaka Kansai KIX T1 → Pune PNQ T1', flightNo: 'XX3', notes: 'lands 21:20' }),
+    ]);
+    expect(trips.map((t) => [t.from.code, t.to.code, t.via, t.flightNos])).toEqual([
+      ['PNQ', 'HND', ['HAN'], ['XX1', 'XX2']],
+      ['KIX', 'PNQ', [], ['XX3']],
+    ]);
+    expect(trips[0]!.legs[0]!.landAt).toBe(at('2026-12-18T05:05:00'));
+    expect(trips[0]!.landAt).toBe(at('2026-12-18T15:05:00'));
+    expect(trips[0]!.to.terminal).toBe('T3');
+  });
+
+  it('the long leg is the longest timed step, with its stations', () => {
+    const leg = longLeg({ data: { steps: '10:30 Check out | walk to the station\n11:10 Local line → Hub\n12:00 Express | Hub → Far Town · reserved seats\n14:15 Bus to the village\n15:00 Check in' } });
+    expect(leg).toEqual({ what: 'Express', from: 'Hub', to: 'Far Town', leave: '12:00', arrive: '14:15', minutes: 135 });
+    expect(longLeg({ data: { steps: '10:00 Walk\n10:20 Arrive' } })).toBeNull();
+    expect(connectionMargin({ data: { lastConnection: 'Last bus at 17:45', endAt: at('2026-12-26T14:45:00') } })).toBe(180);
+  });
+
+  it('overlapping stays: let go of the one still free to cancel', () => {
+    const keep = ev('k', { kind: 'stay', startAt: at('2026-12-31T15:00:00'), endAt: at('2027-01-03T11:00:00') });
+    const drop = ev('d', { kind: 'stay', startAt: at('2027-01-01T15:00:00'), endAt: at('2027-01-02T11:00:00'), cancelBy: '2026-12-27' });
+    const other = ev('o', { kind: 'stay', startAt: at('2027-01-03T15:00:00'), endAt: at('2027-01-05T11:00:00') });
+    const r = overlappingStays([keep, drop, other], at('2026-11-20T09:00:00'));
+    expect(r.map((x) => [x.cancel.id, x.keep.id, x.freeUntil])).toEqual([['d', 'k', '2026-12-27']]);
+    expect(stayNights(keep)).toBe(3);
   });
 });

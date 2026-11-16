@@ -61,20 +61,24 @@ export interface TripAppImport {
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
-const at = (day: string, time: string) => new Date(`${day}T${/^\d{1,2}:\d{2}$/.test(time) ? time.padStart(5, '0') : '12:00'}:00`).getTime();
+/** A day and a time as written in the app ("10:45", "≈10:45", "about 9:05"); noon when there is no time. */
+export const appTimeAt = (day: string, time: string) => {
+  const m = /(\d{1,2}):(\d{2})/.exec(time ?? '');
+  return new Date(`${day}T${m ? `${m[1]!.padStart(2, '0')}:${m[2]}` : '12:00'}:00`).getTime();
+};
 const AIRLINES: Record<string, string> = { VN: 'Vietnam Airlines', '6E': 'IndiGo', AI: 'Air India', NH: 'ANA', JL: 'Japan Airlines', SQ: 'Singapore Airlines' };
 
 const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 
 /** "Shinano seats open 26 Nov" → that day at 10:00, in the year before the journey's day. */
 export function seatsOpen(note: string, journeyDay: string): number | undefined {
-  const m = /\bopen(?:s|ing)?\s+(?:on\s+)?(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i.exec(note);
+  const m = /\bopen(?:s|ing)?\s+(?:on\s+|about\s+|around\s+|from\s+|~\s*|≈\s*)?(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i.exec(note);
   if (!m) return undefined;
   const year = Number(journeyDay.slice(0, 4));
   const pad = (n: number) => String(n).padStart(2, '0');
   const iso = (y: number) => `${y}-${pad(MONTHS[m[2]!.toLowerCase()]! + 1)}-${pad(Number(m[1]))}`;
   const day = iso(year) <= journeyDay ? iso(year) : iso(year - 1);
-  return at(day, '10:00');
+  return appTimeAt(day, '10:00');
 }
 
 function bySourceKey<T>(os: LifeOSContext, object: string, key: string): ObjectRecord<T> | undefined {
@@ -157,13 +161,13 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
       if (b.kind === 'stay') {
         const stopId = stopOf.get(String(b.placeId ?? '')) ?? stopsOf(os, trip.id, ['stop', 'airport']).find((x) => x.title.toLowerCase() === String(b.place ?? '').toLowerCase())?.id;
         const place = stopId ? os.records.get(stopId)?.title : str(b.place);
-        upsertEvent(os, trip.id, key, `Stay · ${b.title}`, { kind: 'stay', startAt: at(String(b.start), '15:00'), ...(str(b.end) ? { endAt: at(String(b.end), '11:00') } : {}), allDay: true, location: place, stopId, ...money, chargeOn: str(b.chargeOn), cancelBy: str(b.cancelBy), cancelNote: str(b.cancelNote), checkIn: str(b.checkIn), checkOut: str(b.checkOut), access: str(b.access), mapUrl: str(b.mapLink) });
+        upsertEvent(os, trip.id, key, `Stay · ${b.title}`, { kind: 'stay', startAt: appTimeAt(String(b.start), '15:00'), ...(str(b.end) ? { endAt: appTimeAt(String(b.end), '11:00') } : {}), allDay: true, location: place, stopId, ...money, chargeOn: str(b.chargeOn), cancelBy: str(b.cancelBy), cancelNote: str(b.cancelNote), checkIn: str(b.checkIn), checkOut: str(b.checkOut), access: str(b.access), mapUrl: str(b.mapLink) });
         out.stays++;
       } else if (b.kind === 'flight') {
-        upsertEvent(os, trip.id, key, `Ticket · ${b.title}`, { kind: 'ticket', startAt: at(String(b.start), '12:00'), ...(str(b.end) ? { endAt: at(String(b.end), '12:00') } : {}), allDay: true, location: str(b.place), ...money });
+        upsertEvent(os, trip.id, key, `Ticket · ${b.title}`, { kind: 'ticket', startAt: appTimeAt(String(b.start), '12:00'), ...(str(b.end) ? { endAt: appTimeAt(String(b.end), '12:00') } : {}), allDay: true, location: str(b.place), ...money });
         out.tickets++;
       } else {
-        upsertEvent(os, trip.id, key, String(b.title), { kind: b.kind === 'activity' ? 'activity' : 'other', startAt: at(String(b.start), '10:00'), ...(str(b.end) ? { endAt: at(String(b.end), '18:00') } : {}), allDay: true, location: str(b.place), ...money, cancelBy: str(b.cancelBy), cancelNote: str(b.cancelNote) });
+        upsertEvent(os, trip.id, key, String(b.title), { kind: b.kind === 'activity' ? 'activity' : 'other', startAt: appTimeAt(String(b.start), '10:00'), ...(str(b.end) ? { endAt: appTimeAt(String(b.end), '18:00') } : {}), allDay: true, location: str(b.place), ...money, cancelBy: str(b.cancelBy), cancelNote: str(b.cancelNote) });
         out.others++;
       }
     }
@@ -177,7 +181,7 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
         const code = (x: unknown) => /\b([A-Z]{3})\b/.exec(String(x ?? ''))?.[1] ?? str(x) ?? '?';
         const no = /\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{2,4})\b/.exec(String(l.details ?? ''));
         const flightNo = no ? `${no[1]}${no[2]}` : undefined;
-        upsertEvent(os, trip.id, `${tripKey}:leg:${l.id}`, `Flight ${code(l.from)} → ${code(l.to)}`, { kind: 'flight', startAt: at(day, String(l.time ?? '')), allDay: !str(l.time), location: `${str(l.from) ?? ''} → ${str(l.to) ?? ''}`, notes: str(l.details), booking: l.status === 'Booked' ? 'confirmed' : undefined, ...(flightNo ? { flightNo, airline: AIRLINES[no![1]!] } : {}) });
+        upsertEvent(os, trip.id, `${tripKey}:leg:${l.id}`, `Flight ${code(l.from)} → ${code(l.to)}`, { kind: 'flight', startAt: appTimeAt(day, String(l.time ?? '')), allDay: !str(l.time), location: `${str(l.from) ?? ''} → ${str(l.to) ?? ''}`, notes: str(l.details), booking: l.status === 'Booked' ? 'confirmed' : undefined, ...(flightNo ? { flightNo, airline: AIRLINES[no![1]!] } : {}) });
         out.flights++;
         continue;
       }
@@ -186,8 +190,8 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
       const title = `${str(l.from) ?? '?'} → ${str(l.to) ?? '?'}`;
       upsertEvent(os, trip.id, `${tripKey}:leg:${l.id}`, title, {
         kind: 'journey',
-        startAt: at(day, leave ?? ''),
-        ...(arrive ? { endAt: at(day, arrive) } : {}),
+        startAt: appTimeAt(day, leave ?? ''),
+        ...(arrive ? { endAt: appTimeAt(day, arrive) } : {}),
         allDay: !leave,
         location: title,
         fromStopId: stopOf.get(String(l.fromId ?? '')),
@@ -299,7 +303,7 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
       const same = facts.find((f) => f.sourceRef === ref);
       if (same && same.text === plan) continue;
       if (same) os.facts.forget(same.id);
-      os.facts.add({ text: plan, subjectId: trip.id, source: 'user', sourceRef: ref, statedAt: at(d.id, '12:00') });
+      os.facts.add({ text: plan, subjectId: trip.id, source: 'user', sourceRef: ref, statedAt: appTimeAt(d.id, '12:00') });
       out.days++;
     }
   });

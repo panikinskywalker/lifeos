@@ -35,6 +35,10 @@ export interface TripData {
   look?: string;
   /** Hidden: where an imported trip came from ("tripapp:japan-dec-2026"), so a second import updates it. */
   sourceKey?: string;
+  /** Hidden (Today's cash and IC wallet): the cash and the IC card's balance you carry, in `currency` (the local one). */
+  wallet?: { cash?: number; ic?: number; currency?: string };
+  /** Hidden (Recap's Keep for the next trip): what carries into a trip started from this one. */
+  keep?: { packing?: boolean; todo?: boolean; group?: boolean };
 }
 
 export const LOOKS = [{ value: 'japan', label: 'Japan' }];
@@ -53,7 +57,7 @@ export const tripType: ObjectDef<TripData> = {
   label: 'Trip',
   labelPlural: 'Trips',
   icon: 'airplane',
-  schema: z.object({ destination: z.string().min(1), placeId: z.string().optional(), startDate: z.string().optional(), endDate: z.string().optional(), budget: z.coerce.number().optional(), purpose: z.string().optional(), personIds: z.array(z.string()).optional(), notes: z.string().optional(), localCurrency: z.string().optional(), packed: z.array(z.string()).optional(), groupId: z.string().optional(), dailyAllowance: z.coerce.number().optional(), fxRate: z.coerce.number().optional(), fxDate: z.string().optional(), fromTripId: z.string().optional(), look: z.string().optional(), sourceKey: z.string().optional() }),
+  schema: z.object({ destination: z.string().min(1), placeId: z.string().optional(), startDate: z.string().optional(), endDate: z.string().optional(), budget: z.coerce.number().optional(), purpose: z.string().optional(), personIds: z.array(z.string()).optional(), notes: z.string().optional(), localCurrency: z.string().optional(), packed: z.array(z.string()).optional(), groupId: z.string().optional(), dailyAllowance: z.coerce.number().optional(), fxRate: z.coerce.number().optional(), fxDate: z.string().optional(), fromTripId: z.string().optional(), look: z.string().optional(), sourceKey: z.string().optional(), wallet: z.object({ cash: z.coerce.number().optional(), ic: z.coerce.number().optional(), currency: z.string().optional() }).optional(), keep: z.object({ packing: z.boolean().optional(), todo: z.boolean().optional(), group: z.boolean().optional() }).optional() }),
   fields: [
     { key: 'destination', label: 'Destination', type: 'text', required: true, placeholder: 'Tokyo, Goa, …' },
     { key: 'startDate', label: 'Starts', type: 'date', summary: true },
