@@ -16,6 +16,8 @@ export interface WheelCard {
   note?: string;
   /** What to use it for ("Shopping", "Forex"), as pills under the name on the card in front. */
   uses?: string[];
+  /** Money you owe (a card, a loan): the amount is red on a dark band, readable on every face. */
+  owe?: boolean;
   /** A card that needs you (a late bill) wears coral whatever its face. */
   alert?: boolean;
 }
@@ -40,6 +42,8 @@ const FACES: Array<{ bg: string; art: string; ink: string }> = [
   { bg: '#D9CBB4', art: '#3B3B42', ink: '#0B0B0D' },
 ];
 const ALERT = { bg: '#FF8A7A', art: '#8A1A12', ink: '#0B0B0D' };
+/** What you owe, on its dark band. */
+const OWE_RED = '#FF6B5B';
 const ARTS = 8;
 
 /** A small stable number from the card's key, for its face, pattern and how crooked it sits. */
@@ -162,10 +166,16 @@ function WheelSlot({ card: c, index: i, y, top, width, isFront, depth, onPress }
           </View>
           {isFront && c.note ? <Text style={{ alignSelf: 'flex-start', fontSize: 12, lineHeight: 16, fontWeight: '700', color: face.ink, backgroundColor: face.bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' }}>{c.note}</Text> : null}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ flex: 1, letterSpacing: -1.4, color: face.ink, fontVariant: ['tabular-nums'] }}>
-              <Text style={{ fontSize: 38, lineHeight: 42, fontWeight: '700', color: face.ink }}>{whole}</Text>
-              {paise ? <Text style={{ fontSize: 17, fontWeight: '600', color: face.ink }}>{`.${paise}`}</Text> : null}
-            </Text>
+            {c.owe ? (
+              <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ maxWidth: '100%', fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: -1, color: OWE_RED, backgroundColor: '#0B0B0D', paddingHorizontal: 12, paddingVertical: 2, borderRadius: 14, overflow: 'hidden', fontVariant: ['tabular-nums'] }}>{c.amount}</Text>
+              </View>
+            ) : (
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ flex: 1, letterSpacing: -1.4, color: face.ink, fontVariant: ['tabular-nums'] }}>
+                <Text style={{ fontSize: 38, lineHeight: 42, fontWeight: '700', color: face.ink }}>{whole}</Text>
+                {paise ? <Text style={{ fontSize: 17, fontWeight: '600', color: face.ink }}>{`.${paise}`}</Text> : null}
+              </Text>
+            )}
             {c.tail ? <Text style={{ fontSize: 13, lineHeight: 18, fontWeight: '600', color: muted, fontVariant: ['tabular-nums'], letterSpacing: 0.5 }}>{c.tail}</Text> : null}
           </View>
         </View>

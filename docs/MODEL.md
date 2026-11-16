@@ -1319,6 +1319,10 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   as, and it becomes a Loan ("SBI ••1176 is a loan: you owe ₹5,04,583.36"), with
   Undo; with no match it is a new loan. A loan's card says *Loan · you owe* and
   shows the amount owed, which counts against net worth.
+  What you owe reads as owed everywhere (17 Nov, Rutvij): a card's or loan's
+  amount is a minus figure in red on a small dark band ("−₹33,207"), readable on
+  every card face, and *On your cards* is a red minus total. Only bank, cash and
+  wallet money is *In your accounts*.
   Everything comes in by screenshot (17 Nov, Rutvij): besides balances, card
   bills, loans, funds and SIPs, a **subscriptions** screenshot (an app's
   subscription page, Google Play or App Store, a renewal mail) updates a known

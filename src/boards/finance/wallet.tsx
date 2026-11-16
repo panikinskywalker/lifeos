@@ -81,7 +81,7 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
           </View>
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text color="secondary" style={{ fontSize: 14, lineHeight: 19 }}>{`On your cards${totals.cards ? ` · ${totals.cards}` : ''}`}</Text>
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5} style={{ fontSize: 34, lineHeight: 40, fontWeight: '700', letterSpacing: -1.4, color: totals.owe ? blocks.orange : t.c.fg.secondary, fontVariant: ['tabular-nums'] }}>{money(totals.owe)}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5} style={{ fontSize: 34, lineHeight: 40, fontWeight: '700', letterSpacing: -1.4, color: totals.owe ? t.c.alert.coralText : t.c.fg.secondary, fontVariant: ['tabular-nums'] }}>{money(-totals.owe)}</Text>
           </View>
         </View>
         <Text color="secondary" style={{ fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'] }}>{`net worth ${money(data.nw.total)}`}</Text>
@@ -101,7 +101,8 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
               alert: late,
               title: acc.title.replace(/\s*[•·]+\s*\d{3,4}$/, ''),
               corner: card ? 'You owe' : d.kind === 'loan' ? 'Loan · you owe' : KIND_WORD[d.kind],
-              amount: unset ? 'Set balance' : owes ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
+              amount: unset ? 'Set balance' : owes ? money(-Math.max(0, -balance), d.currency) : money(balance, d.currency),
+              owe: owes && !unset && balance < 0,
               tail: d.last4 ? `•••• ${d.last4}` : undefined,
               uses: cardUses(d.useFor, d.kind),
               note: unset ? 'what is on it? open to set' : d.kind === 'forex' && d.pockets?.length ? pocketLine(os, acc) : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
@@ -157,7 +158,7 @@ function WalletCard({ account: a, balance, front, first, money, still }: { accou
   const owes = card || d.kind === 'loan';
   const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
   const unset = needsBalance(d.kind, balance);
-  const figure = unset ? 'Set balance' : owes ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency);
+  const figure = unset ? 'Set balance' : owes ? money(-Math.max(0, -balance), d.currency) : money(balance, d.currency);
   const source = unset ? 'tap Set balance below' : d.kind === 'forex' && d.pockets?.length ? 'in rupees, today’s rates' : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? 'from its spends' : 'from opening balance';
   const bg = late ? '#FF8A7A' : CARD[d.kind] ?? blocks.sky;
   return (
@@ -177,7 +178,7 @@ function WalletCard({ account: a, balance, front, first, money, still }: { accou
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
           <View style={{ gap: 2, flexShrink: 1 }}>
             <Text style={{ fontSize: 12, lineHeight: 15, fontWeight: '600', color: 'rgba(11,11,13,0.68)' }}>{owes ? 'You owe' : 'Balance'}</Text>
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: 32, lineHeight: 34, fontWeight: '700', letterSpacing: -1, color: INK, fontVariant: ['tabular-nums'] }}>{figure}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ alignSelf: 'flex-start', fontSize: 32, lineHeight: 36, fontWeight: '700', letterSpacing: -1, fontVariant: ['tabular-nums'], ...(owes && balance < 0 ? { color: '#FF6B5B', backgroundColor: INK, paddingHorizontal: 12, borderRadius: 14, overflow: 'hidden' } : { color: INK }) }}>{figure}</Text>
           </View>
           <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: 'rgba(11,11,13,0.68)', textAlign: 'right' }}>{source}</Text>
         </View>
