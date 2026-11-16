@@ -25,10 +25,17 @@ export function settleFromPayment(os: LifeOSContext, txId: string): AutoSettled 
   // Their money in for what they owe you, or yours out for what you owe them.
   if (!((tx.data.kind === 'income' && bal > 0) || (tx.data.kind === 'expense' && bal < 0))) return null;
   const amount = tx.data.amount;
-  const direction: DebtData['direction'] = bal > 0 ? 'they_owe' : 'i_owe';
-  // Turf's shares are Turf's to settle (its ledger sets their status): only the rest, oldest first, up to what moved.
+  const settled = settleOldest(os, payee.id, bal > 0 ? 'they_owe' : 'i_owe', amount);
+  if (!settled.length) return null;
+  os.links.link(txId, settled[0]!, 'settles', {}, 'system');
+  if (tx.data.kind === 'income') os.records.update(txId, { data: { share: 0 } }, 'system');
+  return { personId: payee.id, amount, settled };
+}
+
+/** Settle someone's open shares in one direction, oldest first, up to an amount. Turf's shares are Turf's to settle (its ledger sets their status). */
+export function settleOldest(os: LifeOSContext, personId: string, direction: DebtData['direction'], amount: number): string[] {
   const open = os.records
-    .query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: payee.id }, { field: 'status', op: 'eq', value: 'open' }] } }, { limit: 500 })
+    .query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: personId }, { field: 'status', op: 'eq', value: 'open' }] } }, { limit: 500 })
     .filter((d) => d.data.direction === direction && !os.links.forEntity(d.id).some((l) => l.other.object === 'appearance'))
     .sort((a, b) => a.data.date.localeCompare(b.data.date) || a.createdAt - b.createdAt);
   const settled: string[] = [];
@@ -39,10 +46,7 @@ export function settleFromPayment(os: LifeOSContext, txId: string): AutoSettled 
     os.records.setStatus(d.id, 'settled', 'system');
     settled.push(d.id);
   }
-  if (!settled.length) return null;
-  os.links.link(txId, settled[0]!, 'settles', {}, 'system');
-  if (tx.data.kind === 'income') os.records.update(txId, { data: { share: 0 } }, 'system');
-  return { personId: payee.id, amount, settled };
+  return settled;
 }
 
 /** A UPI ID as banks write it: name@bank. */

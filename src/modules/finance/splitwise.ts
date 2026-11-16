@@ -1,5 +1,6 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { DebtData } from './split';
+import { settleOldest } from './settleUpi';
 
 /**
  * Splitwise, kept in step (docs/MODEL.md, Splitwise and settling up). You sign
@@ -199,23 +200,6 @@ const signed = (d: DebtData) => (d.direction === 'they_owe' ? d.amount : -d.amou
 function shareParams(me: number, friend: number, amount: number, theyOwe: boolean): Record<string, string> {
   const [payer, ower] = theyOwe ? [me, friend] : [friend, me];
   return { users__0__user_id: String(payer), users__0__paid_share: money(amount), users__0__owed_share: '0.00', users__1__user_id: String(ower), users__1__paid_share: '0.00', users__1__owed_share: money(amount) };
-}
-
-/** Settle someone's open Debts in one direction, oldest first, up to what they paid. */
-function settleOldest(os: LifeOSContext, personId: string, direction: DebtData['direction'], amount: number): string[] {
-  const open = os.records
-    .query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: personId }, { field: 'status', op: 'eq', value: 'open' }] } }, { limit: 500 })
-    .filter((d) => d.data.direction === direction)
-    .sort((a, b) => a.data.date.localeCompare(b.data.date) || a.createdAt - b.createdAt);
-  const done: string[] = [];
-  let left = amount + 0.5;
-  for (const d of open) {
-    if (d.data.amount > left) break;
-    left -= d.data.amount;
-    os.records.setStatus(d.id, 'settled', 'system');
-    done.push(d.id);
-  }
-  return done;
 }
 
 export interface SyncResult {
