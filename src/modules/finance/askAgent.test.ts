@@ -185,7 +185,7 @@ describe('Ask Money as an agent', () => {
   });
 
   it('fills in what each card is for once, asking nothing, and never tries the same card again', async () => {
-    const a = os.records.create({ object: 'account', title: 'ICICI Bank card', data: { kind: 'credit', institution: 'ICICI Bank', last4: '8013', currency: 'INR', openingBalance: 0 } });
+    const a = os.records.create({ object: 'account', title: 'Amazon Pay ICICI card', data: { kind: 'credit', institution: 'ICICI Bank', last4: '8013', currency: 'INR', openingBalance: 0 } });
     const api = fakeApi((sent) => sent.some((e) => e.type === 'user.custom_tool_result') ? [
       { id: 'e1', type: 'session.status_running' },
       { id: 'e2', type: 'agent.custom_tool_use', name: 'card_use', input: { ref: 'card-1', uses: ['Shopping', 'Amazon'] } },
@@ -204,5 +204,20 @@ describe('Ask Money as an agent', () => {
     os.records.update(a.id, { data: { useFor: undefined } }, 'user');
     expect(await fillCardUses(os, { apiKey: 'k', fetchImpl: api.fetchImpl }, { wait: async () => undefined })).toBe(0);
     expect(api.calls.length).toBe(calls);
+  });
+
+  it('never guesses the uses of a card named only by its bank, and takes off the guesses made before', async () => {
+    const { cardsWithoutUses, forgetGuessedUses, unnamedCard } = await import('./askAgent');
+    const plain = os.records.create({ object: 'account', title: 'ICICI Bank card', data: { kind: 'credit', institution: 'ICICI Bank', currency: 'INR', openingBalance: 0, useFor: 'Everything else, Bills' } });
+    const named = os.records.create({ object: 'account', title: 'Axis Bank Select credit card', data: { kind: 'credit', institution: 'Axis Bank', currency: 'INR', openingBalance: 0 } });
+    expect(unnamedCard(plain as never)).toBe(true);
+    expect(unnamedCard(named as never)).toBe(false);
+    expect(unnamedCard({ title: 'ICICI Bank card ••6931', data: { institution: 'ICICI Bank' } } as never)).toBe(true);
+    os.settings.set('finance.cardUsesTried', [plain.id]);
+    forgetGuessedUses(os);
+    expect((os.records.get(plain.id)!.data as { useFor?: string }).useFor).toBeUndefined();
+    expect(cardsWithoutUses(os).map((a) => a.id)).toEqual([named.id]);
+    os.records.update(plain.id, { title: 'ICICI Forex card' }, 'user');
+    expect(cardsWithoutUses(os).map((a) => a.id).sort()).toEqual([named.id, plain.id].sort());
   });
 });

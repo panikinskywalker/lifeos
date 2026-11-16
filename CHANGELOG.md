@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.97 · 17 Nov 2026
+
+**No more guessed card uses.** A card named only by its bank no longer gets
+uses guessed from what goes through it (it told you to use a forex card for
+bills); those guesses are taken off. Its page asks which card it is, and once
+you name it, Ask Money fills its uses from that card's real rewards.
+
 ## v0.0.96 · 17 Nov 2026
 
 **Cards come with what to use them for.** When Accounts and cards opens, Ask

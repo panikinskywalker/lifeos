@@ -10,7 +10,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
 import { CardWheel, Icon, IconButton, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
 import { cardUses, incomeInRange, monthRange, netWorth, spendInRange } from '@modules/finance/lib';
-import { ASK_AGENT_MODEL, cardsWithoutUses, fillCardUses } from '@modules/finance/askAgent';
+import { ASK_AGENT_MODEL, cardsWithoutUses, fillCardUses, forgetGuessedUses } from '@modules/finance/askAgent';
 import { INSTRUMENTS, type AccountData } from '@modules/finance/types';
 import { KIND_WORD, Rows, SectionHead, Spark, day } from './parts';
 import { UploadSheet } from './uploadSheet';
@@ -41,6 +41,7 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
   useEffect(() => {
     let live = true;
     void (async () => {
+      forgetGuessedUses(os);
       if (!cardsWithoutUses(os).length) return;
       const key = await os.device?.claudeKey?.().catch(() => null);
       if (!key || !live) return;

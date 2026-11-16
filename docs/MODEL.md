@@ -1445,6 +1445,12 @@ references).** Each screen takes the direction that suits it:
   `card_use`; each card is tried once, so it never repeats or spends again. On a
   card still without uses, the tile opens Ask Money already asking about that
   card (sent by its ref, so no digits leave the phone).
+  Uses come from the card's product and its published rewards, never from what
+  happens to go through it (17 Nov, Rutvij: it told him to use his forex card for
+  bills). So a card named only by its bank ("ICICI Bank card") is never guessed
+  at: its page asks "Which ICICI card is this?" with a name field, and once named
+  (with Undo) Ask Money fills its uses. The uses v0.0.96 guessed for such cards
+  were taken off once. A forex card is for spending abroad, never for bills.
 - **An account's or card's page** (direction A): the account drawn as its card
   (balance or what you owe on it), then round-icon buttons Add · Transfer · Set
   balance (Set owed) · Edit.

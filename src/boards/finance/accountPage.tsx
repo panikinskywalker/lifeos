@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import type { ObjectRecord } from '@core/domain/types';
@@ -7,7 +7,8 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, Icon, NumberField, Sheet, Text, TrackColumns, useToast } from '@ui/kit';
+import { Button, Icon, NumberField, Sheet, Text, TextField, TrackColumns, useToast } from '@ui/kit';
+import { ASK_AGENT_MODEL, fillCardUses, unnamedCard } from '@modules/finance/askAgent';
 import { blocks } from '@ui/theme/tokens';
 import { accountBalance, accountFlows, cardUses, setBalance } from '@modules/finance/lib';
 import type { AccountData, TransactionData } from '@modules/finance/types';
@@ -38,6 +39,23 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
   const toast = useToast();
   const [ask, setAsk] = useState(false);
   const [typed, setTyped] = useState<number | undefined>(undefined);
+  // Naming a card named only by its bank: the name is kept (Undo), then Ask Money fills its uses from the product.
+  const [product, setProduct] = useState('');
+  const [working, setWorking] = useState(false);
+  const nameIt = () => {
+    const before = a.title;
+    ctx.records.update(a.id, { title: product.trim() }, 'user');
+    setProduct('');
+    toast.show({ message: `Named ${product.trim()}`, icon: 'check', undo: () => void ctx.records.update(a.id, { title: before }, 'user') });
+    void (async () => {
+      const key = await ctx.device?.claudeKey?.().catch(() => null);
+      if (!key) return;
+      setWorking(true);
+      const n = await fillCardUses(ctx, { apiKey: key }).catch(() => 0);
+      ctx.brain.sent.add({ at: Date.now(), pass: 'ask', why: 'Use it for, on a card you named', model: ASK_AGENT_MODEL, lines: ['Money agent · each card’s bank and spend by category and shop, rounded; no account digits'], records: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, outcome: n ? 'ok' : 'error', error: null });
+      setWorking(false);
+    })();
+  };
   const saveBalance = () => {
     if (typed == null) return;
     // A card's figure is what you owe: its balance is that, below zero.
@@ -80,10 +98,22 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
         <Quick label="Edit" icon="edit" onPress={() => controls?.edit()} />
       </View>
 
-      {/* What the card is for: Ask Money sets it when it advises; tap to change it. */}
-      {d.useFor || card ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={d.useFor ? `Use it for ${d.useFor}. Edit` : 'What is this card best for? Ask Money'} onPress={() => (d.useFor ? controls?.edit() : router.push({ pathname: '/module/[id]/[page]', params: { id: 'finance', page: 'ask', card: a.id } } as never))} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 24, backgroundColor: d.useFor ? blocks.lime : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
-          <Icon name="sparkle" size={22} color={d.useFor ? '#0B0B0D' : t.c.accent.gold} />
+      {/* What the card is for. A card named only by its bank asks which card it is first: uses come from the product, never a guess (17 Nov, Rutvij). */}
+      {card && !d.useFor && unnamedCard(a) ? (
+        <View style={{ padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Icon name="sparkle" size={22} color={t.c.accent.gold} />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700' }}>{`Which ${institution ?? 'card'} card is this?`}</Text>
+              <Text variant="caption" color="secondary">Its name tells Ask Money its rewards, so it can say what to use it for.</Text>
+            </View>
+          </View>
+          <TextField label="Card name" value={product} onChange={setProduct} placeholder="Amazon Pay, Coral, Forex…" />
+          <Button title="Save" onPress={nameIt} disabled={product.trim().length < 2} block />
+        </View>
+      ) : d.useFor || card ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={d.useFor ? `Use it for ${d.useFor}. Edit` : 'What is this card best for? Ask Money'} disabled={working} onPress={() => (d.useFor ? controls?.edit() : router.push({ pathname: '/module/[id]/[page]', params: { id: 'finance', page: 'ask', card: a.id } } as never))} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 24, backgroundColor: d.useFor ? blocks.lime : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
+          {working ? <ActivityIndicator color={t.c.accent.gold} /> : <Icon name="sparkle" size={22} color={d.useFor ? '#0B0B0D' : t.c.accent.gold} />}
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: d.useFor ? 'rgba(11,11,13,0.62)' : t.c.fg.secondary }}>USE IT FOR</Text>
             {d.useFor ? (
@@ -93,10 +123,10 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
                 ))}
               </View>
             ) : (
-              <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', color: t.c.fg.primary }}>Tap and Ask Money works it out for this card</Text>
+              <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', color: t.c.fg.primary }}>{working ? 'Ask Money is looking up its rewards' : 'Tap and Ask Money works it out for this card'}</Text>
             )}
           </View>
-          <Icon name={d.useFor ? 'edit' : 'chevron-right'} size={16} color={d.useFor ? '#0B0B0D' : t.c.fg.secondary} />
+          {working ? null : <Icon name={d.useFor ? 'edit' : 'chevron-right'} size={16} color={d.useFor ? '#0B0B0D' : t.c.fg.secondary} />}
         </Pressable>
       ) : null}
       <Sheet visible={ask} onClose={() => setAsk(false)} title={card ? 'What does the card app say you owe?' : 'What does the bank show?'} footer={<Button title={card ? 'Set owed' : 'Set balance'} onPress={saveBalance} disabled={typed == null} />}>
