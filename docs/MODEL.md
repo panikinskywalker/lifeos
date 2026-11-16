@@ -1349,9 +1349,14 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   payment sheets start fresh each time they open, so a reading left from before
   never waits behind its Apply or Save.
 - **Photos and PDFs are read by Haiku** (17 Nov, Rutvij): a snapped or attached
-  bill, an uploaded statement and Snap the fridge go to Claude Haiku 5.5
-  (`PHOTO_MODEL`), whatever model the brain's other passes use; same key, budget
-  and Sent to Claude log. Every photo goes with the type its own first bytes say
+  bill and Snap the fridge go to Claude Haiku 5.5 (`PHOTO_MODEL`), whatever model
+  the brain's other passes use; same key, budget and Sent to Claude log. An
+  uploaded statement or fund screen is a dense table and goes to Claude Sonnet 5.5
+  (`STATEMENT_MODEL`), asked to think little (effort low) with room for a long
+  list (8,000 tokens), since Haiku's thinking used up the old 2,500 and missed
+  funds and SIPs. When nothing can be updated, the sheet says what was read
+  ("Claude read 6 funds, but none had a rupee figure") and which screen to try;
+  the CAMS / KFintech CAS PDF is the surest way to bring in every fund. Every photo goes with the type its own first bytes say
   (`mediaTypeOf`), since the picker can call a photo PNG after turning it into
   JPEG; a failed bill says Claude's reason. A bill is also read for how it was
   paid ("Paid: CASH", "Card XX8013"), so *Paid with* starts on Cash or the card

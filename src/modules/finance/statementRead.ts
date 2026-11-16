@@ -83,12 +83,12 @@ export const STATEMENT_SCHEMA = { type: 'object', additionalProperties: false, r
 
 const SYSTEM = `You read a statement or a screenshot from an Indian bank, credit card, mutual fund app (CAMS, KFintech, Groww, Zerodha Coin, Kuvera) or broker. Answer with JSON only.
 accounts: each bank account or credit card shown. bank: the bank's short name (SBI, ICICI, HDFC, Axis). last4: its last 4 digits, "" if not shown. kind: bank, credit or loan (an education, home, car or personal loan account). For a bank account, balance is the closing or available balance; for a card, owed is the total amount due (or outstanding), minDue the minimum due and dueOn the payment due date; for a loan, owed is the outstanding, cleared or closing balance (marked DR) and minDue the EMI. asOf: the statement or screenshot date. Dates YYYY-MM-DD, "" if not shown; numbers 0 when not shown.
-holdings: each fund, stock or deposit with its name as printed, units, current value, amount invested, and a monthly SIP amount and its day of the month if one is shown (0 if not). On a SIP screen (Groww, Coin, Kuvera, a CAMS mandate) the day is the day of the month of the next instalment date ("Next SIP 5 Dec" is 5); a fund shown only with its SIP still counts, with value and invested 0.
+holdings: each fund, stock or deposit with its name as printed, units, current value, amount invested, and a monthly SIP amount and its day of the month if one is shown (0 if not). On a fund app's holdings list (Groww, Coin, Kuvera, Zerodha, INDmoney, a CAMS or KFintech CAS) value is the current value and invested the amount invested, both in rupees; ignore 1-day and total return figures and percentages. Read every row, scrolling cut-offs included. On a SIP screen (Groww, Coin, Kuvera, a CAMS mandate) the day is the day of the month of the next instalment date ("Next SIP 5 Dec" is 5); a fund shown only with its SIP still counts, with value and invested 0.
 subscriptions: each recurring subscription or membership shown (an app's subscription page, Google Play or App Store subscriptions, a renewal mail): its name, price, how often (week, month, quarter, year) and the next renewal date ("" if not shown).
 Leave out anything you cannot read clearly. Never invent figures.`;
 
 export function statementAsk(): Omit<PhotoAsk, 'image'> {
-  return { module: 'finance', moduleName: 'Money', why: 'you pressed Upload a statement', what: 'a statement or screenshot', system: SYSTEM, prompt: 'Read this.', record: {}, schema: STATEMENT_SCHEMA as unknown as Record<string, unknown>, maxTokens: 2500 };
+  return { module: 'finance', moduleName: 'Money', why: 'you pressed Upload a statement', what: 'a statement or screenshot', system: SYSTEM, prompt: 'Read this.', record: {}, schema: STATEMENT_SCHEMA as unknown as Record<string, unknown>, maxTokens: 8000, effort: 'low' };
 }
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : 0);

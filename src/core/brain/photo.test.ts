@@ -83,6 +83,10 @@ describe('a photo sent on purpose', () => {
     await claude.complete({ system: 's', user: 'Text only', maxTokens: 10 });
     expect(bodies[0]!.messages[0]!.content).toEqual([{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: PHOTO } }, { type: 'text', text: 'Compare.' }]);
     expect(bodies[1]!.messages[0]!.content).toBe('Text only');
+    // A statement read asks for little thought, so a long list has room; the default stays medium.
+    await claude.complete({ system: 's', user: 'Read this.', maxTokens: 8000, effort: 'low' });
+    expect(bodies[2]!.output_config.effort).toBe('low');
+    expect(bodies[1]!.output_config.effort).toBe('medium');
   });
 });
 

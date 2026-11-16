@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.115 · 17 Nov 2026
+
+**Funds and SIPs from screenshots, for real.** Statements and fund screens are now read by Claude Sonnet 5.5, asked to think little and given room for a long list (Haiku's thinking used up the space, so lists came back cut off). It is told which figures on a fund app's holdings screen are the value and the amount invested. When nothing can be updated, the sheet says what was read and which screen to try. The CAMS / KFintech CAS PDF is suggested for all your funds at once.
+
 ## v0.0.114 · 17 Nov 2026
 
 **No payments from the future.** A bank text whose date came out after the day it arrived (your ₹1,96,958 salary filed as 13 Feb, years ahead) now takes the day it arrived, and a payment dated after today never counts in a balance. HSBC is back to what your bank shows.

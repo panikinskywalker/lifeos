@@ -26,6 +26,8 @@ export interface PhotoAsk {
   schema: Record<string, unknown>;
   image: BrainImage;
   maxTokens?: number;
+  /** How hard it thinks first; a long list read wants 'low', so the answer has room. */
+  effort?: 'low' | 'medium' | 'high';
 }
 
 export type PhotoResult = { ok: true; answer: unknown } | { ok: false; note: 'off' | 'no key' | 'over budget' | 'error'; error?: string };
@@ -61,7 +63,7 @@ export async function askWithPhoto(os: LifeOSContext, model: BrainModel | null, 
   try {
     // The type goes from the file's own first bytes: a picker can say PNG for a photo it has turned into JPEG, and Claude refuses a mismatch.
     const image = { ...ask.image, mediaType: mediaTypeOf(ask.image.data) ?? ask.image.mediaType };
-    const r = await model.complete({ system: ask.system, user, maxTokens, schema: ask.schema, image });
+    const r = await model.complete({ system: ask.system, user, maxTokens, schema: ask.schema, image, effort: ask.effort });
     const answer = parseJson(r.text);
     os.brain.sent.add({ ...base, ...r.usage, outcome: answer == null ? 'error' : 'ok', error: answer == null ? 'The answer was not the expected JSON' : null });
     recordUsage(os, { provider: 'claude', model: model.model, purpose: 'brain', input: r.usage.input + r.usage.cacheRead + r.usage.cacheWrite, output: r.usage.output, at: now });

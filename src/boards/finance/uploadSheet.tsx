@@ -4,7 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
 import { askWithPhoto, mediaTypeOf } from '@core/brain';
-import { PHOTO_MODEL } from '@core/ai/brainModel';
+import { STATEMENT_MODEL } from '@core/ai/brainModel';
 import type { BrainImage } from '@core/brain/model';
 import { useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -58,11 +58,17 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
     const mediaType = mediaTypeOf(data) ?? (file.mimeType === 'application/pdf' ? 'application/pdf' : 'image/jpeg');
     const limit = mediaType === 'application/pdf' ? MAX_BASE64 : MAX_IMAGE_BASE64;
     if (data.length > limit) return setPhase({ at: 'failed', why: mediaType === 'application/pdf' ? 'That PDF is too big to send. Try the statement for one month.' : 'That image is too big to send. Crop it to the part with the balances, or take a smaller screenshot.' });
-    const model = (await os.device?.brain?.model(PHOTO_MODEL)) ?? null;
+    const model = (await os.device?.brain?.model(STATEMENT_MODEL)) ?? null;
     const res = await askWithPhoto(os, model, { ...statementAsk(), image: { mediaType, data } });
     if (!res.ok) return setPhase({ at: 'failed', why: `${WHY[res.note] ?? WHY.error!}${res.note === 'error' && res.error ? ` (${res.error.slice(0, 160)})` : ''}` });
     const proposals = proposeChanges(os, readStatement(res.answer));
-    if (!proposals.length) return setPhase({ at: 'failed', why: 'Nothing to update from that: no balance, card bill, holding or subscription could be read.' });
+    if (!proposals.length) {
+      // Say what was read, so a screen with only returns or percentages is told apart from one Claude could not read.
+      const raw = (res.answer ?? {}) as { accounts?: unknown[]; holdings?: unknown[]; subscriptions?: unknown[] };
+      const n = (x?: unknown[]) => (Array.isArray(x) ? x.length : 0);
+      const seen = [[n(raw.accounts), 'account'], [n(raw.holdings), 'fund'], [n(raw.subscriptions), 'subscription']].filter(([c]) => (c as number) > 0).map(([c, w]) => `${c} ${w}${c === 1 ? '' : 's'}`);
+      return setPhase({ at: 'failed', why: seen.length ? `Claude read ${seen.join(', ')}, but none had a rupee figure to update (a value, an amount invested, a SIP or a balance). Try the screen that shows current values or the SIP amounts.` : 'Claude found no balance, card bill, fund, SIP or subscription in that. Try the holdings or SIPs screen of your fund app, or the CAMS / KFintech statement PDF.' });
+    }
     // One that could be several accounts waits, unticked, until you pick which.
     setPhase({ at: 'review', proposals, on: Object.fromEntries(proposals.map((p) => [p.id, !p.choices])), pick: {} });
   };
@@ -100,8 +106,8 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
     <Sheet visible={visible} onClose={close} title="Upload a statement">
       {phase.at === 'pick' ? (
         <View style={{ gap: 12 }}>
-          {option('A PDF or file', 'a bank, card or loan statement, a CAMS or broker summary', 'file', () => void fromFiles(), true)}
-          {option('A screenshot', 'your bank, card or fund app, SIPs, or your subscriptions', 'image', () => void fromPhotos())}
+          {option('A PDF or file', 'a bank, card or loan statement, or the CAMS / KFintech CAS for all your funds', 'file', () => void fromFiles(), true)}
+          {option('A screenshot', 'your bank or card app, a fund app’s holdings or SIPs screen, or your subscriptions', 'image', () => void fromPhotos())}
           <Text color="secondary" style={{ fontSize: 12, lineHeight: 17 }}>It goes to Claude once, to be read, because you pressed the button. You see every change before anything is updated.</Text>
         </View>
       ) : null}

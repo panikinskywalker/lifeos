@@ -19,5 +19,6 @@ export interface BrainImage {
 export interface BrainModel {
   id: string;
   model: string;
-  complete(args: { system: string; user: string; maxTokens: number; schema?: Record<string, unknown>; image?: BrainImage }): Promise<{ text: string; usage: BrainUsage }>;
+  /** effort: how hard it thinks before answering; reading a statement wants little thought and room to answer. */
+  complete(args: { system: string; user: string; maxTokens: number; schema?: Record<string, unknown>; image?: BrainImage; effort?: 'low' | 'medium' | 'high' }): Promise<{ text: string; usage: BrainUsage }>;
 }
