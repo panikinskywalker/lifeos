@@ -10,6 +10,7 @@ import { dayPlans, dayView, moneyOf, nightsOf, stepsOf, type StopData, type Trav
 import { dayLabel, Note, Row, RowCard, SectionHead, timeOf } from './parts';
 import { amount, approxInr, bookingRoute, openUrl, PayChip } from './bookings';
 import { StopDisc } from './plan';
+import { HappeningToday } from './things';
 
 /**
  * A day of the trip (the trip template, R7g slice 2; JP-Day, JP-DayTravel):
@@ -71,6 +72,7 @@ export function DayScreen({ params }: { ctx: LifeOSContext; params: Record<strin
           ) : null}
           {journey ? <JourneyCard e={journey} onPress={() => setTab('travel')} /> : null}
           {journey?.data.lastConnection ? <Note icon="alert" iconColor="#FF6B7A">{`Last connection: ${journey.data.lastConnection}`}</Note> : null}
+          <HappeningToday trip={trip} day={v.day} stopId={v.stopId} />
           {v.toPay.length ? (
             <View style={{ gap: 10 }}>
               <SectionHead title="To pay today" sub={v.toPay.some((e) => /cash/i.test(e.data.payHow ?? '')) ? 'cash only for some' : null} />

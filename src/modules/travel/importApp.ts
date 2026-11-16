@@ -1,6 +1,7 @@
 import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
-import type { StopData, TripData } from './types';
+import type { Happening, OutingData, OutingKind, StopData, TripData } from './types';
+import { placeFor } from './trips';
 import { ensureStop, stopsOf } from './stops';
 import type { BookingStatus } from './booked';
 
@@ -29,6 +30,8 @@ export interface TripAppSnapshot {
   bookings?: Doc[];
   transport?: Doc[];
   days?: Doc[];
+  things?: Doc[];
+  events?: Doc[];
 }
 
 export function isTripAppSnapshot(x: unknown): x is TripAppSnapshot {
@@ -46,6 +49,8 @@ export interface TripAppImport {
   tickets: number;
   journeys: number;
   others: number;
+  things: number;
+  events: number;
 }
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
@@ -96,7 +101,7 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
   const travellers = (m.travellers ?? []).filter((x) => typeof x === 'string' && x.trim());
   const me = opts.me ?? travellers[0];
   const local = Object.keys(m.fx ?? {}).find((c) => c !== 'INR' && c !== 'USD') ?? Object.keys(m.fx ?? {})[0];
-  const out: TripAppImport = { tripId: '', createdTrip: false, stops: 0, stays: 0, flights: 0, days: 0, tickets: 0, journeys: 0, others: 0 };
+  const out: TripAppImport = { tripId: '', createdTrip: false, stops: 0, stays: 0, flights: 0, days: 0, tickets: 0, journeys: 0, others: 0, things: 0, events: 0 };
   os.db.transaction(() => {
     // The trip.
     const tripKey = `tripapp:${snap.key}`;
@@ -195,6 +200,32 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
         notes: str(l.details),
       });
       out.journeys++;
+    }
+
+    // Things to do and events on the route (R7g slice 3).
+    const KIND: Record<string, OutingKind> = { See: 'see', Eat: 'eat', Do: 'do', Onsen: 'relax', Shop: 'shop', Event: 'event' };
+    const TSTATUS: Record<string, string> = { Idea: 'idea', 'Want to': 'want', Planned: 'planned', Done: 'done' };
+    const SURE: Record<string, OutingData['sure']> = { Official: 'official', 'Past pattern': 'past', Predicted: 'predicted' };
+    const upsertThing = (key: string, title: string, data: Partial<OutingData>, status: string) => {
+      const same = bySourceKey<OutingData>(os, 'outing', key);
+      const full = { ...data, tripId: trip.id, sourceKey: key } as OutingData;
+      if (same) os.records.update<OutingData>(same.id, { title, data: full, status }, 'assistant');
+      else os.records.create<OutingData>({ object: 'outing', title, data: full, status }, 'assistant');
+    };
+    for (const x of snap.things ?? []) {
+      const title = str(x.title);
+      if (!title) continue;
+      const kind = KIND[String(x.kind)] ?? 'see';
+      const lat = num(x.lat), lng = num(x.lon);
+      const placeId = lat != null && lng != null ? placeFor(os, title, { kind: kind === 'eat' ? 'restaurant' : kind === 'shop' ? 'shop' : 'other', coordinates: { lat, lng } }) ?? undefined : undefined;
+      upsertThing(`${tripKey}:thing:${x.id}`, title, { kind, stopId: stopOf.get(String(x.place ?? '')), placeId, cost: num(x.cost), day: str(x.day), crowd: num(x.crowd), quietest: str(x.quietest), notes: str(x.note), book: Array.isArray(x.book) ? (x.book as Array<{ label?: unknown; url?: unknown }>).filter((b) => str(b.url)).map((b) => ({ label: str(b.label) ?? 'Book', url: str(b.url)! })) : undefined, suggested: x.suggested === true }, TSTATUS[String(x.status)] ?? 'idea');
+      out.things++;
+    }
+    for (const x of snap.events ?? []) {
+      const title = str(x.title);
+      if (!title) continue;
+      upsertThing(`${tripKey}:event:${x.id}`, title, { kind: 'event', stopId: stopOf.get(String(x.place ?? '')), day: str(x.start), until: str(x.end), happening: (str(x.type)?.toLowerCase() as Happening) ?? 'seasonal', sure: SURE[String(x.conf)], link: str(x.link), notes: [str(x.where), str(x.note)].filter(Boolean).join('\n') || undefined }, 'idea');
+      out.events++;
     }
 
     // Each day's plan, as a Fact on the trip dated that day.

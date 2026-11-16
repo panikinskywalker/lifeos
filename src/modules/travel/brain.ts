@@ -4,6 +4,7 @@ import type { TripData } from './types';
 import { DAY, daysToStart, isoOf, trips, tripDays, tripPhase } from './trips';
 import { DEFAULT_DAYS, climateOf, hasPacked, isAbroad, packingKey, packingList, stillPacked } from './packing';
 import { deadlines, missingCheckIn, tripStays } from './booked';
+import { onRouteAsks } from './outings';
 
 /**
  * What travel brings the brain (docs/MODEL.md layer 8, *Travel through the
@@ -187,6 +188,8 @@ function bookingCandidates(os: LifeOSContext, now: number): Candidate[] {
 
 export const travelBrain: BrainDef = {
   candidates: (os, now) => [...checkInCandidates(os, now), ...bookingCandidates(os, now), ...packCandidates(os, now), ...beforeYouGo(os, now), ...backHomeCandidates(os, now)],
+  // What's on while you're there, per stop and its dates (R7g slice 3): kept, offered to add, never added on its own.
+  asks: (os, now) => onRouteAsks(os, now),
   act(os, verb, nudge: Nudge) {
     if (verb !== 'yes') return null;
     const p = (nudge.payload ?? {}) as { tripId?: string; eventId?: string; what?: string };

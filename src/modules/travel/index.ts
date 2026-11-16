@@ -3,7 +3,7 @@ import type { ModuleManifest } from '@core/registry/types';
 import type { ObjectRecord } from '@core/domain/types';
 import { withExtras } from '@core/ai/cards';
 import { bus } from '@core/events/bus';
-import { TRAVEL_COLOR, stopType, tripType, type TripData } from './types';
+import { TRAVEL_COLOR, outingType, stopType, tripType, type TripData } from './types';
 import { foldStops } from './stops';
 import { travelParsers } from './filing/parser';
 import { linkTripPlace, nextTrip, trips, tripSpend } from './trips';
@@ -15,6 +15,7 @@ export * from './packing';
 export * from './stops';
 export * from './importApp';
 export * from './booked';
+export * from './outings';
 export { travelBrain, AIRLINE_SITES } from './brain';
 export { parseFlight, parseStay, type ParsedFlight, type ParsedStay } from './filing/bookings';
 
@@ -31,7 +32,7 @@ export const travelModule: ModuleManifest = {
   icon: 'airplane',
   color: TRAVEL_COLOR,
   dependencies: ['crm'],
-  objects: [tripType, stopType],
+  objects: [tripType, stopType, outingType],
   filing: { parsers: travelParsers },
   brain: travelBrain,
   onStart: (os) => {

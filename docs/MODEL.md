@@ -597,7 +597,8 @@ off); it links to a Place when it is one (decided 15 Nov).
 | Field | Type | Notes |
 |---|---|---|
 | Name | text (the title) | "Nakasendo walk to Tsumago" |
-| Stop | link → Stop, word *at* (`stopId`) | |
+| Trip | link → Trip, word *part_of* (`tripId`) | every one is on a trip; an event for the whole trip (New Year closures) has no stop |
+| Stop | link → Stop, word *stop* (`stopId`) | the same word a stay uses; *at* is the Place's, and one Object cannot carry two link Fields with one word |
 | Place | link → Place, word *at* (`placeId`) | when it is somewhere on the map (Fushimi Inari); its pin |
 | Kind | select | see · eat · do · relax (an onsen) · shop · event |
 | Day | date (`day`) | when it is planned; an event's first day |
@@ -608,8 +609,10 @@ off); it links to a Place when it is one (decided 15 Nov).
 | What kind of event | select (`happening`) | events: festival · seasonal · closure · crowds · holiday · weather; the things to be aware of while you're there, not only the fun ones (New Year closures, peak crowds, snow) |
 | How sure | select (`sure`) | events: official · past pattern · predicted |
 | Link | contact (url) | its page, or the source for an event |
+| Book at | contact (url), several, each with its label (`book`) | links to book it (a guided walk, a ticket) |
 | Photo | file | |
 | Notes | long text | |
+| *(hidden)* suggested | boolean | Claude suggested it, not you |
 
 Statuses: idea · want to · planned · done. Want to, planned and done things
 that cost count in the trip's estimates (below).
@@ -1672,7 +1675,7 @@ screens checked on the phone → overrides only where the default is wrong)
     others); a booking's page (`JP-Booking`) with its papers (Document's Booking link); journeys' links to book. The parsers fill check-in times, still
     to pay and free cancellation from the mail. Nudges (*coming up*): seats open, free cancellation ends, a
     card is charged, a check-in time is missing.
-  - [ ] **3. Things to do.** Thing to do; a stop's things (All · Planned · Want to · Ideas · Free; how busy,
+  - [x] **3. Things to do.** *Built 16 Nov (no migration; see `docs/handover/r7g-3-things.md`).* Thing to do; a stop's things (All · Planned · Want to · Ideas · Free; how busy,
     quietest time, Google Maps); events on the route (festivals and what to be aware of: closures, holidays,
     crowds, weather) with how sure and the source, and the copilot finding them for each stop's dates.
   - [ ] **4. Bill and money on a trip.** Bill in finance (Splitwise's payers and five ways to split, the ₹ value

@@ -11,6 +11,7 @@ import { addToLine, nightsOf, stopSpan, stopsOf, type StopData, type TripData } 
 import { datesLabel, plural, Row, RowCard, SectionHead } from './parts';
 import { planRoute, StopDisc, stopHex } from './plan';
 import { bookingRoute } from './bookings';
+import { StopEvents, ThingsSection } from './things';
 
 /**
  * A stop's page (the trip template, R7g slice 1; JP-Place): its mark and
@@ -81,6 +82,9 @@ export function StopPage({ entity, ctx, controls }: Props) {
           )}
         </RowCard>
       </View>
+
+      <ThingsSection stop={stop} ctx={ctx} currency={trip.data.localCurrency ?? 'INR'} />
+      <StopEvents stop={stop} ctx={ctx} />
 
       {prev || next ? (
         <View style={{ gap: 10 }}>

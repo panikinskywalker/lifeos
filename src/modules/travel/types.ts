@@ -136,3 +136,96 @@ export const stopType: ObjectDef<StopData> = {
   computeSubtitle: (d) => [d.localName, d.kind === 'idea' ? 'Idea' : d.kind === 'airport' ? 'Airport' : d.order != null ? `Stop ${d.order}` : null].filter(Boolean).join(' · ') || undefined,
   searchText: (d) => [d.localName, d.about].filter(Boolean).join(' '),
 };
+
+/* ------------------------------------------------------------------ */
+/* Thing to do (the trip template, R7g slice 3)                         */
+/* ------------------------------------------------------------------ */
+
+export type OutingKind = 'see' | 'eat' | 'do' | 'relax' | 'shop' | 'event';
+export type Happening = 'festival' | 'seasonal' | 'closure' | 'crowds' | 'holiday' | 'weather';
+
+export interface OutingData {
+  /** link → Trip, word `part_of`: every thing to do is on a trip; a trip-wide event has no stop. */
+  tripId?: string;
+  /** link → Stop, word `stop` (the same word a stay uses). */
+  stopId?: string;
+  /** link → Place, word `at`: when it is somewhere on the map. */
+  placeId?: string;
+  kind: OutingKind;
+  /** The day it is planned; an event's first day. */
+  day?: string;
+  /** An event's last day. */
+  until?: string;
+  /** A person, in the local currency; 0 is free, empty is not known. */
+  cost?: number;
+  /** 1 quiet to 5 packed. */
+  crowd?: number;
+  quietest?: string;
+  /** Events: what kind of thing to be aware of. */
+  happening?: Happening;
+  /** Events: official · past pattern · predicted. */
+  sure?: 'official' | 'past' | 'predicted';
+  link?: string;
+  /** Links to book it. */
+  book?: Array<{ label: string; url: string }>;
+  photo?: { uri: string; name?: string; mime?: string };
+  notes?: string;
+  /** Hidden: Claude suggested it (not you). */
+  suggested?: boolean;
+  /** Hidden: where an imported one came from. */
+  sourceKey?: string;
+}
+
+export const OUTING_KINDS = [
+  { value: 'see', label: 'See', icon: 'eye' },
+  { value: 'eat', label: 'Eat', icon: 'food' },
+  { value: 'do', label: 'Do', icon: 'activity' },
+  { value: 'relax', label: 'Relax', icon: 'drop' },
+  { value: 'shop', label: 'Shop', icon: 'bag' },
+  { value: 'event', label: 'Event', icon: 'calendar' },
+];
+export const HAPPENINGS = [
+  { value: 'festival', label: 'Festival' },
+  { value: 'seasonal', label: 'Seasonal' },
+  { value: 'closure', label: 'Closure' },
+  { value: 'crowds', label: 'Crowds' },
+  { value: 'holiday', label: 'Holiday' },
+  { value: 'weather', label: 'Weather' },
+];
+export const OUTING_STATUSES = [
+  { value: 'idea', label: 'Idea', color: 'gray' },
+  { value: 'want', label: 'Want to', color: 'orange' },
+  { value: 'planned', label: 'Planned', color: 'green' },
+  { value: 'done', label: 'Done', color: 'gray' },
+];
+
+export const outingType: ObjectDef<OutingData> = {
+  id: 'outing',
+  module: 'travel',
+  label: 'Thing to do',
+  labelPlural: 'Things to do',
+  icon: 'star',
+  color: TRAVEL_COLOR,
+  schema: z.object({ tripId: z.string().optional(), stopId: z.string().optional(), placeId: z.string().optional(), kind: z.enum(['see', 'eat', 'do', 'relax', 'shop', 'event']).default('see'), day: z.string().optional(), until: z.string().optional(), cost: z.coerce.number().optional(), crowd: z.coerce.number().min(1).max(5).optional(), quietest: z.string().optional(), happening: z.enum(['festival', 'seasonal', 'closure', 'crowds', 'holiday', 'weather']).optional(), sure: z.enum(['official', 'past', 'predicted']).optional(), link: z.string().optional(), book: z.array(z.object({ label: z.string(), url: z.string() })).optional(), photo: z.object({ uri: z.string(), name: z.string().optional(), mime: z.string().optional() }).optional(), notes: z.string().optional(), suggested: z.boolean().optional(), sourceKey: z.string().optional() }),
+  fields: [
+    { key: 'kind', label: 'Kind', type: 'select', required: true, default: 'see', options: OUTING_KINDS, summary: true },
+    { key: 'tripId', label: 'Trip', type: 'link', linkTo: 'trip', linkWord: 'part_of', required: true },
+    { key: 'stopId', label: 'Stop', type: 'link', linkTo: 'stop', linkWord: 'stop' },
+    { key: 'placeId', label: 'Place', type: 'link', linkTo: 'place', linkWord: 'at' },
+    { key: 'day', label: 'Day', type: 'date', summary: true },
+    { key: 'until', label: 'Until', type: 'date', description: 'An event’s last day' },
+    { key: 'cost', label: 'Cost each', type: 'money', description: 'In the local currency; 0 is free' },
+    { key: 'crowd', label: 'How busy', type: 'number', description: '1 quiet to 5 packed' },
+    { key: 'quietest', label: 'Quietest time', type: 'text', placeholder: 'after 15:00' },
+    { key: 'happening', label: 'What kind of event', type: 'select', options: HAPPENINGS, section: 'Event' },
+    { key: 'sure', label: 'How sure', type: 'select', options: [{ value: 'official', label: 'Official' }, { value: 'past', label: 'Past pattern' }, { value: 'predicted', label: 'Predicted' }], section: 'Event' },
+    { key: 'link', label: 'Link', type: 'contact' },
+    { key: 'photo', label: 'Photo', type: 'file' },
+    { key: 'notes', label: 'Notes', type: 'longtext' },
+  ],
+  statuses: OUTING_STATUSES,
+  hidden: true,
+  occurredAtField: 'day',
+  computeSubtitle: (d) => [OUTING_KINDS.find((k) => k.value === d.kind)?.label, d.cost === 0 ? 'Free' : null, d.quietest].filter(Boolean).join(' · ') || undefined,
+  searchText: (d) => [d.notes, d.quietest].filter(Boolean).join(' '),
+};
