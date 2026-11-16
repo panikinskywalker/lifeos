@@ -7,7 +7,8 @@ import type { LifeOSContext } from '@core/registry/context';
  * no rate was known is converted once one arrives.
  */
 
-export const FX_CURRENCIES = ['USD', 'GBP', 'JPY', 'AED'] as const;
+/** The currencies a forex card holds or a spend abroad comes in (17 Nov, Rutvij: dinar, yen, dollar, pound on one card). */
+export const FX_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AED', 'KWD', 'BHD', 'OMR', 'SAR', 'QAR', 'SGD', 'THB', 'AUD', 'CAD', 'CHF'] as const;
 const KEY = 'fx.rates';
 
 export interface FxRates {

@@ -7,10 +7,11 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, Icon, NumberField, Sheet, Text, TextField, TrackColumns, useToast } from '@ui/kit';
+import { Button, Icon, NumberField, SelectField, Sheet, Text, TextField, TrackColumns, useToast } from '@ui/kit';
 import { ASK_AGENT_MODEL, fillCardUses, unnamedCard } from '@modules/finance/askAgent';
 import { blocks } from '@ui/theme/tokens';
-import { accountBalance, accountFlows, cardUses, setBalance } from '@modules/finance/lib';
+import { accountBalance, accountFlows, cardUses, pocketBalances, setBalance, setPockets } from '@modules/finance/lib';
+import { FX_CURRENCIES } from '@modules/finance/filing/fx';
 import type { AccountData, TransactionData } from '@modules/finance/types';
 import { FieldRow, FieldValue, Hairline, KIND_WORD, Metric, Quick, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, TxRow, day, kindWord, relDay, shortMoney } from './parts';
 import { AccountCard } from './wallet';
@@ -57,6 +58,22 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
       setWorking(false);
     })();
   };
+  // A forex card holds several currencies: Set balance asks for each (17 Nov, Rutvij).
+  const forex = d.kind === 'forex';
+  const pockets = useLive((o) => (forex ? pocketBalances(o, a) : []), [a.id, a.version, forex]);
+  const [rows, setRows] = useState<Array<{ currency?: string; amount?: number }>>([]);
+  const [pocketing, setPocketing] = useState(false);
+  const openSet = () => {
+    if (!forex) return setAsk(true);
+    setRows(pockets.length ? pockets.map((p) => ({ currency: p.currency, amount: p.amount })) : [{ currency: 'USD' }]);
+    setPocketing(true);
+  };
+  const savePockets = () => {
+    const kept = rows.filter((r): r is { currency: string; amount: number } => !!r.currency && (r.amount ?? 0) > 0);
+    const before = setPockets(ctx, a.id, kept);
+    setPocketing(false);
+    toast.show({ message: `On the card: ${kept.map((r) => ctx.format.currency(r.amount, r.currency)).join(' · ') || 'nothing'}`, icon: 'check', undo: () => void ctx.records.update(a.id, { data: { pockets: before } }, 'user') });
+  };
   const saveBalance = () => {
     if (typed == null) return;
     // A card's figure is what you owe: its balance is that, below zero.
@@ -95,7 +112,7 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Quick label="Add" icon="plus" onPress={() => addTx('expense')} />
         <Quick label="Transfer" icon="arrow.up.arrow.down" onPress={() => addTx('transfer')} />
-        <Quick label={card ? 'Set owed' : 'Set balance'} icon="check" onPress={() => setAsk(true)} />
+        <Quick label={card ? 'Set owed' : 'Set balance'} icon="check" onPress={openSet} />
         <Quick label="Edit" icon="edit" onPress={() => controls?.edit()} />
       </View>
 
@@ -130,6 +147,39 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
           {working ? null : <Icon name={uses.length ? 'edit' : 'chevron-right'} size={16} color={uses.length ? '#0B0B0D' : t.c.fg.secondary} />}
         </Pressable>
       ) : null}
+      {forex && pockets.length ? (
+        <View style={{ gap: 10 }}>
+          <SectionHead title="On the card" sub={`${pockets.length} ${pockets.length === 1 ? 'currency' : 'currencies'}`} action="Set" lime onAction={openSet} />
+          <View style={{ paddingVertical: 4, paddingHorizontal: 16, borderRadius: 24, backgroundColor: t.c.bg.tile }}>
+            {pockets.map((p, i) => (
+              <View key={p.currency} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, borderTopWidth: i ? 1 : 0, borderColor: t.c.line }}>
+                <Text style={{ width: 52, fontSize: 13, lineHeight: 17, fontWeight: '700', color: t.c.fg.secondary }}>{p.currency}</Text>
+                <Text style={{ flex: 1, fontSize: 17, lineHeight: 22, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{ctx.format.currency(p.amount, p.currency)}</Text>
+                <Text color="secondary" style={{ fontSize: 14, lineHeight: 19, fontVariant: ['tabular-nums'] }}>{p.inr == null ? 'no rate yet' : `≈ ${ctx.format.currency(Math.round(p.inr))}`}</Text>
+              </View>
+            ))}
+          </View>
+          <Text variant="caption" color="secondary" style={{ paddingHorizontal: 4 }}>Spends abroad in a currency come off it. Rupees at today’s rate.</Text>
+        </View>
+      ) : null}
+
+      <Sheet visible={pocketing} onClose={() => setPocketing(false)} title="What is on the card?" footer={<Button title="Save" onPress={savePockets} disabled={!rows.some((r) => r.currency && (r.amount ?? 0) > 0)} />}>
+        <View style={{ gap: 12 }}>
+          {rows.map((r, i) => (
+            <View key={i} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
+              <View style={{ flex: 1 }}>
+                <SelectField label={i ? undefined : 'Currency'} options={FX_CURRENCIES.map((c) => ({ value: c, label: c }))} value={r.currency} onChange={(v) => setRows(rows.map((x, k) => (k === i ? { ...x, currency: v } : x)))} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <NumberField label={i ? undefined : 'Amount'} value={r.amount} onChange={(v) => setRows(rows.map((x, k) => (k === i ? { ...x, amount: v } : x)))} />
+              </View>
+            </View>
+          ))}
+          <Button title="Add a currency" icon="plus" variant="secondary" size="sm" onPress={() => setRows([...rows, { currency: FX_CURRENCIES.find((c) => !rows.some((r) => r.currency === c)) }])} />
+          <Text variant="caption" color="secondary">What the card app shows for each currency. Spends abroad after this come off it.</Text>
+        </View>
+      </Sheet>
+
       <Sheet visible={ask} onClose={() => setAsk(false)} title={card ? 'What does the card app say you owe?' : 'What does the bank show?'} footer={<Button title={card ? 'Set owed' : 'Set balance'} onPress={saveBalance} disabled={typed == null} />}>
         <View style={{ gap: 10 }}>
           <NumberField label={card ? 'Owed now' : 'Balance now'} unit="₹" value={typed} onChange={setTyped} autoFocus />

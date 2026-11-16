@@ -160,8 +160,8 @@ export function looksLikeBankSender(sender: string, sampleText = ''): boolean {
 }
 
 /** Every money mention: "Rs.450", "INR 1,240.00", "USD 45.00", "$45", "£12.50", "¥3,200", "AED 150", "45.00 USD". */
-const MONEY = /(?:(INR|Rs|₹|USD|US\$|\$|GBP|£|JPY|JP¥|¥|AED|Dhs)\.?:?\s?([\d,]+(?:\.\d{1,2})?))|(?:\b([\d,]+(?:\.\d{1,2})?)\s?(INR|USD|GBP|JPY|AED)\b)/gi;
-const CURRENCY: Record<string, string> = { inr: 'INR', rs: 'INR', 'rs.': 'INR', '₹': 'INR', usd: 'USD', 'us$': 'USD', $: 'USD', gbp: 'GBP', '£': 'GBP', jpy: 'JPY', 'jp¥': 'JPY', '¥': 'JPY', aed: 'AED', dhs: 'AED', 'dhs.': 'AED' };
+const MONEY = /(?:(INR|Rs|₹|USD|US\$|\$|EUR|€|GBP|£|JPY|JP¥|¥|AED|Dhs|KWD|BHD|OMR|SAR|QAR|SGD|THB|AUD|CAD|CHF)\.?:?\s?([\d,]+(?:\.\d{1,3})?))|(?:\b([\d,]+(?:\.\d{1,3})?)\s?(INR|USD|EUR|GBP|JPY|AED|KWD|BHD|OMR|SAR|QAR|SGD|THB|AUD|CAD|CHF)\b)/gi;
+const CURRENCY: Record<string, string> = { inr: 'INR', rs: 'INR', 'rs.': 'INR', '₹': 'INR', usd: 'USD', 'us$': 'USD', $: 'USD', gbp: 'GBP', '£': 'GBP', jpy: 'JPY', 'jp¥': 'JPY', '¥': 'JPY', aed: 'AED', dhs: 'AED', 'dhs.': 'AED', eur: 'EUR', '€': 'EUR', kwd: 'KWD', bhd: 'BHD', omr: 'OMR', sar: 'SAR', qar: 'QAR', sgd: 'SGD', thb: 'THB', aud: 'AUD', cad: 'CAD', chf: 'CHF' };
 /** Words right before a figure that make it not the transaction: a limit, a balance, a due. */
 const NOT_THE_AMOUNT = /(?:\b(?:avl|avbl|available|avail|total|credit|cr|card|clear|ledger|min(?:imum)?|outstanding|o\/s)\b[\s.:]*)?\b(?:lmt|limit|bal|balance|outstanding|due|amount due|amt due|dues|cover|sum (?:assured|insured))\b[^\d\n]{0,14}$/i;
 

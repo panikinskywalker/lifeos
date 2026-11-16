@@ -3,6 +3,7 @@ import type { ObjectRecord } from '@core/domain/types';
 import { nextOccurrence } from '@core/automation/recurrence';
 import type { AccountData, InvestmentData, SubscriptionData, TransactionData } from './types';
 import { categoryTargets } from './categories';
+import { toInr } from './filing/fx';
 import { incomeSql, MONEY_KINDS_SQL, spentSql } from '@core/dashboard/money';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -37,8 +38,32 @@ export function periodRange(period: 'monthly' | 'weekly' | 'yearly', at: number 
  * balance), that is the start instead, and only payments after it are added:
  * dated after its day, or that day and heard after it.
  */
+/** What a forex card holds in each currency now: what you set, less spends in that currency since; in rupees at today's rate (null when no rate yet). */
+export function pocketBalances(os: LifeOSContext, account: ObjectRecord<AccountData>): Array<{ currency: string; amount: number; inr: number | null }> {
+  const j = (k: string) => `json_extract(data,'$.${k}')`;
+  return (account.data.pockets ?? []).map((p) => {
+    const row = os.db.get<{ s: number | null }>(
+      `SELECT SUM(${j('originalAmount')}) AS s FROM records WHERE object='transaction' AND deleted_at IS NULL AND ${j('accountId')}=? AND ${j('kind')}='expense' AND ${j('originalCurrency')}=? AND (${j('date')} > ? OR (${j('date')} = ? AND created_at > ?))`,
+      [account.id, p.currency, p.on, p.on, p.at],
+    );
+    const amount = Math.round((p.amount - (row?.s ?? 0)) * 1000) / 1000;
+    return { currency: p.currency, amount, inr: toInr(os, amount, p.currency)?.inr ?? null };
+  });
+}
+
+/** Set what a forex card holds in each currency, from now. Returns the old pockets for Undo. */
+export function setPockets(os: LifeOSContext, accountId: string, pockets: Array<{ currency: string; amount: number }>, now = Date.now()): AccountData['pockets'] {
+  const before = os.records.get<AccountData>(accountId)?.data.pockets;
+  const dt = new Date(now);
+  const on = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  os.records.update(accountId, { data: { pockets: pockets.filter((p) => p.amount > 0).map((p) => ({ ...p, on, at: now })) } }, 'user');
+  return before;
+}
+
 export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountData>): number {
   const d = account.data;
+  // A forex card with its currencies set is worth what they come to in rupees.
+  if (d.kind === 'forex' && d.pockets?.length) return pocketBalances(os, account).reduce((n, p) => n + (p.inr ?? 0), 0);
   const known = typeof d.knownBalance === 'number' && d.knownOn ? { on: d.knownOn, at: d.knownAt ?? 0 } : null;
   const j = (k: string) => `json_extract(r.data,'$.${k}')`;
   const heard = `COALESCE((SELECT q.received_at FROM ingest_queue q WHERE q.id = ${j('sourceRef')}), r.created_at)`;

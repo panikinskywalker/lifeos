@@ -1458,6 +1458,17 @@ references).** Each screen takes the direction that suits it:
   needed), and Ask Money knows it is for spending abroad. A debit or forex card
   below zero cannot be right (a card bill read before its type was set): its
   card says *Set balance* instead of a minus figure.
+  A forex card holds **several currencies** (17 Nov, Rutvij: dinar, yen, dollar,
+  pound on one card). Its Set balance asks for each currency and amount, as the
+  card app shows them; a spend abroad in a currency after that comes off it (the
+  text's own amount, `originalAmount`). Its page lists *On the card*, each
+  currency with what it is worth in rupees at today's rate, and the card in the
+  wheel shows them in one line ("$385 · KWD 30") over the rupee total, which is
+  what counts in *In your accounts*. Loading the card from a bank is a transfer
+  (the bank goes down in rupees); what landed in each currency is set on the
+  card, since the rate the bank used is not in the text. Rates come once a day
+  for USD, EUR, GBP, JPY, AED, KWD, BHD, OMR, SAR, QAR, SGD, THB, AUD, CAD and
+  CHF, and bank texts in those currencies are read.
 - **An account's or card's page** (direction A): the account drawn as its card
   (balance or what you owe on it), then round-icon buttons Add · Transfer · Set
   balance (Set owed) · Edit.

@@ -49,6 +49,8 @@ export interface AccountData {
   statement?: { total: number; min?: number; dueOn: string; at: number };
   /** What to use it for, with commas ("Shopping, Forex"), shown as pills on the card: Ask Money fills it in, or you type it. */
   useFor?: string;
+  /** A forex card's money in each currency, as you last set it (on that day, at that time); spends in a currency after it come off. */
+  pockets?: Array<{ currency: string; amount: number; on: string; at: number }>;
 }
 
 export const accountType: ObjectDef<AccountData> = {
@@ -72,6 +74,7 @@ export const accountType: ObjectDef<AccountData> = {
     knownAt: z.coerce.number().optional(),
     statement: z.object({ total: z.number(), min: z.number().optional(), dueOn: z.string(), at: z.number() }).optional(),
     useFor: z.string().max(80).optional(),
+    pockets: z.array(z.object({ currency: z.string(), amount: z.number(), on: z.string(), at: z.number() })).optional(),
   }),
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [

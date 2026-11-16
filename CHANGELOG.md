@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.100 · 17 Nov 2026
+
+**A forex card in several currencies.** Set balance on a forex card asks what
+it holds in each currency (dinar, yen, dollar, pound…). Spends abroad come off
+the right currency; its page lists *On the card* with each in rupees at today's
+rate, and the wheel shows them in one line over the rupee total. Rates and bank
+texts now cover EUR, KWD, BHD, OMR, SAR, QAR, SGD, THB, AUD, CAD and CHF too.
+
 ## v0.0.99 · 17 Nov 2026
 
 **Forex cards look right.** A forex card says *Spending abroad* on its own, with

@@ -4,7 +4,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { importSource, runSource } from '@core/filing/sources';
 import type { DeviceBridge } from '@core/registry/context';
 import { sourceState } from '@core/sources/deviceData';
-import { applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance/filing/fx';
+import { FX_CURRENCIES, applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance/filing/fx';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
 import { syncMail } from './email';
@@ -153,10 +153,11 @@ async function syncRegistered(os: LifeOSContext, id: string) {
   await quietly(() => runSource(os, src));
 }
 
-/** Today's exchange rates for USD / GBP / JPY / AED (once a day, when online), then convert anything waiting. */
+/** Today's exchange rates (once a day, when online, or sooner when a currency has none yet), then convert anything waiting. */
 export async function refreshFxRates(os: LifeOSContext) {
   const today = new Date().toISOString().slice(0, 10);
-  if (fxRates(os)?.day !== today) {
+  const known = fxRates(os);
+  if (known?.day !== today || FX_CURRENCIES.some((c) => !known.inrPer[c])) {
     try {
       const r = await fetch('https://open.er-api.com/v6/latest/INR');
       const j = (await r.json()) as { result?: string; rates?: Record<string, number> };

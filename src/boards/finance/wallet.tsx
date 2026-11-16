@@ -9,13 +9,15 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
 import { CardWheel, Icon, IconButton, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
-import { cardUses, incomeInRange, monthRange, needsBalance, netWorth, spendInRange } from '@modules/finance/lib';
+import { cardUses, incomeInRange, monthRange, needsBalance, netWorth, pocketBalances, spendInRange } from '@modules/finance/lib';
 import { ASK_AGENT_MODEL, cardsWithoutUses, fillCardUses, forgetGuessedUses } from '@modules/finance/askAgent';
 import { INSTRUMENTS, type AccountData } from '@modules/finance/types';
 import { KIND_WORD, Rows, SectionHead, Spark, day } from './parts';
 import { UploadSheet } from './uploadSheet';
 
 const INK = '#0B0B0D';
+/** A forex card's currencies in one line: "$420 · ¥12,000 · KWD 30". */
+const pocketLine = (os: LifeOSContext, a: ObjectRecord<AccountData>) => pocketBalances(os, a).map((p) => os.format.currency(p.amount, p.currency)).join(' · ');
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 /** Each kind of account has its own card colour. */
 const CARD: Record<AccountData['kind'], string> = { bank: blocks.lime, credit: blocks.lilac, debit: blocks.mint, forex: blocks.yellow, cash: blocks.orange, wallet: blocks.sky, loan: blocks.pink, investment: blocks.mint };
@@ -101,7 +103,7 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
               amount: unset ? 'Set balance' : card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
               tail: d.last4 ? `•••• ${d.last4}` : undefined,
               uses: cardUses(d.useFor, d.kind),
-              note: unset ? 'what is on it? open to set' : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
+              note: unset ? 'what is on it? open to set' : d.kind === 'forex' && d.pockets?.length ? pocketLine(os, acc) : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
             };
           })}
           onOpen={(id) => router.push(`/entity/account/${id}` as never)}
@@ -154,7 +156,7 @@ function WalletCard({ account: a, balance, front, first, money, still }: { accou
   const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
   const unset = needsBalance(d.kind, balance);
   const figure = unset ? 'Set balance' : card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency);
-  const source = unset ? 'tap Set balance below' : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? 'from its spends' : 'from opening balance';
+  const source = unset ? 'tap Set balance below' : d.kind === 'forex' && d.pockets?.length ? 'in rupees, today’s rates' : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? 'from its spends' : 'from opening balance';
   const bg = late ? '#FF8A7A' : CARD[d.kind] ?? blocks.sky;
   return (
     <Pressable
