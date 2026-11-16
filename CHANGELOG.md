@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.95 · 17 Nov 2026
+
+**Polish on Who owes whom and a debt.** A person's card shows their latest four
+open items and "N more", which opens their page; Settle up all on a debt is
+white under its coloured card, as in the design.
+
 ## v0.0.94 · 16 Nov 2026
 
 **Turf looks like Turf web, screen for screen.** Each screen is rebuilt from

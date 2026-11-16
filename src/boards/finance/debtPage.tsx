@@ -86,7 +86,8 @@ export function DebtPage({ entity, ctx, controls, say }: { entity: ObjectRecord<
       <View style={{ gap: 10 }}>
         {view.balance !== 0 ? (
           <>
-            <Button title={`Settle up all ${money(Math.abs(view.balance))}`} icon="check" onPress={settle} block />
+            {/* White under a coloured card, as on NR-Money-Debt; lime when the card is grey. */}
+            <Button title={`Settle up all ${money(Math.abs(view.balance))}`} icon="check" onPress={settle} block style={settled ? undefined : { backgroundColor: '#F5F5F7' }} />
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>{`Settles everything open with ${first} · Undo after`}</Text>
           </>
         ) : null}

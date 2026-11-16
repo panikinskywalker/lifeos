@@ -1466,8 +1466,8 @@ No screen stays on the generic layout; each is put together from v3 Noir kit par
 - **Who owes whom** (Money › Who owes whom, the *All* of that home section; built
   from NR-Money-Owes 17 Nov): two tiles, *To you* in lime and *You owe* with a coral
   figure; then *Owed to you* and *You owe*, a card per person with their net, their
-  open items ("Sat 17 Oct · Turf at Playground Arena", an item the other way round
-  with a minus) and a full-width Settle up, lime on the one who owes you most; the
+  latest four open items ("Sat 17 Oct · Turf at Playground Arena", an item the other
+  way round with a minus; "6 more" opens their page) and a full-width Settle up, lime on the one who owes you most; the
   last settled ones faded below. A Turf debt's reason is "Turf · <venue>"; its date
   is its own Field.
 - **A debt's page** (built from NR-Money-Debt 17 Nov): the top bar; the person's

@@ -7,7 +7,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, IconButton, OnBar, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
+import { Button, Icon, IconButton, OnBar, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
 import { blocks } from '@ui/theme/tokens';
 import { perMonth } from '@modules/finance/reports';
 import { balances, type DebtData } from '@modules/finance/split';
@@ -248,6 +248,8 @@ export function DebtsScreen(_: { ctx: LifeOSContext; params: Record<string, stri
 }
 
 const INK = '#0B0B0D';
+/** Open items shown on a person's card; the rest are on their page. */
+const SHOWN_ITEMS = 4;
 
 /** One of the two totals on Who owes whom: lime for what comes to you, coral figures for what you owe. */
 function TotalTile({ label, value, line, lime, coral }: { label: string; value: string; line: string; lime?: boolean; coral?: boolean }) {
@@ -283,7 +285,7 @@ function PersonOwes({ p, lead }: { p: { personId: string; amount: number; name: 
       </Pressable>
       {p.items.length ? (
         <View style={{ borderTopWidth: 1, borderColor: t.c.line }}>
-          {p.items.map((d) => {
+          {p.items.slice(0, SHOWN_ITEMS).map((d) => {
             // An item the other way round from their net shows with a minus.
             const against = (d.data.direction === 'they_owe') !== toYou;
             return (
@@ -293,6 +295,12 @@ function PersonOwes({ p, lead }: { p: { personId: string; amount: number; name: 
               </Pressable>
             );
           })}
+          {p.items.length > SHOWN_ITEMS ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={`${p.items.length - SHOWN_ITEMS} more with ${p.name}. Opens their page`} onPress={() => router.push(`/entity/person/${p.personId}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, opacity: pressed ? 0.7 : 1 })}>
+              <Text style={{ fontSize: 14, lineHeight: 19, fontWeight: '600', color: t.c.accent.gold }}>{`${p.items.length - SHOWN_ITEMS} more`}</Text>
+              <Icon name="chevron-right" size={14} color={t.c.accent.gold} />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
       <Button title={`Settle up ${os.format.currency(Math.abs(p.amount))}`} variant={lead ? 'primary' : 'secondary'} onPress={settle} block />
