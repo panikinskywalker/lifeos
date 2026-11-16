@@ -1,6 +1,8 @@
 import { createLifeOS } from '@core/lifeos';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
+import { Platform } from 'react-native';
+import { swConfig, syncSplitwise, SplitwiseClient } from '@modules/finance/splitwise';
 import { installedModules } from '@modules/index';
 import { installedBoards } from '@boards/index';
 import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
@@ -117,6 +119,19 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   bus.on('app.foreground', () => void runFiling(os));
   // Phone data (bank SMS, payment notifications, screen time, Health Connect): on every foreground and live.
   bus.on('app.foreground', () => void syncSources(os));
+  // A linked person's share made, changed, settled or deleted: Splitwise hears within seconds (docs/MODEL.md, Splitwise and settling up).
+  let swTimer: ReturnType<typeof setTimeout> | null = null;
+  const swSoon = ({ entity }: { entity: { object: string; data: unknown } }) => {
+    if (entity.object !== 'debt' || Platform.OS === 'web') return;
+    const c = swConfig(os);
+    if (!c.me || c.signedOut || !c.people[(entity.data as { personId?: string }).personId ?? '']) return;
+    if (swTimer) clearTimeout(swTimer);
+    swTimer = setTimeout(() => void syncSplitwise(os, new SplitwiseClient()).catch(() => {}), 4000);
+  };
+  bus.on('entity.created', swSoon);
+  bus.on('entity.updated', swSoon);
+  bus.on('entity.status', swSoon);
+  bus.on('entity.deleted', swSoon);
   listenLive(os);
 
   // Run any due scheduled jobs now, then hand off to the background task.

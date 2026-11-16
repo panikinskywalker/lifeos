@@ -98,6 +98,19 @@ describe('Splitwise kept in step', () => {
     expect((await syncSplitwise(os, sw.client)).paidThere).toBe(0);
   });
 
+  it('a Turf share part-paid after it went to Splitwise is paid back there for what was sent', async () => {
+    const k = kalpak();
+    linkPerson(os, k.id, { id: KALPAK, name: 'Kalpak Rao' }, 0);
+    const d = debt(k.id, 200);
+    const sw = fakeSplitwise();
+    await syncSplitwise(os, sw.client);
+    // A ₹50 part payment lowers what is open; then the rest settles it.
+    os.records.update(d.id, { data: { amount: 150 } });
+    os.records.setStatus(d.id, 'settled');
+    await syncSplitwise(os, sw.client);
+    expect(sw.posts.filter((p) => p.path === 'create_expense').at(-1)!.body).toMatchObject({ payment: 'true', cost: '200.00' });
+  });
+
   it('a payment he records on Splitwise settles his shares here, oldest first, up to what he paid', async () => {
     const k = kalpak();
     linkPerson(os, k.id, { id: KALPAK, name: 'Kalpak Rao' }, Date.now() + 60_000);

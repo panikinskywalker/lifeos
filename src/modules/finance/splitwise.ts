@@ -60,6 +60,8 @@ export interface SwConfig {
   balances: Record<string, number>;
   /** Debt → the Splitwise expense made for it. */
   pushed: Record<string, number>;
+  /** Debt → the amount that went to Splitwise, so its payment is that amount (a Turf share's amount drops as part payments come). */
+  amounts?: Record<string, number>;
   /** Settled Debts whose payment is on Splitwise (or came from it). */
   sent: string[];
   /** Expenses LifeOS made, so a sync never reads its own payments back. */
@@ -228,6 +230,7 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
     }
     c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined })), swGroups: groups });
     const pushed = { ...c.pushed };
+    const amounts = { ...(c.amounts ?? {}) };
     const sent = new Set(c.sent);
     const ours = new Set(c.ours);
 
@@ -239,6 +242,7 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
         if (!link || pushed[d.id] || d.data.kind === 'payment' || d.createdAt < link.at || (d.data.currency && d.data.currency !== 'INR')) continue;
         const id = await sw.createExpense({ cost: money(d.data.amount), description: (d.data.reason || 'Shared expense').slice(0, 100), currency_code: 'INR', date: new Date(`${d.data.date}T12:00:00`).toISOString(), group_id: (d.data.groupId && c.groups[d.data.groupId]) || 0, ...shareParams(me.id, link.sw, d.data.amount, d.data.direction === 'they_owe') });
         pushed[d.id] = id;
+        amounts[d.id] = d.data.amount;
         ours.add(id);
         result.pushed++;
       }
@@ -249,6 +253,7 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       if (os.records.get(debtId)) continue;
       await sw.deleteExpense(expenseId).catch(() => {});
       delete pushed[debtId];
+      delete amounts[debtId];
       result.removed++;
     }
 
@@ -258,7 +263,8 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       if (sent.has(debtId)) continue;
       const d = os.records.get<DebtData>(debtId);
       if (!d || d.status !== 'settled' || !c.people[d.data.personId]) continue;
-      byPerson.set(d.data.personId, (byPerson.get(d.data.personId) ?? 0) + signed(d.data));
+      const sentAmount = amounts[debtId] ?? d.data.amount;
+      byPerson.set(d.data.personId, (byPerson.get(d.data.personId) ?? 0) + (d.data.direction === 'they_owe' ? sentAmount : -sentAmount));
       sent.add(debtId);
     }
     for (const [personId, amount] of byPerson) {
@@ -286,7 +292,7 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       result.settledHere += done.length;
     }
 
-    setSwConfig(os, { pushed, sent: [...sent], ours: [...ours].slice(-2000), lastSync: now });
+    setSwConfig(os, { pushed, amounts, sent: [...sent], ours: [...ours].slice(-2000), lastSync: now });
     return result;
   } catch (e) {
     if (e instanceof SplitwiseError && e.signedOut) setSwConfig(os, { signedOut: true });

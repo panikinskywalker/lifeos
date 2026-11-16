@@ -1869,6 +1869,13 @@ how far apart. **Built 17 Nov (v0.0.118, steps 5 to 7 and the bill split):**
   line no one took is shared by everyone; tax, service and rounding go in
   proportion, to the paisa (`splitBill`); Save files the payment and each
   share as Debts (so Splitwise follows).
+Turf and Splitwise (checked 17 Nov): a Turf share for a linked person is a Debt
+the moment the game reaches LifeOS, and goes to Splitwise within seconds (a
+change to a linked person's Debt starts a sync 4 s later). When Kalpak pays by
+UPI, the bank text is filed, Turf matches it to his share (on its own when the
+sender is known and the amount exact; else To check asks), marks it paid on Turf
+web, and his Debt settles; Splitwise then gets a payment for the amount that was
+sent there (a part payment shows on Splitwise only once the share is paid in full).
 Still to come: one Splitwise expense per bill with every share (today each
 share goes as its own), and the bill photo on it.
 Bills, statements and fund screens are read by Haiku (bills already; statements

@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.120 · 17 Nov 2026
+
+**Splitwise hears within seconds.** A linked person's share made, changed, settled or deleted (a Turf game, a split, a payment that settles it) syncs to Splitwise a few seconds later, not at the next background sync. A Turf share paid in parts is paid back on Splitwise for exactly what was sent.
+
 ## v0.0.119 · 17 Nov 2026
 
 **One way to settle.** A payment recorded on Splitwise settles shares the same way a bank text does, and leaves Turf's shares to Turf too.
