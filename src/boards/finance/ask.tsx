@@ -475,7 +475,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
           </View>
         ))}
 
-        {!items.length && !empty ? <Text color="secondary" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 4 }}>A question you type goes to Ask Money's agent (Claude Haiku, on your Claude key) or else the model in You › Agent: rounded amounts, dates and categories, with people as placeholders. Never your texts. It can change categories, keep cards on Money home and, after asking, set limits; each change has Undo.</Text> : null}
+        {!items.length && !empty ? <Text color="secondary" style={{ fontSize: 13, lineHeight: 18, paddingHorizontal: 4 }}>A question you type goes to Ask Money's agent (Claude Sonnet with web search, on your Claude key) or else the model in You › Agent: rounded amounts, dates and categories, with people as placeholders. Never your texts. It can change categories, keep cards on Money home and, after asking, set limits; each change has Undo.</Text> : null}
       </ScrollView>
 
       <View style={{ paddingHorizontal: t.layout.gutter, paddingTop: 12, paddingBottom: insets.bottom + 16 }}>

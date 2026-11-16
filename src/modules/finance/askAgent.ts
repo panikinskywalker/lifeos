@@ -38,7 +38,8 @@ How you work:
 - To put something on the user's Money home (a tracker, a chart), call keep_view with the money query; it stays live.
 - You never move money, pay anyone or settle a debt. If asked, say so and offer to keep a view or note instead.
 - You can search the web (web_search) and read pages (web_fetch) for what is not in the user's records: today's FD and savings rates, a fund's returns and expense ratio, tax rules and deadlines, card offers, prices. Put the figures you find next to theirs and say where they came from. Never put the user's names, account digits or exact figures into a search.
-- Cards: when asked how to spend smarter, or when it would save real money, call cards_and_spend, look up each card's current rewards, cashback and fees on the web (by bank and card name; ask the user which card it is when the name is only the bank's, like "ICICI Bank card"), and say which card to use for which kind of spend, with the rupees it saves a month. Mention fees, caps and anything that expires.
+- Cards: when asked how to spend smarter, or when it would save real money, call cards_and_spend, look up each card's current rewards, cashback and fees on the web, and say which card to use for which kind of spend, with the rupees it saves a month. Mention fees, caps and anything that expires. When a card is named only by its bank ("ICICI Bank card"), never stop at asking: give your best advice now from the bank, what goes through that card (its top shops say a lot: Amazon spend on an ICICI card is probably the Amazon Pay card) and the bank's popular cards, say what you assumed, then ask one short question to confirm. When the user says which card it is, call name_card so it is remembered.
+- If a large share of spending is in Other, say so plainly and offer to sort it (recategorise by shop); advice is only as good as the categories.
 - No buy or sell calls on a fund or a stock. Explain what they hold and the general rules (an emergency fund first, stepping a SIP up) instead.
 - People appear as placeholders like "Person 3"; use them as given. Amounts are rounded rupees unless a currency is given.
 - Think like a sharp personal finance advisor, not a search box. Look at more than one figure before you answer: compare with last month or the usual month (money_query with sameDaysBefore, or by month), find what drives a number (by category, then by payee), and name the specific shops, bills or days behind it.
@@ -84,9 +85,9 @@ export const MONEY_AGENT_TOOLS: AiToolDef[] = [
     run: async (_input, os) => {
       const people = new Set(peopleNames(os).map((n) => n.toLowerCase()));
       const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
-      const accounts = os.records.query<AccountData>('account', {}, { limit: 100 }).filter((a) => a.data.kind === 'credit' || a.data.kind === 'bank' || a.data.kind === 'wallet');
+      const accounts = cardList(os);
       return {
-        accounts: accounts.map((a) => {
+        accounts: accounts.map((a, i) => {
           const txs = os.records.query<TransactionData>('transaction', { filter: { and: [{ field: 'data.accountId', op: 'eq', value: a.id }, { field: 'data.kind', op: 'eq', value: 'expense' }, { field: 'data.date', op: 'gte', value: since }] } }, { limit: 3000 });
           const sum = (key: (t: TransactionData & { title?: string }) => string | null) => {
             const m = new Map<string, number>();
@@ -97,6 +98,7 @@ export const MONEY_AGENT_TOOLS: AiToolDef[] = [
             return [...m.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, v]) => ({ name: k, perMonth: roundMoney(v / 3) }));
           };
           return {
+            ref: `card-${i + 1}`,
             name: a.title.replace(/\s*[•·]+\s*\d{3,4}$/, ''),
             bank: a.data.institution ?? null,
             kind: a.data.kind,
@@ -108,6 +110,19 @@ export const MONEY_AGENT_TOOLS: AiToolDef[] = [
           };
         }),
       };
+    },
+  },
+  {
+    name: 'name_card',
+    description: 'Give one of the user\'s cards or accounts its real name, the product as the bank sells it ("Amazon Pay ICICI credit card", "HDFC Millennia"), so you and the user can tell them apart and you can look up its rewards. ref is from cards_and_spend. Runs at once; the user can undo it.',
+    input: z.object({ ref: z.string(), name: z.string().min(2).max(60) }),
+    run: async (input, os) => {
+      const i = input as { ref: string; name: string };
+      const a = cardList(os)[Number(/^card-(\d+)$/.exec(i.ref)?.[1] ?? 0) - 1];
+      if (!a) return { error: `No ${i.ref}. Call cards_and_spend for the refs.` };
+      const before = a.title;
+      os.records.update(a.id, { title: i.name }, 'user');
+      return withExtras({ named: i.name, was: before.replace(/\s*[•·]+\s*\d{3,4}$/, '') }, { undo: () => os.records.update(a.id, { title: before }, 'user') });
     },
   },
   {
@@ -154,6 +169,11 @@ export const MONEY_AGENT_TOOLS: AiToolDef[] = [
     },
   },
 ];
+
+/** Cards and accounts in a stable order, so a ref from cards_and_spend names the same one in name_card. */
+function cardList(os: LifeOSContext) {
+  return os.records.query<AccountData>('account', {}, { limit: 100 }).filter((a) => a.data.kind === 'credit' || a.data.kind === 'bank' || a.data.kind === 'wallet').sort((x, y) => x.createdAt - y.createdAt || x.id.localeCompare(y.id));
+}
 
 /** Money's read-only tools the agent may use (each goes through the privacy gate), then its own. */
 const READS = new Set(['money_query', 'money_show', 'net_worth', 'portfolio', 'subscriptions_run_rate']);
@@ -207,7 +227,7 @@ export interface AgentHooks {
   confirm(label: string): Promise<boolean>;
 }
 
-const STEP: Record<string, string> = { cards_and_spend: 'Looked at your cards', money_overview: 'Looked at the month', money_query: 'Worked out a figure', net_worth: 'Looked at net worth', portfolio: 'Looked at investments', subscriptions_run_rate: 'Looked at subscriptions', recategorise: 'Moved payments', keep_view: 'Built a card', set_budget: 'Set a limit', money_show: 'Drew it' };
+const STEP: Record<string, string> = { name_card: 'Named a card', cards_and_spend: 'Looked at your cards', money_overview: 'Looked at the month', money_query: 'Worked out a figure', net_worth: 'Looked at net worth', portfolio: 'Looked at investments', subscriptions_run_rate: 'Looked at subscriptions', recategorise: 'Moved payments', keep_view: 'Built a card', set_budget: 'Set a limit', money_show: 'Drew it' };
 
 /** Run one tool the agent called, on the phone: validate, ask first when it must, run, return what goes back. */
 export async function runAgentTool(os: LifeOSContext, name: string, input: unknown, hooks: Pick<AgentHooks, 'confirm' | 'change'>): Promise<string> {
@@ -227,6 +247,7 @@ function changeLabel(name: string, out: Record<string, unknown>, os: LifeOSConte
   if (name === 'recategorise') return `Moved ${out.moved} payment${out.moved === 1 ? '' : 's'} to ${CATEGORIES.find((c) => c.value === out.category)?.label ?? out.category} · ${out.payee} files there from now on`;
   if (name === 'keep_view') return `Added "${out.kept}" to Money home`;
   if (name === 'set_budget') return 'Limit set';
+  if (name === 'name_card') return `Named ${out.was} "${out.named}"`;
   return `Done · ${name}`;
 }
 

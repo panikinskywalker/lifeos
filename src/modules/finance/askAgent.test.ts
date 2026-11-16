@@ -145,4 +145,16 @@ describe('Ask Money as an agent', () => {
     expect(JSON.stringify(out)).not.toContain('Priya');
     expect(JSON.stringify(out)).not.toContain('3007');
   });
+
+  it('name_card renames the card a ref points at, and Undo puts the old name back', async () => {
+    const a = os.records.create({ object: 'account', title: 'ICICI Bank card ••3007', data: { kind: 'credit', institution: 'ICICI Bank', last4: '3007', currency: 'INR', openingBalance: 0 } });
+    const { runAgentTool } = await import('./askAgent');
+    const changes: Array<{ label: string; undo?: () => void }> = [];
+    const refs = JSON.parse(await runAgentTool(os, 'cards_and_spend', {}, { confirm: async () => true, change: () => {} })).accounts.map((x: { ref: string }) => x.ref);
+    await runAgentTool(os, 'name_card', { ref: refs[0], name: 'Amazon Pay ICICI card' }, { confirm: async () => true, change: (c) => changes.push(c) });
+    expect(os.records.get(a.id)!.title).toBe('Amazon Pay ICICI card');
+    expect(changes[0]!.label).toBe('Named ICICI Bank card "Amazon Pay ICICI card"');
+    changes[0]!.undo!();
+    expect(os.records.get(a.id)!.title).toBe('ICICI Bank card ••3007');
+  });
 });

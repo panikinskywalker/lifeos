@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.90 · 16 Nov 2026
+
+**Ask Money answers card questions instead of asking first.** When a card is
+only "ICICI Bank card", it now gives its best advice straight away from the
+bank and what you buy on that card (Amazon on an ICICI card is probably the
+Amazon Pay card), says what it assumed, and asks one short question. Tell it
+which card it is and it renames the card in the app (with Undo), so it knows
+next time. When much of your spending sits in Other, it says so and offers to
+sort it, since advice is only as good as the categories.
+
 ## v0.0.89 · 16 Nov 2026
 
 **Ask Money gets smarter: Claude Sonnet 5.5, the web, and your cards.**
