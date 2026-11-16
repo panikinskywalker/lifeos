@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -46,6 +46,10 @@ export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onC
   const router = useRouter();
   const toast = useToast();
   const [phase, setPhase] = useState<Phase>({ at: 'pick' });
+  // Each opening starts fresh: a reading left from before (the app went away mid-way) never waits behind its Apply (17 Nov).
+  useEffect(() => {
+    if (visible) setPhase({ at: 'pick' });
+  }, [visible]);
   const [said, setSaid] = useState('');
   const accounts = useLive((o) => o.records.query<AccountData>('account', {}, { limit: 50 }).filter((a) => a.data.kind !== 'investment' && a.data.kind !== 'loan'), []);
   const close = () => {

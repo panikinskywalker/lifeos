@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.105 · 17 Nov 2026
+
+**Upload and Add a payment start fresh.** If the app went away while a statement
+or bill was being read, reopening the sheet showed the old reading with its
+Apply or Save where a tap could land. Each opening now starts at the beginning.
+
 ## v0.0.104 · 17 Nov 2026
 
 **Loan statements.** An uploaded loan statement is read as a loan, not a bank

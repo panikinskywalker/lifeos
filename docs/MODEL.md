@@ -1318,7 +1318,9 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   (DR), and its EMI is shown. Its last digits find it whatever type it was filed
   as, and it becomes a Loan ("SBI ••1176 is a loan: you owe ₹5,04,583.36"), with
   Undo; with no match it is a new loan. A loan's card says *Loan · you owe* and
-  shows the amount owed, which counts against net worth.
+  shows the amount owed, which counts against net worth. The Upload and Add a
+  payment sheets start fresh each time they open, so a reading left from before
+  never waits behind its Apply or Save.
 - **Photos and PDFs are read by Haiku** (17 Nov, Rutvij): a snapped or attached
   bill, an uploaded statement and Snap the fridge go to Claude Haiku 5.5
   (`PHOTO_MODEL`), whatever model the brain's other passes use; same key, budget

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -37,6 +37,10 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
   const t = useTheme();
   const toast = useToast();
   const [phase, setPhase] = useState<Phase>({ at: 'pick' });
+  // Each opening starts fresh: a reading left from before (the app went away mid-way) never waits behind its Apply (17 Nov).
+  useEffect(() => {
+    if (visible) setPhase({ at: 'pick' });
+  }, [visible]);
   const close = () => {
     setPhase({ at: 'pick' });
     onClose();
