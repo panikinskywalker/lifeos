@@ -126,7 +126,8 @@ export function proposeChanges(os: LifeOSContext, read: StatementRead, now = Dat
   const out: Proposal[] = [];
   read.accounts.forEach((r, k) => {
     const bank = r.bank.toLowerCase().split(/\s+/)[0] ?? '';
-    const kindOk = (a: (typeof accounts)[number]) => (a.data.kind === 'credit') === (r.kind === 'credit');
+    // A card balance goes to a card; a bank balance to an account that holds money, never a card or a loan.
+    const kindOk = (a: (typeof accounts)[number]) => (r.kind === 'credit' ? a.data.kind === 'credit' : a.data.kind !== 'credit' && a.data.kind !== 'loan');
     const bankOk = (a: (typeof accounts)[number]) => !bank || `${a.title} ${a.data.institution ?? ''}`.toLowerCase().includes(bank);
     // The last digits decide: one account of that kind ending in them is the one, whatever bank was read.
     const byDigits = r.last4 ? accounts.filter((a) => kindOk(a) && a.data.last4 === r.last4) : [];
