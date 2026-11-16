@@ -9,7 +9,7 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
 import { CardWheel, Icon, IconButton, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
-import { cardUses, incomeInRange, monthRange, netWorth, spendInRange } from '@modules/finance/lib';
+import { cardUses, incomeInRange, monthRange, needsBalance, netWorth, spendInRange } from '@modules/finance/lib';
 import { ASK_AGENT_MODEL, cardsWithoutUses, fillCardUses, forgetGuessedUses } from '@modules/finance/askAgent';
 import { INSTRUMENTS, type AccountData } from '@modules/finance/types';
 import { KIND_WORD, Rows, SectionHead, Spark, day } from './parts';
@@ -92,15 +92,16 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
             const d = acc.data;
             const card = d.kind === 'credit';
             const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
+            const unset = needsBalance(d.kind, balance);
             return {
               key: acc.id,
               alert: late,
               title: acc.title.replace(/\s*[•·]+\s*\d{3,4}$/, ''),
               corner: card ? 'You owe' : KIND_WORD[d.kind],
-              amount: card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
+              amount: unset ? 'Set balance' : card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
               tail: d.last4 ? `•••• ${d.last4}` : undefined,
-              uses: cardUses(d.useFor),
-              note: typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
+              uses: cardUses(d.useFor, d.kind),
+              note: unset ? 'what is on it? open to set' : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
             };
           })}
           onOpen={(id) => router.push(`/entity/account/${id}` as never)}
@@ -151,8 +152,9 @@ function WalletCard({ account: a, balance, front, first, money, still }: { accou
   const d = a.data;
   const card = d.kind === 'credit';
   const late = card && !!d.statement && d.statement.dueOn < format(new Date(), 'yyyy-MM-dd');
-  const figure = card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency);
-  const source = typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? 'from its spends' : 'from opening balance';
+  const unset = needsBalance(d.kind, balance);
+  const figure = unset ? 'Set balance' : card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency);
+  const source = unset ? 'tap Set balance below' : typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? 'from its spends' : 'from opening balance';
   const bg = late ? '#FF8A7A' : CARD[d.kind] ?? blocks.sky;
   return (
     <Pressable

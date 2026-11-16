@@ -53,8 +53,14 @@ export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountD
   return start + (row?.i ?? 0) - (row?.o ?? 0);
 }
 
-/** A card's uses as pills ("Shopping, Forex" → ["Shopping", "Forex"]). */
-export const cardUses = (useFor?: string): string[] => (useFor ?? '').split(',').map((u) => u.trim()).filter(Boolean);
+/** A card's uses as pills ("Shopping, Forex" → ["Shopping", "Forex"]); a forex card is for spending abroad until told otherwise. */
+export function cardUses(useFor?: string, kind?: string): string[] {
+  const uses = (useFor ?? '').split(',').map((u) => u.trim()).filter(Boolean);
+  return uses.length || kind !== 'forex' ? uses : ['Spending abroad'];
+}
+
+/** A prepaid or debit card cannot hold less than nothing: a figure below zero is left over (a card bill read before its type was set) and wants setting. */
+export const needsBalance = (kind: string, balance: number) => (kind === 'forex' || kind === 'debit') && balance < 0;
 
 /** You told it what the bank shows: that is the balance from now on (Set balance, Reconcile). */
 export function setBalance(os: LifeOSContext, accountId: string, balance: number, now = Date.now()): { knownBalance?: number; knownOn?: string; knownAt?: number } {

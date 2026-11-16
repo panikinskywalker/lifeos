@@ -40,6 +40,7 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
   const [ask, setAsk] = useState(false);
   const [typed, setTyped] = useState<number | undefined>(undefined);
   // Naming a card named only by its bank: the name is kept (Undo), then Ask Money fills its uses from the product.
+  const uses = cardUses(d.useFor, d.kind);
   const [product, setProduct] = useState('');
   const [working, setWorking] = useState(false);
   const nameIt = () => {
@@ -99,7 +100,7 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
       </View>
 
       {/* What the card is for. A card named only by its bank asks which card it is first: uses come from the product, never a guess (17 Nov, Rutvij). */}
-      {(card || d.kind === 'forex') && !d.useFor && unnamedCard(a) ? (
+      {card && !uses.length && unnamedCard(a) ? (
         <View style={{ padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Icon name="sparkle" size={22} color={t.c.accent.gold} />
@@ -111,14 +112,14 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
           <TextField label="Card name" value={product} onChange={setProduct} placeholder="Amazon Pay, Coral, Forex…" />
           <Button title="Save" onPress={nameIt} disabled={product.trim().length < 2} block />
         </View>
-      ) : d.useFor || card || d.kind === 'forex' ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={d.useFor ? `Use it for ${d.useFor}. Edit` : 'What is this card best for? Ask Money'} disabled={working} onPress={() => (d.useFor ? controls?.edit() : router.push({ pathname: '/module/[id]/[page]', params: { id: 'finance', page: 'ask', card: a.id } } as never))} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 24, backgroundColor: d.useFor ? blocks.lime : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
-          {working ? <ActivityIndicator color={t.c.accent.gold} /> : <Icon name="sparkle" size={22} color={d.useFor ? '#0B0B0D' : t.c.accent.gold} />}
+      ) : uses.length || card ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={uses.length ? `Use it for ${uses.join(', ')}. Edit` : 'What is this card best for? Ask Money'} disabled={working} onPress={() => (uses.length ? controls?.edit() : router.push({ pathname: '/module/[id]/[page]', params: { id: 'finance', page: 'ask', card: a.id } } as never))} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 24, backgroundColor: uses.length ? blocks.lime : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
+          {working ? <ActivityIndicator color={t.c.accent.gold} /> : <Icon name="sparkle" size={22} color={uses.length ? '#0B0B0D' : t.c.accent.gold} />}
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: d.useFor ? 'rgba(11,11,13,0.62)' : t.c.fg.secondary }}>USE IT FOR</Text>
-            {d.useFor ? (
+            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: uses.length ? 'rgba(11,11,13,0.62)' : t.c.fg.secondary }}>USE IT FOR</Text>
+            {uses.length ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
-                {cardUses(d.useFor).map((u) => (
+                {uses.map((u) => (
                   <Text key={u} style={{ fontSize: 13, lineHeight: 17, fontWeight: '700', color: blocks.lime, backgroundColor: '#0B0B0D', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, overflow: 'hidden' }}>{u}</Text>
                 ))}
               </View>
@@ -126,7 +127,7 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
               <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', color: t.c.fg.primary }}>{working ? 'Ask Money is looking up its rewards' : 'Tap and Ask Money works it out for this card'}</Text>
             )}
           </View>
-          {working ? null : <Icon name={d.useFor ? 'edit' : 'chevron-right'} size={16} color={d.useFor ? '#0B0B0D' : t.c.fg.secondary} />}
+          {working ? null : <Icon name={uses.length ? 'edit' : 'chevron-right'} size={16} color={uses.length ? '#0B0B0D' : t.c.fg.secondary} />}
         </Pressable>
       ) : null}
       <Sheet visible={ask} onClose={() => setAsk(false)} title={card ? 'What does the card app say you owe?' : 'What does the bank show?'} footer={<Button title={card ? 'Set owed' : 'Set balance'} onPress={saveBalance} disabled={typed == null} />}>

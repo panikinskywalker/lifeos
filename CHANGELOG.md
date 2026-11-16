@@ -7,6 +7,13 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.99 · 17 Nov 2026
+
+**Forex cards look right.** A forex card says *Spending abroad* on its own, with
+no name or Ask Money needed. A forex or debit card whose figure is below zero
+(left over from when it was read as a credit card) shows *Set balance* instead of
+a minus amount.
+
 ## v0.0.98 · 17 Nov 2026
 
 **Debit and forex cards.** An account can now be a Debit card or a Forex card

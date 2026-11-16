@@ -220,4 +220,15 @@ describe('Ask Money as an agent', () => {
     os.records.update(plain.id, { title: 'ICICI Forex card' }, 'user');
     expect(cardsWithoutUses(os).map((a) => a.id).sort()).toEqual([named.id, plain.id].sort());
   });
+
+  it('a forex card is for spending abroad until told otherwise, and one below zero wants its balance set', async () => {
+    const { cardUses, needsBalance } = await import('./lib');
+    expect(cardUses(undefined, 'forex')).toEqual(['Spending abroad']);
+    expect(cardUses('Travel, Forex', 'forex')).toEqual(['Travel', 'Forex']);
+    expect(cardUses(undefined, 'credit')).toEqual([]);
+    expect(needsBalance('forex', -15036)).toBe(true);
+    expect(needsBalance('debit', -1)).toBe(true);
+    expect(needsBalance('forex', 500)).toBe(false);
+    expect(needsBalance('bank', -200)).toBe(false);
+  });
 });

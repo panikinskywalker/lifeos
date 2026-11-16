@@ -213,7 +213,7 @@ export function unnamedCard(a: { title: string; data: AccountData }): boolean {
 /** Named credit cards with no uses yet that were never tried: each is tried once, so this never repeats or spends again. A card named only by its bank is never guessed at (17 Nov, Rutvij: it said to use a forex card for bills). */
 export function cardsWithoutUses(os: LifeOSContext) {
   const tried = new Set(os.settings.get<string[]>(TRIED_KEY, []));
-  return cardList(os).filter((a) => (a.data.kind === 'credit' || a.data.kind === 'forex') && !a.data.useFor && !tried.has(a.id) && !unnamedCard(a));
+  return cardList(os).filter((a) => a.data.kind === 'credit' && !a.data.useFor && !tried.has(a.id) && !unnamedCard(a));
 }
 
 /** Once: take off the uses guessed for cards named only by their bank (v0.0.96 guessed them from spending alone). */
