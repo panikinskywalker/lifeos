@@ -1318,7 +1318,15 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   (DR), and its EMI is shown. Its last digits find it whatever type it was filed
   as, and it becomes a Loan ("SBI ••1176 is a loan: you owe ₹5,04,583.36"), with
   Undo; with no match it is a new loan. A loan's card says *Loan · you owe* and
-  shows the amount owed, which counts against net worth. The Upload and Add a
+  shows the amount owed, which counts against net worth.
+  Everything comes in by screenshot (17 Nov, Rutvij): besides balances, card
+  bills, loans, funds and SIPs, a **subscriptions** screenshot (an app's
+  subscription page, Google Play or App Store, a renewal mail) updates a known
+  subscription (price, how often, next renewal) or adds a new one, with Undo. A
+  screenshot of all your balances updates every account it shows; when one
+  could be several accounts (three SBI accounts and no digits shown) its row
+  asks **which account**, with one chip each, and stays unticked until you pick:
+  never a guess, never a new account. The Upload and Add a
   payment sheets start fresh each time they open, so a reading left from before
   never waits behind its Apply or Save.
 - **Photos and PDFs are read by Haiku** (17 Nov, Rutvij): a snapped or attached

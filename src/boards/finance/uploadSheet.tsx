@@ -11,7 +11,7 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Icon, Sheet, Text, useToast } from '@ui/kit';
 import { proposeChanges, readStatement, statementAsk, type Proposal } from '@modules/finance/statementRead';
 
-type Phase = { at: 'pick' } | { at: 'reading' } | { at: 'review'; proposals: Proposal[]; on: Record<string, boolean> } | { at: 'failed'; why: string };
+type Phase = { at: 'pick' } | { at: 'reading' } | { at: 'review'; proposals: Proposal[]; on: Record<string, boolean>; pick: Record<string, string> } | { at: 'failed'; why: string };
 
 /** About 9 MB of base64: a long PDF statement still fits one request. */
 const MAX_BASE64 = 9_000_000;
@@ -62,8 +62,9 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
     const res = await askWithPhoto(os, model, { ...statementAsk(), image: { mediaType, data } });
     if (!res.ok) return setPhase({ at: 'failed', why: `${WHY[res.note] ?? WHY.error!}${res.note === 'error' && res.error ? ` (${res.error.slice(0, 160)})` : ''}` });
     const proposals = proposeChanges(os, readStatement(res.answer));
-    if (!proposals.length) return setPhase({ at: 'failed', why: 'Nothing to update from that: no balance, card bill or holding could be read.' });
-    setPhase({ at: 'review', proposals, on: Object.fromEntries(proposals.map((p) => [p.id, true])) });
+    if (!proposals.length) return setPhase({ at: 'failed', why: 'Nothing to update from that: no balance, card bill, holding or subscription could be read.' });
+    // One that could be several accounts waits, unticked, until you pick which.
+    setPhase({ at: 'review', proposals, on: Object.fromEntries(proposals.map((p) => [p.id, !p.choices])), pick: {} });
   };
   const fromFiles = async () => {
     const r = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true });
@@ -80,7 +81,7 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
   const apply = () => {
     if (phase.at !== 'review') return;
     const chosen = phase.proposals.filter((p) => phase.on[p.id]);
-    const undos = chosen.map((p) => p.apply());
+    const undos = chosen.map((p) => p.apply(phase.pick[p.id]));
     toast.show({ message: `Updated ${chosen.length} thing${chosen.length === 1 ? '' : 's'} from the statement`, icon: 'check', undo: () => undos.forEach((u) => u()) });
     close();
   };
@@ -99,8 +100,8 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
     <Sheet visible={visible} onClose={close} title="Upload a statement">
       {phase.at === 'pick' ? (
         <View style={{ gap: 12 }}>
-          {option('A PDF or file', 'a bank or card statement, a CAMS or broker summary', 'file', () => void fromFiles(), true)}
-          {option('A screenshot', 'your bank app, card app or fund app', 'image', () => void fromPhotos())}
+          {option('A PDF or file', 'a bank, card or loan statement, a CAMS or broker summary', 'file', () => void fromFiles(), true)}
+          {option('A screenshot', 'your bank, card or fund app, SIPs, or your subscriptions', 'image', () => void fromPhotos())}
           <Text color="secondary" style={{ fontSize: 12, lineHeight: 17 }}>It goes to Claude once, to be read, because you pressed the button. You see every change before anything is updated.</Text>
         </View>
       ) : null}
@@ -123,16 +124,31 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
           <Text color="secondary" style={{ fontSize: 13, lineHeight: 18 }}>{`What the statement says. Untick anything that's wrong.`}</Text>
           {phase.proposals.map((p) => {
             const on = phase.on[p.id];
+            const waiting = !!p.choices && !phase.pick[p.id];
             return (
-              <Pressable key={p.id} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={`${p.label}, ${p.detail}`} onPress={() => setPhase({ ...phase, on: { ...phase.on, [p.id]: !on } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 20, backgroundColor: t.c.bg.tileRaised }}>
-                <View style={{ width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.c.accent.mustard : 'transparent', borderWidth: on ? 0 : 1.5, borderColor: t.c.fg.secondary }}>
-                  {on ? <Icon name="check" size={15} color={t.c.accent.mustardInk} /> : null}
-                </View>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={{ fontSize: 14, lineHeight: 19, fontWeight: '600' }}>{p.label}</Text>
-                  <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{p.detail}</Text>
-                </View>
-              </Pressable>
+              <View key={p.id} style={{ padding: 14, borderRadius: 20, backgroundColor: t.c.bg.tileRaised, gap: 10 }}>
+                <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on, disabled: waiting }} disabled={waiting} accessibilityLabel={`${p.label}, ${p.detail}`} onPress={() => setPhase({ ...phase, on: { ...phase.on, [p.id]: !on } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={{ width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.c.accent.mustard : 'transparent', borderWidth: on ? 0 : 1.5, borderColor: t.c.fg.secondary, opacity: waiting ? 0.4 : 1 }}>
+                    {on ? <Icon name="check" size={15} color={t.c.accent.mustardInk} /> : null}
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ fontSize: 14, lineHeight: 19, fontWeight: '600' }}>{p.label}</Text>
+                    <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{p.detail}</Text>
+                  </View>
+                </Pressable>
+                {p.choices ? (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingLeft: 38 }}>
+                    {p.choices.map((c) => {
+                      const picked = phase.pick[p.id] === c.id;
+                      return (
+                        <Pressable key={c.id} accessibilityRole="radio" accessibilityState={{ selected: picked }} accessibilityLabel={c.label} onPress={() => setPhase({ ...phase, pick: { ...phase.pick, [p.id]: c.id }, on: { ...phase.on, [p.id]: true } })} style={{ height: 36, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', backgroundColor: picked ? t.c.accent.mustard : t.c.bg.tile }}>
+                          <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '600', color: picked ? t.c.accent.mustardInk : t.c.fg.primary }}>{c.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
             );
           })}
           <Pressable accessibilityRole="button" accessibilityLabel="Apply" disabled={!Object.values(phase.on).some(Boolean)} onPress={apply} style={({ pressed }) => ({ height: 52, borderRadius: 999, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center', opacity: pressed || !Object.values(phase.on).some(Boolean) ? 0.6 : 1 })}>

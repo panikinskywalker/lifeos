@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.106 · 17 Nov 2026
+
+**Subscriptions by screenshot, and every account from one screenshot.** Upload
+a screenshot of your subscriptions (an app, Google Play, App Store or a renewal
+mail) to add new ones or update a known one's price and renewal. A screenshot
+of all your balances updates each account; one that could be several accounts
+asks which, with a chip for each, instead of making a new account.
+
 ## v0.0.105 · 17 Nov 2026
 
 **Upload and Add a payment start fresh.** If the app went away while a statement

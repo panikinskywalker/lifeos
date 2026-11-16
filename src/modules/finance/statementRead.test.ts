@@ -8,7 +8,7 @@ import { crmModule } from '@modules/crm';
 import { financeModule } from '@modules/finance';
 import { accountBalance } from './lib';
 import { proposeChanges, readStatement } from './statementRead';
-import type { AccountData, InvestmentData } from './types';
+import type { AccountData, InvestmentData, SubscriptionData } from './types';
 
 /** Upload a statement (docs/MODEL.md): read once, matched on the phone, nothing changes until you apply, each with Undo. */
 
@@ -100,7 +100,32 @@ describe('Upload a statement', () => {
     expect(os.records.get<AccountData>(l.id)!.data).toMatchObject({ kind: 'bank', knownBalance: 20000 });
   });
 
+  it('a balance that could be one of several accounts asks which; the one you pick is set', () => {
+    const one = os.records.create<AccountData>({ object: 'account', title: 'SBI', data: { kind: 'bank', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
+    const two = os.records.create<AccountData>({ object: 'account', title: 'SBI salary', data: { kind: 'bank', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
+    const [p] = proposeChanges(os, readStatement({ accounts: [{ bank: 'SBI', last4: '', kind: 'bank', balance: 20000, owed: 0, minDue: 0, dueOn: '', asOf: '' }], holdings: [] }));
+    expect(p!.label).toBe('SBI: balance ₹20,000');
+    expect(p!.choices!.map((c) => c.label)).toEqual(['SBI', 'SBI salary']);
+    const undo = p!.apply(two.id);
+    expect(accountBalance(os, os.records.get<AccountData>(two.id)!)).toBe(20000);
+    expect(os.records.get<AccountData>(one.id)!.data.knownBalance).toBeUndefined();
+    undo();
+    expect(os.records.get<AccountData>(two.id)!.data.knownBalance).toBeUndefined();
+  });
+
+  it('a subscriptions screenshot adds the new ones and updates a known one', () => {
+    const known = os.records.create<SubscriptionData>({ object: 'subscription', title: 'Spotify', data: { name: 'Spotify', amount: 119, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-11-20', category: 'subscriptions' } as SubscriptionData });
+    const ps = proposeChanges(os, readStatement({ accounts: [], holdings: [], subscriptions: [{ name: 'Spotify Premium', amount: 139, every: 'month', next: '2026-12-02' }, { name: 'YouTube Premium', amount: 1290, every: 'year', next: '' }] }), Date.parse('2026-11-16T10:00:00'));
+    expect(ps.map((p) => p.label)).toEqual(['Spotify: ₹139 a month, next 2026-12-02', 'New subscription: YouTube Premium']);
+    const undos = ps.map((p) => p.apply());
+    expect(os.records.get<SubscriptionData>(known.id)!.data).toMatchObject({ amount: 139, nextBillingAt: '2026-12-02' });
+    expect(os.records.query<SubscriptionData>('subscription').find((s) => s.data.name === 'YouTube Premium')!.data).toMatchObject({ amount: 1290, rrule: 'FREQ=YEARLY;INTERVAL=1' });
+    undos.forEach((u) => u());
+    expect(os.records.get<SubscriptionData>(known.id)!.data).toMatchObject({ amount: 119, nextBillingAt: '2026-11-20' });
+    expect(os.records.query('subscription')).toHaveLength(1);
+  });
+
   it('keeps only what makes sense from a reading', () => {
-    expect(readStatement({ accounts: [{ bank: '', last4: '', kind: 'bank', balance: 1, owed: 0, minDue: 0, dueOn: 'soon', asOf: '' }], holdings: [{ name: 'X', units: 0, value: 0, invested: 0, sip: 0, sipDay: 0 }] })).toEqual({ accounts: [], holdings: [] });
+    expect(readStatement({ accounts: [{ bank: '', last4: '', kind: 'bank', balance: 1, owed: 0, minDue: 0, dueOn: 'soon', asOf: '' }], holdings: [{ name: 'X', units: 0, value: 0, invested: 0, sip: 0, sipDay: 0 }] })).toEqual({ accounts: [], holdings: [], subscriptions: [] });
   });
 });
