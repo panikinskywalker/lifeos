@@ -123,6 +123,8 @@ export interface EntityDetailSection {
   placement?: 'page' | 'hero' | 'top' | 'body';
   /** A 'page' that draws its own Links card (Person); else the record page adds the generic one below it (R11). */
   ownLinks?: boolean;
+  /** A 'page' that fills the screen and scrolls itself (the trip template's pages, with their floating trip bar). */
+  fullScreen?: boolean;
   /** Field keys this section draws itself; the Details card leaves them out (R7f: a Note's body). */
   fields?: string[];
 }

@@ -7,6 +7,29 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.121 · 16 Nov 2026
+
+**Trips, as designed** (R7g, the trip template, merged from
+`claude/serene-edison-o0lpvy`, labelled v0.0.32 on GitHub). Every trip now has the five sections of the
+*Trip template · Noir (Japan)* design, with the trip bar at the bottom
+(Overview, Plan, Bookings, Money, Prep) and the copilot beside it. **Travel**
+shows your next trip as a card with its countdown on a platform LED board.
+The **trip page** changes with the trip: before it, the stage stepper, the
+hero with the nights hanko, the boarding pass, what needs attention, what's
+coming up until you fly and when seats open; while away, **Today** (leave by,
+the next train, the last connection, cash and IC card, the stamp you
+collected, tomorrow); after, the **Recap** with the stamp book. **Plan** has
+the line of stops, the days and the map; each stop has its station board,
+the legs either side and its things to do. **Bookings** and every booking,
+each **day** with its travel. **Money** works like Splitwise: the budget
+with paid, booked and estimates, cost by day, log a spend, split a receipt
+photo, pay back, settle up. **Prep** has the checklist, packing and papers
+with the emergency numbers. **Search** the trip, ask the **copilot** (it
+proposes changes, saved only when you say), or share a **view-only** copy.
+Money shows in rupees or the local currency at a tap. Japan gets its own
+touches: names in Japanese, mincho station boards, seigaiha waves, stamps.
+Import a trip from the trip app's file under Travel › + › Import a trip.
+
 ## v0.0.120 · 17 Nov 2026
 
 **Splitwise hears within seconds.** A linked person's share made, changed, settled or deleted (a Turf game, a split, a payment that settles it) syncs to Splitwise a few seconds later, not at the next background sync. A Turf share paid in parts is paid back on Splitwise for exactly what was sent.

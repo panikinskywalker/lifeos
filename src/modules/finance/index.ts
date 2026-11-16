@@ -10,6 +10,9 @@ import { financeFilingTools } from './filing/tools';
 import { linkMissingPayees, tidyPayeeNames } from './filing/payee';
 import { sortOldMoneyIn } from './filing/moneyIn';
 import { spotSubscriptions } from './filing/recurring';
+import { billType } from './bills';
+
+export * from './bills';
 import { learnCategory, payeeOf } from './filing/rules';
 import { foldSplitShares } from './split';
 import { bus } from '@core/events/bus';
@@ -22,7 +25,7 @@ export const financeModule: ModuleManifest = {
   description: 'Accounts, transactions, budgets and subscriptions — with receipts, trips and people all linked.',
   icon: 'banknote',
   color: FINANCE_COLOR,
-  objects: [accountType, transactionType, subscriptionType, debtType, investmentType],
+  objects: [accountType, transactionType, subscriptionType, debtType, investmentType, billType],
   triggers: [
     {
       id: 'finance.transaction.created', module: 'finance', label: 'Transaction added', event: 'entity.created',

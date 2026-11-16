@@ -60,9 +60,10 @@ describe('flights and stays from booking mail (plausible samples)', () => {
   });
 
   it('MakeMyTrip hotel, Booking.com and Airbnb stays', () => {
-    expect(parseStay(MMT_HOTEL)).toEqual({ name: 'The Park Calangute', checkIn: '2026-12-18', checkOut: '2026-12-22', place: 'Goa' });
-    expect(parseStay(BOOKING)).toEqual({ name: 'Lemon Tree Premier, Aerocity', checkIn: '2027-01-14', checkOut: '2027-01-16', place: 'Delhi' });
-    expect(parseStay(AIRBNB)).toEqual({ name: 'Cosy cabin in Old Manali', checkIn: '2027-02-12', checkOut: '2027-02-15', place: 'Old Manali' });
+    // R7g slice 2 adds what the mail says about times, money and cancellation to the same read.
+    expect(parseStay(MMT_HOTEL)).toMatchObject({ name: 'The Park Calangute', checkIn: '2026-12-18', checkOut: '2026-12-22', place: 'Goa', checkInTime: 'from 14:00', checkOutTime: 'by 12:00' });
+    expect(parseStay(BOOKING)).toMatchObject({ name: 'Lemon Tree Premier, Aerocity', checkIn: '2027-01-14', checkOut: '2027-01-16', place: 'Delhi', checkInTime: 'from 14:00', checkOutTime: 'by 12:00' });
+    expect(parseStay(AIRBNB)).toMatchObject({ name: 'Cosy cabin in Old Manali', checkIn: '2027-02-12', checkOut: '2027-02-15', place: 'Old Manali', checkInTime: 'from 15:00', checkOutTime: 'by 11:00' });
   });
 
   it('filed: one booked trip per journey, its Place, its end moved by the return flight; the fare is its spend', () => {

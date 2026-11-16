@@ -3,7 +3,8 @@ import type { ModuleManifest } from '@core/registry/types';
 import type { ObjectRecord } from '@core/domain/types';
 import { withExtras } from '@core/ai/cards';
 import { bus } from '@core/events/bus';
-import { TRAVEL_COLOR, tripType, type TripData } from './types';
+import { TRAVEL_COLOR, outingType, stopType, tripType, type TripData } from './types';
+import { foldStops } from './stops';
 import { travelParsers } from './filing/parser';
 import { linkTripPlace, nextTrip, trips, tripSpend } from './trips';
 import { travelBrain } from './brain';
@@ -11,6 +12,19 @@ import { travelBrain } from './brain';
 export * from './types';
 export * from './trips';
 export * from './packing';
+export * from './stops';
+export * from './importApp';
+export * from './booked';
+export * from './outings';
+export * from './money';
+export * from './prep';
+export * from './weather';
+export * from './overview';
+export * from './today';
+export * from './planview';
+export * from './search';
+export * from './copilot';
+export * from './travelhome';
 export { travelBrain, AIRLINE_SITES } from './brain';
 export { parseFlight, parseStay, type ParsedFlight, type ParsedStay } from './filing/bookings';
 
@@ -27,7 +41,7 @@ export const travelModule: ModuleManifest = {
   icon: 'airplane',
   color: TRAVEL_COLOR,
   dependencies: ['crm'],
-  objects: [tripType],
+  objects: [tripType, stopType, outingType],
   filing: { parsers: travelParsers },
   brain: travelBrain,
   onStart: (os) => {
@@ -35,6 +49,16 @@ export const travelModule: ModuleManifest = {
     if (!os.settings.get<boolean>('travel.foldedR7d', false) && os.registry.objects.has('place')) {
       for (const t of trips(os)) linkTripPlace(os, t);
       os.settings.set('travel.foldedR7d', true);
+    }
+    // R7g slice 1, once: a trip's destination becomes its first stop; each stay lands on the stop for its city.
+    if (!os.settings.get<boolean>('travel.foldedR7g1', false) && os.registry.objects.has('event')) {
+      foldStops(os);
+      os.settings.set('travel.foldedR7g1', true);
+    }
+    // R7g slice 5, once: tasks linked to a trip by Plan a trip before the Trip Field existed get it, so an edit keeps the Link.
+    if (!os.settings.get<boolean>('travel.foldedR7g5', false) && os.registry.objects.has('task')) {
+      for (const t of trips(os)) for (const r of os.links.forEntity(t.id, 'trip')) if (r.direction === 'in' && r.other.object === 'task' && !os.records.get<{ tripId?: string }>(r.other.id)?.data.tripId) os.records.update(r.other.id, { data: { tripId: t.id } }, 'assistant');
+      os.settings.set('travel.foldedR7g5', true);
     }
     // A trip saved without a Place gets the one its destination names.
     bus.on('entity.created', ({ entity }) => {
@@ -55,8 +79,8 @@ export const travelModule: ModuleManifest = {
         const made: string[] = [];
         if (os.registry.objects.has('task')) {
           for (const t of i.todos ?? []) {
-            const task = os.records.create({ object: 'task', title: t, data: { priority: 'medium', dueDate: i.startDate }, status: 'todo' }, 'assistant');
-            os.links.link(task.id, trip.id, 'trip', {}, 'assistant');
+            // The Trip Field makes the Link, so editing the task later keeps it (R7g slice 5).
+            const task = os.records.create({ object: 'task', title: t, data: { priority: 'medium', dueDate: i.startDate, tripId: trip.id, section: 'to-do' }, status: 'todo' }, 'assistant');
             made.push(task.id);
           }
         }
