@@ -1,5 +1,6 @@
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
+import { billBalances, billBalanceWith, billsOf, makePayment } from './bills';
 
 /** 'me' is the phone's owner; everyone else is a person record id. */
 export type Party = 'me' | string;
@@ -130,13 +131,18 @@ const signed = (d: DebtData) => (d.direction === 'they_owe' ? d.amount : -d.amou
 
 /** + they owe me, − I owe them. Rounded to paise. */
 export function balanceWith(os: LifeOSContext, personId: string, groupId?: string): number {
-  return paise(openDebts(os, { personId, groupId }).reduce((a, d) => a + signed(d.data), 0)) / 100;
+  // Debts (loans, Turf's shares, splits made before Bill) and Bills (Splitwise's way).
+  return paise(openDebts(os, { personId, groupId }).reduce((a, d) => a + signed(d.data), 0) + billBalanceWith(os, personId, groupId)) / 100;
 }
 
 /** Everyone with a non-zero balance, biggest first. */
 export function balances(os: LifeOSContext, groupId?: string): Array<{ personId: string; amount: number }> {
   const by = new Map<string, number>();
   for (const d of openDebts(os, { groupId })) by.set(d.data.personId, (by.get(d.data.personId) ?? 0) + signed(d.data));
+  for (const d of billBalances(billsOf(os, groupId ? { groupId } : {})).debts) {
+    if (d.to === 'me' && d.from !== 'me') by.set(d.from, (by.get(d.from) ?? 0) + d.amount);
+    if (d.from === 'me' && d.to !== 'me') by.set(d.to, (by.get(d.to) ?? 0) - d.amount);
+  }
   return [...by.entries()]
     .map(([personId, a]) => ({ personId, amount: paise(a) / 100 }))
     .filter((b) => b.amount !== 0)
@@ -148,12 +154,16 @@ export function balances(os: LifeOSContext, groupId?: string): Array<{ personId:
  * whole balance is filed, and every open debt between us is marked settled.
  * Returns what Undo needs.
  */
-export function settleUp(os: LifeOSContext, personId: string, opts: { groupId?: string; date?: string } = {}): { paymentId: string | null; settled: string[] } {
+export function settleUp(os: LifeOSContext, personId: string, opts: { groupId?: string; date?: string } = {}): { paymentId: string | null; settled: string[]; billId?: string | null } {
   const open = openDebts(os, { personId, groupId: opts.groupId });
   const bal = paise(open.reduce((a, d) => a + signed(d.data), 0)) / 100;
+  const fromBills = billBalanceWith(os, personId, opts.groupId);
   let paymentId: string | null = null;
+  let billId: string | null = null;
   const settled: string[] = [];
   os.db.transaction(() => {
+    // What Bills say is owed is settled by a payback Bill, so it shows with the others.
+    if (fromBills !== 0) billId = makePayment(os, fromBills > 0 ? personId : 'me', fromBills > 0 ? 'me' : personId, Math.abs(fromBills), { date: opts.date ?? today(), groupId: opts.groupId }).id;
     if (bal !== 0) {
       paymentId = os.records.create<DebtData>({ object: 'debt', status: 'settled', data: { personId, direction: bal > 0 ? 'i_owe' : 'they_owe', amount: Math.abs(bal), reason: 'Settled up', date: opts.date ?? today(), kind: 'payment', groupId: opts.groupId } }).id;
     }
@@ -162,12 +172,13 @@ export function settleUp(os: LifeOSContext, personId: string, opts: { groupId?: 
       settled.push(d.id);
     }
   });
-  return { paymentId, settled };
+  return { paymentId, settled, billId };
 }
 
-export function undoSettle(os: LifeOSContext, s: { paymentId: string | null; settled: string[] }): void {
+export function undoSettle(os: LifeOSContext, s: { paymentId: string | null; settled: string[]; billId?: string | null }): void {
   os.db.transaction(() => {
     for (const id of s.settled) os.records.setStatus(id, 'open');
     if (s.paymentId) os.records.delete(s.paymentId);
+    if (s.billId) os.records.delete(s.billId);
   });
 }

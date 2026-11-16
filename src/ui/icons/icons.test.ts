@@ -34,7 +34,10 @@ describe('icon set', () => {
         const p = path.join(dir, e.name);
         if (e.isDirectory()) walk(p);
         else if (/\.(ts|tsx)$/.test(e.name) && !e.name.endsWith('.test.ts')) {
-          for (const m of readFileSync(p, 'utf8').matchAll(/\bicon(?:Name)?[=:]\s*\{?\s*['"]([a-z0-9.-]+)['"]/g)) used.add(m[1]!);
+          const src = readFileSync(p, 'utf8');
+          // A screen that draws its own inline glyphs (the trip template) names them itself.
+          if (src.startsWith('// own-glyphs')) continue;
+          for (const m of src.matchAll(/\bicon(?:Name)?[=:]\s*\{?\s*['"]([a-z0-9.-]+)['"]/g)) used.add(m[1]!);
         }
       }
     };

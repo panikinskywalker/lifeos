@@ -149,6 +149,8 @@ export interface GroupData {
   memberIds: string[];
   /** How a bill in this group splits unless you say otherwise. */
   defaultSplit?: 'equal' | 'shares';
+  /** Settle the group's Bills in the fewest payments (MODEL.md, *Bill*). */
+  simplifyDebts?: boolean;
   placeId?: string;
   photo?: FileValue;
   notes?: string;
@@ -157,12 +159,13 @@ export interface GroupData {
 /** Group (R2): flatmates, a trip crew, family, the Football group. Members also live in group_members (shares, joined / left). */
 export const groupType: ObjectDef<GroupData> = {
   id: 'group', module: 'crm', label: 'Group', labelPlural: 'Groups', icon: 'people',
-  schema: z.object({ name: z.string().min(1), kind: z.string().optional(), memberIds: z.array(z.string()).default([]), defaultSplit: z.enum(['equal', 'shares']).optional(), placeId: z.string().optional(), photo: file.optional(), notes: z.string().optional() }),
+  schema: z.object({ name: z.string().min(1), kind: z.string().optional(), memberIds: z.array(z.string()).default([]), defaultSplit: z.enum(['equal', 'shares']).optional(), simplifyDebts: z.boolean().optional(), placeId: z.string().optional(), photo: file.optional(), notes: z.string().optional() }),
   fields: [
     { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Flat 4B, Goa trip, Family' },
     { key: 'kind', label: 'Kind', type: 'select', summary: true, options: GROUP_KINDS },
     { key: 'memberIds', label: 'Members', type: 'link', linkTo: 'person', linkWord: 'member', default: [] },
     { key: 'defaultSplit', label: 'Default split', type: 'select', options: [{ value: 'equal', label: 'Equally' }, { value: 'shares', label: 'By shares' }], description: 'How a bill in this group splits unless you say otherwise' },
+    { key: 'simplifyDebts', label: 'Simplify debts', type: 'boolean', description: 'Settle up in the fewest payments' },
     { key: 'placeId', label: 'Place', type: 'link', linkTo: 'place', linkWord: 'at', section: 'Details' },
     { key: 'photo', label: 'Photo', type: 'file', section: 'Details' },
     { key: 'notes', label: 'About', type: 'longtext', section: 'Details' },

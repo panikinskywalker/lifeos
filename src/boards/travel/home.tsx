@@ -1,331 +1,398 @@
-import { useState } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import React, { useState } from 'react';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
-import Svg, { Rect } from 'react-native-svg';
-import { answerNudge } from '@core/brain/runner';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
-import { useTheme } from '@ui/theme/ThemeProvider';
-import { blocks, gradients } from '@ui/theme/tokens';
-import { Button, Icon, niceMax, ProgressBar, Screen, Text, type IconName } from '@ui/kit';
-import { hasPacked, nextTrip, packingList, tripBookings, tripDays, tripPhase, trips, tripSpend } from '@modules/travel';
-import { ToCheckBell } from '../../screens/ToCheckBell';
-import { AddTrip, bookedWords, CARD_GLOWS, Chip28, companions, dayLabel, datesLabel, Disc, GlassPill, INK, Note, onPhoto, PillButton, plural, Row, RowCard, routes, SectionHead, SerifName, slashDates, StatCard, TripPhoto, weekdayLong, whenShort, WHITE, withLine } from './parts';
+import { ActionSheet, useBottomBarInset, type BottomBarItem } from '@ui/kit';
+import { Icon as UiIcon } from '@ui/icons';
+import { homeDates, monoDates, travelHomeOf, tripDays, type NextTripCard, type TripRow } from '@modules/travel';
+import { Anim, bgImage, JP_SERIF, MONO, Wave } from './jp/kit';
+import { C, DotMatrix, Faces, isJapan, money, scriptName, tripRoutes, useShow } from './jp/shell';
+import { routes } from './parts';
 
 /**
- * The Travel home (NR-Travel-Home, the board's index; NR-Travel-Empty with no
- * trips): the next trip on its photo, the year in two numbers, Before you go
- * (Pack, then what the brain filed for this trip), Coming up, Budget used,
- * and what each trip this year cost.
+ * The Travel home (JP-Travel, "Travel · all trips"; the board's index): the
+ * next trip on its deep indigo card (its stage, the place in its script, the
+ * dot-matrix countdown, what each person is projected to spend against the
+ * budget), its most urgent note, the other trips coming up, Start a trip, the
+ * trips you have been on with what they cost you, and the year in three
+ * numbers, over the app's own bottom bar. With no trips, a calm start.
  */
 
-const DAY = 86_400_000;
-const FRIDGE = /\b(use|eat|cook|fridge|finish)\b/i;
-const ORDER = /\b(order|grocer|skip|pause|deliver)/i;
-const PEOPLE = /\b(tell|squad|match|team|message)\b/i;
+/** The app's tabs (app/(tabs)/_layout.tsx), drawn as the artboard draws them. */
+const TABS: BottomBarItem[] = [
+  { key: 'index', label: 'Today', icon: 'sun' },
+  { key: 'upkeep', label: 'Upkeep', icon: 'repeat' },
+  { key: 'dump', label: 'Dump', icon: 'brain', primary: true },
+  { key: 'browse', label: 'Browse', icon: 'grid' },
+  { key: 'you', label: 'You', icon: 'user' },
+];
+const TAB_PATH: Record<string, string> = { index: '/', upkeep: '/upkeep', dump: '/dump', browse: '/browse', you: '/you' };
 
-/** The icon and colour a line from Claude's list reads as. */
-function lineLook(line: string): { icon: IconName; color: string } {
-  if (FRIDGE.test(line)) return { icon: 'fridge', color: blocks.mint };
-  if (ORDER.test(line)) return { icon: 'cart', color: blocks.yellow };
-  if (PEOPLE.test(line)) return { icon: 'people', color: blocks.sky };
-  return { icon: 'check-circle', color: blocks.lilac };
-}
+const SANS = 'PlusJakartaSans_500Medium';
+const SEMI = 'PlusJakartaSans_600SemiBold';
+const BOLD = 'PlusJakartaSans_700Bold';
 
-export function TravelHome({ ctx }: { ctx: LifeOSContext; params: Record<string, string> }) {
-  const router = useRouter();
-  const t = useTheme();
-  const [, bump] = useState(0);
-  const d = useLive((os) => {
-    const now = Date.now();
-    const all = trips(os);
-    const year = String(new Date(now).getFullYear());
-    const thisYear = all.filter((x) => x.data.startDate?.startsWith(year));
-    const spendOf = new Map(thisYear.map((x) => [x.id, tripSpend(os, x, now)]));
-    const spent = (id: string) => spendOf.get(id)?.spent ?? 0;
-    const next = nextTrip(os, now);
-    const done = thisYear.filter((x) => tripPhase(x.data, now) === 'back');
-    const ahead = thisYear.filter((x) => tripPhase(x.data, now) !== 'back');
-    const budgeted = [...ahead, ...[...done].reverse()].filter((x) => x.data.budget);
-    let hero = null;
-    if (next) {
-      const bookings = tripBookings(os, next.id);
-      const list = packingList(os, next);
-      const nudges = (os.brain?.nudges.since(now - 14 * DAY) ?? []).filter((n) => {
-        const p = (n.payload ?? {}) as { tripId?: string; eventId?: string; what?: string };
-        return n.module === 'travel' && n.state === 'open' && p.what !== 'pack' && p.what !== 'back' && (p.tripId === next.id || bookings.some((b) => b.id === p.eventId));
-      });
-      const learned = os.brain?.learned.get<string[] | string>(`travel:beforelist:${next.id}:${next.data.startDate}`);
-      hero = {
-        trip: next,
-        cover: os.attachments.cover(next.id)?.uri ?? null,
-        bookings,
-        people: companions(os, next),
-        packed: hasPacked(os, next),
-        days: tripDays(next.data) ?? list.days,
-        packLine: list.line.split(' · ').pop() ?? '',
-        away: tripPhase(next.data, now) === 'away',
-        flight: bookings.find((b) => b.kind === 'flight' && b.startAt > now) ?? null,
-        nudges,
-        lines: Array.isArray(learned) ? learned : learned ? [learned] : [],
-      };
-    }
-    return {
-      count: all.length,
-      year,
-      hero,
-      total: thisYear.length,
-      doneCount: done.length,
-      aheadCount: ahead.length,
-      spentAll: thisYear.reduce((n, x) => n + spent(x.id), 0),
-      coming: all
-        .filter((x) => x.data.startDate && tripPhase(x.data, now) !== 'back')
-        .slice(0, 4)
-        .map((x) => ({ trip: x, people: companions(os, x), when: whenShort(x.data, now) })),
-      budget: budgeted.map((x) => ({ id: x.id, title: x.title, budget: x.data.budget!, spent: spent(x.id) })),
-      costs: done.slice(-6).map((x) => ({ id: x.id, label: x.data.destination, spent: spent(x.id) })),
-    };
-  }, []);
-  const money = (n: number) => ctx.format.currency(Math.round(n));
-  const open = (id: string) => router.push(routes.trip(id) as never);
-  const add = () => router.push(routes.newTrip as never);
-  const hero = d.hero;
-  const when = hero ? whenShort(hero.trip.data) : null;
-  const caption = `${hero ? `${hero.trip.data.destination} ${when ?? ''}`.trim() : 'No trip planned'} · ${plural(d.total, 'trip')} this year`;
+const Icon = ({ d, size = 18, color = C.white, children }: { d?: string[]; size?: number; color?: string; children?: React.ReactNode }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    {d?.map((x) => <Path key={x} d={x} />)}
+    {children}
+  </Svg>
+);
+const Chevron = () => <Icon d={['m9 18 6-6-6-6']} color={C.low} />;
 
-  const top = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 0 }}>
-      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-        <Text variant="caption" color="secondary" numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>{caption}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text variant="title" accessibilityRole="header">Travel</Text>
-          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: gradients.travel[0] }} />
-        </View>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {d.count ? <ToCheckBell /> : null}
-        <AddTrip onPress={add} />
-      </View>
-    </View>
-  );
-
-  if (!d.count) {
-    return (
-      <Screen contentStyle={{ gap: 24 }}>
-        {top}
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <StatCard label="NEXT TRIP" value="·" quiet />
-          <StatCard label={`SPENT IN ${d.year}`} value={money(0)} />
-        </View>
-        <View style={{ paddingVertical: 28, paddingHorizontal: 22, borderRadius: 28, backgroundColor: t.c.bg.tile, alignItems: 'center', gap: 16 }}>
-          <Tickets />
-          <Text accessibilityRole="header" style={{ fontSize: 20, lineHeight: 25, fontWeight: '700', letterSpacing: -0.3, textAlign: 'center' }}>No trips planned</Text>
-          <Text style={{ fontSize: 15, lineHeight: 21, fontWeight: '500', color: t.c.fg.secondary, textAlign: 'center' }}>Tickets from Gmail and dumps add them. A flight to Goa makes “Trip to Goa” and files the ticket in it.</Text>
-          <View style={{ alignSelf: 'stretch', gap: 8, paddingTop: 4 }}>
-            <Button title="Add a trip" icon="plus" block onPress={add} />
-            <Pressable accessibilityRole="button" onPress={() => router.push('/settings/email' as never)} style={({ pressed }) => ({ height: 52, borderRadius: 999, backgroundColor: t.c.bg.tileRaised, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: pressed ? 0.8 : 1 })}>
-              <Icon name="inbox" size={17} color={t.c.accent.gold} />
-              <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '600' }}>Connect Gmail</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={{ gap: 10 }}>
-          <Text variant="labelCaps" color="secondary" accessibilityRole="header" style={{ paddingHorizontal: 4 }}>OR SAY IT IN THE DUMP</Text>
-          <View style={{ gap: 8 }}>
-            {['“Plan Kyoto in late December with Priya, ₹2L budget”', '“Goa 20 to 24 Dec with the Goa group, book flights and a villa”'].map((line) => (
-              <View key={line} style={{ paddingVertical: 14, paddingHorizontal: 16, borderRadius: 20, backgroundColor: t.c.bg.tile }}>
-                <Text style={{ fontSize: 15, lineHeight: 21, fontWeight: '500' }}>{line}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={{ fontSize: 13, lineHeight: 18, color: t.c.fg.secondary, paddingHorizontal: 4 }}>Each makes the trip, with a to-do for every thing to book.</Text>
-        </View>
-        <Note icon="lock">Booking mails are read on this phone. LifeOS keeps the flight or the stay and the mail’s subject line, nothing more.</Note>
-      </Screen>
-    );
-  }
-
-  /** Claude's lines you have ticked, kept per trip. */
-  const doneKey = hero ? `travel.beforeDone.${hero.trip.id}` : '';
-  const ticked = hero ? ctx.settings.get<string[]>(doneKey, []) : [];
-  const tick = (line: string) => {
-    ctx.settings.set(doneKey, [...ticked, line]);
-    bump((n) => n + 1);
-  };
-  const act = (id: string) => {
-    const r = answerNudge(ctx, id, 'yes');
-    if (r?.open) {
-      if (/^[a-z]+:/i.test(r.open)) void Linking.openURL(r.open);
-      else router.push(r.open as never);
-    }
-  };
-  const lines = hero ? hero.lines.filter((l) => !ticked.includes(l)) : [];
-  const nudges = hero ? hero.nudges.filter((n) => !(lines.length && (n.payload as { what?: string }).what === 'before')) : [];
-  const showPack = !!hero && !hero.away && !hero.packed;
-  const showBefore = !!hero && !hero.away && (showPack || lines.length > 0 || nudges.length > 0);
-
+function RoundButton({ label, onPress, bg, children }: { label: string; onPress: () => void; bg: string; children: React.ReactNode }) {
   return (
-    <Screen contentStyle={{ gap: 24 }}>
-      {top}
-
-      {hero ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={`${hero.away ? 'Away now' : 'Next trip'}: ${hero.trip.data.destination}, ${datesLabel(hero.trip.data)}`} onPress={() => open(hero.trip.id)} style={({ pressed }) => ({ height: 184, borderRadius: 24, overflow: 'hidden', padding: 12, opacity: pressed ? 0.92 : 1 })}>
-          <TripPhoto uri={hero.cover} glows={CARD_GLOWS} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            {hero.trip.data.startDate ? <Chip28 tone="lime" label={dayLabel(hero.trip.data.startDate)} /> : <View />}
-            {hero.people.length ? <GlassPill icon="people" label={`${hero.people.length + 1} going`} /> : null}
-          </View>
-          <View style={{ marginTop: 'auto', gap: 2 }}>
-            <Text style={onPhoto.caps}>{hero.away ? 'AWAY NOW' : 'NEXT TRIP'}{when ? ` · ${when.toUpperCase()}` : ''}</Text>
-            <SerifName size={40}>{hero.trip.data.destination}</SerifName>
-            <Text numberOfLines={1} style={onPhoto.line}>{[datesLabel(hero.trip.data), bookedWords(hero.bookings)].filter(Boolean).join(' · ')}</Text>
-          </View>
-        </Pressable>
-      ) : null}
-
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <StatCard label={`TRIPS IN ${d.year}`} value={String(d.total)} line={`${d.doneCount} done · ${d.aheadCount} coming up`} />
-        <StatCard label={`SPENT IN ${d.year}`} value={money(d.spentAll)} line="payments linked to trips" />
-      </View>
-
-      {showBefore && hero ? (
-        <View style={{ gap: 10, minWidth: 0 }}>
-          <SectionHead
-            title="Before you go"
-            sub={hero.flight ? `You fly to ${hero.trip.data.destination} on ${weekdayLong(hero.flight.startAt)}` : `${hero.trip.data.destination} ${when ?? ''}`.trim()}
-            right={
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 24, paddingHorizontal: 9, borderRadius: 999, backgroundColor: t.c.accent.mustardSoft }}>
-                <Icon name="sparkle" size={12} color={t.c.accent.gold} />
-                <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: t.c.accent.gold }}>LifeOS</Text>
-              </View>
-            }
-          />
-          <RowCard>
-            {showPack ? <Row lead={<Disc icon="bag" color={t.tints.travel.ink} />} title={`Pack for ${plural(hero.days, 'day')}`} sub={hero.packLine} trailing={<PillButton title="Pack" tone="lime" onPress={() => router.push(routes.pack(hero.trip.id) as never)} />} /> : null}
-            {nudges.map((n) => (
-              <Row key={n.id} lead={<Disc icon={(n.payload as { what?: string }).what === 'checkin' ? 'plane' : 'check-circle'} color={t.tints.travel.ink} />} title={n.line} lines={2} trailing={n.yes ? <PillButton title={n.yes} onPress={() => act(n.id)} /> : null} />
-            ))}
-            {lines.map((line) => {
-              const look = lineLook(line);
-              return <Row key={line} lead={<Disc icon={look.icon} color={look.color} />} title={line} lines={2} trailing={<Tick label={line} onPress={() => tick(line)} />} />;
-            })}
-            {hero.lines.length ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 2, paddingTop: 4, paddingBottom: 2 }}>
-                <Icon name="lock" size={14} color={t.c.fg.secondary} />
-                <Text style={{ flex: 1, fontSize: 12, lineHeight: 16, fontWeight: '500', color: t.c.fg.secondary }}>Claude saw the trip and what else is coming up. Never your mail.</Text>
-              </View>
-            ) : null}
-          </RowCard>
-        </View>
-      ) : null}
-
-      <View style={{ gap: 10, minWidth: 0 }}>
-        <SectionHead title="Coming up" sub="Tickets from Gmail and dumps add them" action="All trips" chevron onAction={() => router.push(routes.all as never)} />
-        <RowCard>
-          {d.coming.length ? (
-            d.coming.map(({ trip, people, when: w }) => (
-              <Row key={trip.id} lead={<Disc icon="plane" color={t.tints.travel.ink} />} title={trip.title} sub={[slashDates(trip.data), withLine(people)].filter(Boolean).join(' · ')} trailing={w ? <Chip28 tone={trip.id === hero?.trip.id ? 'soft' : 'quiet'} label={w} /> : null} onPress={() => open(trip.id)} />
-            ))
-          ) : (
-            <Row lead={<Disc icon="plane" color={t.tints.travel.ink} />} title="No trips planned" sub="Add one, or tell the Dump" onPress={add} />
-          )}
-        </RowCard>
-      </View>
-
-      {d.budget.length ? (
-        <View style={{ gap: 10, minWidth: 0 }}>
-          <SectionHead title="Budget used" sub="What each trip cost against its budget" />
-          <View style={{ padding: 18, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 18 }}>
-            {d.budget.map((b) => {
-              const over = b.spent > b.budget;
-              return (
-                <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`${b.title}, ${money(b.spent)} of ${money(b.budget)}${over ? ', over' : ''}`} onPress={() => open(b.id)} style={({ pressed }) => ({ gap: 8, minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                    <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, lineHeight: 19, fontWeight: '600' }}>{b.title}</Text>
-                    <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: over ? '600' : '500', color: over ? t.c.alert.coralText : t.c.fg.secondary, fontVariant: ['tabular-nums'] }}>{money(b.spent)} of {money(b.budget)}{over ? ' · over' : ''}</Text>
-                  </View>
-                  <ProgressBar value={b.spent / b.budget} height={10} color={over ? t.c.alert.coralText : t.c.accent.mustard} />
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      ) : null}
-
-      {d.costs.length ? <CostBlock year={d.year} costs={d.costs} total={money(d.costs.reduce((n, c) => n + c.spent, 0))} onOpen={open} /> : null}
-      <View style={{ height: 8 }} />
-    </Screen>
-  );
-}
-
-function Tick({ label, onPress }: { label: string; onPress: () => void }) {
-  const t = useTheme();
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Done: ${label}`} onPress={onPress} hitSlop={2} style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: pressed ? 0.75 : 1 })}>
-      <Icon name="check" size={18} color={t.c.accent.gold} />
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 22, backgroundColor: bg, alignItems: 'center', justifyContent: 'center', flexShrink: 0, transform: [{ scale: pressed ? 0.95 : 1 }] })}>
+      {children}
     </Pressable>
   );
 }
 
-/** Two tickets, one tilted over the other. */
-function Tickets() {
-  const t = useTheme();
+/** The bell: what was filed that you have not looked at; opens To check. */
+function Bell() {
+  const router = useRouter();
+  const n = useLive((o) => o.filings.toCheckCount(), []);
   return (
-    <View accessible={false} style={{ width: 120, height: 92 }}>
-      <View style={{ position: 'absolute', left: 8, top: 16, width: 76, height: 62, borderRadius: 12, backgroundColor: t.c.bg.tileRaised, transform: [{ rotate: '-8deg' }] }} />
-      <View style={{ position: 'absolute', left: 36, top: 6, width: 76, height: 62, borderRadius: 12, backgroundColor: WHITE, transform: [{ rotate: '6deg' }], padding: 9, gap: 6 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: gradients.travel[0] }} />
-          <View style={{ height: 4, flex: 1, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.14)' }} />
+    <View>
+      <RoundButton label={n ? `To check, ${n} item${n === 1 ? '' : 's'}` : 'To check'} bg={C.raised} onPress={() => router.push('/check' as never)}>
+        <Icon d={['M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9', 'M10.3 21a1.94 1.94 0 0 0 3.4 0']} />
+      </RoundButton>
+      {n ? (
+        <View pointerEvents="none" style={{ position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: C.lime, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: C.ink, fontSize: 10, fontFamily: BOLD }}>{n > 99 ? '99+' : n}</Text>
         </View>
-        <View style={{ height: 3, width: '80%', borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.14)' }} />
-        <View style={{ marginTop: 'auto', opacity: 0.6 }}>
-          <Svg width="100%" height={10}>
-            {Array.from({ length: 15 }, (_, i) => <Rect key={i} x={i * 4} y={0} width={2} height={10} fill={INK} />)}
-          </Svg>
-        </View>
-      </View>
+      ) : null}
     </View>
   );
 }
 
-const CHART = 150;
-const k = (n: number) => (n >= 100_000 ? `${+(n / 100_000).toFixed(1)}L` : n >= 1000 ? `${+(n / 1000).toFixed(1)}k` : String(n));
-
-/** The orange block: what each trip this year cost, the latest bar in white. */
-function CostBlock({ year, costs, total, onOpen }: { year: string; costs: Array<{ id: string; label: string; spent: number }>; total: string; onOpen: (id: string) => void }) {
-  const top = niceMax(Math.max(...costs.map((c) => c.spent), 1));
-  const faint = 'rgba(11,11,13,0.62)';
-  const label = { fontSize: 10, lineHeight: 13, fontWeight: '600' } as const;
+function SectionTitle({ title, sub }: { title: string; sub?: string }) {
   return (
-    <View style={{ padding: 16, borderRadius: 28, backgroundColor: blocks.orange, gap: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Text variant="labelCaps" color={INK} numberOfLines={1} accessibilityRole="header" style={{ flex: 1 }}>TRIPS IN {year} · WHAT EACH COST</Text>
-        <View style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, backgroundColor: INK, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: WHITE }}>{costs.length} done</Text>
-        </View>
+    <View style={{ paddingTop: 10, paddingHorizontal: 4, gap: 1 }}>
+      <Text accessibilityRole="header" numberOfLines={1} style={{ color: C.white, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, fontFamily: SEMI }}>{title}</Text>
+      {sub ? <Text numberOfLines={1} style={{ color: C.mid, fontSize: 13, lineHeight: 17, fontFamily: SANS }}>{sub}</Text> : null}
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* A trip's thumbnail: its cover, else a blurred photo-like gradient   */
+/* ------------------------------------------------------------------ */
+
+const PALETTES: Array<{ bg: [string, string, string]; glow: string[] }> = [
+  { bg: ['#4A4A24', '#2C2C16', '#121208'], glow: ['#8A9A40', '#C8B050', '#F0E08A'] },
+  { bg: ['#4A2A4E', '#2A1830', '#100A14'], glow: ['#8A60C0', '#E0709A', '#FFB08A'] },
+  { bg: ['#1C3A5E', '#12263E', '#081220'], glow: ['#5A9AE0', '#9AD0FF', '#9AD0FF'] },
+  { bg: ['#1E4A3A', '#12302A', '#081410'], glow: ['#4CC9A0', '#8FE0C0', '#D7F55C'] },
+];
+const hash = (s: string) => {
+  let h = 2166136261;
+  for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return h;
+};
+
+function Thumb({ name, uri }: { name: string; uri: string | null }) {
+  if (uri) return <Image source={{ uri }} style={{ width: 44, height: 44, borderRadius: 14, flexShrink: 0 }} accessibilityIgnoresInvertColors />;
+  let h = hash(name);
+  const rnd = () => ((h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0), (h % 1000) / 1000);
+  const p = PALETTES[hash(name) % PALETTES.length]!;
+  const blobs = Array.from({ length: 6 }, (_, i) => ({ size: 8 + Math.round(rnd() * 24), top: -6 + Math.round(rnd() * 40), left: -10 + Math.round(rnd() * 96), color: p.glow[i % p.glow.length]!, o: 0.4 + rnd() * 0.32 }));
+  return (
+    <View style={{ width: 44, height: 44, borderRadius: 14, overflow: 'hidden', flexShrink: 0 }}>
+      <View style={[bgImage(`linear-gradient(180deg, ${p.bg[0]} 0%, ${p.bg[1]} 55%, ${p.bg[2]} 100%)`), { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }]} />
+      {blobs.map((b, i) => (
+        <View key={i} style={[bgImage(`radial-gradient(closest-side, ${b.color} 0%, ${b.color} 55%, rgba(0,0,0,0) 100%)`), { position: 'absolute', width: b.size, height: b.size, top: b.top, left: `${b.left}%`, borderRadius: b.size / 2, opacity: b.o, filter: 'blur(5px)' } as never]} />
+      ))}
+    </View>
+  );
+}
+
+function TripRowView({ row, right, sub, onPress }: { row: TripRow; right: React.ReactNode; sub: string; onPress: () => void }) {
+  const cover = useLive((o) => o.attachments.cover(row.trip.id)?.uri ?? null, [row.trip.id]);
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${row.trip.title}, ${sub}`} onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0, minHeight: 56, opacity: pressed ? 0.75 : 1 })}>
+      <Thumb name={row.trip.title} uri={cover} />
+      <View style={{ flexGrow: 1, flexShrink: 1, gap: 1, minWidth: 0 }}>
+        <Text numberOfLines={1} style={{ color: C.white, fontSize: 16, lineHeight: 21, letterSpacing: -0.2, fontFamily: SEMI }}>{row.trip.data.destination || row.trip.title}</Text>
+        <Text numberOfLines={1} style={{ color: C.mid, fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'], fontFamily: SANS }}>{sub}</Text>
       </View>
-      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: 38, lineHeight: 39, fontWeight: '700', letterSpacing: -1.5, color: INK, fontVariant: ['tabular-nums'] }}>{total}</Text>
-      <View style={{ flexDirection: 'row' }} accessibilityRole="image" accessibilityLabel={costs.map((c) => `${c.label} ${Math.round(c.spent)} rupees`).join(', ')}>
-        <View style={{ width: 28, height: CHART }}>
-          <Text style={[label, { color: faint, position: 'absolute', top: -6 }]}>{k(top)}</Text>
-          <Text style={[label, { color: faint, position: 'absolute', top: CHART / 2 - 6 }]}>{k(top / 2)}</Text>
-          <Text style={[label, { color: faint, position: 'absolute', bottom: -6 }]}>0</Text>
+      {right}
+    </Pressable>
+  );
+}
+
+const Card = ({ children, gap = 8 }: { children: React.ReactNode; gap?: number }) => <View style={{ padding: 14, backgroundColor: C.tile, borderRadius: 24, overflow: 'hidden', gap }}>{children}</View>;
+const Hair = () => <View style={{ height: 1, backgroundColor: C.line }} />;
+const Pill = ({ label }: { label: string }) => (
+  <View style={{ height: 24, paddingHorizontal: 9, borderRadius: 999, backgroundColor: C.raised, justifyContent: 'center', flexShrink: 0 }}>
+    <Text numberOfLines={1} style={{ color: C.mid, fontSize: 12, lineHeight: 16, fontVariant: ['tabular-nums'], fontFamily: SEMI }}>{label}</Text>
+  </View>
+);
+
+/* ------------------------------------------------------------------ */
+/* The next trip's card                                                */
+/* ------------------------------------------------------------------ */
+
+/** The next trip's card; without `onPress` it is only shown (the view-only trip). */
+export function NextCard({ card, people, onPress, label }: { card: NextTripCard; people: string[]; onPress?: () => void; label?: string }) {
+  const show = useShow(card.trip);
+  const { trip } = card;
+  const script = scriptName(trip);
+  const name = trip.data.destination || trip.title;
+  const away = card.stage === 'travel';
+  const board = away ? `D${card.dayOf ?? 1}` : card.days != null ? `${Math.min(card.days, 999)}D` : '';
+  const share = card.budget ? Math.min(1, card.projectedEach / card.budget) : 0;
+  const over = !!card.budget && card.projectedEach > card.budget;
+  return (
+    <Anim k="jr" delay={50} style={{ minWidth: 0 }}>
+      <Pressable
+        accessibilityRole={onPress ? 'button' : 'summary'}
+        disabled={!onPress}
+        accessibilityLabel={`${away ? 'Away now' : 'Next trip'}: ${name}, ${monoDates(trip.data).toLowerCase()}, ${card.stage}`}
+        onPress={onPress}
+        style={({ pressed }) => [bgImage('linear-gradient(170deg,#24306A 0%,#141A3C 55%,#0D0F1E 100%)'), { backgroundColor: '#141A3C', gap: 12, paddingTop: 18, paddingHorizontal: 18, paddingBottom: 52, borderRadius: 32, overflow: 'hidden', opacity: pressed ? 0.92 : 1 }]}
+      >
+        {isJapan(trip) ? (
+          <Anim k="jwave" pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 52 }}>
+            <View style={{ height: 24, overflow: 'hidden' }}>
+              <Wave />
+            </View>
+          </Anim>
+        ) : null}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ height: 26, paddingHorizontal: 11, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.14)', justifyContent: 'center' }}>
+            <Text numberOfLines={1} style={{ color: C.white, fontSize: 12, lineHeight: 16, fontFamily: SEMI }}>{label ?? (away ? 'Away now' : 'Next trip')} · {card.stage}</Text>
+          </View>
+          <Faces names={people} ring="#151B38" />
         </View>
-        <View style={{ flex: 1, flexDirection: 'row', gap: costs.length > 4 ? 8 : 16 }}>
-          {costs.map((c, i) => {
-            const last = i === costs.length - 1;
-            return (
-              <Pressable key={c.id} accessibilityRole="button" accessibilityLabel={`Open ${c.label}`} onPress={() => onOpen(c.id)} style={{ flex: 1, minWidth: 0, gap: 6, alignItems: 'center' }}>
-                <View style={{ alignSelf: 'stretch', height: CHART, borderRadius: 12, backgroundColor: 'rgba(11,11,13,0.18)', justifyContent: 'flex-end' }}>
-                  <View style={{ height: Math.max(c.spent ? 6 : 0, (c.spent / top) * CHART), borderRadius: 12, backgroundColor: last ? WHITE : INK }} />
-                </View>
-                <Text numberOfLines={1} style={[label, { color: last ? INK : 'rgba(11,11,13,0.72)' }]}>{c.label}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
+          <View style={{ flexShrink: 1, minWidth: 0 }}>
+            {script ? (
+              <>
+                <Text style={{ color: C.white, fontSize: 56, lineHeight: 58, letterSpacing: 3, fontFamily: JP_SERIF, fontWeight: '800' }}>{script}</Text>
+                <Text numberOfLines={1} style={{ marginTop: 2, color: C.white, fontSize: 20, fontFamily: BOLD }}>{name}</Text>
+              </>
+            ) : (
+              <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6} style={{ color: C.white, fontSize: 44, lineHeight: 48, letterSpacing: -1, fontFamily: 'PlusJakartaSans_800ExtraBold' }}>{name}</Text>
+            )}
+            <Text numberOfLines={1} style={{ marginTop: 4, color: 'rgba(255,255,255,0.75)', fontSize: 11, letterSpacing: 3, fontFamily: MONO }}>{monoDates(trip.data)}</Text>
+          </View>
+          {board ? <DotMatrix text={board} pitch={4.2} label={away ? `Day ${card.dayOf}` : `${card.days} days to go`} /> : null}
+        </View>
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <Text numberOfLines={1} style={{ flexShrink: 1, color: C.white, fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'], fontFamily: BOLD }}>{show(card.projectedEach, true)} projected each</Text>
+            <View style={{ flexGrow: 1 }} />
+            {card.budget ? <Text style={{ color: over ? C.coral : 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'], fontFamily: SEMI }}>of {show(card.budget, true)}</Text> : null}
+          </View>
+          {card.budget ? (
+            <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.16)', overflow: 'hidden' }}>
+              <Anim k="jbar" style={{ width: `${Math.round(share * 100)}%`, height: '100%', borderRadius: 4, backgroundColor: over ? C.coral : C.lime }} />
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+    </Anim>
+  );
+}
+
+const NOTE_LOOK: Record<string, { disc: string; bg: string }> = {
+  urgent: { disc: '#FF5C47', bg: 'rgba(255,92,71,0.18)' },
+  high: { disc: C.amber, bg: 'rgba(246,181,71,0.16)' },
+};
+
+function NoteStrip({ card, onPress }: { card: NextTripCard; onPress: () => void }) {
+  const note = card.note!;
+  const look = NOTE_LOOK[note.priority] ?? { disc: C.raised, bg: C.tile };
+  const sub = card.moreNotes ? `and ${card.moreNotes} more` : note.body;
+  const plain = !NOTE_LOOK[note.priority];
+  return (
+    <Anim k="jr" delay={110}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${note.title}${sub ? `, ${sub}` : ''}`} onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 22, backgroundColor: look.bg, opacity: pressed ? 0.8 : 1 })}>
+        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: look.disc, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon size={16} color={plain ? C.white : C.ink} d={['M12 8v4', 'M12 16h.01']}>
+            <Circle cx={12} cy={12} r={10} />
+          </Icon>
+        </View>
+        <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={{ color: C.white, fontSize: 15, fontFamily: BOLD }}>{note.title}</Text>
+          {sub ? <Text numberOfLines={1} style={{ color: C.mid, fontSize: 12, fontFamily: 'PlusJakartaSans_400Regular' }}>{sub}</Text> : null}
+        </View>
+        <Chevron />
+      </Pressable>
+    </Anim>
+  );
+}
+
+function StartTrip({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Start a trip" onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 24, backgroundColor: C.tile, opacity: pressed ? 0.8 : 1 })}>
+      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon d={['M5 12h14', 'M12 5v14']} color={C.lime} />
+      </View>
+      <View style={{ flexGrow: 1, flexShrink: 1, gap: 1, minWidth: 0 }}>
+        <Text numberOfLines={1} style={{ color: C.white, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, fontFamily: SEMI }}>Start a trip</Text>
+        <Text numberOfLines={1} style={{ color: C.mid, fontSize: 13, lineHeight: 17, fontFamily: SANS }}>stops, people, dates · the same five sections</Text>
+      </View>
+      <Chevron />
+    </Pressable>
+  );
+}
+
+function YearTile({ year, trips, nights, spent }: { year: number; trips: number; nights: number; spent: number }) {
+  const cell = (label: string, value: string) => (
+    <View key={label} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, gap: 4, minWidth: 0 }}>
+      <Text style={{ color: C.low, fontSize: 11, lineHeight: 14, letterSpacing: 0.9, fontFamily: SEMI }}>{label}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ color: C.white, fontSize: 22, lineHeight: 26, letterSpacing: -0.5, fontVariant: ['tabular-nums'], fontFamily: BOLD }}>{value}</Text>
+    </View>
+  );
+  return (
+    <View accessible accessibilityLabel={`${year}: ${trips} trips, ${nights} nights, ${money(spent)} spent`} style={{ flexDirection: 'row', gap: 12, padding: 16, borderRadius: 24, backgroundColor: C.tile }}>
+      {cell(`TRIPS · ${year}`, String(trips))}
+      {cell('NIGHTS', String(nights))}
+      {cell('SPENT', money(spent, 'INR', true))}
+    </View>
+  );
+}
+
+/** The app's bottom bar as the artboard draws it: the tab pill at the left edge, the Dump disc at the right. */
+function NavBar({ active, onPress }: { active: string; onPress: (key: string) => void }) {
+  const insets = useSafeAreaInsets();
+  const action = TABS.find((t) => t.primary)!;
+  return (
+    <View accessibilityRole="tablist" pointerEvents="box-none" style={{ position: 'absolute', left: 20, right: 20, bottom: insets.bottom + 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 999, backgroundColor: C.tile, borderWidth: 1, borderColor: C.line }}>
+        {TABS.filter((t) => !t.primary).map((t) => {
+          const on = t.key === active;
+          return (
+            <Pressable key={t.key} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => onPress(t.key)} style={({ pressed }) => ({ width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? C.lime : pressed ? C.raised : 'transparent' })}>
+              <UiIcon name={t.icon} size={22} color={on ? C.ink : C.mid} />
+            </Pressable>
+          );
+        })}
+      </View>
+      <Pressable accessibilityRole="tab" accessibilityLabel="Dump, tell or ask" onPress={() => onPress(action.key)} style={({ pressed }) => ({ width: 64, height: 64, borderRadius: 32, backgroundColor: C.lime, alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(215,245,92,0.25)', transform: [{ scale: pressed ? 0.95 : 1 }] })}>
+        <UiIcon name={action.icon} size={28} color={C.ink} />
+      </Pressable>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* The screen                                                          */
+/* ------------------------------------------------------------------ */
+
+export function TravelHome(_: { ctx: LifeOSContext; params: Record<string, string> }) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const barInset = useBottomBarInset();
+  const [adding, setAdding] = useState(false);
+  const d = useLive((os) => {
+    const data = travelHomeOf(os);
+    const people = data.next ? ['You', ...(data.next.trip.data.personIds ?? []).map((id) => os.records.get(id)?.title ?? '?')] : [];
+    return { ...data, people };
+  }, []);
+  const now = Date.now();
+  const open = (id: string) => router.push(tripRoutes.overview(id));
+  const newTrip = () => router.push(routes.newTrip as never);
+  const importTrip = () => router.push(tripRoutes.import);
+  const next = d.next;
+  const nextName = next ? next.trip.data.destination || next.trip.title : '';
+  const caption = !next
+    ? d.count
+      ? `${d.count} ${d.count === 1 ? 'trip' : 'trips'} · none coming up`
+      : 'No trips yet'
+    : next.stage === 'travel'
+      ? `${nextName}, day ${next.dayOf} of ${tripDays(next.trip.data) ?? '?'}`
+      : next.days === 0
+        ? `${nextName} today`
+        : next.days === 1
+          ? `${nextName} tomorrow`
+          : `${nextName} in ${next.days} days`;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.ink }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: barInset + 8, gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, paddingBottom: 4 }}>
+          <View style={{ flexGrow: 1, flexShrink: 1, gap: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={{ color: C.mid, fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'], fontFamily: SANS }}>{caption}</Text>
+            <Text accessibilityRole="header" style={{ color: C.white, fontSize: 28, lineHeight: 32, letterSpacing: -0.6, fontFamily: BOLD }}>Travel</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8, flexShrink: 0 }}>
+            <Bell />
+            <RoundButton label="New trip or import a trip" bg={C.lime} onPress={() => setAdding(true)}>
+              <Icon d={['M5 12h14', 'M12 5v14']} color={C.ink} />
+            </RoundButton>
+          </View>
+        </View>
+
+        {!d.count ? (
+          <Anim k="jr" delay={50} style={{ padding: 22, paddingTop: 26, borderRadius: 32, backgroundColor: C.tile, gap: 14, overflow: 'hidden' }}>
+            <Text style={{ color: C.mid, fontSize: 10, letterSpacing: 1.5, fontFamily: MONO }}>NO TRIPS YET</Text>
+            <Text accessibilityRole="header" style={{ color: C.white, fontSize: 26, lineHeight: 30, letterSpacing: -0.5, fontFamily: BOLD }}>Where to next?</Text>
+            <Text style={{ color: C.mid, fontSize: 14, lineHeight: 20, fontFamily: SANS }}>Start a trip with its stops, people and dates, or import one you planned in the trip app. Tickets from Gmail and dumps add bookings to it.</Text>
+            <View style={{ gap: 8, paddingTop: 6 }}>
+              <Pressable accessibilityRole="button" onPress={newTrip} style={({ pressed }) => ({ height: 52, borderRadius: 999, backgroundColor: C.lime, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: pressed ? 0.85 : 1 })}>
+                <Icon d={['M5 12h14', 'M12 5v14']} color={C.ink} />
+                <Text style={{ color: C.ink, fontSize: 15, fontFamily: BOLD }}>Start a trip</Text>
               </Pressable>
-            );
-          })}
-        </View>
-      </View>
+              <Pressable accessibilityRole="button" onPress={importTrip} style={({ pressed }) => ({ height: 52, borderRadius: 999, backgroundColor: C.raised, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: pressed ? 0.85 : 1 })}>
+                <Icon d={['M12 15V3', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'm7 10 5 5 5-5']} color={C.lime} />
+                <Text style={{ color: C.white, fontSize: 15, fontFamily: SEMI }}>Import a trip</Text>
+              </Pressable>
+            </View>
+          </Anim>
+        ) : null}
+
+        {next ? <NextCard card={next} people={d.people} onPress={() => open(next.trip.id)} /> : null}
+        {next?.note ? <NoteStrip card={next} onPress={() => open(next.trip.id)} /> : null}
+
+        {d.count ? (
+          <>
+            {d.coming.length ? (
+              <>
+                <SectionTitle title="Coming up" />
+                <Card>
+                  {d.coming.map((r, i) => (
+                    <React.Fragment key={r.trip.id}>
+                      {i ? <Hair /> : null}
+                      <TripRowView row={r} sub={[homeDates(r.trip.data, now), r.stay, r.people > 1 ? `${r.people} people` : null].filter(Boolean).join(' · ')} right={<Pill label={r.days != null ? (r.days === 1 ? 'tomorrow' : `in ${r.days} d`) : r.trip.data.startDate ? 'now' : 'no dates'} />} onPress={() => open(r.trip.id)} />
+                    </React.Fragment>
+                  ))}
+                </Card>
+              </>
+            ) : null}
+            <StartTrip onPress={newTrip} />
+            {d.been.length ? (
+              <>
+                <SectionTitle title="Been" sub="newest first" />
+                <Card>
+                  {d.been.map((r, i) => (
+                    <React.Fragment key={r.trip.id}>
+                      {i ? <Hair /> : null}
+                      <TripRowView row={r} sub={[homeDates(r.trip.data, now), r.people > 1 ? `${r.people} people` : 'just you'].join(' · ')} right={<Text numberOfLines={1} style={{ color: C.white, fontSize: 16, lineHeight: 21, fontVariant: ['tabular-nums'], fontFamily: BOLD, flexShrink: 0 }}>{r.spent ? money(r.spent) : '·'}</Text>} onPress={() => open(r.trip.id)} />
+                    </React.Fragment>
+                  ))}
+                </Card>
+              </>
+            ) : null}
+            <YearTile {...d.year} />
+          </>
+        ) : null}
+      </ScrollView>
+      <NavBar active="browse" onPress={(k) => router.navigate(TAB_PATH[k] as never)} />
+      <ActionSheet
+        visible={adding}
+        onClose={() => setAdding(false)}
+        title="Add a trip"
+        actions={[
+          { label: 'New trip', icon: 'plus', onPress: newTrip },
+          { label: 'Import a trip', icon: 'download', onPress: importTrip },
+        ]}
+      />
     </View>
   );
 }

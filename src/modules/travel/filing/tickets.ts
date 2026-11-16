@@ -19,6 +19,40 @@ export interface ParsedStay {
   checkIn: string;
   checkOut: string | null;
   place: string | null;
+  /** The check-in window or start, as the mail says it ("15:00–19:00", "from 14:00"); R7g slice 2. */
+  checkInTime?: string | null;
+  /** "by 11:00". */
+  checkOutTime?: string | null;
+  total?: { amount: number; currency: string } | null;
+  /** The mail says it is paid already. */
+  paid?: boolean;
+  /** The last day it can be cancelled for free. */
+  cancelBy?: string | null;
+}
+
+const hhmm = (h: string, m: string, ap?: string) => {
+  let x = Number(h);
+  if (ap && /pm/i.test(ap) && x < 12) x += 12;
+  if (ap && /am/i.test(ap) && x === 12) x = 0;
+  return `${String(x).padStart(2, '0')}:${m}`;
+};
+const TIME = /(\d{1,2})[:.](\d{2})\s*(am|pm)?/i;
+const CUR: Record<string, string> = { '₹': 'INR', inr: 'INR', rs: 'INR', 'rs.': 'INR', '¥': 'JPY', jpy: 'JPY', 'us$': 'USD', $: 'USD', usd: 'USD', '€': 'EUR', eur: 'EUR' };
+
+/** What a stay mail says about times, money and cancellation (R7g slice 2). */
+export function stayDetails(t: string, ciWindow: string | null, coWindow: string | null, sentAt: number): Pick<ParsedStay, 'checkInTime' | 'checkOutTime' | 'total' | 'paid' | 'cancelBy'> {
+  const range = ciWindow ? /(\d{1,2})[:.](\d{2})\s*(?:–|-|to)\s*(\d{1,2})[:.](\d{2})/.exec(ciWindow) : null;
+  const ciTime = ciWindow ? TIME.exec(ciWindow) : null;
+  const coTime = coWindow ? TIME.exec(coWindow) : null;
+  const money = /\b(?:total(?:\s+(?:price|amount|cost|charge))?|grand total|amount paid|you paid|total amount paid)\b[^\d₹¥$€\n]{0,14}(₹|INR|Rs\.?|¥|JPY|US\$|\$|USD|€|EUR)\s?([\d,]+(?:\.\d{1,2})?)/i.exec(t);
+  const cancel = /\bfree cancell?ation\s+(?:until|till|before|by|up to)\s+([^\n]{3,48})/i.exec(t);
+  return {
+    checkInTime: range ? `${hhmm(range[1]!, range[2]!)}–${hhmm(range[3]!, range[4]!)}` : ciTime ? `from ${hhmm(ciTime[1]!, ciTime[2]!, ciTime[3])}` : null,
+    checkOutTime: coTime ? `by ${hhmm(coTime[1]!, coTime[2]!, coTime[3])}` : null,
+    total: money ? { amount: Number(money[2]!.replace(/,/g, '')), currency: CUR[money[1]!.toLowerCase()] ?? 'INR' } : null,
+    paid: /\b(?:you paid|amount paid|paid in full|payment (?:received|successful))\b/i.test(t) && !/\bpay (?:at|on arrival|at the property)\b/i.test(t),
+    cancelBy: cancel ? (mailDates(cancel[1]!, sentAt)[0]?.day ?? null) : null,
+  };
 }
 
 /** Common airports: IATA code → city (a three-letter word that isn't one of these is not a route). */
@@ -106,7 +140,7 @@ export function parseStay(mail: Mail): ParsedStay | null {
   if (!name) return null;
   const city = CITY_CODES.find(([re]) => re.test(t))?.[1];
   const place = city ? AIRPORTS[city]! : (/\bin ([A-Z][a-z]+(?: [A-Z][a-z]+)?)$/.exec(name)?.[1] ?? null);
-  return { name, checkIn: inDate.day, checkOut: outDate?.day ?? null, place };
+  return { name, checkIn: inDate.day, checkOut: outDate?.day ?? null, place, ...stayDetails(t, ci ? ci[0].slice(0, 80) : null, co ? co[0].slice(0, 80) : null, mail.date) };
 }
 
 /* ------------------------------------------------------------------ */
