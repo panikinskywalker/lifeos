@@ -6,10 +6,11 @@ import type { ObjectRecord } from '@core/domain/types';
 import { allGames, allVenues, turfVenueId, type VenueData } from '@modules/games';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, EmptyState, Icon, Screen, Text } from '@ui/kit';
+import { Icon, Screen, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { NotConnectedCard, SyncBanners, TurfSyncPill, useTurfStatus } from './states';
-import { shortDay, useBack, type Props } from './common';
+import { useBack, type Props } from './common';
+import { PillButton } from './dues';
 import { SearchBox, found } from './search';
 import { useTurfPhoto } from './teams';
 import { BellButton } from './bell-button';
@@ -130,12 +131,6 @@ export function kickOff(time: string | undefined | null): string | null {
   return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'am' : 'pm'}`;
 }
 
-/** Where a venue is, from its Place: the area or city, when it has one. */
-function areaOf(place: { data?: { city?: string; address?: string } } | null | undefined) {
-  return place?.data?.city?.trim() || place?.data?.address?.split(',')[0]?.trim() || null;
-}
-
-const today = () => new Date().toISOString().slice(0, 10);
 
 /* ------------------------------------------------------------------ */
 /* The screen                                                          */
@@ -145,112 +140,146 @@ interface VenueRow {
   v: ObjectRecord<VenueData>;
   area: string | null;
   games: number;
-  last: string | null;
-  next: string | null;
 }
+
+/** Turf web's splitVenue: "Wings - Bishop cotton" is the ground Wings in the area Bishop cotton. */
+const splitVenue = (name: string): [string, string | null] => {
+  const m = name.match(/^(.*?)\s+[-–·]\s+(.*)$/);
+  return m ? [m[1]!, m[2]!] : [name, null];
+};
+/** Turf web's four backdrops, by place in the list. */
+const GREENS: Array<[string, string, string]> = [
+  ['#3C6B45', '#1E3F2A', '#0C1A12'],
+  ['#2A2446', '#1A1630', '#0C0A16'],
+  ['#5A3A3C', '#2B1A1F', '#120C0E'],
+  ['#24445C', '#142A3A', '#0A141C'],
+];
+const INK = '#F5F5F7';
+const INK62 = 'rgba(245,245,247,0.62)';
 
 export function TurfVenues({ ctx }: Props) {
   const router = useRouter();
+  const t = useTheme();
   const back = useBack();
   const { busy, pull } = usePull();
   const status = useTurfStatus();
   const venues = useLive((o) => {
     const games = allGames(o);
-    const now = today();
     return allVenues(o)
-      .map((v): VenueRow => {
-        const here = games.filter((g) => g.data.venueId === v.id);
-        const place = v.data.placeId ? o.records.get<{ city?: string; address?: string }>(v.data.placeId) : null;
-        return { v, area: areaOf(place), games: here.filter((g) => g.data.date <= now).length, last: here.find((g) => g.data.date <= now)?.data.date ?? null, next: [...here].reverse().find((g) => g.data.date > now)?.data.date ?? null };
-      })
-      .sort((x, y) => y.games - x.games || x.v.title.localeCompare(y.v.title));
+      .map((v): VenueRow => ({ v, area: splitVenue(v.data.name)[1], games: games.filter((g) => g.data.venueId === v.id).length }))
+      .sort((x, y) => y.games - x.games || x.v.data.name.localeCompare(y.v.data.name));
   }, []);
   const open = (id?: string) => router.push((id ? `/board/turf/venue?venue=${id}` : '/board/turf/venue') as never);
   const [q, setQ] = useState('');
-  const shown = venues.filter((row) => found(q, row.v.title, row.area));
   return (
     <Screen title="Turf" subtitle="Browse" onBack={back} right={<><TurfSyncPill busy={busy} /><BellButton /></>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <SyncBanners onRetry={() => void pull()} />
       {!venues.length && status.kind === 'off' ? (
         <NotConnectedCard />
-      ) : !venues.length ? (
-        <EmptyState icon="location" line="No venues yet. Add the turfs you play at, with their usual format, cost and kick-off." />
       ) : (
         <>
-          {venues.length > 4 ? <SearchBox value={q} onChange={setQ} placeholder="Search venues" /> : null}
-          {shown.map((row) => <VenueCard key={row.v.id} row={row} money={ctx.format.currency} onOpen={() => open(row.v.id)} />)}
+          {venues.length ? <SearchBox value={q} onChange={setQ} placeholder="Search venues" /> : null}
+          {venues
+            .filter((row) => found(q, row.v.data.name, row.v.data.notes))
+            .map((row, i) => (
+              <VenueCard key={row.v.id} row={row} index={i} money={ctx.format.currency} onEdit={() => open(row.v.id)} />
+            ))}
+          {!venues.length ? (
+            <View style={{ padding: 14, borderRadius: 24, backgroundColor: t.c.bg.tile }}>
+              <Text variant="caption" color="secondary">
+                No venues yet. Add the grounds you play at and new matches fill in from them.
+              </Text>
+            </View>
+          ) : null}
         </>
       )}
-      <Button title="Add venue" icon="plus" variant="secondary" block style={{ height: 48 }} onPress={() => open()} />
+      <PillButton title="Add venue" icon="plus" height={48} style={{ alignSelf: 'stretch' }} onPress={() => open()} />
     </Screen>
   );
 }
 
-function VenueCard({ row, money, onOpen }: { row: VenueRow; money: (n: number) => string; onOpen: () => void }) {
+/** One of the four facts: icon, value, what it is. */
+function Fact({ icon, value, label }: { icon: string; value: string; label: string }) {
+  return (
+    <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 2 }}>
+      <Icon name={icon} size={20} color={INK62} />
+      <Text variant="label" color={INK} numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', textAlign: 'center' }}>
+        {value}
+      </Text>
+      <Text variant="label" color={INK62} style={{ fontSize: 11, lineHeight: 14, fontWeight: '500' }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** A ground, as Turf web's VenueCard: backdrop or photo, area (or games played), Edit; name and Maps; format, usual, kick-off, terms; notes. */
+function VenueCard({ row, index, money, onEdit }: { row: VenueRow; index: number; money: (n: number) => string; onEdit: () => void }) {
   const t = useTheme();
   const { v } = row;
   const d = v.data;
+  const [name] = splitVenue(d.name);
   const maps = d.mapsLink && /^https?:\/\//i.test(d.mapsLink) ? d.mapsLink : null;
-  const played = row.games ? `${row.games} game${row.games === 1 ? '' : 's'} here · last ${shortDay(row.last!)}` : row.next ? `First game here ${shortDay(row.next)}` : 'No games here yet';
-  const tiles: Array<{ icon: string; value: string | null; label: string }> = [
-    { icon: 'people', value: d.sideSize ? `${d.sideSize}-a-side` : null, label: 'format' },
-    { icon: 'rupee', value: d.defaultCost ? money(d.defaultCost) : null, label: 'usual' },
-    { icon: 'clock', value: kickOff(d.defaultTime), label: 'kick-off' },
-    { icon: 'wallet', value: TERMS.find((x) => x.value === d.paymentTerms)?.label ?? null, label: 'terms' },
-  ];
-  const turfId = turfVenueId(v.data);
-  const photo = useTurfPhoto(v.data.photoPath && turfId ? `/api/venues/${encodeURIComponent(turfId)}/photo?v=${encodeURIComponent(v.data.photoPath)}` : null);
+  const turfId = turfVenueId(d);
+  const photo = useTurfPhoto(d.photoPath && turfId ? `/api/venues/${encodeURIComponent(turfId)}/photo?v=${encodeURIComponent(d.photoPath)}` : null);
   const [failed, setFailed] = useState(false);
+  const green = GREENS[index % GREENS.length]!;
+  const rule = <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.10)' }} />;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${d.name}, edit`} onPress={onOpen} style={({ pressed }) => ({ padding: 12, gap: 10, borderRadius: 28, backgroundColor: t.c.bg.tile, opacity: pressed ? 0.9 : 1 })}>
+    <View style={{ padding: 12, gap: 10, borderRadius: 28, backgroundColor: t.c.bg.tile }}>
       <View style={{ height: 140, borderRadius: 22, overflow: 'hidden' }}>
-        <VenuePhoto id={v.id} look={lookOf(v.id)} w={326} h={140} />
+        <Svg style={{ position: 'absolute', left: 0, top: 0 }} width="100%" height="100%">
+          <Defs>
+            <LinearGradient id={`venue${index}`} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={green[0]} />
+              <Stop offset="0.55" stopColor={green[1]} />
+              <Stop offset="1" stopColor={green[2]} />
+            </LinearGradient>
+            <LinearGradient id={`venueShade${index}`} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0.4" stopColor="#000" stopOpacity={0} />
+              <Stop offset="1" stopColor="#000" stopOpacity={0.35} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill={`url(#venue${index})`} />
+        </Svg>
         {photo && !failed ? <Image source={photo} onError={() => setFailed(true)} resizeMode="cover" accessibilityIgnoresInvertColors style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }} /> : null}
-        {row.area ? (
-          <View style={{ position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 8, height: 30, paddingHorizontal: 10, borderRadius: 999, backgroundColor: onPhoto.chip, borderWidth: 1, borderColor: onPhoto.rim }}>
-            <Icon name="location" size={14} color="#F5F5F7" />
-            <Text variant="labelMicro" color="#F5F5F7" numberOfLines={1} style={{ fontWeight: '700', maxWidth: 200 }}>
-              {row.area}
-            </Text>
-          </View>
-        ) : null}
-        <Pressable accessibilityRole="button" accessibilityLabel="Edit" hitSlop={5} onPress={onOpen} style={{ position: 'absolute', right: 12, top: 12, width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: onPhoto.buttonRim, backgroundColor: onPhoto.button, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="edit" size={14} color="#F5F5F7" />
+        <Svg style={{ position: 'absolute', left: 0, top: 0 }} width="100%" height="100%" pointerEvents="none">
+          <Rect x="0" y="0" width="100%" height="100%" fill={`url(#venueShade${index})`} />
+        </Svg>
+        <View style={{ position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 8, height: 30, paddingHorizontal: 10, borderRadius: 999, backgroundColor: onPhoto.chip, borderWidth: 1, borderColor: onPhoto.rim }}>
+          <Icon name="location" size={14} color={INK} />
+          <Text variant="label" color={INK} numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, fontWeight: '700', maxWidth: 220 }}>
+            {row.area || `${row.games} ${row.games === 1 ? 'game' : 'games'}`}
+          </Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Edit" hitSlop={5} onPress={onEdit} style={{ position: 'absolute', right: 12, top: 12, width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: onPhoto.buttonRim, backgroundColor: onPhoto.button, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="edit" size={15} color={INK} />
         </Pressable>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="rowTitle" numberOfLines={2} style={{ fontSize: 18, lineHeight: 22, fontWeight: '700' }}>
-            {d.name}
-          </Text>
-          <Text variant="caption" color="tertiary" numberOfLines={1}>
-            {played}
-          </Text>
-        </View>
+        <Text variant="rowTitle" color={INK} style={{ flex: 1, fontSize: 18, lineHeight: 22, fontWeight: '700' }}>
+          {name}
+        </Text>
         {maps ? (
           <Pressable accessibilityRole="link" accessibilityLabel="Open in Maps" hitSlop={4} onPress={() => void Linking.openURL(maps).catch(() => {})} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="location" size={15} color={t.c.fg.primary} />
+            <Icon name="share" size={16} color={INK} />
           </Pressable>
         ) : null}
       </View>
       <View style={{ flexDirection: 'row' }}>
-        {tiles.map((x, i) => (
-          <View key={x.label} style={{ flex: 1, alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 2, borderLeftWidth: i ? 1 : 0, borderLeftColor: t.dark ? 'rgba(255,255,255,0.10)' : t.c.line }}>
-            <Icon name={x.icon} size={20} color={x.value ? t.c.fg.primary : t.c.fg.tertiary} />
-            <Text variant="labelMicro" color={x.value ? 'primary' : 'tertiary'} numberOfLines={1} style={{ textAlign: 'center' }}>
-              {x.value ?? 'Not set'}
-            </Text>
-            <Text variant="labelMicro" color="secondary" style={{ fontSize: 11, lineHeight: 14, fontWeight: '500' }}>
-              {x.label}
-            </Text>
-          </View>
-        ))}
+        <Fact icon="people" value={d.sideSize ? `${d.sideSize}-a-side` : '–'} label="format" />
+        {rule}
+        <Fact icon="rupee" value={d.defaultCost ? money(d.defaultCost) : '–'} label="usual" />
+        {rule}
+        <Fact icon="clock" value={kickOff(d.defaultTime) ?? '–'} label="kick-off" />
+        {rule}
+        <Fact icon="cash" value={TERMS.find((x) => x.value === d.paymentTerms)?.label ?? 'Postpaid'} label="terms" />
       </View>
       {d.notes ? (
         <Text variant="caption" color="secondary">
           {d.notes}
         </Text>
       ) : null}
-    </Pressable>
+    </View>
   );
 }

@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import { allAppearances, allPlayers, auditLog, duesTexts, undoTurfChange, isSending, markPaid, owedOn, payPart, recordPayment, rupees, turfDues, youPersonId, type AuditEntry, type DueGame, type DuePerson, type Dues } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { monoFonts } from '@ui/theme/tokens';
-import { FilterChip, Icon, IconButton, NumberField, Screen, Text, useToast } from '@ui/kit';
+import { fonts, monoFonts } from '@ui/theme/tokens';
+import { ChipRow, FilterChip, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Face, Mono, SyncPill } from './teams';
 import { useCopyShare } from './switcher';
@@ -167,6 +167,29 @@ interface JustPaid {
 
 const keyOf = (p: Pick<DuePerson, 'playerId' | 'direction'>) => `${p.direction}:${p.playerId}`;
 
+/** Turf web's AmountBox: ₹ and an amount in a pill, and Record (it pays the oldest open games first; more than is open becomes credit). */
+function AmountBox({ placeholder, value, onChange, onSave }: { placeholder: string; value: number | undefined; onChange: (v: number | undefined) => void; onSave: (rupees: number) => void }) {
+  const t = useTheme();
+  const [text, setText] = useState(value ? String(value) : '');
+  const set = (raw: string) => {
+    const clean = raw.replace(/[^\d.]/g, '').slice(0, 8);
+    setText(clean);
+    onChange(Number(clean) > 0 ? Number(clean) : undefined);
+  };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ flex: 1, minWidth: 0, height: 36, paddingHorizontal: 12, borderRadius: 999, backgroundColor: t.c.bg.tileRaised, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <Text variant="caption" color="tertiary">₹</Text>
+        <TextInput value={text} onChangeText={set} inputMode="decimal" keyboardType="decimal-pad" placeholder={placeholder} placeholderTextColor={t.c.fg.tertiary} accessibilityLabel="Amount paid" style={{ flex: 1, minWidth: 0, height: 36, padding: 0, fontFamily: fonts[600], fontSize: 14, color: t.c.fg.primary }} />
+      </View>
+      <PillButton title="Record" height={36} disabled={!(Number(text) > 0)} onPress={() => {
+        onSave(Number(text));
+        setText('');
+      }} />
+    </View>
+  );
+}
+
 /**
  * "Who still owes": one line per person (face, name, "2 games · since 3 Oct",
  * amount, tick); tap to open their games, each with its own tick, and Settle
@@ -310,12 +333,7 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
               ))}
             </View>
             {!youOwe && !done ? (
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginLeft: 48 }}>
-                <View style={{ flex: 1 }}>
-                  <NumberField label="Part payment" value={part} onChange={setPart} unit="₹" />
-                </View>
-                <PillButton title="Record" height={44} disabled={!(part && part > 0)} onPress={() => part && payDown(p, part)} />
-              </View>
+              <AmountBox placeholder={`Part of ${rupees(total)}, oldest first`} value={part} onChange={setPart} onSave={(amount) => payDown(p, amount)} />
             ) : null}
             {!youOwe && !done ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
@@ -375,14 +393,33 @@ function SendingNote({ caps }: { caps?: boolean }) {
 }
 
 /** Copy all · ₹1,170 and a share disc, under the rows. */
-export function CopyAllRow({ height = 48 }: { height?: number }) {
-  const { copy, share } = useCopyShare();
+/** Home's "Who still owes" buttons, as Turf web's: Copy details and Copy short. */
+export function CopyAllRow({ height = 40 }: { height?: number }) {
+  const t = useTheme();
+  const { copy } = useCopyShare();
   const d = useLive((o) => ({ texts: duesTexts(o), total: turfDues(o).owedToYou.totalCents }), []);
   if (!d.total) return null;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <PillButton title={`Copy all · ${rupees(d.total)}`} icon="file" height={height} full onPress={() => void copy(d.texts.all, 'Copied · everyone’s dues')} />
-      <Disc icon="share" label="Share everyone’s dues" size={height} onPress={() => share(d.texts.all)} />
+      <PillButton title="Copy details" icon="file" height={height} full onPress={() => void copy(d.texts.all, 'Details copied')} />
+      <PillButton title="Copy short" icon="file" height={height} full bg="transparent" style={{ borderWidth: 1, borderColor: t.c.line }} onPress={() => void copy(d.texts.short, 'Short version copied')} />
+    </View>
+  );
+}
+
+/** Turf web's Dues buttons: Copy details, Copy short, Share on WhatsApp. */
+function DuesTexts({ total }: { total: number }) {
+  const t = useTheme();
+  const { copy, share } = useCopyShare();
+  const texts = useLive((o) => duesTexts(o), []);
+  const ghost = { bg: 'transparent', style: { borderWidth: 1, borderColor: t.c.line } } as const;
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <PillButton title="Copy details" icon="file" height={48} full onPress={() => void copy(texts.all, 'Details copied')} />
+        <PillButton title="Copy short" icon="file" height={48} full {...ghost} onPress={() => void copy(texts.short, 'Short version copied')} />
+      </View>
+      <PillButton title={`Share on WhatsApp · ${rupees(total)}`} icon="send" height={44} bg="transparent" style={{ alignSelf: 'stretch', borderWidth: 1, borderColor: t.c.line }} onPress={() => share(texts.all)} />
     </View>
   );
 }
@@ -421,32 +458,32 @@ export function TurfDues(_props: Props) {
     const shown = (filter === 'settled' ? [] : filter === 'all' ? d.people : d.people.filter((p) => p.direction === filter)).filter((p) => found(q, p.name, p.creditorName));
     const oldestFirst = [...shown].sort((a, b) => a.since.localeCompare(b.since) || b.totalCents - a.totalCents);
     const settled = (filter === 'all' || filter === 'settled' ? d.settled : []).filter((x) => found(q, x.name));
-    const empty = filter === 'you_owe' ? 'You don’t owe anyone.' : filter === 'settled' ? 'Nobody has settled in the last 30 days.' : 'Nothing open. Every share is paid.';
+    const empty = filter === 'you_owe' ? 'You don’t owe anyone.' : filter === 'settled' ? 'Nobody has settled in the last 30 days.' : 'Nothing open.';
     body = (
       <>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <StatTile label="Owed to you" value={rupees(d.owedToYou.totalCents)} sub={d.owedToYou.people ? `${plural(d.owedToYou.people, 'person', 'people')} · oldest ${dayMonth(d.owedToYou.oldest!)}` : 'all paid'} accent onPress={() => setFilter('owes_you')} />
-          <StatTile label="You owe" value={rupees(d.youOwe.totalCents)} sub={youOwe.length ? youOwe.map((p) => `${firstName(p.name)} · ${day(p.since)}`).join(', ') : data.you ? 'nothing' : 'set which player is you'} onPress={() => (data.you ? setFilter('you_owe') : router.push('/settings/turf' as never))} />
+          <StatTile label="Owed to you" value={rupees(d.owedToYou.totalCents)} sub={d.owedToYou.people ? `${plural(d.owedToYou.people, 'person', 'people')} · oldest ${dayMonth(d.owedToYou.oldest!)}` : 'all paid'} accent />
+          <StatTile label="You owe" value={rupees(d.youOwe.totalCents)} sub={youOwe.length ? youOwe.map((p) => `${firstName(p.name)} · ${day(p.since)}`).join(', ') : data.you ? 'nothing' : 'set who you are in Settings'} />
         </View>
         <TurfCard padding={10} radius={20}>
           <Pressable accessibilityRole="link" onPress={() => router.push('/board/turf/audit' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 40 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.dim, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="history" size={16} />
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="history" size={16} color="#F5F5F7" />
             </View>
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text variant="rowTitle">Audit log</Text>
               <Text variant="caption" color="secondary" numberOfLines={1}>
-                {data.changes.length ? `${plural(data.changes.length, 'change')} today · last ${format(new Date(data.changes[0]!.at), 'H:mm')}` : 'Every change Turf web logged'}
+                {data.changes.length ? `${plural(data.changes.length, 'change')} today · last ${format(new Date(data.changes[0]!.at), 'H:mm')} · undo any` : 'every change, with undo'}
               </Text>
             </View>
             <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} />
           </Pressable>
         </TurfCard>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        <ChipRow>
           {DUES_FILTERS.map((f) => (
             <FilterChip key={f.key} label={f.label} selected={filter === f.key} onPress={() => setFilter(f.key)} />
           ))}
-        </View>
+        </ChipRow>
         <SearchBox value={q} onChange={setQ} placeholder="Search people" />
         <Text variant="caption" color="tertiary">
           Oldest first · the checkbox marks every game paid · tap a row for one game at a time or a part payment
@@ -460,7 +497,7 @@ export function TurfDues(_props: Props) {
             </Text>
           )}
         </TurfCard>
-        {d.credits.length && filter === 'all' ? (
+        {d.credits.length ? (
           <TurfCard gap={8}>
             <Text variant="labelCaps" color="tertiary" style={{ textTransform: 'uppercase' }}>
               Credit held
@@ -476,11 +513,11 @@ export function TurfDues(_props: Props) {
               </View>
             ))}
             <Text variant="caption" color="tertiary">
-              Paid more than their share. Turf web takes it off their next match.
+              Paid more than their share. It comes off their next match automatically, and the move shows in the audit log.
             </Text>
           </TurfCard>
         ) : null}
-        <CopyAllRow />
+        {d.owedToYou.totalCents > 0 || d.credits.length ? <DuesTexts total={d.owedToYou.totalCents} /> : null}
       </>
     );
   }

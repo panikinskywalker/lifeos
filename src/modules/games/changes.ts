@@ -258,6 +258,19 @@ export function setFormation(os: LifeOSContext, gameId: string, team: 'A' | 'B',
   });
 }
 
+/** The two kits, as Turf web's Pick teams sets them (its teamColors action). */
+export function setKits(os: LifeOSContext, gameId: string, colorA: string, colorB: string) {
+  const { g, id } = game(os, gameId);
+  if ((g.data.colorA ?? DEFAULT_KITS.A) === colorA && (g.data.colorB ?? DEFAULT_KITS.B) === colorB) return null;
+  return change(os, {
+    label: `Kits ${kitOf(colorA, DEFAULT_KITS.A).name} v ${kitOf(colorB, DEFAULT_KITS.B).name} · ${shortDay(g.data.date)}`,
+    recordId: g.id,
+    touches: [g.id],
+    body: { action: 'teamColors', gameId: id, teamAColor: colorA, teamBColor: colorB },
+    apply: () => replaceData<GameData>(os, g.id, { ...g.data, colorA, colorB }),
+  });
+}
+
 /* ---------- the score ---------- */
 
 /** A score set by hand: it stops following the goals. */

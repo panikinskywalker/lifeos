@@ -7,6 +7,27 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.94 · 16 Nov 2026
+
+**Turf looks like Turf web, screen for screen.** Each screen is rebuilt from
+Turf web's own, piece for piece:
+- **Games:** Match centre (the season card with played, goals and per match,
+  Upcoming with the match wallet or Nothing booked, the activity grid with its
+  months and days, the month, When you play) and Match history.
+- **Match:** the vote card, "Who's in" before kick-off with Add players and the
+  RSVP link, the payment summary's buttons, the Team view (pitch and
+  formations, match stats, each side's players, Log stats · Pick teams ·
+  share) and Match history as its own sheet.
+- **Pick teams** (suggest, reshuffle, random, captains, kits, formations) and
+  **Log stats** (the score, each side, the counters).
+- **New match:** venues as a list, format chips, the day and kick-off, cost,
+  terms, kits beside their crests, and Add players with who said In, last
+  match, regulars, In this match and the A to Z list.
+- **Player profile:** the hero and Overview, Matches, Stats and Dues tabs.
+- **Squad, Dues and Venues**, and Home's Copy details and Copy short.
+
+Ratings count best on their team, as Turf web's do.
+
 ## v0.0.93 · 17 Nov 2026
 
 **Who owes whom and a debt's page, redesigned.** Who owes whom has a lime *To

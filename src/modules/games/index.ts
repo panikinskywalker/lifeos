@@ -20,6 +20,7 @@ export * from './kits';
 export { matchVenuePayment, linkVenuePayments, undoVenuePayment, TURF_BOOKING } from './venuePay';
 export * from './teams';
 export * from './captains';
+export { profileGames, profileOf, moreOf, nightsOf, squadMax, isUpcomingGame, levelOf, type ProfileGame, type ProfilePlayer, type Profile, type More, type Night, type Trait, type Trophy, type Rival, type MonthLine, type Best, type SquadMax } from './profile';
 export * from './leaders';
 export * from './money';
 export * from './inbox';

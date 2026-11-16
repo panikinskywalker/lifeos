@@ -37,8 +37,25 @@ export function ratingPlayer(p: PlayerProfileData): RatingPlayer {
 }
 
 /** A Game and its Appearances as the ratings and the generator read them. */
-export function ratingGame(g: ObjectRecord<GameData>, apps: AppearanceData[], nameOf: (personId: string) => string): RatingGame & RatedGame {
+/** Best on each side by their teammates' votes, once counted, a clear leader only (Turf web's teamBestOf). `personOf`: Turf web player id → Person. */
+export function teamBestOf(g: GameData, apps: Array<Pick<AppearanceData, 'personId' | 'team'>>, personOf: Map<string, string>): string[] {
+  if (!g.potmSettled || !g.teamVotes) return [];
+  const n = new Map<string, number>();
+  for (const nominee of Object.values(g.teamVotes)) {
+    const pid = personOf.get(nominee);
+    if (pid) n.set(pid, (n.get(pid) ?? 0) + 1);
+  }
+  const out: string[] = [];
+  for (const side of ['A', 'B']) {
+    const list = [...n.entries()].filter(([id]) => apps.some((a) => a.personId === id && a.team === side)).sort((a, b) => b[1] - a[1]);
+    if (list.length && (!list[1] || list[1][1] < list[0]![1])) out.push(list[0]![0]);
+  }
+  return out;
+}
+
+export function ratingGame(g: ObjectRecord<GameData>, apps: AppearanceData[], nameOf: (personId: string) => string, personOf?: Map<string, string>): RatingGame & RatedGame {
   return {
+    teamBest: personOf ? teamBestOf(g.data, apps, personOf) : [],
     id: g.id,
     date: g.data.date,
     sideSize: g.data.sideSize ?? null,
@@ -71,9 +88,10 @@ export function squadData(os: LifeOSContext, before?: ObjectRecord<GameData>) {
   for (const a of apps) byGame.set(a.data.gameId, [...(byGame.get(a.data.gameId) ?? []), a.data]);
   const names = new Map(profiles.map((p) => [p.data.personId, p.data.name]));
   const nameOf = (id: string) => names.get(id) ?? os.records.get(id)?.title ?? 'Player';
+  const personOf = new Map(profiles.map((p) => [p.data.sourceKey?.replace('turf:players:', '') ?? '', p.data.personId]));
   const history = games
     .filter((g) => !before || (g.id !== before.id && g.data.date <= before.data.date))
-    .map((g) => ratingGame(g, byGame.get(g.id) ?? [], nameOf));
+    .map((g) => ratingGame(g, byGame.get(g.id) ?? [], nameOf, personOf));
   return { players: profiles.map((p) => ratingPlayer(p.data)), history, profiles };
 }
 

@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, TextInput, View } from 'react-native';
+import { Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { allPlayers, mePersonId, squadRatings, statsFor, whoOwes, type PlayerProfileData } from '@modules/games';
+import { allPlayers, mePersonId, whoOwes, type PlayerProfileData } from '@modules/games';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { fonts } from '@ui/theme/tokens';
-import { ChipRow, EmptyState, FilterChip, Icon, IconButton, Screen, Segmented, Text } from '@ui/kit';
+import { ChipRow, FilterChip, Icon, Screen, Segmented, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Face, SyncPill } from './teams';
 import { NotConnected, type Props, useBack } from './common';
 import { BellButton } from './bell-button';
+import { PillButton } from './dues';
+import { SearchBox } from './search';
 
 /**
  * Turf · Noir 5a Players · Squad (TF-Squad): the section switcher, Squad /
@@ -41,9 +42,8 @@ export function TurfPlayers({ ctx }: Props) {
   const [avail, setAvail] = useState<Avail | null>(null);
   const squad = useLive((o) => {
     const owes = new Map(whoOwes(o).map((w) => [w.personId, w.amount]));
-    const ratings = squadRatings(o).players;
     const me = mePersonId(o);
-    const rows = allPlayers(o).map((p) => ({ p, owed: owes.get(p.data.personId) ?? 0, games: statsFor(o, p.data.personId).games, overall: ratings.get(p.data.personId)?.overall ?? null, me: p.data.personId === me }));
+    const rows = allPlayers(o).map((p) => ({ p, owed: owes.get(p.data.personId) ?? 0, me: p.data.personId === me }));
     return rows.sort((a, b) => Number(b.me) - Number(a.me) || a.p.data.name.localeCompare(b.p.data.name));
   }, []);
   const shown = useMemo(() => {
@@ -54,7 +54,7 @@ export function TurfPlayers({ ctx }: Props) {
       if (avail && p.data.availability !== avail) return false;
       if (!needle) return true;
       const d = p.data;
-      return [d.name, d.position, d.secondaryPosition, d.comfortable, d.speciality, d.playingStyle].some((v) => v?.toLowerCase().includes(needle));
+      return [d.name, d.position, d.playingStyle, d.speciality].some((v) => v?.toLowerCase().includes(needle));
     });
   }, [squad, q, pay, avail]);
   const withDues = squad.filter((s) => s.owed > 0).length;
@@ -65,13 +65,7 @@ export function TurfPlayers({ ctx }: Props) {
       title="Turf"
       subtitle="Browse"
       onBack={back}
-      right={
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <SyncPill />
-          <BellButton />
-          <IconButton icon="plus" accessibilityLabel="Add player" filled onPress={() => router.push('/board/turf/player-edit' as never)} />
-        </View>
-      }
+      right={<><SyncPill /><BellButton /></>}
       refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}
     >
       <Segmented options={[{ value: 'squad', label: 'Squad' }, { value: 'leaders', label: 'Leaders' }]} value="squad" onChange={(v) => v === 'leaders' && router.replace('/board/turf/leaders' as never)} />
@@ -79,19 +73,11 @@ export function TurfPlayers({ ctx }: Props) {
         <NotConnected />
       ) : (
         <>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingHorizontal: 18, borderRadius: 16, backgroundColor: t.c.bg.tile, borderWidth: 1, borderColor: t.c.line }}>
-            <Icon name="search" size={18} color={t.c.fg.tertiary} />
-            <TextInput
-              value={q}
-              onChangeText={setQ}
-              placeholder="Name, role or skill"
-              placeholderTextColor={t.c.fg.tertiary}
-              autoCorrect={false}
-              returnKeyType="search"
-              accessibilityLabel="Search the squad"
-              style={{ flex: 1, minHeight: 48, color: t.c.fg.primary, fontFamily: fonts[500], fontSize: 15, lineHeight: 20 }}
-            />
-            {q ? <IconButton icon="x" accessibilityLabel="Clear search" size={28} onPress={() => setQ('')} /> : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <SearchBox value={q} onChange={setQ} placeholder="Name, role or skill" />
+            </View>
+            <PillButton title="Add" icon="user" tone="lime" height={48} onPress={() => router.push('/board/turf/player-edit' as never)} />
           </View>
           <ChipRow>
             {(['all', 'unpaid', 'clear'] as const).map((k) => (
@@ -103,48 +89,48 @@ export function TurfPlayers({ ctx }: Props) {
               <FilterChip key={a.value} label={a.label} icon={avail === a.value ? 'check' : undefined} selected={avail === a.value} onPress={() => setAvail(avail === a.value ? null : a.value)} />
             ))}
           </ChipRow>
-          {shown.length ? (
-            <View style={{ padding: 14, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 8 }}>
-              {shown.map(({ p, owed, games, overall, me }, i) => {
-                const d = p.data;
-                const sub = [d.position, d.availability === 'INJ' ? 'injured' : d.availability === 'OOS' ? 'out' : null, d.guest ? 'guest' : null, overall !== null && games ? `${overall} OVR` : null, games ? `${games} app${games === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
-                return (
-                  <View key={p.id} style={{ gap: 8 }}>
-                    {i > 0 ? <View style={{ height: 1, backgroundColor: t.c.line }} /> : null}
-                    <Pressable accessibilityRole="button" accessibilityLabel={`${d.name}${owed > 0 ? `, owes ${f(owed)}` : ''}`} onPress={() => router.push(`/board/turf/player?player=${p.id}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, opacity: pressed ? 0.75 : 1 })}>
-                      <Face id={d.personId} name={d.name} size={40} />
-                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                        <Text variant="rowTitle" numberOfLines={1}>
-                          {me ? `${d.name} (you)` : d.name}
+          <View style={{ padding: 14, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 8 }}>
+            {shown.map(({ p, owed, me }, i) => {
+              const d = p.data;
+              const sub = [d.position || (d.guest ? 'guest' : '–'), d.availability === 'INJ' ? 'injured' : d.availability === 'OOS' ? 'out' : null].filter(Boolean).join(' · ');
+              return (
+                <View key={p.id} style={{ gap: 8 }}>
+                  {i > 0 ? <View style={{ height: 1, backgroundColor: t.c.line }} /> : null}
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${d.name}${owed > 0 ? `, owes ${f(owed)}` : ''}`} onPress={() => router.push(`/board/turf/player?player=${p.id}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, opacity: pressed ? 0.75 : 1 })}>
+                    <Face id={d.personId} name={d.name} size={40} />
+                    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                      <Text variant="rowTitle" numberOfLines={1}>
+                        {me ? `${d.name} (you)` : d.name}
+                      </Text>
+                      <Text variant="caption" color="secondary" numberOfLines={1}>
+                        {sub}
+                      </Text>
+                    </View>
+                    {owed > 0 ? (
+                      <View style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: t.c.alert.coralFill }}>
+                        <Text variant="labelMicro" color={t.c.alert.coralText} numberOfLines={1}>
+                          owes {f(owed)}
                         </Text>
-                        {sub ? (
-                          <Text variant="caption" color="secondary" numberOfLines={1}>
-                            {sub}
-                          </Text>
-                        ) : null}
                       </View>
-                      {owed > 0 ? (
-                        <View style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: t.c.alert.coralFill }}>
-                          <Text variant="labelMicro" color={t.c.alert.coralText} numberOfLines={1}>
-                            owes {f(owed)}
-                          </Text>
-                        </View>
-                      ) : null}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View accessibilityLabel={AVAIL.find((a) => a.value === d.availability)?.label} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: availabilityColour(d.availability, t) }} />
-                        <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} />
-                      </View>
-                    </Pressable>
-                  </View>
-                );
-              })}
-            </View>
-          ) : (
-            <EmptyState icon="search" line="Nobody in the squad matches." />
-          )}
-          <Text variant="caption" color="tertiary">
-            {shown.length === squad.length ? `${squad.length} player${squad.length === 1 ? '' : 's'}` : `${shown.length} of ${squad.length} players`} · {withDues ? `${withDues} with dues` : 'no dues'}
+                    ) : null}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View accessibilityLabel={AVAIL.find((a) => a.value === d.availability)?.label} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: availabilityColour(d.availability, t) }} />
+                      <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} />
+                    </View>
+                  </Pressable>
+                </View>
+              );
+            })}
+            {!shown.length ? (
+              <Text variant="caption" color="secondary">
+                Nobody matches that.
+              </Text>
+            ) : null}
+          </View>
+          <Text variant="caption" color="tertiary" style={{ textAlign: 'center' }}>
+            {`${squad.length} player${squad.length === 1 ? '' : 's'} · ${withDues} with dues`}
           </Text>
+          <PillButton title="Add a player" icon="user" height={48} style={{ alignSelf: 'stretch' }} onPress={() => router.push('/board/turf/player-edit' as never)} />
         </>
       )}
     </Screen>
