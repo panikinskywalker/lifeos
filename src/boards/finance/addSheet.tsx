@@ -79,7 +79,7 @@ export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onC
     const mediaType = a.mimeType === 'image/png' || a.mimeType === 'image/webp' ? a.mimeType : 'image/jpeg';
     const res = await askWithPhoto(os, model, { ...billAsk(), image: { mediaType, data: a.base64 } });
     if (camera) dropFile(a.uri);
-    if (!res.ok) return setPhase({ at: 'failed', why: WHY[res.note] ?? WHY.error! });
+    if (!res.ok) return setPhase({ at: 'failed', why: `${WHY[res.note] ?? WHY.error!}${res.note === 'error' && res.error ? ` (${res.error.slice(0, 160)})` : ''}` });
     const p = readBill(os, res.answer);
     if (!p) return setPhase({ at: 'failed', why: 'That doesn’t look like a bill. Try again, or type it.' });
     setPhase({ at: 'review', p, account: null });

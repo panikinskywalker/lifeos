@@ -30,6 +30,15 @@ export interface PhotoAsk {
 
 export type PhotoResult = { ok: true; answer: unknown } | { ok: false; note: 'off' | 'no key' | 'over budget' | 'error'; error?: string };
 
+/** What a file really is, from its first bytes (null when they say nothing). */
+export function mediaTypeOf(base64: string): BrainImage['mediaType'] | null {
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('iVBOR')) return 'image/png';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  if (base64.startsWith('JVBER')) return 'application/pdf';
+  return null;
+}
+
 /** A photo is about 1,600 tokens at most once the API scales it. */
 const PHOTO_TOKENS = 1600;
 
@@ -50,7 +59,9 @@ export async function askWithPhoto(os: LifeOSContext, model: BrainModel | null, 
   const lines = [`${ask.moduleName} · ${ask.what}: read once, not kept`, `${ask.moduleName} · ${fields(ask.record)}`];
   const base = { at: now, pass: 'photo', why: ask.why, model: model.model, lines, records: 1 };
   try {
-    const r = await model.complete({ system: ask.system, user, maxTokens, schema: ask.schema, image: ask.image });
+    // The type goes from the file's own first bytes: a picker can say PNG for a photo it has turned into JPEG, and Claude refuses a mismatch.
+    const image = { ...ask.image, mediaType: mediaTypeOf(ask.image.data) ?? ask.image.mediaType };
+    const r = await model.complete({ system: ask.system, user, maxTokens, schema: ask.schema, image });
     const answer = parseJson(r.text);
     os.brain.sent.add({ ...base, ...r.usage, outcome: answer == null ? 'error' : 'ok', error: answer == null ? 'The answer was not the expected JSON' : null });
     recordUsage(os, { provider: 'claude', model: model.model, purpose: 'brain', input: r.usage.input + r.usage.cacheRead + r.usage.cacheWrite, output: r.usage.output, at: now });

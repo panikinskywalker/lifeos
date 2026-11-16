@@ -48,6 +48,12 @@ describe('a photo sent on purpose', () => {
     expect(JSON.stringify(os.db.all('SELECT * FROM brain_learned'))).not.toContain(PHOTO);
   });
 
+  it('sends the type the file really is: a JPEG the picker called PNG goes as JPEG', async () => {
+    const m = model();
+    await askWithPhoto(os, m, { ...ask(), image: { mediaType: 'image/png', data: '/9j/4AAQSkZJRg' } }, NOW);
+    expect(m.complete).toHaveBeenCalledWith(expect.objectContaining({ image: { mediaType: 'image/jpeg', data: '/9j/4AAQSkZJRg' } }));
+  });
+
   it('no key, the brain off, or over the budget: nothing leaves and nothing is logged', async () => {
     expect(await askWithPhoto(os, null, ask(), NOW)).toEqual({ ok: false, note: 'no key' });
     setBrainSettings(os, { budget: 2000 });

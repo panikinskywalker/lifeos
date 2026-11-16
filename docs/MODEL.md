@@ -1316,7 +1316,9 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
 - **Photos and PDFs are read by Haiku** (17 Nov, Rutvij): a snapped or attached
   bill, an uploaded statement and Snap the fridge go to Claude Haiku 5.5
   (`PHOTO_MODEL`), whatever model the brain's other passes use; same key, budget
-  and Sent to Claude log.
+  and Sent to Claude log. Every photo goes with the type its own first bytes say
+  (`mediaTypeOf`), since the picker can call a photo PNG after turning it into
+  JPEG; a failed bill says Claude's reason.
 - **Privacy** (decided 11 Nov): money questions may go to any provider in the chain,
   OpenRouter's free models included, knowing some free providers log or train on
   what they are sent. Only the records needed leave (payee, amount, date,

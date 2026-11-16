@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
-import { askWithPhoto } from '@core/brain';
+import { askWithPhoto, mediaTypeOf } from '@core/brain';
 import { PHOTO_MODEL } from '@core/ai/brainModel';
 import type { BrainImage } from '@core/brain/model';
 import { useOS } from '@ui/hooks';
@@ -18,14 +18,6 @@ const MAX_BASE64 = 9_000_000;
 /** The API takes an image of at most 5 MB. */
 const MAX_IMAGE_BASE64 = 6_900_000;
 
-/** What a file really is, from its first bytes. */
-function typeOf(base64: string): BrainImage['mediaType'] | null {
-  if (base64.startsWith('/9j/')) return 'image/jpeg';
-  if (base64.startsWith('iVBOR')) return 'image/png';
-  if (base64.startsWith('UklGR')) return 'image/webp';
-  if (base64.startsWith('JVBER')) return 'application/pdf';
-  return null;
-}
 const WHY: Record<string, string> = {
   'no key': 'Reading a statement needs your Claude key in You › Agent › Brain.',
   'over budget': 'Today’s budget for Claude is used up. Try again tomorrow, or raise it in You › Agent › Brain.',
@@ -59,7 +51,7 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
       return setPhase({ at: 'failed', why: 'LifeOS couldn’t open that file.' });
     }
     // The type comes from the file's own first bytes: a picker can say PNG for a screenshot it has turned into JPEG.
-    const mediaType = typeOf(data) ?? (file.mimeType === 'application/pdf' ? 'application/pdf' : 'image/jpeg');
+    const mediaType = mediaTypeOf(data) ?? (file.mimeType === 'application/pdf' ? 'application/pdf' : 'image/jpeg');
     const limit = mediaType === 'application/pdf' ? MAX_BASE64 : MAX_IMAGE_BASE64;
     if (data.length > limit) return setPhase({ at: 'failed', why: mediaType === 'application/pdf' ? 'That PDF is too big to send. Try the statement for one month.' : 'That image is too big to send. Crop it to the part with the balances, or take a smaller screenshot.' });
     const model = (await os.device?.brain?.model(PHOTO_MODEL)) ?? null;
