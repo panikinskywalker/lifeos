@@ -7,6 +7,20 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.118 · 17 Nov 2026
+
+**Pay, remind, settle on its own, and split a bill by item.**
+- Money from someone who owes you (or to someone you owe) settles their
+  shares on its own, oldest first, as soon as the payment is tied to them.
+- *Pay ₹450 by UPI* on a person you owe opens your UPI app with everything
+  filled in; their UPI ID is asked for once and kept on their record.
+- *Remind* writes a friendly WhatsApp message with Haiku (their name stays on
+  the phone), in a tone you pick.
+- "1200 dinner with Arjun and Priya, Arjun paid" in Money's + is split
+  equally on Save.
+- A scanned bill shows *Split by item*: who had what, portions, a line no
+  one took shared by all, tax and service in proportion, to the paisa.
+
 ## v0.0.117 · 17 Nov 2026
 
 **Splitwise, kept in step.** Money › Splitwise: sign in on Splitwise's own page

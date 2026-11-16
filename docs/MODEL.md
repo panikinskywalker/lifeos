@@ -1851,8 +1851,26 @@ here is deleted there; Debts settled here go out as one payment per person;
 Splitwise payments since the last sync settle Debts here, oldest first, up to
 what was paid. LifeOS remembers the expenses it made, so it never reads its own
 back. A person's Money section says "Splitwise says ₹1,600 too · in step", or
-how far apart. Still to come: Pay by UPI, Remind, the typed split, splitting a
-scanned bill by item.
+how far apart. **Built 17 Nov (v0.0.118, steps 5 to 7 and the bill split):**
+- *Settled from the bank text*: a payment tied to a person you have a balance
+  with (theirs in, or yours out) settles their shares oldest first, up to what
+  moved, the moment it is tied to them (`settleFromPayment`); Turf's shares are
+  left to Turf, whose ledger sets them. Splitwise gets the payment at the sync.
+- *Pay by UPI* on a person you owe: their UPI ID (the person's UPI Field, asked
+  for once) opens your UPI app with the amount and what for (`upiLink`).
+- *Remind* on someone who owes you: Haiku writes it (tones: Friendly, Short,
+  Funny, With my UPI), their name sent as {name}; Send on WhatsApp opens their
+  chat when their phone is known.
+- *Type a split*: "1200 dinner with Arjun and Priya, Arjun paid" is split
+  equally on Save when every name is someone in People (else its page opens).
+- *Split the bill by item* (Money › Split the bill, from a scanned bill's
+  *Split by item*): the bill is read line by line (name, quantity, line total,
+  tax, service); tap a face to take someone off a line, hold it for portions; a
+  line no one took is shared by everyone; tax, service and rounding go in
+  proportion, to the paisa (`splitBill`); Save files the payment and each
+  share as Debts (so Splitwise follows).
+Still to come: one Splitwise expense per bill with every share (today each
+share goes as its own), and the bill photo on it.
 Bills, statements and fund screens are read by Haiku (bills already; statements
 back from Sonnet once it has room). Left out: Splitware's UPI directory (it sends
 your email and UPI ID to a third party) and a copy of Splitwise's group screens

@@ -11,6 +11,8 @@ import { blocks } from '@ui/theme/tokens';
 import { Icon, IconButton, Sheet, Text, useToast } from '@ui/kit';
 import { billAsk, readBill, readSaid, saveQuick, type QuickPayment } from '@modules/finance/quickAdd';
 import { categoryOf, type AccountData } from '@modules/finance/types';
+import { suggestPerson } from '@modules/finance/splitwise';
+import { applySplit } from '@modules/finance/split';
 import { catColor } from './parts';
 
 type Phase = { at: 'pick' } | { at: 'reading' } | { at: 'review'; p: QuickPayment; account: string | 'cash' | null } | { at: 'failed'; why: string };
@@ -92,6 +94,16 @@ export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onC
     if (phase.at !== 'review') return;
     const { id, undo } = saveQuick(os, phase.p, phase.account);
     const split = phase.p.splitWith;
+    // "with Arjun and Priya, Arjun paid": when every name is someone in People, it is split equally now.
+    const people = os.records.query('person', {}, { limit: 3000 }).map((x) => ({ id: x.id, title: x.title }));
+    const ids = split.map((n) => suggestPerson(people, n));
+    const payer = phase.p.payer ? suggestPerson(people, phase.p.payer) : null;
+    if (split.length && ids.every(Boolean) && (!phase.p.payer || payer)) {
+      const parts = [...new Set(['me', ...(ids as string[]), ...(payer ? [payer] : [])])].map((party) => ({ party }));
+      applySplit(os, id, { payer: payer ?? 'me', method: 'equal', parts });
+      toast.show({ message: `Saved · split ${parts.length} ways${payer ? `, ${phase.p.payer} paid` : ''}`, icon: 'check', undo });
+      return close();
+    }
     toast.show({ message: `Saved · ${os.format.currency(phase.p.amount)}${phase.p.payee ? ` at ${phase.p.payee}` : ''}`, icon: 'check', undo });
     close();
     // Who shares it is set on its page, where Split is.
@@ -174,6 +186,11 @@ export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onC
             {phase.p.splitWith.length ? <Text color="secondary" style={{ fontSize: 13, lineHeight: 18 }}>{`Shared with ${phase.p.splitWith.join(', ')}: its page opens after saving, to split it.`}</Text> : null}
           </View>
 
+          {(phase.p.lines?.length ?? 0) > 1 ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Split by item" onPress={() => { const bill = JSON.stringify({ p: phase.p, account: phase.account }); close(); router.push({ pathname: '/module/[id]/[page]', params: { id: 'finance', page: 'billsplit', bill } } as never); }} style={({ pressed }) => ({ height: 52, borderRadius: 999, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+              <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700' }}>{`Split by item · ${phase.p.lines!.length} items`}</Text>
+            </Pressable>
+          ) : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Save" onPress={save} style={({ pressed }) => ({ height: 52, borderRadius: 999, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
             <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', color: t.c.accent.mustardInk }}>Save</Text>
           </Pressable>

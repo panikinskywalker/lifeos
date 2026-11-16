@@ -13,6 +13,7 @@ import { spotSubscriptions } from './filing/recurring';
 import { learnCategory, payeeOf } from './filing/rules';
 import { foldSplitShares } from './split';
 import { bus } from '@core/events/bus';
+import { settleFromPayment } from './settleUpi';
 
 export const financeModule: ModuleManifest = {
   id: 'finance',
@@ -110,6 +111,10 @@ export const financeModule: ModuleManifest = {
       spotSubscriptions(os);
       os.settings.set('finance.spottedV1', true);
     }
+    // Money from someone you have a balance with (or to someone you owe) settles it, the moment the payment is tied to them.
+    bus.on('relation.added', ({ relation }) => {
+      if (relation.kind === 'person' || relation.kind === 'payee') settleFromPayment(os, relation.fromId);
+    });
     // You recategorised a payment: that payee keeps the category next time (SMS, notifications, mail).
     bus.on('entity.updated', ({ entity, previous, actor }) => {
       if (actor !== 'user' || entity.object !== 'transaction') return;

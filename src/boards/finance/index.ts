@@ -6,6 +6,7 @@ import { AccountPage } from './accountPage';
 import { DebtPage } from './debtPage';
 import { DebtsScreen, SubscriptionsScreen } from './lists';
 import { SplitwiseScreen } from './splitwiseScreen';
+import { BillSplitScreen } from './billSplitScreen';
 import { FilesScreen } from './filesScreen';
 import { AskScreen, ProofScreen } from './ask';
 import { GroupBalanceSection, PersonBalanceSection } from './splitScreens';
@@ -38,7 +39,7 @@ export const financeBoard: BoardManifest = {
     ],
     action: { label: 'Ask Money', icon: 'sparkle', screen: 'ask' },
   },
-  screens: [{ key: 'index', title: 'Money', component: FinanceHome }, { key: 'wallet', title: 'Accounts and cards', component: WalletScreen },{ key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }, { key: 'subscriptions', title: 'Subscriptions', component: SubscriptionsScreen }, { key: 'debts', title: 'Who owes whom', component: DebtsScreen }, { key: 'ask', title: 'Ask Money', component: AskScreen, noBar: true }, { key: 'proof', title: 'The payments behind it', component: ProofScreen }, { key: 'files', title: 'Import & export', component: FilesScreen }, { key: 'splitwise', title: 'Splitwise', component: SplitwiseScreen }],
+  screens: [{ key: 'index', title: 'Money', component: FinanceHome }, { key: 'wallet', title: 'Accounts and cards', component: WalletScreen },{ key: 'reports', title: 'Reports', component: ReportsScreen }, { key: 'spend', title: 'Spend', component: SpendScreen }, { key: 'subscriptions', title: 'Subscriptions', component: SubscriptionsScreen }, { key: 'debts', title: 'Who owes whom', component: DebtsScreen }, { key: 'ask', title: 'Ask Money', component: AskScreen, noBar: true }, { key: 'proof', title: 'The payments behind it', component: ProofScreen }, { key: 'files', title: 'Import & export', component: FilesScreen }, { key: 'splitwise', title: 'Splitwise', component: SplitwiseScreen }, { key: 'billsplit', title: 'Split the bill', component: BillSplitScreen }],
   quickActions: [
     { id: 'finance.addTransaction', label: 'Transaction', icon: 'arrow.up.arrow.down', route: '/entity/transaction/new', global: true },
     { id: 'finance.addAccount', label: 'Account', icon: 'creditcard', route: '/entity/account/new' },

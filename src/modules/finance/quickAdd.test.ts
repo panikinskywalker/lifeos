@@ -27,6 +27,7 @@ describe('Add a payment', () => {
     expect(readSaid(os, 'auto 120 cash', today)).toMatchObject({ amount: 120, paidWith: 'cash' });
     expect(readSaid(os, 'paid 1,250 to Zepto by upi', today)).toMatchObject({ amount: 1250, payee: 'Zepto', paidWith: 'upi' });
     expect(readSaid(os, 'lunch with friends', today)).toBeNull();
+    expect(readSaid(os, '1200 dinner with Arjun and Priya, Arjun paid', today)).toMatchObject({ amount: 1200, splitWith: ['Arjun', 'Priya'], payer: 'Arjun', paidWith: 'someone' });
   });
 
   it('keeps a bill reading to what makes sense: a total, a past date, a known category', () => {
