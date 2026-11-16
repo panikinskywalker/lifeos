@@ -65,6 +65,8 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
 
   return (
     <View style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
+      {page?.fullScreen ? <page.component entity={entity} ctx={os} controls={controls} say={say ? say(entity) : null} /> : null}
+      {page?.fullScreen ? null : (
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
         {page ? (
           <page.component entity={entity} ctx={os} controls={controls} say={say ? say(entity) : null} />
@@ -138,6 +140,7 @@ export function RecordScreen({ id, say }: { id: string; say?: (entity: ObjectRec
           </Text>
         </View>}
       </ScrollView>
+      )}
 
       <ActionSheet
         visible={panel === 'menu'}
