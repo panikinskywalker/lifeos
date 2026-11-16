@@ -38,6 +38,8 @@ export interface AccountData {
   institutionId?: string;
   institution?: string;
   last4?: string;
+  /** Last digits of copies merged into this account, so their texts still land here. */
+  alsoLast4?: string[];
   creditLimit?: number;
   includeInNetWorth?: boolean;
   color?: string;
@@ -66,6 +68,7 @@ export const accountType: ObjectDef<AccountData> = {
     institutionId: z.string().optional(),
     institution: z.string().optional(),
     last4: z.string().max(4).optional(),
+    alsoLast4: z.array(z.string()).optional(),
     creditLimit: z.coerce.number().optional(),
     includeInNetWorth: z.boolean().default(true),
     color: z.string().optional(),

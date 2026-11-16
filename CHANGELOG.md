@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.112 · 17 Nov 2026
+
+**Merge a copied account.** An account's page has *This is a copy of another account*: its payments move to the real one, which keeps its balance and learns the copy's digits, and the copy goes, with Undo.
+
 ## v0.0.111 · 17 Nov 2026
 
 **Before payday in colour.** Each card on Money home is coloured by what it is (late coral, bill or card bill blue, renewal lilac, SIP green), labelled, with its category as a pill and a legend under the row.

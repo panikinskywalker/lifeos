@@ -127,6 +127,24 @@ describe('Upload a statement', () => {
     expect(os.records.query('subscription')).toHaveLength(1);
   });
 
+  it('a copy merges into the real account: payments move, the real balance stays, its digits are learned; Undo puts it back', async () => {
+    const { mergeAccount } = await import('./lib');
+    const { accountFor } = await import('./filing/accounts');
+    const real = os.records.create<AccountData>({ object: 'account', title: 'HSBC', data: { kind: 'bank', institution: 'HSBC', last4: '3006', currency: 'INR', openingBalance: 0, knownBalance: 163424.4, knownOn: '2026-11-16', knownAt: Date.parse('2026-11-16T15:00:00') } as AccountData });
+    const copy = os.records.create<AccountData>({ object: 'account', title: 'HSBC ••355', data: { kind: 'bank', institution: 'HSBC', last4: '355', currency: 'INR', openingBalance: 0, knownBalance: 296958 } as AccountData });
+    const tx = os.records.create({ object: 'transaction', title: 'Swiggy', data: { amount: 300, kind: 'expense', category: 'food', date: '2026-11-10', accountId: copy.id } });
+    const undo = mergeAccount(os, copy.id, real.id);
+    expect(os.records.get(copy.id)).toBeUndefined();
+    expect((os.records.get(tx.id)!.data as { accountId: string }).accountId).toBe(real.id);
+    expect(accountBalance(os, os.records.get<AccountData>(real.id)!)).toBeCloseTo(163424.4, 2);
+    expect(os.records.get<AccountData>(real.id)!.data.alsoLast4).toEqual(['355']);
+    expect(accountFor(os, { last4: '355' } as never, 'HSBC')).toBe(real.id);
+    undo();
+    expect(os.records.get(copy.id)).toBeDefined();
+    expect((os.records.get(tx.id)!.data as { accountId: string }).accountId).toBe(copy.id);
+    expect(os.records.get<AccountData>(real.id)!.data.alsoLast4).toBeUndefined();
+  });
+
   it('keeps only what makes sense from a reading', () => {
     expect(readStatement({ accounts: [{ bank: '', last4: '', kind: 'bank', balance: 1, owed: 0, minDue: 0, dueOn: 'soon', asOf: '' }], holdings: [{ name: 'X', units: 0, value: 0, invested: 0, sip: 0, sipDay: 0 }] })).toEqual({ accounts: [], holdings: [], subscriptions: [] });
   });

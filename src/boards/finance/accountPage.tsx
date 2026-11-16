@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import type { ObjectRecord } from '@core/domain/types';
@@ -10,7 +10,8 @@ import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Icon, NumberField, SelectField, Sheet, Text, TextField, TrackColumns, useToast } from '@ui/kit';
 import { ASK_AGENT_MODEL, fillCardUses, unnamedCard } from '@modules/finance/askAgent';
 import { blocks } from '@ui/theme/tokens';
-import { accountBalance, accountFlows, cardUses, pocketBalances, setBalance, setPockets } from '@modules/finance/lib';
+import { accountBalance, accountFlows, cardUses, mergeAccount, pocketBalances, setBalance, setPockets } from '@modules/finance/lib';
+import { EntityPicker } from '@ui/components/fields';
 import { FX_CURRENCIES } from '@modules/finance/filing/fx';
 import type { AccountData, TransactionData } from '@modules/finance/types';
 import { FieldRow, FieldValue, Hairline, KIND_WORD, Metric, Quick, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, TxRow, day, kindWord, relDay, shortMoney } from './parts';
@@ -73,6 +74,19 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
     const before = setPockets(ctx, a.id, kept);
     setPocketing(false);
     toast.show({ message: `On the card: ${kept.map((r) => ctx.format.currency(r.amount, r.currency)).join(' · ') || 'nothing'}`, icon: 'check', undo: () => void ctx.records.update(a.id, { data: { pockets: before } }, 'user') });
+  };
+  // A copy of another account (two HSBC accounts that are one): merge it into the real one, with Undo.
+  const [merging, setMerging] = useState(false);
+  const mergeInto = (intoId: string) => {
+    setMerging(false);
+    const into = ctx.records.get(intoId)?.title ?? 'that account';
+    const go = () => {
+      const undo = mergeAccount(ctx, a.id, intoId);
+      toast.show({ message: `Merged into ${into}`, icon: 'check', undo });
+      router.back();
+    };
+    if (Platform.OS === 'web') return go();
+    Alert.alert(`Merge into ${into}?`, `${a.title}'s payments move to ${into}, which keeps its own balance and learns these last digits. ${a.title} goes.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Merge', onPress: go }]);
   };
   const saveBalance = () => {
     if (typed == null) return;
@@ -218,6 +232,9 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
           <FieldRow label="In net worth"><FieldValue>{d.includeInNetWorth === false ? 'No' : 'Yes'}</FieldValue></FieldRow>
         </View>
       </View>
+
+      <Button title="This is a copy of another account" icon="link" variant="secondary" size="sm" onPress={() => setMerging(true)} />
+      <EntityPicker visible={merging} onClose={() => setMerging(false)} types={['account']} selected={[]} exclude={[a.id]} title="Which account is it a copy of?" onSelect={mergeInto} />
 
       <RecordExtras entity={a} module="finance" />
 

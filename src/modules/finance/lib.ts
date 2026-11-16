@@ -87,6 +87,34 @@ export function cardUses(useFor?: string, kind?: string): string[] {
 /** A prepaid or debit card cannot hold less than nothing: a figure below zero is left over (a card bill read before its type was set) and wants setting. */
 export const needsBalance = (kind: string, balance: number) => (kind === 'forex' || kind === 'debit') && balance < 0;
 
+/**
+ * One account is a copy of another (17 Nov, Rutvij: HSBC ••355 was HSBC ••3006):
+ * its payments, transfers and subscriptions move to the real one, which keeps its
+ * own balance and learns the copy's digits; the copy goes. Returns the Undo.
+ */
+export function mergeAccount(os: LifeOSContext, fromId: string, intoId: string): () => void {
+  const from = os.records.get<AccountData>(fromId);
+  const into = os.records.get<AccountData>(intoId);
+  if (!from || !into || fromId === intoId) return () => {};
+  const moved: Array<{ id: string; field: 'accountId' | 'toAccountId' }> = [];
+  const objects = ['transaction', ...(os.registry.objects.has('subscription') ? ['subscription'] : [])];
+  for (const object of objects)
+    for (const field of object === 'transaction' ? (['accountId', 'toAccountId'] as const) : (['accountId'] as const))
+      for (const r of os.records.query(object, { filter: { and: [{ field: `data.${field}`, op: 'eq', value: fromId }] } }, { limit: 20000 })) {
+        os.records.update(r.id, { data: { [field]: intoId } }, 'user');
+        moved.push({ id: r.id, field });
+      }
+  const before = { last4: into.data.last4, alsoLast4: into.data.alsoLast4 };
+  const digits = [from.data.last4, ...(from.data.alsoLast4 ?? [])].filter((d): d is string => !!d && d !== into.data.last4);
+  if (digits.length) os.records.update<AccountData>(intoId, { data: into.data.last4 ? { alsoLast4: [...new Set([...(into.data.alsoLast4 ?? []), ...digits])] } : { last4: digits[0], alsoLast4: digits.length > 1 ? digits.slice(1) : into.data.alsoLast4 } }, 'user');
+  os.records.delete(fromId, 'user');
+  return () => {
+    os.records.restore(fromId, 'user');
+    for (const m of moved) os.records.update(m.id, { data: { [m.field]: fromId } }, 'user');
+    os.records.update(intoId, { data: before }, 'user');
+  };
+}
+
 /** You told it what the bank shows: that is the balance from now on (Set balance, Reconcile). */
 export function setBalance(os: LifeOSContext, accountId: string, balance: number, now = Date.now()): { knownBalance?: number; knownOn?: string; knownAt?: number } {
   const a = os.records.get<AccountData>(accountId);

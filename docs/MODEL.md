@@ -1323,6 +1323,11 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   amount is a minus figure in red on a small dark band ("−₹33,207"), readable on
   every card face, and *On your cards* is a red minus total. Only bank, cash and
   wallet money is *In your accounts*.
+  **Merge a copy** (17 Nov, Rutvij: HSBC ••355 and ICICI ••637 were copies): an
+  account's page has *This is a copy of another account*; pick the real one and
+  confirm. Its payments, transfers and subscriptions move there, the real one
+  keeps its own balance and learns the copy's digits (`alsoLast4`, so later
+  texts with them land in it), and the copy goes. Undo puts it all back.
   **Before payday** cards wear a colour by kind (17 Nov, Rutvij; NR-Money-Home
   v34 and v35): late coral, a bill or card bill sky, a subscription renewing lilac,
   a SIP mint, each labelled (LATE, BILL, CARD BILL, RENEWS, SIP) with a dot legend

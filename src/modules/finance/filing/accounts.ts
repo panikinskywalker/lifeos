@@ -6,10 +6,11 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 /** The account a message moved money on: by last digits (+ bank), or a new one named for it. */
 export function accountFor(os: LifeOSContext, t: ParsedTxn, from: string, created: string[] = []): string | null {
   if (!os.registry.objects.has('account')) return null;
-  const accounts = os.records.query<{ last4?: string; institution?: string; kind?: string }>('account', {}, { limit: 500 });
+  const accounts = os.records.query<{ last4?: string; alsoLast4?: string[]; institution?: string; kind?: string }>('account', {}, { limit: 500 });
   const bankName = t.bank ? BANK_NAMES[t.bank] : null;
   if (t.last4) {
-    const hits = accounts.filter((a) => a.data.last4 && (a.data.last4.endsWith(t.last4!) || t.last4!.endsWith(a.data.last4)));
+    // Its own digits, and those of copies merged into it.
+    const hits = accounts.filter((a) => [a.data.last4, ...(a.data.alsoLast4 ?? [])].some((d) => d && (d.endsWith(t.last4!) || t.last4!.endsWith(d))));
     const hit = hits.find((a) => !bankName || !a.data.institution || norm(a.data.institution).includes(norm(bankName).split(' ')[0]!)) ?? hits[0];
     if (hit) return hit.id;
   }
