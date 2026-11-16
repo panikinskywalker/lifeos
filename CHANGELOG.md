@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.96 · 17 Nov 2026
+
+**Cards come with what to use them for.** When Accounts and cards opens, Ask
+Money fills in the uses of every card that has none, once per card, as pills
+(Shopping, Forex, Fuel) on the card in front and on its page. A card still
+without uses opens Ask Money already asking about that card, instead of an
+empty Ask screen.
+
 ## v0.0.95 · 17 Nov 2026
 
 **Polish on Who owes whom and a debt.** A person's card shows their latest four

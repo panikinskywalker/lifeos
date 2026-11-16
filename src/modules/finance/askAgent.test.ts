@@ -173,14 +173,36 @@ describe('Ask Money as an agent', () => {
     expect(JSON.stringify(api.calls)).not.toContain('8013');
   });
 
-  it('card_use writes what a card is for on it, and Undo takes it off', async () => {
+  it('card_use writes what a card is for on it as pills, and Undo takes it off', async () => {
     const a = os.records.create({ object: 'account', title: 'ICICI Bank card', data: { kind: 'credit', institution: 'ICICI Bank', last4: '8013', currency: 'INR', openingBalance: 0 } });
     const { runAgentTool } = await import('./askAgent');
     const changes: Array<{ label: string; undo?: () => void }> = [];
-    await runAgentTool(os, 'card_use', { ref: 'card-1', useFor: 'Amazon and Flipkart' }, { confirm: async () => true, change: (c) => changes.push(c) });
-    expect((os.records.get(a.id)!.data as { useFor?: string }).useFor).toBe('Amazon and Flipkart');
-    expect(changes[0]!.label).toBe('ICICI Bank card ••8013: use for Amazon and Flipkart');
+    await runAgentTool(os, 'card_use', { ref: 'card-1', uses: ['Shopping', 'Amazon'] }, { confirm: async () => true, change: (c) => changes.push(c) });
+    expect((os.records.get(a.id)!.data as { useFor?: string }).useFor).toBe('Shopping, Amazon');
+    expect(changes[0]!.label).toBe('ICICI Bank card ••8013: use for Shopping, Amazon');
     changes[0]!.undo!();
     expect((os.records.get(a.id)!.data as { useFor?: string }).useFor).toBeUndefined();
+  });
+
+  it('fills in what each card is for once, asking nothing, and never tries the same card again', async () => {
+    const a = os.records.create({ object: 'account', title: 'ICICI Bank card', data: { kind: 'credit', institution: 'ICICI Bank', last4: '8013', currency: 'INR', openingBalance: 0 } });
+    const api = fakeApi((sent) => sent.some((e) => e.type === 'user.custom_tool_result') ? [
+      { id: 'e1', type: 'session.status_running' },
+      { id: 'e2', type: 'agent.custom_tool_use', name: 'card_use', input: { ref: 'card-1', uses: ['Shopping', 'Amazon'] } },
+      { id: 'e3', type: 'session.status_idle', stop_reason: { type: 'requires_action', event_ids: ['e2'] } },
+      { id: 'e4', type: 'agent.message', content: [{ type: 'text', text: 'Done.' }] },
+      { id: 'e5', type: 'session.status_idle', stop_reason: { type: 'end_turn' } },
+    ] : [
+      { id: 'e1', type: 'session.status_running' },
+      { id: 'e2', type: 'agent.custom_tool_use', name: 'card_use', input: { ref: 'card-1', uses: ['Shopping', 'Amazon'] } },
+      { id: 'e3', type: 'session.status_idle', stop_reason: { type: 'requires_action', event_ids: ['e2'] } },
+    ]);
+    const { fillCardUses } = await import('./askAgent');
+    expect(await fillCardUses(os, { apiKey: 'k', fetchImpl: api.fetchImpl }, { wait: async () => undefined })).toBe(1);
+    expect((os.records.get(a.id)!.data as { useFor?: string }).useFor).toBe('Shopping, Amazon');
+    const calls = api.calls.length;
+    os.records.update(a.id, { data: { useFor: undefined } }, 'user');
+    expect(await fillCardUses(os, { apiKey: 'k', fetchImpl: api.fetchImpl }, { wait: async () => undefined })).toBe(0);
+    expect(api.calls.length).toBe(calls);
   });
 });

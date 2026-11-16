@@ -38,7 +38,7 @@ How you work:
 - To put something on the user's Money home (a tracker, a chart), call keep_view with the money query; it stays live.
 - You never move money, pay anyone or settle a debt. If asked, say so and offer to keep a view or note instead.
 - You can search the web (web_search) and read pages (web_fetch) for what is not in the user's records: today's FD and savings rates, a fund's returns and expense ratio, tax rules and deadlines, card offers, prices. Put the figures you find next to theirs and say where they came from. Never put the user's names, account digits or exact figures into a search.
-- Cards: when asked how to spend smarter, or when it would save real money, call cards_and_spend, look up each card's current rewards, cashback and fees on the web, and say which card to use for which kind of spend, with the rupees it saves a month. Mention fees, caps and anything that expires. When a card is named only by its bank ("ICICI Bank card"), never stop at asking: give your best advice now from the bank, what goes through that card (its top shops say a lot: Amazon spend on an ICICI card is probably the Amazon Pay card) and the bank's popular cards, say what you assumed, then ask one short question to confirm. When the user says which card it is, call name_card so it is remembered. Once you have said which card to use for what, call card_use for each card with a few words ("Amazon and Flipkart", "everything else") so it shows on the card in the app. In your answer name a card by its ref exactly as cards_and_spend gives it (card-4), every time: the phone shows the card's own name and last digits there, so never write "card 4" or "cards 4 and 6".
+- Cards: when asked how to spend smarter, or when it would save real money, call cards_and_spend, look up each card's current rewards, cashback and fees on the web, and say which card to use for which kind of spend, with the rupees it saves a month. Mention fees, caps and anything that expires. When a card is named only by its bank ("ICICI Bank card"), never stop at asking: give your best advice now from the bank, what goes through that card (its top shops say a lot: Amazon spend on an ICICI card is probably the Amazon Pay card) and the bank's popular cards, say what you assumed, then ask one short question to confirm. When the user says which card it is, call name_card so it is remembered. Once you have said which card to use for what, call card_use for each card with one to four short uses ("Shopping", "Amazon", "Forex", "Fuel", "Dining", "Travel", "Bills", "Everything else") so they show as pills on the card in the app. In your answer name a card by its ref exactly as cards_and_spend gives it (card-4), every time: the phone shows the card's own name and last digits there, so never write "card 4" or "cards 4 and 6".
 - If a large share of spending is in Other, say so plainly and offer to sort it (recategorise by shop); advice is only as good as the categories.
 - No buy or sell calls on a fund or a stock. Explain what they hold and the general rules (an emergency fund first, stepping a SIP up) instead.
 - People appear as placeholders like "Person 3"; use them as given. Amounts are rounded rupees unless a currency is given.
@@ -128,15 +128,16 @@ export const MONEY_AGENT_TOOLS: AiToolDef[] = [
   },
   {
     name: 'card_use',
-    description: 'Write on one of the user\'s cards or accounts what to use it for, a few words ("Amazon and Flipkart", "fuel", "everything else"), so the app shows it on the card. ref is from cards_and_spend. Runs at once; the user can undo it.',
-    input: z.object({ ref: z.string(), useFor: z.string().min(2).max(60) }),
+    description: 'Write on one of the user\'s cards what to use it for: one to four short uses, a word or two each ("Shopping", "Amazon", "Forex", "Fuel", "Dining", "Travel", "Bills", "Everything else"), shown as pills on the card. ref is from cards_and_spend. Runs at once; the user can undo it.',
+    input: z.object({ ref: z.string(), uses: z.array(z.string().min(2).max(24)).min(1).max(4) }),
     run: async (input, os) => {
-      const i = input as { ref: string; useFor: string };
+      const i = input as { ref: string; uses: string[] };
       const a = cardList(os)[Number(/^card-(\d+)$/.exec(i.ref)?.[1] ?? 0) - 1];
       if (!a) return { error: `No ${i.ref}. Call cards_and_spend for the refs.` };
       const before = a.data.useFor;
-      os.records.update(a.id, { data: { useFor: i.useFor } }, 'user');
-      return withExtras({ card: i.ref, useFor: i.useFor }, { undo: () => os.records.update(a.id, { data: { useFor: before } }, 'user') });
+      const useFor = i.uses.map((u) => u.replace(/,/g, ' ').trim()).filter(Boolean).join(', ');
+      os.records.update(a.id, { data: { useFor } }, 'user');
+      return withExtras({ card: i.ref, useFor }, { undo: () => os.records.update(a.id, { data: { useFor: before } }, 'user') });
     },
   },
   {
@@ -191,6 +192,38 @@ export function cardNames(os: LifeOSContext, text: string): string {
     const a = list[Number(n) - 1];
     return a ? (a.data.last4 && !a.title.includes(a.data.last4) ? `${a.title} ••${a.data.last4}` : a.title) : m;
   });
+}
+
+/** The question a card's "Use it for" tile asks: shown with the card's name, sent with its ref so the digits stay on the phone. */
+export function cardQuestion(os: LifeOSContext, accountId: string): { shown: string; sent: string } | null {
+  const i = cardList(os).findIndex((a) => a.id === accountId);
+  if (i < 0) return null;
+  const ref = `card-${i + 1}`;
+  return { shown: `What should I use ${cardNames(os, ref)} for?`, sent: `What should I use ${ref} for to save the most? Call cards_and_spend, look up its rewards and fees on the web, say which spends it is best for and which card to use instead for the rest, then save it with card_use.` };
+}
+
+const TRIED_KEY = 'finance.cardUsesTried';
+
+/** Credit cards with no uses yet that were never tried: each card is tried once, so this never repeats or spends again. */
+export function cardsWithoutUses(os: LifeOSContext) {
+  const tried = new Set(os.settings.get<string[]>(TRIED_KEY, []));
+  return cardList(os).filter((a) => a.data.kind === 'credit' && !a.data.useFor && !tried.has(a.id));
+}
+
+/**
+ * Fill in "Use it for" on the cards that have none (17 Nov, Rutvij: the cards
+ * should already say what they are for): one agent turn that looks up each
+ * card's rewards and calls card_use, asking nothing. Returns how many it filled.
+ */
+export async function fillCardUses(os: LifeOSContext, cfg: ManagedConfig, opts?: ConstructorParameters<typeof MoneyAgentChat>[2]): Promise<number> {
+  const todo = cardsWithoutUses(os);
+  if (!todo.length) return 0;
+  os.settings.set(TRIED_KEY, [...os.settings.get<string[]>(TRIED_KEY, []), ...todo.map((a) => a.id)]);
+  const list = cardList(os);
+  const refs = todo.map((a) => `card-${list.findIndex((x) => x.id === a.id) + 1}`);
+  const quiet: AgentHooks = { text: () => {}, step: () => {}, show: () => {}, change: () => {}, confirm: async () => false };
+  await new MoneyAgentChat(os, cfg, opts).ask(`Fill in what each of these cards is for: ${refs.join(', ')}. Do not ask me anything: call cards_and_spend, look up each card's rewards on the web, and call card_use once for each with your best one to four uses (from the bank, the card's name and what goes through it). Then reply in one short line.`, quiet);
+  return todo.filter((a) => !!os.records.get<AccountData>(a.id)?.data.useFor).length;
 }
 
 /** Cards and accounts in a stable order, so a ref from cards_and_spend names the same one in name_card. */

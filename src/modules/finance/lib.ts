@@ -53,6 +53,9 @@ export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountD
   return start + (row?.i ?? 0) - (row?.o ?? 0);
 }
 
+/** A card's uses as pills ("Shopping, Forex" → ["Shopping", "Forex"]). */
+export const cardUses = (useFor?: string): string[] => (useFor ?? '').split(',').map((u) => u.trim()).filter(Boolean);
+
 /** You told it what the bank shows: that is the balance from now on (Set balance, Reconcile). */
 export function setBalance(os: LifeOSContext, accountId: string, balance: number, now = Date.now()): { knownBalance?: number; knownOn?: string; knownAt?: number } {
   const a = os.records.get<AccountData>(accountId);

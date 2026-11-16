@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
@@ -9,7 +9,8 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
 import { CardWheel, Icon, IconButton, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
-import { incomeInRange, monthRange, netWorth, spendInRange } from '@modules/finance/lib';
+import { cardUses, incomeInRange, monthRange, netWorth, spendInRange } from '@modules/finance/lib';
+import { ASK_AGENT_MODEL, cardsWithoutUses, fillCardUses } from '@modules/finance/askAgent';
 import { INSTRUMENTS, type AccountData } from '@modules/finance/types';
 import { KIND_WORD, Rows, SectionHead, Spark, day } from './parts';
 import { UploadSheet } from './uploadSheet';
@@ -35,6 +36,23 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
   const insets = useSafeAreaInsets();
   const bottom = useBottomBarInset();
   const [uploading, setUploading] = useState(false);
+  // Cards say what they are for without a tap: a card with no uses gets them from Ask Money once (17 Nov, Rutvij).
+  const [filling, setFilling] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      if (!cardsWithoutUses(os).length) return;
+      const key = await os.device?.claudeKey?.().catch(() => null);
+      if (!key || !live) return;
+      setFilling(true);
+      const n = await fillCardUses(os, { apiKey: key }).catch(() => 0);
+      os.brain.sent.add({ at: Date.now(), pass: 'ask', why: 'Use it for, on your cards', model: ASK_AGENT_MODEL, lines: ['Money agent · each card’s bank and spend by category and shop, rounded; no account digits'], records: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, outcome: n ? 'ok' : 'error', error: null });
+      if (live) setFilling(false);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [os]);
   const m = monthRange(0);
   const data = useLive((o) => ({ nw: netWorth(o), spent: spendInRange(o, m.start, m.end), income: incomeInRange(o, m.start, m.end) }), [m.start]);
   const money = (n: number, c?: string) => `${n < 0 ? '−' : ''}${os.format.currency(Math.round(Math.abs(n)), c)}`;
@@ -80,7 +98,7 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
               corner: card ? 'You owe' : KIND_WORD[d.kind],
               amount: card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
               tail: d.last4 ? `•••• ${d.last4}` : undefined,
-              use: d.useFor || undefined,
+              uses: cardUses(d.useFor),
               note: typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
             };
           })}
@@ -91,7 +109,14 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
           <Text variant="label">Add an account or card</Text>
         </Pressable>
       )}
-      <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, textAlign: 'center', marginTop: -12 }}>Scroll the cards; tap the front one to open it</Text>
+      {filling ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: -12 }}>
+          <ActivityIndicator size="small" color={t.c.accent.gold} />
+          <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>Ask Money is working out what each card is for</Text>
+        </View>
+      ) : (
+        <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, textAlign: 'center', marginTop: -12 }}>Scroll the cards; tap the front one to open it</Text>
+      )}
 
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <MoneyTile icon="download" label="came in" value={money(data.income)} onPress={() => router.push('/module/finance/reports' as never)} />

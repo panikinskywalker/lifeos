@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import { Assistant, type AssistantTurn } from '@core/ai/assistant';
 import { classifyFailure } from '@core/ai/limits';
 import { maskPeople, unmask } from '@core/ai/privacy';
 import { peopleNames } from '@modules/finance/filing/moneyIn';
-import { ASK_AGENT_MODEL, MoneyAgentChat } from '@modules/finance/askAgent';
+import { ASK_AGENT_MODEL, MoneyAgentChat, cardQuestion } from '@modules/finance/askAgent';
 import { ManagedError } from '@core/ai/managedAgent';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -360,9 +360,24 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
     }
   };
 
-  const askAgent = async (id: string, q: string, apiKey: string) => {
+  // Opened from a card's "Use it for" tile: ask about that card at once (17 Nov, Rutvij: the tile has to do something).
+  const asked = useRef(false);
+  useEffect(() => {
+    if (asked.current || !params.card) return;
+    asked.current = true;
+    const q = cardQuestion(ctx, params.card);
+    if (!q) return;
+    void (async () => {
+      const key = await ctx.device?.claudeKey?.().catch(() => null);
+      if (key) return askAgent(`q${Date.now()}`, q.sent, key, q.shown);
+      push({ id: `q${Date.now()}`, question: q.shown, answer: { text: 'Advice on a card needs your Claude key in You › Agent. Until then, type what it is for with Edit on the card’s page.', source: 'phone' } });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.card]);
+
+  const askAgent = async (id: string, q: string, apiKey: string, shown?: string) => {
     const turn = (fn: (a: AgentTurn) => AgentTurn) => setItems((xs) => xs.map((x) => (x.id === id && x.agent ? { ...x, agent: fn(x.agent) } : x)));
-    push({ id, question: q, agent: { texts: [], steps: [], shows: [], changes: [] } });
+    push({ id, question: shown ?? q, agent: { texts: [], steps: [], shows: [], changes: [] } });
     chat.current ??= new MoneyAgentChat(ctx, { apiKey });
     const masked = maskPeople(ctx, q, peopleNames(ctx));
     try {

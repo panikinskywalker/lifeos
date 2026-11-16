@@ -46,7 +46,7 @@ export interface AccountData {
   knownAt?: number;
   /** A card's latest statement: the total and minimum due, by when (cleared when a payment that covers it arrives). */
   statement?: { total: number; min?: number; dueOn: string; at: number };
-  /** What to use it for ("Amazon and Flipkart"), shown on the card: Ask Money sets it when it advises, or you type it. */
+  /** What to use it for, with commas ("Shopping, Forex"), shown as pills on the card: Ask Money fills it in, or you type it. */
   useFor?: string;
 }
 
@@ -81,7 +81,7 @@ export const accountType: ObjectDef<AccountData> = {
     { key: 'last4', label: 'Last 4 digits', type: 'text', section: 'Details' },
     currencyField,
     { key: 'creditLimit', label: 'Credit limit', type: 'money', section: 'Details' },
-    { key: 'useFor', label: 'Use it for', type: 'text', section: 'Details', description: 'What this card is best for, like Amazon and Flipkart. Ask Money fills it when it advises.' },
+    { key: 'useFor', label: 'Use it for', type: 'text', section: 'Details', description: 'What this card is best for, with commas: Shopping, Forex, Fuel. Ask Money fills it in.' },
     { key: 'includeInNetWorth', label: 'Include in net worth', type: 'boolean', default: true, section: 'Details' },
   ],
   indexed: ['kind'],

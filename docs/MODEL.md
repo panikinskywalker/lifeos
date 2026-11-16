@@ -1437,10 +1437,14 @@ references).** Each screen takes the direction that suits it:
   17 Nov (Rutvij): the top shows two figures side by side, *In your accounts*
   (bank, cash, wallets) and *On your cards* (what you owe, and how many), so a
   card's balance you set moves a figure you can see; net worth under them. Each
-  account has a **Use it for** Field ("Amazon and Flipkart"): the card in front
-  says "Use for …" under its name, and its page shows it as a lime tile (tap to
-  edit; on a card without one, the tile asks Ask Money). Ask Money's `card_use`
-  writes it once it has said which card to use for what, with Undo.
+  account has a **Use it for** Field, short uses with commas ("Shopping, Forex,
+  Fuel"), shown as pills under the name on the card in front and on a lime tile
+  on its page (tap to edit). Cards come filled in: when Accounts and cards opens
+  and a credit card has none, Ask Money (one quiet agent turn, with your Claude
+  key) looks up each such card's rewards and writes one to four uses with
+  `card_use`; each card is tried once, so it never repeats or spends again. On a
+  card still without uses, the tile opens Ask Money already asking about that
+  card (sent by its ref, so no digits leave the phone).
 - **An account's or card's page** (direction A): the account drawn as its card
   (balance or what you owe on it), then round-icon buttons Add · Transfer · Set
   balance (Set owed) · Edit.

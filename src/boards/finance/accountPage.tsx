@@ -9,7 +9,7 @@ import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Icon, NumberField, Sheet, Text, TrackColumns, useToast } from '@ui/kit';
 import { blocks } from '@ui/theme/tokens';
-import { accountBalance, accountFlows, setBalance } from '@modules/finance/lib';
+import { accountBalance, accountFlows, cardUses, setBalance } from '@modules/finance/lib';
 import type { AccountData, TransactionData } from '@modules/finance/types';
 import { FieldRow, FieldValue, Hairline, KIND_WORD, Metric, Quick, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, TxRow, day, kindWord, relDay, shortMoney } from './parts';
 import { AccountCard } from './wallet';
@@ -82,11 +82,19 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
 
       {/* What the card is for: Ask Money sets it when it advises; tap to change it. */}
       {d.useFor || card ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={d.useFor ? `Use it for ${d.useFor}. Edit` : 'What is this card best for? Ask Money'} onPress={() => (d.useFor ? controls?.edit() : router.push('/module/finance/ask' as never))} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 24, backgroundColor: d.useFor ? blocks.lime : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
+        <Pressable accessibilityRole="button" accessibilityLabel={d.useFor ? `Use it for ${d.useFor}. Edit` : 'What is this card best for? Ask Money'} onPress={() => (d.useFor ? controls?.edit() : router.push({ pathname: '/module/[id]/[page]', params: { id: 'finance', page: 'ask', card: a.id } } as never))} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 24, backgroundColor: d.useFor ? blocks.lime : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
           <Icon name="sparkle" size={22} color={d.useFor ? '#0B0B0D' : t.c.accent.gold} />
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: d.useFor ? 'rgba(11,11,13,0.62)' : t.c.fg.secondary }}>USE IT FOR</Text>
-            <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', color: d.useFor ? '#0B0B0D' : t.c.fg.primary }}>{d.useFor ?? 'Ask Money which spends this card is best for'}</Text>
+            {d.useFor ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
+                {cardUses(d.useFor).map((u) => (
+                  <Text key={u} style={{ fontSize: 13, lineHeight: 17, fontWeight: '700', color: blocks.lime, backgroundColor: '#0B0B0D', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, overflow: 'hidden' }}>{u}</Text>
+                ))}
+              </View>
+            ) : (
+              <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', color: t.c.fg.primary }}>Tap and Ask Money works it out for this card</Text>
+            )}
           </View>
           <Icon name={d.useFor ? 'edit' : 'chevron-right'} size={16} color={d.useFor ? '#0B0B0D' : t.c.fg.secondary} />
         </Pressable>

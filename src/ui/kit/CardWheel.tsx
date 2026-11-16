@@ -14,8 +14,8 @@ export interface WheelCard {
   tail?: string;
   /** A small line on the card in front ("bank said, 14 Nov"). */
   note?: string;
-  /** What to use it for ("Amazon, Flipkart"), under the name on the card in front. */
-  use?: string;
+  /** What to use it for ("Shopping", "Forex"), as pills under the name on the card in front. */
+  uses?: string[];
   /** A card that needs you (a late bill) wears coral whatever its face. */
   alert?: boolean;
 }
@@ -133,7 +133,7 @@ function WheelSlot({ card: c, index: i, y, top, width, isFront, depth, onPress }
     <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: top + i * STEP, height: CARD_H, zIndex: 100 - depth, elevation: 100 - depth, opacity, transform: [{ perspective: 900 }, { translateY }, { translateX }, { rotateX }, { rotateZ }, { scale }] }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${c.title}${c.tail ? `, ${c.tail}` : ''}, ${c.amount}${c.use ? `, use for ${c.use}` : ''}${isFront ? '. Opens it' : '. Brings it to the front'}`}
+        accessibilityLabel={`${c.title}${c.tail ? `, ${c.tail}` : ''}, ${c.amount}${c.uses?.length ? `, use for ${c.uses.join(', ')}` : ''}${isFront ? '. Opens it' : '. Brings it to the front'}`}
         onPressIn={() => Animated.spring(press, { ...SPRING, toValue: 0.965 }).start()}
         onPressOut={() => Animated.spring(press, { ...SPRING, toValue: 1 }).start()}
         onPress={() => {
@@ -144,6 +144,7 @@ function WheelSlot({ card: c, index: i, y, top, width, isFront, depth, onPress }
       >
         <Art kind={c.alert ? 0 : Math.floor(s / 63) % ARTS} color={face.art} width={width} />
         <View style={{ flex: 1, paddingHorizontal: 18, paddingVertical: 14, justifyContent: 'space-between' }}>
+          <View style={{ gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Text numberOfLines={1} style={{ flex: 1, fontSize: 17, lineHeight: 21, letterSpacing: -0.4, color: face.ink }}>
               <Text style={{ fontSize: 17, fontWeight: '700', color: face.ink }}>{first}</Text>
@@ -151,7 +152,14 @@ function WheelSlot({ card: c, index: i, y, top, width, isFront, depth, onPress }
             </Text>
             {c.corner ? <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '700', color: muted }}>{c.corner}</Text> : null}
           </View>
-          {isFront && c.use ? <Text numberOfLines={1} style={{ marginTop: -8, fontSize: 13, lineHeight: 17, fontWeight: '600', color: muted }}>{`Use for ${c.use}`}</Text> : null}
+          {isFront && c.uses?.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, maxHeight: 26, overflow: 'hidden' }}>
+              {c.uses.map((u) => (
+                <Text key={u} style={{ fontSize: 12, lineHeight: 16, fontWeight: '700', color: face.ink, backgroundColor: face.ink === '#0B0B0D' ? 'rgba(11,11,13,0.12)' : 'rgba(245,245,247,0.18)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' }}>{u}</Text>
+              ))}
+            </View>
+          ) : null}
+          </View>
           {isFront && c.note ? <Text style={{ alignSelf: 'flex-start', fontSize: 12, lineHeight: 16, fontWeight: '700', color: face.ink, backgroundColor: face.bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' }}>{c.note}</Text> : null}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
             <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ flex: 1, letterSpacing: -1.4, color: face.ink, fontVariant: ['tabular-nums'] }}>
