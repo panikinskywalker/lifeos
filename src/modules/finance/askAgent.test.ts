@@ -51,12 +51,15 @@ const hooks = () => {
 };
 
 describe('Ask Money as an agent', () => {
-  it('is a Haiku 5.5 agent whose tools are all answered on the phone', () => {
+  it('is a Sonnet 5.5 agent with web search; every money tool is answered on the phone', () => {
     const def = agentDefinition();
     expect(def.model.id).toBe(ASK_AGENT_MODEL);
-    expect(ASK_AGENT_MODEL).toBe('claude-haiku-5-5');
-    expect(def.tools.every((t) => t.type === 'custom')).toBe(true);
-    expect(def.tools.map((t) => t.name)).toEqual(expect.arrayContaining(['money_overview', 'money_query', 'money_show', 'recategorise', 'keep_view', 'set_budget']));
+    expect(ASK_AGENT_MODEL).toBe('claude-sonnet-5-5');
+    const toolset = def.tools.find((t) => t.type === 'agent_toolset_20260401') as { default_config: { enabled: boolean }; configs: Array<{ name: string; enabled: boolean }> };
+    expect(toolset.default_config.enabled).toBe(false);
+    expect(toolset.configs.filter((c) => c.enabled).map((c) => c.name).sort()).toEqual(['web_fetch', 'web_search']);
+    const custom = def.tools.filter((t): t is (typeof def.tools)[number] & { name: string } => t.type === 'custom');
+    expect(custom.map((t) => t.name)).toEqual(expect.arrayContaining(['money_overview', 'cards_and_spend', 'money_query', 'money_show', 'recategorise', 'keep_view', 'set_budget']));
   });
 
   it('answers a tool call on the phone, moves the payments with Undo, shows the answer, and makes the agent only once', async () => {
@@ -127,5 +130,19 @@ describe('Ask Money as an agent', () => {
     const result = JSON.stringify(api.sent.find((e) => e.type === 'user.custom_tool_result'));
     expect(result).not.toContain('Priya');
     expect(result).toContain('Person');
+  });
+
+  it('cards and spend: what goes through each card by category and shop, rounded, never a person', async () => {
+    os.records.create({ object: 'person', title: 'Priya Sharma', data: {} });
+    const card = os.records.create({ object: 'account', title: 'ICICI Bank card ••3007', data: { kind: 'credit', institution: 'ICICI Bank', last4: '3007', currency: 'INR', openingBalance: 0, creditLimit: 130000 } });
+    const day = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10);
+    for (const [title, amount, category] of [['Swiggy', 487, 'food'], ['Swiggy', 512, 'food'], ['Priya Sharma', 900, 'food'], ['Amazon', 2399, 'shopping']] as const) os.records.create<TransactionData>({ object: 'transaction', title, data: { amount, kind: 'expense', category, date: day, merchant: title, accountId: card.id } as TransactionData }, 'assistant');
+    const { runAgentTool } = await import('./askAgent');
+    const out = JSON.parse(await runAgentTool(os, 'cards_and_spend', {}, { confirm: async () => true, change: () => {} }));
+    const c = out.accounts.find((a: { name: string }) => a.name === 'ICICI Bank card');
+    expect(c).toMatchObject({ bank: 'ICICI Bank', kind: 'credit', limit: 130000 });
+    expect(c.byCategory[0]).toEqual({ name: 'shopping', perMonth: 800 });
+    expect(JSON.stringify(out)).not.toContain('Priya');
+    expect(JSON.stringify(out)).not.toContain('3007');
   });
 });

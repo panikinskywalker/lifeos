@@ -7,6 +7,19 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.89 · 16 Nov 2026
+
+**Ask Money gets smarter: Claude Sonnet 5.5, the web, and your cards.**
+- It now runs on Claude Sonnet 5.5 instead of Haiku, for much better judgement.
+- **It can search the web** and read pages: today's FD and savings rates, a
+  fund's returns and costs, tax rules and deadlines, card rewards and offers.
+  Every search shows in its steps ("Searched the web: ICICI Amazon Pay card
+  cashback"); it never puts your names, account digits or exact figures in one.
+- **Which card for what:** it sees what goes through each of your cards by
+  category and shop (rounded), looks up each card's rewards, and tells you which
+  card to use for which spend and what that saves a month, with fees and caps.
+  When a card is only "ICICI Bank card", it asks you which one it is.
+
 ## v0.0.88 · 16 Nov 2026
 
 **A SIP screenshot sets up your SIP.** Upload a screenshot of your fund

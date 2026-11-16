@@ -1263,8 +1263,14 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
     Remove · Undo). Kept views are these components.
   - The privacy gate stays. With no AI connected, it offers Connect
     OpenRouter, and the quick answers keep working on the phone.
-  - **How it runs** (15 Nov, Rutvij): a Claude Managed Agent on **Claude Haiku
-    5.5**, with the Claude key already in You › Agent. The app creates the
+  - **How it runs** (15 Nov, Rutvij; 16 Nov: **Claude Sonnet 5.5 with web
+    search**, since Haiku was too weak for judgement; it searches and reads pages
+    for rates, fund facts, tax rules and card rewards, each search shown in its
+    steps, never with names, digits or exact figures; its environment is open to
+    the web and every other sandbox tool is off. Cards: `cards_and_spend` gives
+    each card's spend by category and shop, rounded, so it can say which card to
+    use for what and what that saves): a Claude Managed Agent, first on Claude Haiku
+    5.5, with the Claude key already in You › Agent. The app creates the
     agent and its environment once, keeps their IDs, and updates the agent when
     its definition changes. Each Ask conversation is a session; every tool is
     one the phone answers (no sandbox tools, no web; the environment's network
