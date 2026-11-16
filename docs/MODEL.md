@@ -1327,7 +1327,12 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   account's page has *This is a copy of another account*; pick the real one and
   confirm. Its payments, transfers and subscriptions move there, the real one
   keeps its own balance and learns the copy's digits (`alsoLast4`, so later
-  texts with them land in it), and the copy goes. Undo puts it all back.
+  texts with them land in it), and the copy goes. Undo puts it all back. The
+  real account's figure is kept as it was: the copy's payments join its history,
+  never its total.
+  **No payment from the future** (17 Nov): a bank text whose date is after the
+  day it came is a misread (a ₹1,96,958 salary filed as 13 Feb 2034) and takes
+  the day it came; and a payment dated after today never counts in a balance.
   **Before payday** cards wear a colour by kind (17 Nov, Rutvij; NR-Money-Home
   v34 and v35): late coral, a bill or card bill sky, a subscription renewing lilac,
   a SIP mint, each labelled (LATE, BILL, CARD BILL, RENEWS, SIP) with a dot legend

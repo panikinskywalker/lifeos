@@ -103,7 +103,8 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
   const id = ctx.id;
   const item = { source: m.source, from: m.from, text: m.body, title: m.title ?? null, account: m.account ?? null, receivedAt: m.receivedAt };
   const created: string[] = [];
-  const date = t.date ?? iso(item.receivedAt);
+  // A text's date after the day it came is a misread ("13 Feb" for a salary that came on 16 Nov): the day it came instead.
+  const date = t.date && t.date <= iso(item.receivedAt + 86_400_000) ? t.date : iso(item.receivedAt);
   // To or from your own name: money moving between your accounts.
   if (!t.investment && !t.transfer && isMyName(os, t.counterparty)) t = { ...t, transfer: true };
   // A nameless debit by NACH for one of your SIPs is that SIP; any other is asked about once it is filed.

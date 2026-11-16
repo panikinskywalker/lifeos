@@ -147,6 +147,13 @@ describe('Upload a statement', () => {
     expect(os.records.get<AccountData>(real.id)!.data.alsoLast4).toBeUndefined();
   });
 
+  it('a payment dated after today never counts in a balance (a misread date)', () => {
+    const acc = os.records.create<AccountData>({ object: 'account', title: 'HSBC', data: { kind: 'bank', institution: 'HSBC', currency: 'INR', openingBalance: 1000 } as AccountData });
+    os.records.create({ object: 'transaction', title: 'Tech Uniapps', data: { amount: 196958, kind: 'income', category: 'salary', date: '2034-02-13', accountId: acc.id } });
+    os.records.create({ object: 'transaction', title: 'Swiggy', data: { amount: 300, kind: 'expense', category: 'food', date: '2026-11-01', accountId: acc.id } });
+    expect(accountBalance(os, os.records.get<AccountData>(acc.id)!)).toBe(700);
+  });
+
   it('keeps only what makes sense from a reading', () => {
     expect(readStatement({ accounts: [{ bank: '', last4: '', kind: 'bank', balance: 1, owed: 0, minDue: 0, dueOn: 'soon', asOf: '' }], holdings: [{ name: 'X', units: 0, value: 0, invested: 0, sip: 0, sipDay: 0 }] })).toEqual({ accounts: [], holdings: [], subscriptions: [] });
   });

@@ -60,6 +60,13 @@ export function setPockets(os: LifeOSContext, accountId: string, pockets: Array<
   return before;
 }
 
+/** The local day as YYYY-MM-DD. */
+const isoDay = (ms: number) => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** A payment dated after today cannot have happened yet (a misread date): it never counts in a balance. */
 export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountData>): number {
   const d = account.data;
   // A forex card with its currencies set is worth what they come to in rupees.
@@ -71,8 +78,8 @@ export function accountBalance(os: LifeOSContext, account: ObjectRecord<AccountD
   const row = os.db.get<{ i: number | null; o: number | null }>(
     `SELECT SUM(CASE WHEN ${j('accountId')}=? AND ${j('kind')}='income' THEN ${j('amount')} WHEN ${j('toAccountId')}=? AND ${j('kind')} IN ('transfer','investment') THEN ${j('amount')} ELSE 0 END) AS i,
             SUM(CASE WHEN ${j('accountId')}=? AND ${j('kind')} IN ('expense','transfer','investment') THEN ${j('amount')} ELSE 0 END) AS o
-       FROM records r WHERE r.object='transaction' AND r.deleted_at IS NULL ${after}`,
-    [account.id, account.id, account.id, ...(known ? [known.on, known.on, known.at] : [])],
+       FROM records r WHERE r.object='transaction' AND r.deleted_at IS NULL AND ${j('date')} <= ? ${after}`,
+    [account.id, account.id, account.id, isoDay(Date.now()), ...(known ? [known.on, known.on, known.at] : [])],
   );
   const start = known ? d.knownBalance! : (d.openingBalance ?? 0);
   return start + (row?.i ?? 0) - (row?.o ?? 0);
