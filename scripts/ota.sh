@@ -12,6 +12,10 @@ msg="${2:?usage: scripts/ota.sh <tag-or-commit> \"message\" [--dry-run]}"
 dry="${3:-}"
 
 root="$(git rev-parse --show-toplevel)"
+if ! git -C "$root" rev-parse --verify -q "$ref^{commit}" >/dev/null; then
+  echo "No tag or commit named $ref. Commit the version and tag it first (git tag $ref), then run this again." >&2
+  exit 1
+fi
 dir="$(mktemp -d)/ota"
 cleanup() { git -C "$root" worktree remove --force "$dir" >/dev/null 2>&1 || true; git -C "$root" worktree prune; }
 trap cleanup EXIT
