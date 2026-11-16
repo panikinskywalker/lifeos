@@ -113,6 +113,34 @@ export interface EventData {
   tripId?: string;
   /** Travel (R7g): the trip stop a stay is at (word `stop`; places owns `at`). */
   stopId?: string;
+  /** Travel's booking and journey Fields (MODEL.md, *Event, new Fields for travel*; R7g slice 2). */
+  booking?: 'confirmed' | 'pending' | 'planned' | 'cancelled';
+  currency?: string;
+  toPay?: number;
+  /** Who paid the part already paid: 'me', or a Person's id. */
+  paidBy?: string;
+  payHow?: string;
+  chargeOn?: string;
+  cancelBy?: string;
+  cancelNote?: string;
+  checkIn?: string;
+  checkOut?: string;
+  access?: string;
+  reference?: string;
+  bookingUrl?: string;
+  mapUrl?: string;
+  fromStopId?: string;
+  toStopId?: string;
+  mode?: string;
+  plan?: string;
+  fare?: number;
+  estimate?: boolean;
+  takes?: string;
+  bookNote?: string;
+  seatsOpenAt?: number;
+  book?: Array<{ label: string; url: string }>;
+  lastConnection?: string;
+  steps?: string;
   airline?: string;
   flightNo?: string;
   cost?: number;
@@ -129,7 +157,7 @@ export const eventType: ObjectDef<EventData> = {
   labelPlural: 'Events',
   icon: 'calendar',
   color: 'red',
-  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), projectId: z.string().optional(), tripId: z.string().optional(), stopId: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional(), source: z.string().optional(), sourceKey: z.string().optional(), calendars: z.array(z.string()).optional() }),
+  schema: z.object({ kind: z.string().optional(), startAt: z.number(), endAt: z.number().optional(), location: z.string().optional(), notes: z.string().optional(), allDay: z.boolean().optional(), personIds: z.array(z.string()).optional(), projectId: z.string().optional(), tripId: z.string().optional(), stopId: z.string().optional(), booking: z.enum(['confirmed', 'pending', 'planned', 'cancelled']).optional(), currency: z.string().optional(), toPay: z.coerce.number().optional(), paidBy: z.string().optional(), payHow: z.string().optional(), chargeOn: z.string().optional(), cancelBy: z.string().optional(), cancelNote: z.string().optional(), checkIn: z.string().optional(), checkOut: z.string().optional(), access: z.string().optional(), reference: z.string().optional(), bookingUrl: z.string().optional(), mapUrl: z.string().optional(), fromStopId: z.string().optional(), toStopId: z.string().optional(), mode: z.string().optional(), plan: z.string().optional(), fare: z.coerce.number().optional(), estimate: z.boolean().optional(), takes: z.string().optional(), bookNote: z.string().optional(), seatsOpenAt: z.number().optional(), book: z.array(z.object({ label: z.string(), url: z.string() })).optional(), lastConnection: z.string().optional(), steps: z.string().optional(), airline: z.string().optional(), flightNo: z.string().optional(), cost: z.coerce.number().optional(), source: z.string().optional(), sourceKey: z.string().optional(), calendars: z.array(z.string()).optional() }),
   fields: [
     { key: 'kind', label: 'Kind', type: 'text', summary: true, placeholder: 'flight, dinner, meeting, concert…' },
     { key: 'startAt', label: 'Starts', type: 'datetime', required: true, default: () => Date.now() + 3600000 },
@@ -141,6 +169,30 @@ export const eventType: ObjectDef<EventData> = {
     { key: 'tripId', label: 'Trip', type: 'link', linkTo: 'trip', linkWord: 'trip', section: 'Links' },
     { key: 'stopId', label: 'Stop', type: 'link', linkTo: 'stop', linkWord: 'stop', section: 'Travel', description: 'The trip stop a stay is at' },
     { key: 'airline', label: 'Airline', type: 'text', section: 'Travel' },
+    { key: 'booking', label: 'Booking', type: 'select', section: 'Booking', options: [{ value: 'confirmed', label: 'Confirmed' }, { value: 'pending', label: 'Pending' }, { value: 'planned', label: 'Planned, not booked' }, { value: 'cancelled', label: 'Cancelled' }] },
+    { key: 'currency', label: 'Currency', type: 'select', section: 'Booking', options: ['INR', 'JPY', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'THB'].map((c) => ({ value: c, label: c })) },
+    { key: 'toPay', label: 'Still to pay', type: 'money', section: 'Booking' },
+    { key: 'payHow', label: 'How the rest is paid', type: 'text', section: 'Booking' },
+    { key: 'chargeOn', label: 'Card charged on', type: 'date', section: 'Booking' },
+    { key: 'cancelBy', label: 'Free to cancel until', type: 'date', section: 'Booking' },
+    { key: 'cancelNote', label: 'Cancellation time', type: 'text', section: 'Booking', placeholder: '23:59 JST' },
+    { key: 'checkIn', label: 'Check-in', type: 'text', section: 'Booking', placeholder: '15:00–19:00' },
+    { key: 'checkOut', label: 'Check-out', type: 'text', section: 'Booking', placeholder: 'by 10:00' },
+    { key: 'access', label: 'Getting there', type: 'text', section: 'Booking' },
+    { key: 'reference', label: 'Reference', type: 'text', section: 'Booking' },
+    { key: 'bookingUrl', label: 'Booking link', type: 'contact', section: 'Booking' },
+    { key: 'mapUrl', label: 'Map link', type: 'contact', section: 'Booking' },
+    { key: 'fromStopId', label: 'From', type: 'link', linkTo: 'stop', linkWord: 'from_stop', section: 'Journey' },
+    { key: 'toStopId', label: 'To', type: 'link', linkTo: 'stop', linkWord: 'to_stop', section: 'Journey' },
+    { key: 'mode', label: 'How', type: 'select', section: 'Journey', options: ['Flight', 'Train', 'Bus', 'Train + bus', 'Taxi', 'Car', 'Walk', 'Ferry', 'Other'].map((m) => ({ value: m.toLowerCase(), label: m })) },
+    { key: 'plan', label: 'Plan', type: 'select', section: 'Journey', options: [{ value: 'booked', label: 'Booked' }, { value: 'suggested', label: 'Suggested' }, { value: 'decided', label: 'Decided, not booked' }, { value: 'undecided', label: 'To decide' }] },
+    { key: 'fare', label: 'Cost each', type: 'money', section: 'Journey' },
+    { key: 'estimate', label: 'Cost is an estimate', type: 'boolean', section: 'Journey' },
+    { key: 'takes', label: 'Takes', type: 'text', section: 'Journey', placeholder: '3.5–4 h' },
+    { key: 'bookNote', label: 'Book ahead', type: 'text', section: 'Journey', placeholder: 'seats open 26 Nov' },
+    { key: 'seatsOpenAt', label: 'Seats open', type: 'datetime', section: 'Journey' },
+    { key: 'lastConnection', label: 'Last connection', type: 'text', section: 'Journey' },
+    { key: 'steps', label: 'Step by step', type: 'longtext', section: 'Journey', description: 'One per line: 10:30 Leave the guest house' },
     { key: 'flightNo', label: 'Flight no.', type: 'text', section: 'Travel' },
     { key: 'cost', label: 'Cost', type: 'money', section: 'Details' },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },

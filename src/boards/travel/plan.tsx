@@ -10,8 +10,10 @@ import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { fonts } from '@ui/theme/tokens';
 import { Button, EmptyState, Icon, IconButton, Screen, Segmented, Sheet, Text, TextField, useToast } from '@ui/kit';
-import { addToLine, dayPlans, ensureStop, moveStop, movingDays, nightsOf, segmentsOf, stopMark, stopSpan, stopsOf, tripIcs, type Night, type StopData, type TripData } from '@modules/travel';
+import { addToLine, dayPlans, statusOf, stayMoney, tripStays, tripTickets, ensureStop, moveStop, movingDays, nightsOf, segmentsOf, stopMark, stopSpan, stopsOf, tripIcs, type Night, type StopData, type TripData } from '@modules/travel';
 import { Caps, datesLabel, dayLabel, Note, plural, Row, RowCard, SectionHead, WHITE } from './parts';
+import { dayRoute } from './day';
+import { amount, bookingsRoute } from './bookings';
 
 /**
  * Plan (the trip template, R7g slice 1; JP-Map, JP-Route, JP-Calendar): the
@@ -306,7 +308,7 @@ function DaysView({ d, ctx }: { d: PlanData; ctx: LifeOSContext }) {
           <RowCard>
             {moves.map((m) => {
               const a = byId.get(m.fromStopId), b = byId.get(m.toStopId);
-              return <Row key={m.day} lead={b ? <StopDisc stop={b} look={look} /> : undefined} title={`${a?.title ?? '?'} → ${b?.title ?? '?'}`} sub={dayLabel(m.day)} onPress={b ? () => router.push(`/entity/stop/${b.id}` as never) : undefined} />;
+              return <Row key={m.day} lead={b ? <StopDisc stop={b} look={look} /> : undefined} title={`${a?.title ?? '?'} → ${b?.title ?? '?'}`} sub={dayLabel(m.day)} onPress={() => router.push(dayRoute(d.trip.id, m.day, 'travel') as never)} />;
             })}
           </RowCard>
         </View>
@@ -319,7 +321,7 @@ function DaysView({ d, ctx }: { d: PlanData; ctx: LifeOSContext }) {
             const n = night.get(day);
             const s = n?.stopId ? byId.get(n.stopId) : undefined;
             const plan = d.plans.get(day);
-            return <Row key={day} minHeight={52} lines={2} lead={<View style={{ width: 40, alignItems: 'center' }}><Text style={{ fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{day.slice(8)}</Text><Text style={{ fontSize: 10, fontWeight: '700', color: t.c.fg.tertiary }}>{dayLabel(day).slice(0, 3).toUpperCase()}</Text></View>} title={s?.title ?? (n?.kind === 'air' ? 'On the plane' : day === endDate ? 'Fly home' : 'No bed booked')} sub={plan ? plan.split('\n')[0]! : null} />;
+            return <Row key={day} minHeight={52} lines={2} onPress={() => router.push(dayRoute(d.trip.id, day) as never)} lead={<View style={{ width: 40, alignItems: 'center' }}><Text style={{ fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{day.slice(8)}</Text><Text style={{ fontSize: 10, fontWeight: '700', color: t.c.fg.tertiary }}>{dayLabel(day).slice(0, 3).toUpperCase()}</Text></View>} title={s?.title ?? (n?.kind === 'air' ? 'On the plane' : day === endDate ? 'Fly home' : 'No bed booked')} sub={plan ? plan.split('\n')[0]! : null} />;
           })}
         </RowCard>
       </View>
@@ -408,6 +410,10 @@ export function LineCard({ tripId }: { tripId: string }) {
   const router = useRouter();
   const t = useTheme();
   const d = usePlan(tripId);
+  const b = useLive((os) => {
+    const stays = tripStays(os, tripId);
+    return { stays: stays.filter((e) => statusOf(e) !== 'cancelled').length, tickets: tripTickets(os, tripId).length, toPay: stayMoney(stays).toPay };
+  }, [tripId]);
   if (!d) return null;
   const nights = d.nights.filter((n) => n.kind === 'stay').length;
   const moves = movingDays(d.nights).length;
@@ -436,6 +442,11 @@ export function LineCard({ tripId }: { tripId: string }) {
           <Text variant="caption" color="secondary">Add the stops of the trip: each one gets its nights from the stays booked there.</Text>
         )}
       </Pressable>
+      {b.stays + b.tickets ? (
+        <RowCard>
+          <Row lead={<Icon name="bag" size={18} color={t.c.fg.secondary} />} title="Bookings" sub={[plural(b.stays, 'stay'), b.tickets ? plural(b.tickets, 'ticket') : null, ...Object.entries(b.toPay).filter(([, n]) => n > 0.5).map(([cur, n]) => `${amount(n, cur)} to pay`)].filter(Boolean).join(' · ')} trailing={<Icon name="chevron-right" size={18} color={t.c.fg.secondary} />} onPress={() => router.push(bookingsRoute(tripId) as never)} />
+        </RowCard>
+      ) : null}
     </View>
   );
 }

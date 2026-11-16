@@ -10,6 +10,7 @@ import { Button, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
 import { addToLine, nightsOf, stopSpan, stopsOf, type StopData, type TripData } from '@modules/travel';
 import { datesLabel, plural, Row, RowCard, SectionHead } from './parts';
 import { planRoute, StopDisc, stopHex } from './plan';
+import { bookingRoute } from './bookings';
 
 /**
  * A stop's page (the trip template, R7g slice 1; JP-Place): its mark and
@@ -74,7 +75,7 @@ export function StopPage({ entity, ctx, controls }: Props) {
         <SectionHead title="Nights here" sub={d.span ? `${datesLabel({ startDate: d.span.from, endDate: d.span.to })} · ${plural(d.span.nights, 'night')}` : 'None booked yet'} />
         <RowCard>
           {d.stays.length ? (
-            d.stays.map((s) => <Row key={s.id} lead={<Icon name="moon" size={18} color={c} />} title={s.title.replace(/^Stay · /, '')} sub={s.data.startAt ? datesLabel({ startDate: isoDay(s.data.startAt), endDate: s.data.endAt ? isoDay(s.data.endAt) : undefined }) : null} onPress={() => router.push(`/entity/event/${s.id}` as never)} />)
+            d.stays.map((s) => <Row key={s.id} lead={<Icon name="moon" size={18} color={c} />} title={s.title.replace(/^Stay · /, '')} sub={s.data.startAt ? datesLabel({ startDate: isoDay(s.data.startAt), endDate: s.data.endAt ? isoDay(s.data.endAt) : undefined }) : null} onPress={() => router.push(bookingRoute(s.id) as never)} />)
           ) : (
             <Text variant="caption" color="secondary" style={{ paddingVertical: 10 }}>A stay booked here (from mail or by hand) gives the stop its nights.</Text>
           )}

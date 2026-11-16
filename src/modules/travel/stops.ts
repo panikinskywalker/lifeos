@@ -19,6 +19,7 @@ interface Ev {
   location?: string;
   stopId?: string;
   sourceKey?: string;
+  booking?: string;
 }
 
 /** A trip's stops: those on the line (in order), or any kinds asked for. */
@@ -85,10 +86,13 @@ export interface Night {
   kind: NightKind;
   stopId: string | null;
   stayId: string | null;
+  /** The stay is planned, not booked yet. */
+  planned?: boolean;
 }
 
+/** The trip's stays that hold a bed (a cancelled one does not). */
 function staysOf(os: LifeOSContext, tripId: string) {
-  return linkedTo<Ev>(os, tripId, 'event').filter((e) => e.data.kind === 'stay' && e.data.startAt);
+  return linkedTo<Ev>(os, tripId, 'event').filter((e) => e.data.kind === 'stay' && e.data.startAt && e.data.booking !== 'cancelled');
 }
 
 /** Every night of the trip, Starts to the night before Ends: at a stay (and its stop), on a plane, or a gap with no bed. */
@@ -98,13 +102,13 @@ export function nightsOf(os: LifeOSContext, trip: ObjectRecord<TripData>): Night
   const stays = staysOf(os, trip.id).map((e) => {
     const from = isoOf(e.data.startAt!);
     const to = e.data.endAt ? isoOf(e.data.endAt) : addDays(from, 1);
-    return { id: e.id, from, to: to > from ? to : addDays(from, 1), stopId: e.data.stopId ?? null };
+    return { id: e.id, from, to: to > from ? to : addDays(from, 1), stopId: e.data.stopId ?? null, planned: e.data.booking === 'planned' };
   });
   const flightDays = new Set(linkedTo<Ev>(os, trip.id, 'event').filter((e) => e.data.kind === 'flight' && e.data.startAt).map((e) => isoOf(e.data.startAt!)));
   const out: Night[] = [];
   for (let d = startDate; d < endDate; d = addDays(d, 1)) {
     const s = stays.find((x) => x.from <= d && d < x.to);
-    out.push(s ? { day: d, kind: 'stay', stopId: s.stopId, stayId: s.id } : { day: d, kind: flightDays.has(d) ? 'air' : 'gap', stopId: null, stayId: null });
+    out.push(s ? { day: d, kind: 'stay', stopId: s.stopId, stayId: s.id, ...(s.planned ? { planned: true } : {}) } : { day: d, kind: flightDays.has(d) ? 'air' : 'gap', stopId: null, stayId: null });
   }
   return out;
 }

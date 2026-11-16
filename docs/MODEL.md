@@ -616,12 +616,12 @@ that cost count in the trip's estimates (below).
 
 **Event, new Fields for travel** (added to *Event's Fields*; in sections by
 kind, as an Asset's are by category; projects keeps the Object, travel files
-these kinds). People is *covers* for a booking; Cost is its total.
+these kinds). People is *covers* for a booking (the others: you are always covered); Cost is its total, in the booking's **Currency** (`currency`, a new Field). A flight booking for one person is kind **ticket** (their fare, reference and who paid); the legs stay kind flight.
 | Field | Type | Kind | Notes |
 |---|---|---|---|
 | Booking | select (`booking`) | stay, flight, activity, other | confirmed · pending · planned · cancelled; planned is not booked yet, cancelled leaves the money |
 | Stop | link → Stop, word *stop* (`stopId`) | stay | the trip stop the stay is at, from the booking mail's city or the import; its own word because *at* is places' (an Event *at* its Place) |
-| From, To | link → Stop, words *from* / *to* (`fromStopId`, `toStopId`) | journey | kind `journey` is new, beside flight and stay |
+| From, To | link → Stop, words *from_stop* / *to_stop* (`fromStopId`, `toStopId`) | journey | kind `journey` is new, beside flight and stay; their own words because a dump's *from* / *to* roles on an Event point at Places and carry no marker, so a form edit would drop them |
 | Mode | select (`mode`) | journey | flight · train · bus · train and bus · taxi · car · walk · other |
 | Plan | select (`plan`) | journey | booked · suggested · decided, not booked · to decide |
 | Cost each | money (`fare`) | journey | per person, in its currency |
@@ -632,7 +632,7 @@ these kinds). People is *covers* for a booking; Cost is its total.
 | Last connection | text (`lastConnection`) | journey | "Nakatsugawa → Magome bus, 17:45 on Saturdays" |
 | Steps | long text (`steps`) | journey | one per line: "10:30 Leave the guest house" |
 | Still to pay | money (`toPay`) | stay, flight, activity | in the booking's currency |
-| Paid by | link → Person or you (`paidById`) | stay, flight, activity | who paid the part already paid |
+| Paid by | `me` or a Person's id, hidden (`paidBy`) | stay, ticket, activity | who paid the part already paid; not a link Field, since *you* is no record |
 | How the rest is paid | text (`payHow`) | stay | "cash, yen, at the desk" |
 | Card charged on | date (`chargeOn`) | stay | |
 | Free cancel until | date and time (`cancelBy`, `cancelNote`) | stay, activity | drives the deadline rail and a nudge |
@@ -641,8 +641,8 @@ these kinds). People is *covers* for a booking; Cost is its total.
 | Reference | text (`reference`) | stay, flight, activity | shown on a tap; never to trip members |
 | Booking link, Map link | contact (url) (`bookingUrl`, `mapUrl`) | stay, activity | a blank map link searches by name |
 
-**Document**: one link added, **Booking** (link → Event, word *for*): a
-booking's papers (photos, PDFs), viewed one after another on the stay.
+**Document**: one link added, **Booking** (link → Event, word *for*, `eventId`):
+a booking's papers (photos, PDFs), viewed one after another on the stay.
 
 **Task**: **Trip** (link → Trip, word *trip*, `tripId`) and **Section** (text,
 an open list, `section`: to-do · documents · money · packing · notes). The
@@ -1664,7 +1664,8 @@ screens checked on the phone → overrides only where the default is wrong)
     each night's stop, moving days, Add to my calendar as .ics), Plan › Map (the stops' pins and the route,
     drawn as Places draws maps until a provider is chosen), a stop's page with prev / next, the edit form
     with common places offered. A booking mail's stay lands on its stop.
-  - [ ] **2. Journeys, stays and Bookings.** Event's travel Fields; journeys between stops; a day's page
+  - [x] **2. Journeys, stays and Bookings.** *Built 16 Nov (no migration; see `docs/handover/r7g-2-bookings.md`).*
+    Event's travel Fields; journeys between stops; a day's page
     (Overview · Itinerary · Stay & pay · Travel: leave by, arrive, cost each, book ahead, last connection,
     step by step, your day lines); Bookings (flights as a boarding pass with each person's fare, airport cards,
     stays with paid and still to pay, cancelled and planned ones, which miss a check-in time, tours and

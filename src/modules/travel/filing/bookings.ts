@@ -70,6 +70,9 @@ export function fileStay(os: LifeOSContext, ingestId: string, st: ParsedStay, ma
     id = os.records.create({ object: 'event', title: `Stay · ${st.name}`, data: { kind: 'stay', startAt, allDay: true, ...(st.checkOut ? { endAt: new Date(`${st.checkOut}T11:00:00`).getTime() } : {}), location: st.place ?? undefined, notes: `From ${account}: “${mail.subject}”` } }, 'assistant').id;
     os.filings.add({ source: 'email', sourceRef: ingestId, kind: 'event', entityId: id, label: `Stay: ${st.name} · ${st.checkIn.slice(8)}/${st.checkIn.slice(5, 7)}${st.checkOut ? `–${st.checkOut.slice(8)}/${st.checkOut.slice(5, 7)}` : ''} · from ${account}` });
   }
+  // What the mail says about times, money and cancellation (R7g slice 2); the latest mail wins.
+  const extra = { ...(st.checkInTime ? { checkIn: st.checkInTime } : {}), ...(st.checkOutTime ? { checkOut: st.checkOutTime } : {}), ...(st.total ? { cost: st.total.amount, currency: st.total.currency, ...(st.paid ? { toPay: 0 } : {}) } : {}), ...(st.cancelBy ? { cancelBy: st.cancelBy } : {}) };
+  if (Object.keys(extra).length) os.records.update(id, { data: extra }, 'assistant');
   os.records.timeline.add({ entityId: id, kind: 'email', title: `From Email · ${account}`, body: `${mail.fromName}: ${mail.subject}`, actor: 'system', occurredAt: mail.date, meta: { ingestId } });
   const tripId = tripOn(os, st.checkIn, st.place, ingestId, account, st.checkOut);
   if (tripId && !os.links.forEntity(id, 'part_of').some((r) => r.other.id === tripId)) os.links.link(id, tripId, 'part_of', {}, 'assistant', { source: 'email', sourceId: ingestId });

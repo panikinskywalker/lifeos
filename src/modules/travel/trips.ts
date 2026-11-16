@@ -142,8 +142,8 @@ export interface Booking {
 /** Its flights and stays (Events linked to it), in time order. */
 export function tripBookings(os: LifeOSContext, tripId: string): Booking[] {
   if (!os.registry.objects.has('event')) return [];
-  return linkedTo<{ kind?: string; startAt?: number; endAt?: number; airline?: string; flightNo?: string; location?: string; notes?: string }>(os, tripId, 'event')
-    .filter((e) => e.data.kind === 'flight' || e.data.kind === 'stay')
+  return linkedTo<{ kind?: string; startAt?: number; endAt?: number; airline?: string; flightNo?: string; location?: string; notes?: string; booking?: string }>(os, tripId, 'event')
+    .filter((e) => (e.data.kind === 'flight' || e.data.kind === 'stay') && e.data.booking !== 'cancelled')
     .map((e) => ({ id: e.id, kind: e.data.kind as 'flight' | 'stay', title: e.title, startAt: e.data.startAt ?? 0, endAt: e.data.endAt ?? null, airline: e.data.airline ?? null, flightNo: e.data.flightNo ?? null, location: e.data.location ?? null, pnr: /\bPNR ([A-Z0-9]{6})\b/.exec(e.data.notes ?? '')?.[1] ?? null }))
     .sort((a, b) => a.startAt - b.startAt);
 }

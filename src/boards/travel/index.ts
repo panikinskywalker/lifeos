@@ -9,6 +9,9 @@ import { travelTiles } from './tile';
 import { PlanScreen } from './plan';
 import { StopPage } from './stop';
 import { ImportTripScreen } from './importTrip';
+import { BookingsScreen } from './bookings';
+import { BookingScreen } from './booking';
+import { DayScreen } from './day';
 
 /**
  * Companion board of the travel module, drawn to the NR-Travel-* artboards
@@ -31,6 +34,9 @@ export const travelBoard: BoardManifest = {
     { key: 'pack', title: 'Packing', component: PackScreen },
     { key: 'plan', title: 'Plan', component: PlanScreen },
     { key: 'import', title: 'Import a trip', component: ImportTripScreen },
+    { key: 'bookings', title: 'Bookings', component: BookingsScreen },
+    { key: 'booking', title: 'Booking', component: BookingScreen },
+    { key: 'day', title: 'A day', component: DayScreen },
   ],
   quickActions: [
     { id: 'travel.addTrip', label: 'Trip', icon: 'airplane', route: '/entity/trip/new' },

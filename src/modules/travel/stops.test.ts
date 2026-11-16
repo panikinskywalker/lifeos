@@ -153,7 +153,8 @@ describe('importing a trip app', () => {
     expect(isTripAppSnapshot(snap)).toBe(true);
     expect(isTripAppSnapshot({ format: 'x' })).toBe(false);
     const r = importTripApp(os, snap, { me: 'Asha' });
-    expect(r).toMatchObject({ createdTrip: true, stops: 4, stays: 2, flights: 1, days: 1 });
+    // Since slice 2 the cancelled stay comes in too, marked cancelled (it holds no night), with the ticket and the journey.
+    expect(r).toMatchObject({ createdTrip: true, stops: 4, stays: 3, flights: 1, days: 1, tickets: 1, journeys: 1 });
     const t = os.records.get<TripData>(r.tripId)!;
     expect(t).toMatchObject({ title: 'Japan', status: 'booked', data: { startDate: '2026-12-17', endDate: '2026-12-24', budget: 200000, dailyAllowance: 7000, localCurrency: 'JPY', fxRate: 0.59, look: 'japan' } });
     expect(t.data.personIds!.map((id) => os.records.get(id)!.title)).toEqual(['Ben', 'Cy']);
@@ -172,7 +173,7 @@ describe('importing a trip app', () => {
     expect(again).toMatchObject({ tripId: t.id, createdTrip: false, days: 0 });
     expect(os.records.query('trip')).toHaveLength(1);
     expect(os.records.query<StopData>('stop')).toHaveLength(4);
-    expect(os.records.query('event')).toHaveLength(3);
+    expect(os.records.query('event')).toHaveLength(6);
     expect(os.records.query('person')).toHaveLength(2);
   });
 });

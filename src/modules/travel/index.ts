@@ -14,6 +14,7 @@ export * from './trips';
 export * from './packing';
 export * from './stops';
 export * from './importApp';
+export * from './booked';
 export { travelBrain, AIRLINE_SITES } from './brain';
 export { parseFlight, parseStay, type ParsedFlight, type ParsedStay } from './filing/bookings';
 

@@ -1,8 +1,9 @@
-import type { BrainDef, Candidate, Nudge } from '@core/brain/contract';
+import { keyHash, type BrainDef, type Candidate, type Nudge } from '@core/brain/contract';
 import type { LifeOSContext } from '@core/registry/context';
 import type { TripData } from './types';
 import { DAY, daysToStart, isoOf, trips, tripDays, tripPhase } from './trips';
 import { DEFAULT_DAYS, climateOf, hasPacked, isAbroad, packingKey, packingList, stillPacked } from './packing';
+import { deadlines, missingCheckIn, tripStays } from './booked';
 
 /**
  * What travel brings the brain (docs/MODEL.md layer 8, *Travel through the
@@ -131,8 +132,61 @@ function backHomeCandidates(os: LifeOSContext, now: number): Candidate[] {
   return out;
 }
 
+/**
+ * Bookings (R7g slice 2), *coming up*: seats opening for a journey (from 2
+ * days before), free cancellation ending (3 days), a card charged (2 days),
+ * and stays in the next 3 weeks with no check-in time. Yes opens the booking.
+ */
+function bookingCandidates(os: LifeOSContext, now: number): Candidate[] {
+  const out: Candidate[] = [];
+  const today = isoOf(now);
+  const inDays = (day: string) => Math.round((new Date(`${day}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / DAY);
+  const soon = (n: number) => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
+  for (const t of trips(os)) {
+    if (tripPhase(t.data, now) === 'back') continue;
+    for (const d of deadlines(os, t, now)) {
+      const n = inDays(d.day);
+      if (n > ({ seats: 2, cancel: 3, charge: 2 } as const)[d.kind]) continue;
+      out.push({
+        key: `travel:${d.kind}:${d.eventId}:${d.day}`,
+        kind: 'coming up',
+        shape: 'ask',
+        subjectId: d.eventId,
+        route: `/module/travel/booking?event=${d.eventId}`,
+        title: d.title,
+        line: `${d.line} ${soon(n)}`,
+        record: { what: d.kind === 'seats' ? 'seats open for a journey' : d.kind === 'cancel' ? 'free cancellation ends' : 'card charged for a booking', booking: d.title, in_days: n, trip: t.data.destination },
+        urgent: n === 0,
+        rank: n,
+        yes: d.kind === 'seats' ? 'Book' : 'Open',
+        payload: { eventId: d.eventId, what: d.kind, tripId: t.id },
+      });
+    }
+    const start = t.data.startDate;
+    if (start && inDays(start) <= 21) {
+      const missing = missingCheckIn(tripStays(os, t.id)).filter((e) => e.data.startAt && inDays(isoOf(e.data.startAt)) >= 0);
+      if (missing.length) {
+        out.push({
+          key: `travel:checkin-times:${t.id}:${keyHash(missing.map((e) => e.id))}`,
+          kind: 'coming up',
+          shape: 'check',
+          subjectId: t.id,
+          route: `/module/travel/bookings?trip=${t.id}`,
+          title: t.title,
+          line: `${missing.length} ${missing.length === 1 ? 'stay has' : 'stays have'} no check-in time: ${missing.slice(0, 3).map((e) => e.title.replace(/^Stay · /, '')).join(', ')}`,
+          record: { trip: t.data.destination, stays_missing_check_in: missing.length, starts_in_days: inDays(start) },
+          rank: 6,
+          yes: 'Open',
+          payload: { tripId: t.id, what: 'checkin-times' },
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export const travelBrain: BrainDef = {
-  candidates: (os, now) => [...checkInCandidates(os, now), ...packCandidates(os, now), ...beforeYouGo(os, now), ...backHomeCandidates(os, now)],
+  candidates: (os, now) => [...checkInCandidates(os, now), ...bookingCandidates(os, now), ...packCandidates(os, now), ...beforeYouGo(os, now), ...backHomeCandidates(os, now)],
   act(os, verb, nudge: Nudge) {
     if (verb !== 'yes') return null;
     const p = (nudge.payload ?? {}) as { tripId?: string; eventId?: string; what?: string };
@@ -143,6 +197,13 @@ export const travelBrain: BrainDef = {
       return { open: site ?? `/entity/event/${f.id}` };
     }
     if ((p.what === 'pack' || p.what === 'back') && p.tripId) return { open: `/module/travel/pack?trip=${p.tripId}` };
+    if (p.eventId && (p.what === 'seats' || p.what === 'cancel' || p.what === 'charge')) {
+      const e = os.records.get<{ book?: Array<{ url: string }>; bookingUrl?: string }>(p.eventId);
+      if (!e) return null;
+      const url = p.what === 'seats' ? e.data.book?.[0]?.url : undefined;
+      return { open: url ?? `/module/travel/booking?event=${e.id}` };
+    }
+    if (p.what === 'checkin-times' && p.tripId) return { open: `/module/travel/bookings?trip=${p.tripId}` };
     return null;
   },
   skills: [{ name: 'Travel', body: 'A flight to check in for comes first; then packing. Packing lists are short, things not advice; clothes are counted by the days. Before you go joins the trip with what else is coming up at home: food to use first, orders to skip, matches to drop out of. Never invent bookings.' }],

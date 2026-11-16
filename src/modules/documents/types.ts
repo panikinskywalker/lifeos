@@ -28,6 +28,8 @@ export interface DocumentData {
   personId?: string;
   tripId?: string;
   assetId?: string;
+  /** A booking's papers (R7g): link → Event, word `for`. */
+  eventId?: string;
   file?: DocFile;
   /** A PDF's text, read on the phone, for search only (up to 20,000 characters). */
   text?: string;
@@ -52,7 +54,7 @@ const fileSchema = z.object({ uri: z.string(), name: z.string(), mime: z.string(
 /** Document (docs/MODEL.md layer 2, *Things*; Fields agreed 2 Nov with R7c). */
 export const documentType: ObjectDef<DocumentData> = {
   id: 'document', module: 'documents', label: 'Document', labelPlural: 'Documents', icon: 'doc.text',
-  schema: z.object({ kind: z.string().default('other'), number: z.string().optional(), issuedOn: z.string().optional(), expiresOn: z.string().optional(), issuer: z.string().optional(), notes: z.string().optional(), personId: z.string().optional(), tripId: z.string().optional(), assetId: z.string().optional(), file: fileSchema.optional(), text: z.string().optional(), textRead: z.boolean().optional() }),
+  schema: z.object({ kind: z.string().default('other'), number: z.string().optional(), issuedOn: z.string().optional(), expiresOn: z.string().optional(), issuer: z.string().optional(), notes: z.string().optional(), personId: z.string().optional(), tripId: z.string().optional(), assetId: z.string().optional(), eventId: z.string().optional(), file: fileSchema.optional(), text: z.string().optional(), textRead: z.boolean().optional() }),
   cycleTemplates: (d) => (dateField(d.expiresOn) ? [{ template: 'document.expiry', name: 'Renew', kind: 'fixed', nextDueAt: dateField(d.expiresOn), leadDays: d.kind === 'id' ? 180 : 30 }] : []),
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: KIND_OPTIONS },
@@ -63,6 +65,7 @@ export const documentType: ObjectDef<DocumentData> = {
     { key: 'personId', label: 'Person', type: 'link', linkTo: 'person', linkWord: 'person', section: 'Links' },
     { key: 'tripId', label: 'Trip', type: 'link', linkTo: 'trip', linkWord: 'trip', section: 'Links' },
     { key: 'assetId', label: 'Asset / vehicle', type: 'link', linkTo: 'asset', linkWord: 'asset', section: 'Links' },
+    { key: 'eventId', label: 'Booking', type: 'link', linkTo: 'event', linkWord: 'for', section: 'Links', description: 'The stay or flight these are the papers of' },
     { key: 'notes', label: 'Notes', type: 'longtext', section: 'Details' },
   ],
   statuses: [{ value: 'new', label: 'New', color: 'yellow' }, { value: 'filed', label: 'Filed' }, { value: 'missing', label: 'Missing', color: 'red' }],

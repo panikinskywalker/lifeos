@@ -2,14 +2,15 @@ import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import type { StopData, TripData } from './types';
 import { ensureStop, stopsOf } from './stops';
+import type { BookingStatus } from './booked';
 
 /**
  * Bringing in a trip from its own trip app (MODEL.md layer 2, *The Japan trip
  * comes from the Japan app's data*): a snapshot of the app's database, shared
  * into LifeOS as a file and imported once. Each R7g slice imports its part;
- * slice 1 brings the trip, its stops (the app's places), its stays and flights
- * as Events (the money on them comes with slice 2), and each day's plan as a
- * Fact on the trip. Importing the same snapshot again updates what it made.
+ * slice 1 brings the trip, its stops (the app's places) and each day's plan as
+ * a Fact on the trip; slice 2 its bookings with their money and status (stays,
+ * each person's ticket, activities), flights and journeys between stops. Importing the same snapshot again updates what it made.
  */
 
 export const TRIP_APP_FORMAT = 'lifeos.tripapp.v1';
@@ -24,6 +25,7 @@ export interface TripAppSnapshot {
   look?: string;
   meta: { travellers?: string[]; start?: string; arrive?: string; end?: string; fx?: Record<string, number>; fxDate?: string; budgetPP?: number; dailyPP?: number };
   places?: Doc[];
+  /** Stays, tickets (kind flight: one per person), activities and others, with their payment fields merged in. */
   bookings?: Doc[];
   transport?: Doc[];
   days?: Doc[];
@@ -41,12 +43,28 @@ export interface TripAppImport {
   stays: number;
   flights: number;
   days: number;
+  tickets: number;
+  journeys: number;
+  others: number;
 }
 
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 const at = (day: string, time: string) => new Date(`${day}T${/^\d{1,2}:\d{2}$/.test(time) ? time.padStart(5, '0') : '12:00'}:00`).getTime();
 const AIRLINES: Record<string, string> = { VN: 'Vietnam Airlines', '6E': 'IndiGo', AI: 'Air India', NH: 'ANA', JL: 'Japan Airlines', SQ: 'Singapore Airlines' };
+
+const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+
+/** "Shinano seats open 26 Nov" → that day at 10:00, in the year before the journey's day. */
+export function seatsOpen(note: string, journeyDay: string): number | undefined {
+  const m = /\bopen(?:s|ing)?\s+(?:on\s+)?(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/i.exec(note);
+  if (!m) return undefined;
+  const year = Number(journeyDay.slice(0, 4));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const iso = (y: number) => `${y}-${pad(MONTHS[m[2]!.toLowerCase()]! + 1)}-${pad(Number(m[1]))}`;
+  const day = iso(year) <= journeyDay ? iso(year) : iso(year - 1);
+  return at(day, '10:00');
+}
 
 function bySourceKey<T>(os: LifeOSContext, object: string, key: string): ObjectRecord<T> | undefined {
   return os.records.query<T>(object, { filter: { and: [{ field: 'data.sourceKey', op: 'eq', value: key }] } }, { limit: 2 })[0];
@@ -78,7 +96,7 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
   const travellers = (m.travellers ?? []).filter((x) => typeof x === 'string' && x.trim());
   const me = opts.me ?? travellers[0];
   const local = Object.keys(m.fx ?? {}).find((c) => c !== 'INR' && c !== 'USD') ?? Object.keys(m.fx ?? {})[0];
-  const out: TripAppImport = { tripId: '', createdTrip: false, stops: 0, stays: 0, flights: 0, days: 0 };
+  const out: TripAppImport = { tripId: '', createdTrip: false, stops: 0, stays: 0, flights: 0, days: 0, tickets: 0, journeys: 0, others: 0 };
   os.db.transaction(() => {
     // The trip.
     const tripKey = `tripapp:${snap.key}`;
@@ -117,21 +135,66 @@ export function importTripApp(os: LifeOSContext, snap: TripAppSnapshot, opts: { 
       out.stops++;
     }
 
-    // Stays and flights, as Events (slice 2 adds their money and status Fields).
+    // Bookings (R7g slice 2): stays, each person's ticket, activities and others, with their money and status.
+    const STATUS: Record<string, BookingStatus> = { Confirmed: 'confirmed', Pending: 'pending', Planned: 'planned', Cancelled: 'cancelled' };
+    const party = (name: unknown) => (typeof name !== 'string' || !name.trim() ? undefined : name === me ? 'me' : personFor(os, name) ?? undefined);
+    const others = (names: unknown) => (Array.isArray(names) ? names.filter((x): x is string => typeof x === 'string' && x !== me).map((x) => personFor(os, x)).filter((x): x is string => !!x) : undefined);
     for (const b of snap.bookings ?? []) {
-      if (b.kind !== 'stay' || b.status === 'Cancelled' || !str(b.start) || !str(b.title)) continue;
-      const stopId = stopOf.get(String(b.placeId ?? '')) ?? stopsOf(os, trip.id, ['stop', 'airport']).find((s) => s.title.toLowerCase() === String(b.place ?? '').toLowerCase())?.id;
-      const place = stopId ? os.records.get(stopId)?.title : str(b.place);
-      upsertEvent(os, trip.id, `${tripKey}:booking:${b.id}`, `Stay · ${b.title}`, { kind: 'stay', startAt: at(String(b.start), '15:00'), ...(str(b.end) ? { endAt: at(String(b.end), '11:00') } : {}), allDay: true, location: place, notes: str(b.details), stopId });
-      out.stays++;
+      if (!str(b.start) || !str(b.title)) continue;
+      const money = { booking: STATUS[String(b.status)] ?? 'confirmed', cost: num(b.total), currency: str(b.currency), toPay: num(b.outstanding), paidBy: party(b.paidBy), payHow: str(b.payNote), reference: str(b.ref), bookingUrl: str(b.link), personIds: others(b.forWho), notes: [str(b.details), str(b.paid) ? `Paid: ${str(b.paid)}` : null].filter(Boolean).join('\n') || undefined };
+      const key = `${tripKey}:booking:${b.id}`;
+      if (b.kind === 'stay') {
+        const stopId = stopOf.get(String(b.placeId ?? '')) ?? stopsOf(os, trip.id, ['stop', 'airport']).find((x) => x.title.toLowerCase() === String(b.place ?? '').toLowerCase())?.id;
+        const place = stopId ? os.records.get(stopId)?.title : str(b.place);
+        upsertEvent(os, trip.id, key, `Stay · ${b.title}`, { kind: 'stay', startAt: at(String(b.start), '15:00'), ...(str(b.end) ? { endAt: at(String(b.end), '11:00') } : {}), allDay: true, location: place, stopId, ...money, chargeOn: str(b.chargeOn), cancelBy: str(b.cancelBy), cancelNote: str(b.cancelNote), checkIn: str(b.checkIn), checkOut: str(b.checkOut), access: str(b.access), mapUrl: str(b.mapLink) });
+        out.stays++;
+      } else if (b.kind === 'flight') {
+        upsertEvent(os, trip.id, key, `Ticket · ${b.title}`, { kind: 'ticket', startAt: at(String(b.start), '12:00'), ...(str(b.end) ? { endAt: at(String(b.end), '12:00') } : {}), allDay: true, location: str(b.place), ...money });
+        out.tickets++;
+      } else {
+        upsertEvent(os, trip.id, key, String(b.title), { kind: b.kind === 'activity' ? 'activity' : 'other', startAt: at(String(b.start), '10:00'), ...(str(b.end) ? { endAt: at(String(b.end), '18:00') } : {}), allDay: true, location: str(b.place), ...money, cancelBy: str(b.cancelBy), cancelNote: str(b.cancelNote) });
+        out.others++;
+      }
     }
+
+    // Journeys between stops, and flights (each leg).
+    const PLAN: Record<string, string> = { Booked: 'booked', Suggested: 'suggested', 'Decided, not booked': 'decided', 'To decide': 'undecided' };
     for (const l of snap.transport ?? []) {
-      if (l.mode !== 'Flight' || !str(l.date)) continue;
-      const code = (s: unknown) => /\b([A-Z]{3})\b/.exec(String(s ?? ''))?.[1] ?? str(s) ?? '?';
-      const no = /\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{2,4})\b/.exec(String(l.details ?? ''));
-      const flightNo = no ? `${no[1]}${no[2]}` : undefined;
-      upsertEvent(os, trip.id, `${tripKey}:leg:${l.id}`, `Flight ${code(l.from)} → ${code(l.to)}`, { kind: 'flight', startAt: at(String(l.date), String(l.time ?? '')), allDay: !str(l.time), location: `${str(l.from) ?? ''} → ${str(l.to) ?? ''}`, notes: str(l.details), ...(flightNo ? { flightNo, airline: AIRLINES[no![1]!] } : {}) });
-      out.flights++;
+      if (!str(l.date)) continue;
+      const day = String(l.date);
+      if (l.mode === 'Flight') {
+        const code = (x: unknown) => /\b([A-Z]{3})\b/.exec(String(x ?? ''))?.[1] ?? str(x) ?? '?';
+        const no = /\b([A-Z]{2}|[A-Z]\d|\d[A-Z])\s?(\d{2,4})\b/.exec(String(l.details ?? ''));
+        const flightNo = no ? `${no[1]}${no[2]}` : undefined;
+        upsertEvent(os, trip.id, `${tripKey}:leg:${l.id}`, `Flight ${code(l.from)} → ${code(l.to)}`, { kind: 'flight', startAt: at(day, String(l.time ?? '')), allDay: !str(l.time), location: `${str(l.from) ?? ''} → ${str(l.to) ?? ''}`, notes: str(l.details), booking: l.status === 'Booked' ? 'confirmed' : undefined, ...(flightNo ? { flightNo, airline: AIRLINES[no![1]!] } : {}) });
+        out.flights++;
+        continue;
+      }
+      const leave = str(l.leaveBy) ?? str(l.time);
+      const arrive = /(\d{1,2}:\d{2})/.exec(String(l.arriveAt ?? ''))?.[1];
+      const title = `${str(l.from) ?? '?'} → ${str(l.to) ?? '?'}`;
+      upsertEvent(os, trip.id, `${tripKey}:leg:${l.id}`, title, {
+        kind: 'journey',
+        startAt: at(day, leave ?? ''),
+        ...(arrive ? { endAt: at(day, arrive) } : {}),
+        allDay: !leave,
+        location: title,
+        fromStopId: stopOf.get(String(l.fromId ?? '')),
+        toStopId: stopOf.get(String(l.toId ?? '')),
+        mode: str(l.mode)?.toLowerCase(),
+        plan: PLAN[String(l.status)] ?? undefined,
+        fare: num(l.costPP),
+        currency: str(l.costCur),
+        estimate: l.estimate === true,
+        takes: str(l.duration)?.replace(/^≈\s*/, ''),
+        bookNote: str(l.bookNote),
+        seatsOpenAt: seatsOpen(String(l.bookNote ?? ''), day),
+        book: Array.isArray(l.book) ? (l.book as Array<{ label?: unknown; url?: unknown }>).filter((x) => str(x.url)).map((x) => ({ label: str(x.label) ?? 'Book', url: str(x.url)! })) : undefined,
+        lastConnection: str(l.lastConnection),
+        steps: str(l.timeline),
+        notes: str(l.details),
+      });
+      out.journeys++;
     }
 
     // Each day's plan, as a Fact on the trip dated that day.
