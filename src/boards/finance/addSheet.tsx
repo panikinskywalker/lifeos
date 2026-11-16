@@ -56,7 +56,7 @@ export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onC
   const accountFor = (p: QuickPayment): string | 'cash' | null => {
     if (p.paidWith === 'cash') return 'cash';
     if (p.paidWith === 'upi') return accounts.find((a) => a.data.kind === 'bank')?.id ?? null;
-    if (p.paidWith === 'card') return accounts.find((a) => a.data.kind === 'credit')?.id ?? null;
+    if (p.paidWith === 'card') return (p.last4 && accounts.find((a) => a.data.last4 === p.last4)?.id) || accounts.find((a) => a.data.kind === 'credit')?.id || null;
     return null;
   };
   const fromSaid = () => {
@@ -82,7 +82,7 @@ export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onC
     if (!res.ok) return setPhase({ at: 'failed', why: `${WHY[res.note] ?? WHY.error!}${res.note === 'error' && res.error ? ` (${res.error.slice(0, 160)})` : ''}` });
     const p = readBill(os, res.answer);
     if (!p) return setPhase({ at: 'failed', why: 'That doesn’t look like a bill. Try again, or type it.' });
-    setPhase({ at: 'review', p, account: null });
+    setPhase({ at: 'review', p, account: accountFor(p) });
   };
   const save = () => {
     if (phase.at !== 'review') return;

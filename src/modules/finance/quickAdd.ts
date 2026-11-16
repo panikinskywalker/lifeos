@@ -19,6 +19,8 @@ export interface QuickPayment {
   items: string[];
   tax: number | null;
   paidWith: 'cash' | 'upi' | 'card' | 'someone' | null;
+  /** The card's last digits when a bill prints them ("Card XX1234"). */
+  last4?: string;
   splitWith: string[];
 }
 
@@ -41,7 +43,7 @@ const CATEGORY_IDS = CATEGORIES.map((c) => c.value).filter((v) => v !== 'transfe
 export const BILL_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['payee', 'amount', 'date', 'items', 'tax', 'category'],
+  required: ['payee', 'amount', 'date', 'items', 'tax', 'category', 'paidWith', 'cardLast4'],
   properties: {
     payee: { type: 'string' },
     amount: { type: 'number' },
@@ -49,10 +51,12 @@ export const BILL_SCHEMA = {
     items: { type: 'array', items: { type: 'string' } },
     tax: { type: 'number' },
     category: { type: 'string', enum: CATEGORY_IDS },
+    paidWith: { type: 'string', enum: ['cash', 'upi', 'card', 'unknown'] },
+    cardLast4: { type: 'string' },
   },
 } as const;
 
-const BILL_SYSTEM = `You read a photo of a bill or receipt, usually from India. Answer with JSON only: payee (the shop or restaurant name as printed), amount (the grand total paid, a number), date (YYYY-MM-DD, or "" if none is printed), items (up to 8 short lines like "2 masala dosa"), tax (GST and other taxes added, 0 if none), category (one id from the list). If it is not a bill, answer amount 0.`;
+const BILL_SYSTEM = `You read a photo of a bill or receipt, usually from India. Answer with JSON only: payee (the shop or restaurant name as printed), amount (the grand total paid, a number), date (YYYY-MM-DD, or "" if none is printed), items (up to 8 short lines like "2 masala dosa"), tax (GST and other taxes added, 0 if none), category (one id from the list), paidWith (cash, upi or card when the bill says how it was paid, else unknown), cardLast4 (the card's last 4 digits if printed, else ""). If it is not a bill, answer amount 0.`;
 
 /** The question that goes with a bill photo: the category list and nothing about you. */
 export function billAsk(): Omit<PhotoAsk, 'image'> {
@@ -71,14 +75,16 @@ export function billAsk(): Omit<PhotoAsk, 'image'> {
 
 /** Claude's reading of the bill, kept to what makes sense. */
 export function readBill(os: LifeOSContext, answer: unknown, today = new Date()): QuickPayment | null {
-  const a = (answer ?? {}) as { payee?: unknown; amount?: unknown; date?: unknown; items?: unknown; tax?: unknown; category?: unknown };
+  const a = (answer ?? {}) as { payee?: unknown; amount?: unknown; date?: unknown; items?: unknown; tax?: unknown; category?: unknown; paidWith?: unknown; cardLast4?: unknown };
   const amount = typeof a.amount === 'number' ? Math.round(a.amount * 100) / 100 : 0;
   if (amount <= 0) return null;
   const payee = typeof a.payee === 'string' ? a.payee.trim().slice(0, 80) : '';
   const date = typeof a.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.date) && a.date <= iso(today) ? a.date : iso(today);
   const category = typeof a.category === 'string' && CATEGORY_IDS.includes(a.category) ? a.category : categoryFor(os, payee, '', amount);
   const items = Array.isArray(a.items) ? a.items.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 60)).slice(0, 8) : [];
-  return { payee, amount, date, category, items, tax: typeof a.tax === 'number' && a.tax > 0 ? a.tax : null, paidWith: null, splitWith: [] };
+  const paidWith = a.paidWith === 'cash' || a.paidWith === 'upi' || a.paidWith === 'card' ? a.paidWith : null;
+  const last4 = typeof a.cardLast4 === 'string' ? a.cardLast4.replace(/\D/g, '').slice(-4) : '';
+  return { payee, amount, date, category, items, tax: typeof a.tax === 'number' && a.tax > 0 ? a.tax : null, paidWith, ...(last4.length === 4 ? { last4 } : {}), splitWith: [] };
 }
 
 /** Save it as a payment on the account you picked (Cash is made once if you have none); Undo deletes it. */

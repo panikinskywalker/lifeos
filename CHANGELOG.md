@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.103 · 17 Nov 2026
+
+**A bill says how it was paid.** A snapped or attached bill is read for "Paid:
+CASH" or the card's last digits, so *Paid with* starts on Cash or that card
+instead of "Someone else paid".
+
 ## v0.0.102 · 17 Nov 2026
 
 **Screenshots of bills are read.** A PNG or screenshot attached as a bill (or

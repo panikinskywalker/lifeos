@@ -35,6 +35,13 @@ describe('Add a payment', () => {
     expect(readBill(os, { payee: 'A cat', amount: 0, date: '', items: [], tax: 0, category: 'food' }, today)).toBeNull();
   });
 
+  it('a bill says how it was paid: cash, or a card by its last digits', () => {
+    expect(readBill(os, { payee: 'Test Cafe', amount: 241.5, date: '2026-11-15', items: [], tax: 11.5, category: 'food', paidWith: 'cash', cardLast4: '' }, today)).toMatchObject({ paidWith: 'cash' });
+    const card = readBill(os, { payee: 'Croma', amount: 4999, date: '2026-11-15', items: [], tax: 0, category: 'shopping', paidWith: 'card', cardLast4: 'XXXX8013' }, today)!;
+    expect(card).toMatchObject({ paidWith: 'card', last4: '8013' });
+    expect(readBill(os, { payee: 'Kiosk', amount: 50, date: '', items: [], tax: 0, category: 'food', paidWith: 'unknown', cardLast4: '' }, today)).toMatchObject({ paidWith: null });
+  });
+
   it('paid in cash comes off your Cash account, made once; Undo takes the payment away', () => {
     const p = readSaid(os, '₹640 at Shree Sagar, paid in cash', today)!;
     const a = saveQuick(os, p, 'cash');

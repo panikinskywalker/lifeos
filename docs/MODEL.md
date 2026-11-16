@@ -1318,7 +1318,9 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   (`PHOTO_MODEL`), whatever model the brain's other passes use; same key, budget
   and Sent to Claude log. Every photo goes with the type its own first bytes say
   (`mediaTypeOf`), since the picker can call a photo PNG after turning it into
-  JPEG; a failed bill says Claude's reason.
+  JPEG; a failed bill says Claude's reason. A bill is also read for how it was
+  paid ("Paid: CASH", "Card XX8013"), so *Paid with* starts on Cash or the card
+  with those digits (else the first card for a card payment).
 - **Privacy** (decided 11 Nov): money questions may go to any provider in the chain,
   OpenRouter's free models included, knowing some free providers log or train on
   what they are sent. Only the records needed leave (payee, amount, date,
