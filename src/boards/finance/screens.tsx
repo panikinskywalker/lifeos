@@ -565,19 +565,30 @@ function ComingUp({ coming }: { coming: ReturnType<typeof comingUp> }) {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -t.layout.gutter }} contentContainerStyle={{ paddingHorizontal: t.layout.gutter, gap: 10 }}>
         {coming.items.map((i) => {
           const d = new Date(`${i.due}T12:00:00`);
-          const ink = i.late ? '#0B0B0D' : t.c.fg.primary;
-          const sub = i.late ? 'rgba(11,11,13,0.68)' : t.c.fg.secondary;
+          // Each kind has its colour, from the kit's blocks (NR-Money-Home v34): late coral, a bill or card bill sky, a renewal lilac, a SIP mint.
+          const kind = i.late ? 'LATE' : i.kind === 'card' ? 'CARD BILL' : i.kind === 'sip' ? 'SIP' : i.bill ? 'BILL' : 'RENEWS';
+          const bg = i.late ? t.c.alert.coralText : i.kind === 'card' || i.bill ? blocks.sky : i.kind === 'sip' ? blocks.mint : blocks.lilac;
+          const cat = i.kind === 'card' ? 'Card bill' : categoryOf(i.category).label;
           return (
-            <Pressable key={i.key} accessibilityRole="button" accessibilityLabel={`${i.title}, ${os.format.currency(i.amount)}, ${i.late ? 'late, was due' : 'due'} ${format(d, 'EEE d MMM')}`} onPress={() => router.push(`/entity/${i.object}/${i.id}` as never)} style={({ pressed }) => ({ width: 140, padding: 14, borderRadius: 24, gap: 18, backgroundColor: i.late ? t.c.alert.coralText : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
-              <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: i.late ? '#0B0B0D' : t.c.fg.secondary }}>{`${i.late ? 'LATE · ' : ''}${format(d, 'EEE d').toUpperCase()}`}</Text>
+            <Pressable key={i.key} accessibilityRole="button" accessibilityLabel={`${i.title}, ${cat}, ${os.format.currency(i.amount)}, ${i.late ? 'late, was due' : kind === 'RENEWS' ? 'renews' : 'due'} ${format(d, 'EEE d MMM')}`} onPress={() => router.push(`/entity/${i.object}/${i.id}` as never)} style={({ pressed }) => ({ width: 140, padding: 14, borderRadius: 24, gap: 10, backgroundColor: bg, opacity: pressed ? 0.85 : 1 })}>
+              <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: 'rgba(11,11,13,0.68)' }}>{`${kind} · ${format(d, 'EEE d').toUpperCase()}`}</Text>
+              <Text numberOfLines={1} style={{ alignSelf: 'flex-start', fontSize: 11, lineHeight: 14, fontWeight: '700', color: '#0B0B0D', backgroundColor: 'rgba(11,11,13,0.12)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' }}>{cat}</Text>
               <View style={{ gap: 1 }}>
-                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 20, lineHeight: 24, fontWeight: '700', letterSpacing: -0.4, color: ink, fontVariant: ['tabular-nums'] }}>{os.format.currency(Math.round(i.amount))}</Text>
-                <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, color: sub }}>{i.title.replace(/ bill$/, '').replace(/ SIP$/, ' SIP')}</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 20, lineHeight: 24, fontWeight: '700', letterSpacing: -0.4, color: '#0B0B0D', fontVariant: ['tabular-nums'] }}>{os.format.currency(Math.round(i.amount))}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, color: 'rgba(11,11,13,0.68)' }}>{i.title.replace(/ bill$/, '').replace(/ SIP$/, '')}</Text>
               </View>
             </Pressable>
           );
         })}
       </ScrollView>
+      <View accessible accessibilityLabel="Colours: coral late, blue bill due, lilac renews, green SIP" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 4 }}>
+        {([[t.c.alert.coralText, 'Late'], [blocks.sky, 'Bill due'], [blocks.lilac, 'Renews'], [blocks.mint, 'SIP']] as const).map(([c, w]) => (
+          <View key={w} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c }} />
+            <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, fontWeight: '600' }}>{w}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }

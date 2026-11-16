@@ -1323,6 +1323,11 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   amount is a minus figure in red on a small dark band ("−₹33,207"), readable on
   every card face, and *On your cards* is a red minus total. Only bank, cash and
   wallet money is *In your accounts*.
+  **Before payday** cards wear a colour by kind (17 Nov, Rutvij; NR-Money-Home
+  v34 and v35): late coral, a bill or card bill sky, a subscription renewing lilac,
+  a SIP mint, each labelled (LATE, BILL, CARD BILL, RENEWS, SIP) with a dot legend
+  under the row; a pill names its category from the app's list (a card bill says
+  *Card bill*).
   Everything comes in by screenshot (17 Nov, Rutvij): besides balances, card
   bills, loans, funds and SIPs, a **subscriptions** screenshot (an app's
   subscription page, Google Play or App Store, a renewal mail) updates a known

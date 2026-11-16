@@ -62,6 +62,10 @@ export interface Upcoming {
   amount: number;
   due: string;
   late: boolean;
+  /** A bill you pay (electricity, an EMI) rather than a renewal. */
+  bill?: boolean;
+  /** Its category (a card bill has none). */
+  category?: string;
 }
 
 /** Before payday (or the month's end when no salary says when): card bills, renewals and SIPs, soonest first; a card bill past its day stays, late. */
@@ -77,7 +81,7 @@ export function comingUp(os: LifeOSContext, now = new Date()): { until: string; 
   if (os.registry.objects.has('subscription')) {
     for (const s of os.records.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 1000 })) {
       const due = s.data.nextBillingAt.slice(0, 10);
-      if (due >= today && due <= until) items.push({ key: `sub:${s.id}`, kind: 'subscription', id: s.id, object: 'subscription', title: s.title, amount: s.data.amount, due, late: false });
+      if (due >= today && due <= until) items.push({ key: `sub:${s.id}`, kind: 'subscription', id: s.id, object: 'subscription', title: s.title, amount: s.data.amount, due, late: false, bill: !!s.data.bill, category: s.data.category });
     }
   }
   if (os.registry.objects.has('investment')) {
@@ -86,7 +90,7 @@ export function comingUp(os: LifeOSContext, now = new Date()): { until: string; 
       const d = new Date(now.getFullYear(), now.getMonth(), Math.min(Math.max(i.data.sipDay ?? 1, 1), 28));
       if (isoOf(d) < today) d.setMonth(d.getMonth() + 1);
       const due = isoOf(d);
-      if (due <= until) items.push({ key: `sip:${i.id}`, kind: 'sip', id: i.id, object: 'investment', title: `${i.title} SIP`, amount: i.data.sip, due, late: false });
+      if (due <= until) items.push({ key: `sip:${i.id}`, kind: 'sip', id: i.id, object: 'investment', title: `${i.title} SIP`, amount: i.data.sip, due, late: false, category: 'investment' });
     }
   }
   items.sort((a, b) => Number(b.late) - Number(a.late) || a.due.localeCompare(b.due));

@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.111 · 17 Nov 2026
+
+**Before payday in colour.** Each card on Money home is coloured by what it is (late coral, bill or card bill blue, renewal lilac, SIP green), labelled, with its category as a pill and a legend under the row.
+
 ## v0.0.110 · 17 Nov 2026
 
 **What you owe looks owed.** Card and loan amounts are minus figures in red on a
