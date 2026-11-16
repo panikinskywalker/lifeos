@@ -38,7 +38,7 @@ How you work:
 - To put something on the user's Money home (a tracker, a chart), call keep_view with the money query; it stays live.
 - You never move money, pay anyone or settle a debt. If asked, say so and offer to keep a view or note instead.
 - You can search the web (web_search) and read pages (web_fetch) for what is not in the user's records: today's FD and savings rates, a fund's returns and expense ratio, tax rules and deadlines, card offers, prices. Put the figures you find next to theirs and say where they came from. Never put the user's names, account digits or exact figures into a search.
-- Cards: when asked how to spend smarter, or when it would save real money, call cards_and_spend, look up each card's current rewards, cashback and fees on the web, and say which card to use for which kind of spend, with the rupees it saves a month. Mention fees, caps and anything that expires. When a card is named only by its bank ("ICICI Bank card"), never stop at asking: give your best advice now from the bank, what goes through that card (its top shops say a lot: Amazon spend on an ICICI card is probably the Amazon Pay card) and the bank's popular cards, say what you assumed, then ask one short question to confirm. When the user says which card it is, call name_card so it is remembered. In your answer name a card by its ref exactly as cards_and_spend gives it (card-4), every time: the phone shows the card's own name and last digits there, so never write "card 4" or "cards 4 and 6".
+- Cards: when asked how to spend smarter, or when it would save real money, call cards_and_spend, look up each card's current rewards, cashback and fees on the web, and say which card to use for which kind of spend, with the rupees it saves a month. Mention fees, caps and anything that expires. When a card is named only by its bank ("ICICI Bank card"), never stop at asking: give your best advice now from the bank, what goes through that card (its top shops say a lot: Amazon spend on an ICICI card is probably the Amazon Pay card) and the bank's popular cards, say what you assumed, then ask one short question to confirm. When the user says which card it is, call name_card so it is remembered. Once you have said which card to use for what, call card_use for each card with a few words ("Amazon and Flipkart", "everything else") so it shows on the card in the app. In your answer name a card by its ref exactly as cards_and_spend gives it (card-4), every time: the phone shows the card's own name and last digits there, so never write "card 4" or "cards 4 and 6".
 - If a large share of spending is in Other, say so plainly and offer to sort it (recategorise by shop); advice is only as good as the categories.
 - No buy or sell calls on a fund or a stock. Explain what they hold and the general rules (an emergency fund first, stepping a SIP up) instead.
 - People appear as placeholders like "Person 3"; use them as given. Amounts are rounded rupees unless a currency is given.
@@ -104,6 +104,7 @@ export const MONEY_AGENT_TOOLS: AiToolDef[] = [
             kind: a.data.kind,
             owedNow: a.data.kind === 'credit' ? roundMoney(Math.max(0, -(a.data.knownBalance ?? 0))) : null,
             limit: a.data.creditLimit ? roundMoney(a.data.creditLimit) : null,
+            useFor: a.data.useFor ?? null,
             spentPerMonth: roundMoney(txs.reduce((n, t) => n + t.data.amount, 0) / 3),
             byCategory: sum((t) => t.category),
             topShops: sum((t) => { const n = (t.title || t.merchant || '').trim(); return n && !people.has(n.toLowerCase()) ? n : null; }),
@@ -123,6 +124,19 @@ export const MONEY_AGENT_TOOLS: AiToolDef[] = [
       const before = a.title;
       os.records.update(a.id, { title: i.name }, 'user');
       return withExtras({ named: i.name, was: before.replace(/\s*[•·]+\s*\d{3,4}$/, '') }, { undo: () => os.records.update(a.id, { title: before }, 'user') });
+    },
+  },
+  {
+    name: 'card_use',
+    description: 'Write on one of the user\'s cards or accounts what to use it for, a few words ("Amazon and Flipkart", "fuel", "everything else"), so the app shows it on the card. ref is from cards_and_spend. Runs at once; the user can undo it.',
+    input: z.object({ ref: z.string(), useFor: z.string().min(2).max(60) }),
+    run: async (input, os) => {
+      const i = input as { ref: string; useFor: string };
+      const a = cardList(os)[Number(/^card-(\d+)$/.exec(i.ref)?.[1] ?? 0) - 1];
+      if (!a) return { error: `No ${i.ref}. Call cards_and_spend for the refs.` };
+      const before = a.data.useFor;
+      os.records.update(a.id, { data: { useFor: i.useFor } }, 'user');
+      return withExtras({ card: i.ref, useFor: i.useFor }, { undo: () => os.records.update(a.id, { data: { useFor: before } }, 'user') });
     },
   },
   {
@@ -236,7 +250,7 @@ export interface AgentHooks {
   confirm(label: string): Promise<boolean>;
 }
 
-const STEP: Record<string, string> = { name_card: 'Named a card', cards_and_spend: 'Looked at your cards', money_overview: 'Looked at the month', money_query: 'Worked out a figure', net_worth: 'Looked at net worth', portfolio: 'Looked at investments', subscriptions_run_rate: 'Looked at subscriptions', recategorise: 'Moved payments', keep_view: 'Built a card', set_budget: 'Set a limit', money_show: 'Drew it' };
+const STEP: Record<string, string> = { name_card: 'Named a card', card_use: 'Wrote what a card is for', cards_and_spend: 'Looked at your cards', money_overview: 'Looked at the month', money_query: 'Worked out a figure', net_worth: 'Looked at net worth', portfolio: 'Looked at investments', subscriptions_run_rate: 'Looked at subscriptions', recategorise: 'Moved payments', keep_view: 'Built a card', set_budget: 'Set a limit', money_show: 'Drew it' };
 
 /** Run one tool the agent called, on the phone: validate, ask first when it must, run, return what goes back. */
 export async function runAgentTool(os: LifeOSContext, name: string, input: unknown, hooks: Pick<AgentHooks, 'confirm' | 'change'>): Promise<string> {
@@ -257,6 +271,7 @@ function changeLabel(name: string, out: Record<string, unknown>, os: LifeOSConte
   if (name === 'keep_view') return `Added "${out.kept}" to Money home`;
   if (name === 'set_budget') return 'Limit set';
   if (name === 'name_card') return `Named ${out.was} "${out.named}"`;
+  if (name === 'card_use') return cardNames(os, `${out.card}: use for ${out.useFor}`);
   return `Done · ${name}`;
 }
 

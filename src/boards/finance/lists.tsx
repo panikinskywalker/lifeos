@@ -7,13 +7,14 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { IconButton, OnBar, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
+import { Button, IconButton, OnBar, ScreenHeader, Text, useBottomBarInset } from '@ui/kit';
+import { blocks } from '@ui/theme/tokens';
 import { perMonth } from '@modules/finance/reports';
 import { balances, type DebtData } from '@modules/finance/split';
 import type { InvestmentData, SubscriptionData } from '@modules/finance/types';
 import { Caps, Disc, Rows, SectionHead, Seg, day, debtReason, shortMoney } from './parts';
 import { NoSubscriptions } from './screens';
-import { SettleButton } from './splitScreens';
+import { useSettle } from './splitScreens';
 
 /** The number card at the top of a Money list: a caps label, the figure, a line. */
 function Headline({ label, value, unit, line }: { label: string; value: string; unit?: string; line: string }) {
@@ -184,66 +185,117 @@ export function SubscriptionsScreen(_: { ctx: LifeOSContext; params: Record<stri
   );
 }
 
-const reasonOf = debtReason;
-
-/** Money › Who owes whom (docs/MODEL.md, Money pages with no artboard): per person, their net and Settle up, their open items under it; the last settled below. */
+/** Money › Who owes whom (NR-Money-Owes): to you and you owe as two tiles, then a card per person with what is open and Settle up, the last settled faded below. */
 export function DebtsScreen(_: { ctx: LifeOSContext; params: Record<string, string> }) {
   const os = useOS();
   const t = useTheme();
   const router = useRouter();
   const data = useLive((o) => {
     const open = o.records.query<DebtData>('debt', { filter: { and: [{ field: 'status', op: 'neq', value: 'settled' }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 2000 });
-    const settled = o.records.query<DebtData>('debt', { filter: { and: [{ field: 'status', op: 'eq', value: 'settled' }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 10 });
+    const settled = o.records.query<DebtData>('debt', { filter: { and: [{ field: 'status', op: 'eq', value: 'settled' }] }, sort: [{ field: 'updatedAt', dir: 'desc' }] }, { limit: 8 });
     const people = balances(o).map((b) => ({ ...b, name: o.records.get(b.personId)?.title ?? 'Someone', items: open.filter((d) => d.data.personId === b.personId) }));
     return { people, settled, names: Object.fromEntries(settled.map((d) => [d.data.personId, o.records.get(d.data.personId)?.title ?? 'Someone'])) };
   }, []);
-  const toYou = data.people.filter((p) => p.amount > 0).reduce((a, p) => a + p.amount, 0);
-  const youOwe = data.people.filter((p) => p.amount < 0).reduce((a, p) => a - p.amount, 0);
+  const toYou = data.people.filter((p) => p.amount > 0).sort((a, b) => b.amount - a.amount);
+  const youOwe = data.people.filter((p) => p.amount < 0).sort((a, b) => a.amount - b.amount);
+  const sum = (ps: typeof toYou) => ps.reduce((n, p) => n + Math.abs(p.amount), 0);
+  const who = (ps: typeof toYou, word: string) => (ps.length === 1 ? `${word} ${ps[0]!.name.split(' ')[0]}` : ps.length ? `${word} ${ps.length} people` : 'nothing open');
   const add = <IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} accessibilityLabel="Add a debt" onPress={() => router.push('/entity/debt/new' as never)} />;
-  const short = (d: ObjectRecord<DebtData>) => format(day(d.data.date), 'EEE d MMM');
   return (
-    <ListScreen title="Who owes whom" sub={data.people.length ? `${data.people.length} ${data.people.length === 1 ? 'person' : 'people'}` : 'Money'} right={add}>
+    <ListScreen title="Who owes whom" sub="Money" right={add}>
       {data.people.length ? (
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <View style={{ flex: 1 }}><Headline label="TO YOU" value={shortMoney(os, toYou)} line={`${data.people.filter((p) => p.amount > 0).length} owe you`} /></View>
-          <View style={{ flex: 1 }}><Headline label="YOU OWE" value={shortMoney(os, youOwe)} line={`to ${data.people.filter((p) => p.amount < 0).length}`} /></View>
+          <TotalTile label="TO YOU" value={os.format.currency(sum(toYou))} line={who(toYou, 'from')} lime />
+          <TotalTile label="YOU OWE" value={os.format.currency(sum(youOwe))} line={who(youOwe, 'to')} coral={youOwe.length > 0} />
         </View>
       ) : (
-        <View style={{ padding: 20, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 6 }}>
-          <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '700' }}>All square</Text>
-          <Text variant="caption" color="secondary">Split a payment from its page, or add who owes what with +. Turf shares land here on their own.</Text>
+        <View style={{ padding: 20, borderRadius: 28, backgroundColor: blocks.lime, gap: 6 }}>
+          <Text style={{ fontSize: 22, lineHeight: 27, fontWeight: '700', color: INK }}>All square</Text>
+          <Text style={{ fontSize: 14, lineHeight: 19, color: 'rgba(11,11,13,0.68)' }}>Split a payment from its page, or add who owes what with +. Turf shares land here on their own.</Text>
         </View>
       )}
-      {data.people.map((p) => (
-        <View key={p.personId} style={{ padding: 14, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 4 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56 }}>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Open ${p.name}`} onPress={() => router.push(`/entity/person/${p.personId}` as never)} style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <Disc name={p.name} colorKey={p.personId} />
-              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                <Text variant="rowTitle" numberOfLines={1}>{p.name}</Text>
-                <Text variant="caption" numberOfLines={1} style={{ fontWeight: '600', color: p.amount > 0 ? t.c.accent.gold : t.c.alert.coralText }}>{p.amount > 0 ? 'owes you' : 'you owe'} {os.format.currency(Math.abs(p.amount))}</Text>
+      {toYou.length ? (
+        <View style={{ gap: 12 }}>
+          <SectionHead title="Owed to you" sub={String(toYou.length)} />
+          {toYou.map((p, i) => <PersonOwes key={p.personId} p={p} lead={i === 0} />)}
+        </View>
+      ) : null}
+      {youOwe.length ? (
+        <View style={{ gap: 12 }}>
+          <SectionHead title="You owe" sub={String(youOwe.length)} />
+          {youOwe.map((p) => <PersonOwes key={p.personId} p={p} />)}
+        </View>
+      ) : null}
+      {data.settled.length ? (
+        <View style={{ gap: 4 }}>
+          <SectionHead title="Settled lately" />
+          {data.settled.map((d, i) => (
+            <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`${data.names[d.data.personId]}, ${debtReason(d)}, settled`} onPress={() => router.push(`/entity/debt/${d.id}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, opacity: pressed ? 0.45 : 0.62, borderTopWidth: i ? 1 : 0, borderColor: t.c.line })}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '700' }}>{(data.names[d.data.personId] ?? '?').slice(0, 1).toUpperCase()}</Text>
               </View>
-            </Pressable>
-            <SettleButton personId={p.personId} amount={p.amount} label="Settle" quiet />
-          </View>
-          {p.items.map((d) => (
-            <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`${reasonOf(d)}, ${short(d)}`} onPress={() => router.push(`/entity/debt/${d.id}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 40, paddingLeft: 54, opacity: pressed ? 0.7 : 1 })}>
-              <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, lineHeight: 18 }}><Text color="secondary" style={{ fontSize: 13 }}>{`${short(d)} · `}</Text>{reasonOf(d)}</Text>
-              <Text color="secondary" style={{ fontSize: 14, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{`${d.data.direction === 'they_owe' ? '+' : '−'}${os.format.currency(d.data.amount, d.data.currency)}`}</Text>
+              <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                <Text variant="rowTitle" numberOfLines={1}>{data.names[d.data.personId]}</Text>
+                <Text variant="caption" numberOfLines={1}>{`${debtReason(d)} · settled ${format(new Date(d.updatedAt), 'EEE d MMM')}`}</Text>
+              </View>
+              <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{os.format.currency(d.data.amount, d.data.currency)}</Text>
             </Pressable>
           ))}
         </View>
-      ))}
-      {data.settled.length ? (
-        <View style={{ gap: 10 }}>
-          <SectionHead title="Settled lately" />
-          <Rows gap={4}>
-            {data.settled.map((d) => (
-              <Row key={d.id} name={data.names[d.data.personId]!} colorKey={d.data.personId} title={data.names[d.data.personId]!} line={`${short(d)} · ${reasonOf(d)}`} amount={os.format.currency(d.data.amount, d.data.currency)} amountColor={t.c.fg.secondary} onPress={() => router.push(`/entity/debt/${d.id}` as never)} />
-            ))}
-          </Rows>
-        </View>
       ) : null}
     </ListScreen>
+  );
+}
+
+const INK = '#0B0B0D';
+
+/** One of the two totals on Who owes whom: lime for what comes to you, coral figures for what you owe. */
+function TotalTile({ label, value, line, lime, coral }: { label: string; value: string; line: string; lime?: boolean; coral?: boolean }) {
+  const t = useTheme();
+  return (
+    <View style={{ flex: 1, minHeight: 128, padding: 16, borderRadius: 28, backgroundColor: lime ? blocks.lime : t.c.bg.tile, justifyContent: 'space-between', gap: 8 }}>
+      <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: lime ? INK : t.c.fg.secondary }}>{label}</Text>
+      <View style={{ gap: 2 }}>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: 30, lineHeight: 34, fontWeight: '700', letterSpacing: -1.2, fontVariant: ['tabular-nums'], color: lime ? INK : coral ? t.c.alert.coralText : t.c.fg.secondary }}>{value}</Text>
+        <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, color: lime ? 'rgba(11,11,13,0.62)' : t.c.fg.secondary }}>{line}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** A person on Who owes whom: their net, what is open between you, and Settle up (lime on the one who owes you most). */
+function PersonOwes({ p, lead }: { p: { personId: string; amount: number; name: string; items: Array<ObjectRecord<DebtData>> }; lead?: boolean }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const settle = useSettle(p.personId, p.amount);
+  const toYou = p.amount > 0;
+  const tone = toYou ? t.c.accent.gold : t.c.alert.coralText;
+  return (
+    <View style={{ padding: 16, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 12 }}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${p.name}, ${toYou ? 'owes you' : 'you owe'} ${os.format.currency(Math.abs(p.amount))}. Opens their page`} onPress={() => router.push(`/entity/person/${p.personId}` as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Disc name={p.name} colorKey={p.personId} size={44} />
+        <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+          <Text numberOfLines={1} style={{ fontSize: 16, lineHeight: 21, fontWeight: '600' }}>{p.name}</Text>
+          <Text variant="caption" color="secondary">{`${p.items.length} open`}</Text>
+        </View>
+        <Text style={{ fontSize: 18, lineHeight: 23, fontWeight: '700', color: tone, fontVariant: ['tabular-nums'] }}>{os.format.currency(Math.abs(p.amount))}</Text>
+      </Pressable>
+      {p.items.length ? (
+        <View style={{ borderTopWidth: 1, borderColor: t.c.line }}>
+          {p.items.map((d) => {
+            // An item the other way round from their net shows with a minus.
+            const against = (d.data.direction === 'they_owe') !== toYou;
+            return (
+              <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`${debtReason(d)}, ${format(day(d.data.date), 'EEE d MMM')}, ${os.format.currency(d.data.amount, d.data.currency)}`} onPress={() => router.push(`/entity/debt/${d.id}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, opacity: pressed ? 0.7 : 1 })}>
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, lineHeight: 19, color: t.c.fg.primary, opacity: 0.82 }}>{`${format(day(d.data.date), 'EEE d MMM')} · ${debtReason(d)}`}</Text>
+                <Text style={{ fontSize: 14, lineHeight: 19, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{`${against ? '−' : ''}${os.format.currency(d.data.amount, d.data.currency)}`}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+      <Button title={`Settle up ${os.format.currency(Math.abs(p.amount))}`} variant={lead ? 'primary' : 'secondary'} onPress={settle} block />
+    </View>
   );
 }

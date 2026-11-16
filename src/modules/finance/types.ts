@@ -46,6 +46,8 @@ export interface AccountData {
   knownAt?: number;
   /** A card's latest statement: the total and minimum due, by when (cleared when a payment that covers it arrives). */
   statement?: { total: number; min?: number; dueOn: string; at: number };
+  /** What to use it for ("Amazon and Flipkart"), shown on the card: Ask Money sets it when it advises, or you type it. */
+  useFor?: string;
 }
 
 export const accountType: ObjectDef<AccountData> = {
@@ -68,6 +70,7 @@ export const accountType: ObjectDef<AccountData> = {
     knownOn: z.string().optional(),
     knownAt: z.coerce.number().optional(),
     statement: z.object({ total: z.number(), min: z.number().optional(), dueOn: z.string(), at: z.number() }).optional(),
+    useFor: z.string().max(80).optional(),
   }),
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [
@@ -78,6 +81,7 @@ export const accountType: ObjectDef<AccountData> = {
     { key: 'last4', label: 'Last 4 digits', type: 'text', section: 'Details' },
     currencyField,
     { key: 'creditLimit', label: 'Credit limit', type: 'money', section: 'Details' },
+    { key: 'useFor', label: 'Use it for', type: 'text', section: 'Details', description: 'What this card is best for, like Amazon and Flipkart. Ask Money fills it when it advises.' },
     { key: 'includeInNetWorth', label: 'Include in net worth', type: 'boolean', default: true, section: 'Details' },
   ],
   indexed: ['kind'],

@@ -14,6 +14,8 @@ export interface WheelCard {
   tail?: string;
   /** A small line on the card in front ("bank said, 14 Nov"). */
   note?: string;
+  /** What to use it for ("Amazon, Flipkart"), under the name on the card in front. */
+  use?: string;
   /** A card that needs you (a late bill) wears coral whatever its face. */
   alert?: boolean;
 }
@@ -131,7 +133,7 @@ function WheelSlot({ card: c, index: i, y, top, width, isFront, depth, onPress }
     <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: top + i * STEP, height: CARD_H, zIndex: 100 - depth, elevation: 100 - depth, opacity, transform: [{ perspective: 900 }, { translateY }, { translateX }, { rotateX }, { rotateZ }, { scale }] }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${c.title}${c.tail ? `, ${c.tail}` : ''}, ${c.amount}${isFront ? '. Opens it' : '. Brings it to the front'}`}
+        accessibilityLabel={`${c.title}${c.tail ? `, ${c.tail}` : ''}, ${c.amount}${c.use ? `, use for ${c.use}` : ''}${isFront ? '. Opens it' : '. Brings it to the front'}`}
         onPressIn={() => Animated.spring(press, { ...SPRING, toValue: 0.965 }).start()}
         onPressOut={() => Animated.spring(press, { ...SPRING, toValue: 1 }).start()}
         onPress={() => {
@@ -149,6 +151,7 @@ function WheelSlot({ card: c, index: i, y, top, width, isFront, depth, onPress }
             </Text>
             {c.corner ? <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '700', color: muted }}>{c.corner}</Text> : null}
           </View>
+          {isFront && c.use ? <Text numberOfLines={1} style={{ marginTop: -8, fontSize: 13, lineHeight: 17, fontWeight: '600', color: muted }}>{`Use for ${c.use}`}</Text> : null}
           {isFront && c.note ? <Text style={{ alignSelf: 'flex-start', fontSize: 12, lineHeight: 16, fontWeight: '700', color: face.ink, backgroundColor: face.bg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' }}>{c.note}</Text> : null}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
             <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ flex: 1, letterSpacing: -1.4, color: face.ink, fontVariant: ['tabular-nums'] }}>

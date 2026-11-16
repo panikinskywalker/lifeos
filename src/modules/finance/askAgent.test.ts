@@ -172,4 +172,15 @@ describe('Ask Money as an agent', () => {
     expect(h.out.texts).toEqual(['Use ICICI Bank card ••8013 for Amazon and ICICI Bank card ••3007 for the rest; card-9 is not there.']);
     expect(JSON.stringify(api.calls)).not.toContain('8013');
   });
+
+  it('card_use writes what a card is for on it, and Undo takes it off', async () => {
+    const a = os.records.create({ object: 'account', title: 'ICICI Bank card', data: { kind: 'credit', institution: 'ICICI Bank', last4: '8013', currency: 'INR', openingBalance: 0 } });
+    const { runAgentTool } = await import('./askAgent');
+    const changes: Array<{ label: string; undo?: () => void }> = [];
+    await runAgentTool(os, 'card_use', { ref: 'card-1', useFor: 'Amazon and Flipkart' }, { confirm: async () => true, change: (c) => changes.push(c) });
+    expect((os.records.get(a.id)!.data as { useFor?: string }).useFor).toBe('Amazon and Flipkart');
+    expect(changes[0]!.label).toBe('ICICI Bank card ••8013: use for Amazon and Flipkart');
+    changes[0]!.undo!();
+    expect((os.records.get(a.id)!.data as { useFor?: string }).useFor).toBeUndefined();
+  });
 });

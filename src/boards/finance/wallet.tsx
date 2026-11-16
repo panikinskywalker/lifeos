@@ -51,12 +51,19 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
     <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 24 }}>
       <ScreenHeader title="Accounts and cards" subtitle="Money" onBack={back} right={<><IconButton icon="file" filled accessibilityLabel="Upload a statement" onPress={() => setUploading(true)} /><IconButton icon="plus" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} accessibilityLabel="Add an account" onPress={() => router.push('/entity/account/new' as never)} /></>} />
 
-      <View style={{ gap: 2 }}>
-        <Text color="secondary" style={{ fontSize: 14, lineHeight: 19 }}>In your accounts</Text>
-        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={{ fontSize: 44, lineHeight: 48, fontWeight: '700', letterSpacing: -1.8, color: blocks.sky, fontVariant: ['tabular-nums'] }}>{money(totals.inAccounts)}</Text>
-        <Text color="secondary" style={{ fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'] }}>
-          {[totals.owe ? `you owe ${money(totals.owe)} on ${totals.cards} card${totals.cards === 1 ? '' : 's'}` : null, `net worth ${money(data.nw.total)}`].filter(Boolean).join(' · ')}
-        </Text>
+      {/* Bank money and card dues side by side: setting what a card owes moves the second (17 Nov, Rutvij). */}
+      <View style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', gap: 16 }}>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text color="secondary" style={{ fontSize: 14, lineHeight: 19 }}>In your accounts</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5} style={{ fontSize: 34, lineHeight: 40, fontWeight: '700', letterSpacing: -1.4, color: blocks.sky, fontVariant: ['tabular-nums'] }}>{money(totals.inAccounts)}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text color="secondary" style={{ fontSize: 14, lineHeight: 19 }}>{`On your cards${totals.cards ? ` · ${totals.cards}` : ''}`}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5} style={{ fontSize: 34, lineHeight: 40, fontWeight: '700', letterSpacing: -1.4, color: totals.owe ? blocks.orange : t.c.fg.secondary, fontVariant: ['tabular-nums'] }}>{money(totals.owe)}</Text>
+          </View>
+        </View>
+        <Text color="secondary" style={{ fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'] }}>{`net worth ${money(data.nw.total)}`}</Text>
       </View>
 
       {cards.length ? (
@@ -73,6 +80,7 @@ export function WalletScreen(_: { ctx: LifeOSContext; params: Record<string, str
               corner: card ? 'You owe' : KIND_WORD[d.kind],
               amount: card ? money(Math.max(0, -balance), d.currency) : money(balance, d.currency),
               tail: d.last4 ? `•••• ${d.last4}` : undefined,
+              use: d.useFor || undefined,
               note: typeof d.knownBalance === 'number' && d.knownOn ? `bank said, ${format(day(d.knownOn), 'd MMM')}` : card ? (late ? 'bill is late' : 'from its spends') : undefined,
             };
           })}

@@ -7,6 +7,21 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.93 · 17 Nov 2026
+
+**Who owes whom and a debt's page, redesigned.** Who owes whom has a lime *To
+you* tile and a *You owe* tile, then a card per person with what is open and a
+full-width Settle up. A debt's page puts the amount on a lime (to you) or orange
+(you owe) card with the whole balance with that person, Settle up all, and what
+else is open with each day.
+
+**Cards say what to use them for.** A new *Use it for* Field shows on the card
+in front of the wheel and as a tile on the card's page; Ask Money writes it
+when it says which card to use for what (`card_use`, with Undo).
+
+**Card balances show at the top.** Accounts and cards shows *On your cards*
+next to *In your accounts*, so setting what a card owes moves a big figure.
+
 ## v0.0.92 · 16 Nov 2026
 
 **Turf's Leaders is Turf web's Leaders.** The page is rebuilt from Turf web's,

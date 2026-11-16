@@ -1434,6 +1434,13 @@ references).** Each screen takes the direction that suits it:
   colours, eight patterns, picked from the account so it stays the same), sits
   a little crooked behind the front one, fans in when the screen opens and gives
   under your finger; a card whose bill is late is coral.
+  17 Nov (Rutvij): the top shows two figures side by side, *In your accounts*
+  (bank, cash, wallets) and *On your cards* (what you owe, and how many), so a
+  card's balance you set moves a figure you can see; net worth under them. Each
+  account has a **Use it for** Field ("Amazon and Flipkart"): the card in front
+  says "Use for …" under its name, and its page shows it as a lime tile (tap to
+  edit; on a card without one, the tile asks Ask Money). Ask Money's `card_use`
+  writes it once it has said which card to use for what, with Undo.
 - **An account's or card's page** (direction A): the account drawn as its card
   (balance or what you owe on it), then round-icon buttons Add · Transfer · Set
   balance (Set owed) · Edit.
@@ -1456,15 +1463,20 @@ No screen stays on the generic layout; each is put together from v3 Noir kit par
   then the active ones, soonest renewal first, each with its day in words
   ("Thu 10 Dec · in 26 days") and its cost a month; paused and cancelled ones
   below. None active: the *No active subscriptions* card from the States design.
-- **Who owes whom** (Money › Who owes whom, the *All* of that home section): owed
-  to you and you owe; one block per person with their net and Settle up, their
-  open items under it ("Sat 17 Oct · Turf at Playground Arena"); the last settled ones
-  below. A Turf debt's reason is "Turf · <venue>"; its date is its own Field.
-- **A debt's page**: the top bar; the person's disc, what it was for, who owes whom;
-  pills for open or settled, its kind and its group; three numbers: *Amount*, *Date*
-  and the whole *Balance* with that person. Then Settle up (everything with them,
-  with Undo) or Reopen once settled, their page and Edit; the payment it came from;
-  what else is open between you; its Fields; attachments, tags and reminders.
+- **Who owes whom** (Money › Who owes whom, the *All* of that home section; built
+  from NR-Money-Owes 17 Nov): two tiles, *To you* in lime and *You owe* with a coral
+  figure; then *Owed to you* and *You owe*, a card per person with their net, their
+  open items ("Sat 17 Oct · Turf at Playground Arena", an item the other way round
+  with a minus) and a full-width Settle up, lime on the one who owes you most; the
+  last settled ones faded below. A Turf debt's reason is "Turf · <venue>"; its date
+  is its own Field.
+- **A debt's page** (built from NR-Money-Debt 17 Nov): the top bar; the person's
+  disc, what it was for, who owes whom; pills for open or settled, its kind and its
+  group; an amount card, lime when it comes to you, orange when you owe, grey once
+  settled, with the date and a dark row for the whole balance with that person.
+  Then Settle up all (everything with them, with Undo), their page and Edit; the
+  payment it came from; what else is open between you, each with its day; its
+  Fields; once settled, the day and Reopen; attachments, tags and reminders.
 - **Reports**: account kinds in words, one minus sign (−). The net worth line
   ends at today's net worth and is walked back by each month's payments, so it
   agrees with the number above it; it starts the month before your first payment.

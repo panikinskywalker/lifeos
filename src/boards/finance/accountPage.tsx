@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import type { ObjectRecord } from '@core/domain/types';
@@ -7,7 +7,8 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Button, NumberField, Sheet, Text, TrackColumns, useToast } from '@ui/kit';
+import { Button, Icon, NumberField, Sheet, Text, TrackColumns, useToast } from '@ui/kit';
+import { blocks } from '@ui/theme/tokens';
 import { accountBalance, accountFlows, setBalance } from '@modules/finance/lib';
 import type { AccountData, TransactionData } from '@modules/finance/types';
 import { FieldRow, FieldValue, Hairline, KIND_WORD, Metric, Quick, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, TxRow, day, kindWord, relDay, shortMoney } from './parts';
@@ -78,6 +79,18 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
         <Quick label={card ? 'Set owed' : 'Set balance'} icon="check" onPress={() => setAsk(true)} />
         <Quick label="Edit" icon="edit" onPress={() => controls?.edit()} />
       </View>
+
+      {/* What the card is for: Ask Money sets it when it advises; tap to change it. */}
+      {d.useFor || card ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={d.useFor ? `Use it for ${d.useFor}. Edit` : 'What is this card best for? Ask Money'} onPress={() => (d.useFor ? controls?.edit() : router.push('/module/finance/ask' as never))} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 24, backgroundColor: d.useFor ? blocks.lime : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
+          <Icon name="sparkle" size={22} color={d.useFor ? '#0B0B0D' : t.c.accent.gold} />
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: d.useFor ? 'rgba(11,11,13,0.62)' : t.c.fg.secondary }}>USE IT FOR</Text>
+            <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', color: d.useFor ? '#0B0B0D' : t.c.fg.primary }}>{d.useFor ?? 'Ask Money which spends this card is best for'}</Text>
+          </View>
+          <Icon name={d.useFor ? 'edit' : 'chevron-right'} size={16} color={d.useFor ? '#0B0B0D' : t.c.fg.secondary} />
+        </Pressable>
+      ) : null}
       <Sheet visible={ask} onClose={() => setAsk(false)} title={card ? 'What does the card app say you owe?' : 'What does the bank show?'} footer={<Button title={card ? 'Set owed' : 'Set balance'} onPress={saveBalance} disabled={typed == null} />}>
         <View style={{ gap: 10 }}>
           <NumberField label={card ? 'Owed now' : 'Balance now'} unit="₹" value={typed} onChange={setTyped} autoFocus />
@@ -111,6 +124,7 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
           <Hairline />
           <FieldRow label="Opening balance"><FieldValue>{money(d.openingBalance ?? 0)}</FieldValue></FieldRow>
           {card && d.creditLimit ? (<><Hairline /><FieldRow label="Credit limit"><FieldValue>{money(d.creditLimit)}</FieldValue></FieldRow></>) : null}
+          {d.useFor ? (<><Hairline /><FieldRow label="Use it for"><FieldValue>{d.useFor}</FieldValue></FieldRow></>) : null}
           <Hairline />
           <FieldRow label="In net worth"><FieldValue>{d.includeInNetWorth === false ? 'No' : 'Yes'}</FieldValue></FieldRow>
         </View>
