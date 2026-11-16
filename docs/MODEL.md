@@ -1836,6 +1836,23 @@ drawn first on the Money design canvas (*Splitwise* row):
    to Splitwise for linked people.
 7. **Remind**: on someone who owes you, a short friendly message with the amount
    (Haiku), ready to send on WhatsApp.
+**Built 17 Nov (v0.0.117, steps 1 to 4)** on the *Splitwise* artboards: Money ›
+Splitwise (the grid menu; a person's Money section links there). Signed out, the
+mint card and *Sign in with Splitwise* (Splitwise's page in a WebView, needing the
+build with `react-native-webview`); signed in, the live instrument (owed to you
+and you owe, from linked people's Splitwise balances), arc ticks for people
+linked, *Link your people* (a guess by name with Link or Not them, Pick from
+People or add a new Person; Linked unlinks, with Undo), a group's shares to a
+Splitwise group, *New shares go to Splitwise*, Sign out (clears the cookie
+store). `src/modules/finance/splitwise.ts` holds the client and one sync, run
+when Money › Splitwise opens, from Sync now and with the app's background sync:
+new Debts for linked people made after linking go out as expenses; a Debt gone
+here is deleted there; Debts settled here go out as one payment per person;
+Splitwise payments since the last sync settle Debts here, oldest first, up to
+what was paid. LifeOS remembers the expenses it made, so it never reads its own
+back. A person's Money section says "Splitwise says ₹1,600 too · in step", or
+how far apart. Still to come: Pay by UPI, Remind, the typed split, splitting a
+scanned bill by item.
 Bills, statements and fund screens are read by Haiku (bills already; statements
 back from Sonnet once it has room). Left out: Splitware's UPI directory (it sends
 your email and UPI ID to a third party) and a copy of Splitwise's group screens

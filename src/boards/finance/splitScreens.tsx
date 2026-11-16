@@ -10,6 +10,7 @@ import { Button, Card, EmptyState, FormField, FilterChip, Icon, RowItem, RowList
 import { EntityPicker } from '@ui/components/fields';
 import { Disc, Hairline, IconDisc, SectionHead, Seg, SmallPill, StatusPill } from './parts';
 import { applySplit, balanceWith, balances, clearSplit, settleUp, splitAmounts, undoSettle, type DebtData, type Party, type SplitMethod, type SplitRecord } from '@modules/finance/split';
+import { swConfig } from '@modules/finance/splitwise';
 
 const METHODS: Array<{ value: SplitMethod; label: string }> = [
   { value: 'equal', label: 'Equally' },
@@ -236,7 +237,8 @@ export function PersonBalanceSection({ entity, ctx }: { entity: ObjectRecord<any
   const router = useRouter();
   const bal = useLive((o) => balanceWith(o, entity.id), [entity.id]);
   const open = useLive((o) => o.records.query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: entity.id }, { field: 'status', op: 'neq', value: 'settled' }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 20 }), [entity.id]);
-  if (!open.length && bal === 0) return null;
+  const sw = useLive((o) => { const c = swConfig(o); return c.people[entity.id] ? { says: c.balances[entity.id] ?? 0, name: c.people[entity.id]!.name } : null; }, [entity.id]);
+  if (!open.length && bal === 0 && !sw) return null;
   const first = entity.title.split(' ')[0];
   return (
     <Section title="Money" meta={open.length ? `${open.length} open` : undefined}>
@@ -250,6 +252,12 @@ export function PersonBalanceSection({ entity, ctx }: { entity: ObjectRecord<any
           </Text>
           {bal !== 0 ? <SettleButton personId={entity.id} amount={bal} label="Settle up" /> : null}
         </View>
+        {sw ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`Splitwise says ${ctx.format.currency(Math.abs(sw.says))}. Opens Splitwise`} onPress={() => router.push('/module/finance/splitwise' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: Math.abs(sw.says - bal) < 1 ? 'rgba(159,224,181,0.12)' : 'rgba(255,138,122,0.12)' }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Math.abs(sw.says - bal) < 1 ? '#9FE0B5' : t.c.alert.coralText }} />
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '600', color: Math.abs(sw.says - bal) < 1 ? '#9FE0B5' : t.c.alert.coralText }}>{Math.abs(sw.says - bal) < 1 ? `Splitwise says ${ctx.format.currency(Math.abs(sw.says))} too · in step` : `Splitwise says ${sw.says >= 0 ? '' : 'you owe '}${ctx.format.currency(Math.abs(sw.says))} · ${ctx.format.currency(Math.abs(sw.says - bal))} apart`}</Text>
+          </Pressable>
+        ) : null}
       </Card>
       <RowList>
         {open.map((d) => (

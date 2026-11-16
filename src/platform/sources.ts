@@ -5,6 +5,7 @@ import { importSource, runSource } from '@core/filing/sources';
 import type { DeviceBridge } from '@core/registry/context';
 import { sourceState } from '@core/sources/deviceData';
 import { FX_CURRENCIES, applyPendingFx, fxRates, setFxRatesFromInrBase } from '@modules/finance/filing/fx';
+import { swConfig, syncSplitwise, SplitwiseClient } from '@modules/finance/splitwise';
 import { Device, deviceAvailable } from '../../modules/lifeos-device';
 import { quietly } from '@ui/hooks';
 import { syncMail } from './email';
@@ -172,7 +173,7 @@ export async function refreshFxRates(os: LifeOSContext) {
 let running: { at: number; p: Promise<void> } | null = null;
 
 /** A step that takes longer than this is given up on (it may still finish in the background) so the rest still run. */
-const STEP_LIMIT_MS = { fx: 10_000, phone: 90_000, device: 90_000, mail: 120_000, turf: 60_000, notion: 240_000 };
+const STEP_LIMIT_MS = { fx: 10_000, splitwise: 30_000, phone: 90_000, device: 90_000, mail: 120_000, turf: 60_000, notion: 240_000 };
 
 function withLimit<T>(name: string, ms: number, work: () => Promise<T>): Promise<void> {
   const t0 = Date.now();
@@ -196,6 +197,8 @@ export function syncSources(os: LifeOSContext): Promise<void> {
   if (running && Date.now() - running.at < 5 * 60_000) return running.p;
   const p = (async () => {
     await withLimit('fx', STEP_LIMIT_MS.fx, () => refreshFxRates(os));
+    // Splitwise, once signed in (docs/MODEL.md, Splitwise and settling up): shares out, payments in.
+    if (swConfig(os).me && !swConfig(os).signedOut) await withLimit('splitwise', STEP_LIMIT_MS.splitwise, () => syncSplitwise(os, new SplitwiseClient()).then(() => undefined));
     // Projects' calendar (R4) and People's sources (crm, R2): the contacts you picked, the call log.
     // Documents' folders (R7c) after them: a rescan of the folders you picked.
     for (const id of ['calendar', 'contacts', 'calllog', 'folders'] as const) await withLimit(id, STEP_LIMIT_MS.phone, () => syncRegistered(os, id));

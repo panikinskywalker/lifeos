@@ -1,6 +1,6 @@
 {
   "name": "lifeos",
-  "version": "0.0.116",
+  "version": "0.0.117",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/bebas-neue": "^0.4.1",
