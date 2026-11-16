@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.107 · 17 Nov 2026
+
+**Which account, in order.** The account chips on an unclear balance are listed by name.
+
 ## v0.0.106 · 17 Nov 2026
 
 **Subscriptions by screenshot, and every account from one screenshot.** Upload

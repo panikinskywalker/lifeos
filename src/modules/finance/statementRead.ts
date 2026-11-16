@@ -159,7 +159,7 @@ export function proposeChanges(os: LifeOSContext, read: StatementRead, now = Dat
     if (could.length > 1) {
       if (r.kind === 'credit' ? !r.owed : false) return;
       const figure = r.kind === 'credit' ? `you owe ${money(r.owed)}` : `balance ${money(r.balance)}`;
-      out.push({ id: `a${k}`, label: `${r.bank || 'An account'}: ${figure}`, detail: `Which account is it?${when}`, choices: could.map((a) => ({ id: a.id, label: nameOf(a) })), apply: (choice) => {
+      out.push({ id: `a${k}`, label: `${r.bank || 'An account'}: ${figure}`, detail: `Which account is it?${when}`, choices: could.map((a) => ({ id: a.id, label: nameOf(a) })).sort((x, y) => x.label.localeCompare(y.label)), apply: (choice) => {
         const target = could.find((a) => a.id === choice) ?? could[0]!;
         const before = setBalance(os, target.id, r.kind === 'credit' ? -r.owed : r.balance, at);
         return () => os.records.update(target.id, { data: before }, 'user');
