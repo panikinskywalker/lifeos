@@ -1451,6 +1451,11 @@ references).** Each screen takes the direction that suits it:
   at: its page asks "Which ICICI card is this?" with a name field, and once named
   (with Undo) Ask Money fills its uses. The uses v0.0.96 guessed for such cards
   were taken off once. A forex card is for spending abroad, never for bills.
+  Account types (17 Nov, Rutvij): besides Bank, Cash, Credit card, Wallet / UPI,
+  Investment and Loan, an account can be a **Debit card** or a **Forex card
+  (prepaid)**. Both hold your money, so they count in *In your accounts*; a forex
+  card gets "Use it for" pills like a credit card, and Ask Money knows it is for
+  spending abroad.
 - **An account's or card's page** (direction A): the account drawn as its card
   (balance or what you owe on it), then round-icon buttons Add · Transfer · Set
   balance (Set owed) · Edit.

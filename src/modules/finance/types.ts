@@ -30,7 +30,8 @@ export const categoryOf = (v: string | undefined) => CATEGORIES.find((c) => c.va
 const currencyField = { key: 'currency', label: 'Currency', type: 'select' as const, options: ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'AED', 'SGD'].map((c) => ({ value: c, label: c })), section: 'Details' };
 
 export interface AccountData {
-  kind: 'bank' | 'cash' | 'credit' | 'investment' | 'wallet' | 'loan';
+  /** debit: a debit card kept as its own account; forex: a prepaid forex card, loaded with money for spending abroad (17 Nov, Rutvij). */
+  kind: 'bank' | 'cash' | 'credit' | 'debit' | 'forex' | 'investment' | 'wallet' | 'loan';
   currency?: string;
   openingBalance: number;
   /** The bank / broker as an Organisation record (R1). `institution` is the old free-text name, folded into it on start. */
@@ -57,7 +58,7 @@ export const accountType: ObjectDef<AccountData> = {
   labelPlural: 'Accounts',
   icon: 'creditcard',
   schema: z.object({
-    kind: z.enum(['bank', 'cash', 'credit', 'investment', 'wallet', 'loan']).default('bank'),
+    kind: z.enum(['bank', 'cash', 'credit', 'debit', 'forex', 'investment', 'wallet', 'loan']).default('bank'),
     currency: z.string().optional(),
     openingBalance: z.coerce.number().default(0),
     institutionId: z.string().optional(),
@@ -74,7 +75,7 @@ export const accountType: ObjectDef<AccountData> = {
   }),
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [
-      { value: 'bank', label: 'Bank' }, { value: 'cash', label: 'Cash' }, { value: 'credit', label: 'Credit card' }, { value: 'investment', label: 'Investment' }, { value: 'wallet', label: 'Wallet / UPI' }, { value: 'loan', label: 'Loan' },
+      { value: 'bank', label: 'Bank' }, { value: 'cash', label: 'Cash' }, { value: 'credit', label: 'Credit card' }, { value: 'debit', label: 'Debit card' }, { value: 'forex', label: 'Forex card (prepaid)' }, { value: 'investment', label: 'Investment' }, { value: 'wallet', label: 'Wallet / UPI' }, { value: 'loan', label: 'Loan' },
     ] },
     { key: 'openingBalance', label: 'Opening balance', type: 'money', required: true, default: 0 },
     { key: 'institutionId', label: 'Institution', type: 'link', linkTo: 'org', linkWord: 'institution', summary: true, section: 'Details', description: 'The bank, card issuer or broker' },

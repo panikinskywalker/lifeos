@@ -249,7 +249,7 @@ export function TxRow({ tx, line, minHeight = 60 }: { tx: ObjectRecord<Transacti
   );
 }
 
-const ACCOUNT_ICONS: Record<AccountData['kind'], string> = { bank: 'bank', credit: 'card', investment: 'trend', cash: 'cash', wallet: 'wallet', loan: 'receipt' };
+const ACCOUNT_ICONS: Record<AccountData['kind'], string> = { bank: 'bank', credit: 'card', debit: 'card', forex: 'globe', investment: 'trend', cash: 'cash', wallet: 'wallet', loan: 'receipt' };
 export const accountIcon = (kind: AccountData['kind']) => ACCOUNT_ICONS[kind] ?? 'card';
 
 /** One of the three numbers under the header: a caps label, 22/700, a 12 line. */
@@ -283,7 +283,7 @@ export function Quick({ label, icon, color, onPress }: { label: string; icon: st
 export const debtReason = (d: ObjectRecord<{ reason?: string }>) => (d.data.reason || d.title).replace(/^Turf · /, 'Turf at ').replace(/ · \d{4}-\d{2}-\d{2}$/, '');
 
 /** An account's kind in words. */
-export const KIND_WORD: Record<AccountData['kind'], string> = { bank: 'Bank', cash: 'Cash', credit: 'Credit card', investment: 'Investment', wallet: 'Wallet', loan: 'Loan' };
+export const KIND_WORD: Record<AccountData['kind'], string> = { bank: 'Bank', cash: 'Cash', credit: 'Credit card', debit: 'Debit card', forex: 'Forex card', investment: 'Investment', wallet: 'Wallet', loan: 'Loan' };
 
 /** "HDFC savings ··4821". */
 export const accountName = (a: ObjectRecord<AccountData>) => [a.title, a.data.last4 ? `··${a.data.last4}` : null].filter(Boolean).join(' ');

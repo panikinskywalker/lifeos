@@ -99,7 +99,7 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
       </View>
 
       {/* What the card is for. A card named only by its bank asks which card it is first: uses come from the product, never a guess (17 Nov, Rutvij). */}
-      {card && !d.useFor && unnamedCard(a) ? (
+      {(card || d.kind === 'forex') && !d.useFor && unnamedCard(a) ? (
         <View style={{ padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Icon name="sparkle" size={22} color={t.c.accent.gold} />
@@ -111,7 +111,7 @@ export function AccountPage({ entity, ctx, controls, say }: { entity: ObjectReco
           <TextField label="Card name" value={product} onChange={setProduct} placeholder="Amazon Pay, Coral, Forex…" />
           <Button title="Save" onPress={nameIt} disabled={product.trim().length < 2} block />
         </View>
-      ) : d.useFor || card ? (
+      ) : d.useFor || card || d.kind === 'forex' ? (
         <Pressable accessibilityRole="button" accessibilityLabel={d.useFor ? `Use it for ${d.useFor}. Edit` : 'What is this card best for? Ask Money'} disabled={working} onPress={() => (d.useFor ? controls?.edit() : router.push({ pathname: '/module/[id]/[page]', params: { id: 'finance', page: 'ask', card: a.id } } as never))} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 24, backgroundColor: d.useFor ? blocks.lime : t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
           {working ? <ActivityIndicator color={t.c.accent.gold} /> : <Icon name="sparkle" size={22} color={d.useFor ? '#0B0B0D' : t.c.accent.gold} />}
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

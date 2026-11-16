@@ -18,8 +18,8 @@ import { UploadSheet } from './uploadSheet';
 const INK = '#0B0B0D';
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 /** Each kind of account has its own card colour. */
-const CARD: Record<AccountData['kind'], string> = { bank: blocks.lime, credit: blocks.lilac, cash: blocks.orange, wallet: blocks.sky, loan: blocks.pink, investment: blocks.mint };
-const CASHLIKE = new Set<AccountData['kind']>(['bank', 'cash', 'wallet']);
+const CARD: Record<AccountData['kind'], string> = { bank: blocks.lime, credit: blocks.lilac, debit: blocks.mint, forex: blocks.yellow, cash: blocks.orange, wallet: blocks.sky, loan: blocks.pink, investment: blocks.mint };
+const CASHLIKE = new Set<AccountData['kind']>(['bank', 'cash', 'wallet', 'debit', 'forex']);
 
 /** What is in your accounts and what the cards owe (docs/MODEL.md, Money redesign: Accounts and cards). */
 export function walletTotals(nw: ReturnType<typeof netWorth>) {

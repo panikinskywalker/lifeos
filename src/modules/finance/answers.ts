@@ -113,7 +113,7 @@ function listed(os: LifeOSContext, kind: SpendKind, period: SpendPeriod, sort: '
 
 /** Payday: the day of the month of your latest Salary (null until there is one). */
 function spendable(os: LifeOSContext): number {
-  return netWorth(os).accounts.filter((a) => ['bank', 'cash', 'wallet'].includes(a.account.data.kind)).reduce((n, a) => n + a.balance, 0);
+  return netWorth(os).accounts.filter((a) => ['bank', 'cash', 'wallet', 'debit', 'forex'].includes(a.account.data.kind)).reduce((n, a) => n + a.balance, 0);
 }
 
 function bills(os: LifeOSContext, now: Date): Answer {
