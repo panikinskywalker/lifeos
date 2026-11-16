@@ -20,7 +20,7 @@ const TABLE: Array<[RegExp, number, number, Sky, number, number, Sky]> = [
   [/magome|tsumago|nakatsugawa|kiso|馬籠|妻籠/i, 8, -2, 'snow', 6, -4, 'snow'],
   [/takayama|shirakawa|高山/i, 5, -4, 'snow', 3, -6, 'snow'],
   [/kyoto|京都/i, 12, 3, 'cloud', 9, 1, 'cloud'],
-  [/osaka|大阪/i, 12, 4, 'sun', 10, 2, 'sun'],
+  [/osaka|rinku|izumisano|kansai|kix|大阪|りんくう/i, 12, 4, 'sun', 10, 2, 'sun'],
   [/nara|奈良/i, 11, 1, 'cloud', 9, -1, 'cloud'],
   [/ise|伊勢/i, 12, 2, 'sun', 10, 0, 'sun'],
   [/shingu|kumano|nachi|kii|新宮|熊野/i, 14, 4, 'sun', 12, 2, 'sun'],

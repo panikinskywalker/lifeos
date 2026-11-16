@@ -189,6 +189,59 @@ export function addToLine(os: LifeOSContext, stopId: string): () => void {
   };
 }
 
+/** Put a stop at a place on the line (0 is first), renumbering the rest; returns its Undo. An idea or airport joins the line. */
+export function setStopPosition(os: LifeOSContext, stopId: string, position: number): () => void {
+  const s = os.records.get<StopData>(stopId);
+  if (!s?.data.tripId) throw new Error(`Stop ${stopId} not found`);
+  const line = stopsOf(os, s.data.tripId);
+  const before = [...line, ...(line.some((x) => x.id === stopId) ? [] : [s])].map((x) => [x.id, x.data.kind, x.data.order] as const);
+  const ids = line.map((x) => x.id).filter((id) => id !== stopId);
+  ids.splice(Math.max(0, Math.min(position, ids.length)), 0, stopId);
+  ids.forEach((id, k) => os.records.update<StopData>(id, { data: { order: k + 1, ...(id === stopId ? { kind: 'stop' as const } : {}) } }, 'user'));
+  return () => {
+    for (const [id, kind, order] of before) if (os.records.get(id)) os.records.update<StopData>(id, { data: { kind, order } }, 'user');
+  };
+}
+
+export interface StopPatch {
+  title?: string;
+  localName?: string;
+  kind?: StopData['kind'];
+  color?: string;
+  about?: string;
+  coordinates?: { lat: number; lng: number } | null;
+}
+
+/** Save a stop's edit (names, kind, colour, about, its pin on its Place); returns its Undo. */
+export function saveStop(os: LifeOSContext, stopId: string, patch: StopPatch): () => void {
+  const s = os.records.get<StopData>(stopId);
+  if (!s) throw new Error(`Stop ${stopId} not found`);
+  const prev = { title: s.title, data: { ...s.data } };
+  const place = s.data.placeId ? os.records.get<{ coordinates?: { lat: number; lng: number } }>(s.data.placeId) : null;
+  const prevPin = place?.data.coordinates;
+  const data: Partial<StopData> = {};
+  if (patch.localName !== undefined) data.localName = patch.localName.trim() || undefined;
+  if (patch.kind) data.kind = patch.kind;
+  if (patch.color) data.color = patch.color;
+  if (patch.about !== undefined) data.about = patch.about.trim() || undefined;
+  const title = patch.title?.trim() || s.title;
+  let madePlace: string | null = null;
+  if (patch.coordinates) {
+    if (place) os.records.update(place.id, { data: { coordinates: patch.coordinates } }, 'user');
+    else {
+      madePlace = placeFor(os, title, { kind: (patch.kind ?? s.data.kind) === 'airport' ? 'airport' : 'city', coordinates: patch.coordinates });
+      if (madePlace) data.placeId = madePlace;
+    }
+  }
+  if (data.kind === 'stop' && s.data.kind !== 'stop' && s.data.tripId) data.order = Math.max(0, ...stopsOf(os, s.data.tripId).map((x) => x.data.order ?? 0)) + 1;
+  os.records.update<StopData>(stopId, { title, data }, 'user');
+  return () => {
+    if (!os.records.get(stopId)) return;
+    os.records.update<StopData>(stopId, { title: prev.title, data: { ...prev.data, localName: prev.data.localName, about: prev.data.about, placeId: prev.data.placeId } }, 'user');
+    if (place && patch.coordinates && os.records.get(place.id)) os.records.update(place.id, { data: { coordinates: prevPin } }, 'user');
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* The fold, and the calendar file                                      */
 /* ------------------------------------------------------------------ */
