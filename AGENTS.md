@@ -8,5 +8,6 @@
 - `src/core` is unit-tested with vitest + better-sqlite3 (`npm test`). Never edit a shipped migration in `src/core/db/migrations.ts`; append a version (the migrations test pins a hash per version).
 - Routes live in `app/`; `src/platform` is app-shell glue (do not name a folder `src/app` — expo-router would treat it as routes).
 - Verify with `npm run typecheck`, `npm test`, and `npx expo export --platform web`; native behaviour on the phone.
+- Publish OTA updates with `scripts/ota.sh <tag> "message"` (add `--dry-run` to only check): it publishes from a clean copy of the commit, so other sessions' unfinished edits never ship, and refuses when the runtime fingerprint would not match the phone's build.
 - Product and design: `docs/PRODUCT.md`, `docs/DESIGN.md` (inline SVG icons only, tokens from DESIGN.md). `docs/MILESTONES.md` M1–M4 are history; new work is `docs/MODEL.md` §6.
 - Parked ideas live in `docs/ADHOC.md`: add to it as they come up; don't build from it until the user picks items to push together.
