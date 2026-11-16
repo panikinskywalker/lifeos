@@ -104,6 +104,7 @@ describe('Upload a statement', () => {
     const one = os.records.create<AccountData>({ object: 'account', title: 'SBI', data: { kind: 'bank', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
     const two = os.records.create<AccountData>({ object: 'account', title: 'SBI salary', data: { kind: 'bank', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
     os.records.create<AccountData>({ object: 'account', title: 'SBI education loan', data: { kind: 'loan', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
+    os.records.create<AccountData>({ object: 'account', title: 'SBI forex card', data: { kind: 'forex', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
     const [p] = proposeChanges(os, readStatement({ accounts: [{ bank: 'SBI', last4: '', kind: 'bank', balance: 20000, owed: 0, minDue: 0, dueOn: '', asOf: '' }], holdings: [] }));
     expect(p!.label).toBe('SBI: balance ₹20,000');
     expect(p!.choices!.map((c) => c.label)).toEqual(['SBI', 'SBI salary']);

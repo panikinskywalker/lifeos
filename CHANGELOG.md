@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.109 · 17 Nov 2026
+
+**A bank balance goes only to a bank account.** Forex and debit cards are no longer offered when a bank balance asks which account.
+
 ## v0.0.108 · 17 Nov 2026
 
 **A bank balance never goes to a loan.** When a balance asks which account, your loans and cards are not among the choices.
