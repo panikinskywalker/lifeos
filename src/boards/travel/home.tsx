@@ -5,8 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
-import { ActionSheet, useBottomBarInset, type BottomBarItem } from '@ui/kit';
-import { Icon as UiIcon } from '@ui/icons';
+import { ActionSheet, useBottomBarInset } from '@ui/kit';
 import { homeDates, monoDates, travelHomeOf, tripDays, type NextTripCard, type TripRow } from '@modules/travel';
 import { Anim, bgImage, JP_SERIF, MONO, Wave } from './jp/kit';
 import { C, DotMatrix, Faces, isJapan, money, scriptName, tripRoutes, useShow } from './jp/shell';
@@ -20,16 +19,6 @@ import { routes } from './parts';
  * trips you have been on with what they cost you, and the year in three
  * numbers, over the app's own bottom bar. With no trips, a calm start.
  */
-
-/** The app's tabs (app/(tabs)/_layout.tsx), drawn as the artboard draws them. */
-const TABS: BottomBarItem[] = [
-  { key: 'index', label: 'Today', icon: 'sun' },
-  { key: 'upkeep', label: 'Upkeep', icon: 'repeat' },
-  { key: 'dump', label: 'Dump', icon: 'brain', primary: true },
-  { key: 'browse', label: 'Browse', icon: 'grid' },
-  { key: 'you', label: 'You', icon: 'user' },
-];
-const TAB_PATH: Record<string, string> = { index: '/', upkeep: '/upkeep', dump: '/dump', browse: '/browse', you: '/you' };
 
 const SANS = 'PlusJakartaSans_500Medium';
 const SEMI = 'PlusJakartaSans_600SemiBold';
@@ -258,29 +247,6 @@ function YearTile({ year, trips, nights, spent }: { year: number; trips: number;
   );
 }
 
-/** The app's bottom bar as the artboard draws it: the tab pill at the left edge, the Dump disc at the right. */
-function NavBar({ active, onPress }: { active: string; onPress: (key: string) => void }) {
-  const insets = useSafeAreaInsets();
-  const action = TABS.find((t) => t.primary)!;
-  return (
-    <View accessibilityRole="tablist" pointerEvents="box-none" style={{ position: 'absolute', left: 20, right: 20, bottom: insets.bottom + 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 999, backgroundColor: C.tile, borderWidth: 1, borderColor: C.line }}>
-        {TABS.filter((t) => !t.primary).map((t) => {
-          const on = t.key === active;
-          return (
-            <Pressable key={t.key} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => onPress(t.key)} style={({ pressed }) => ({ width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? C.lime : pressed ? C.raised : 'transparent' })}>
-              <UiIcon name={t.icon} size={22} color={on ? C.ink : C.mid} />
-            </Pressable>
-          );
-        })}
-      </View>
-      <Pressable accessibilityRole="tab" accessibilityLabel="Dump, tell or ask" onPress={() => onPress(action.key)} style={({ pressed }) => ({ width: 64, height: 64, borderRadius: 32, backgroundColor: C.lime, alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(215,245,92,0.25)', transform: [{ scale: pressed ? 0.95 : 1 }] })}>
-        <UiIcon name={action.icon} size={28} color={C.ink} />
-      </Pressable>
-    </View>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* The screen                                                          */
 /* ------------------------------------------------------------------ */
@@ -383,7 +349,6 @@ export function TravelHome(_: { ctx: LifeOSContext; params: Record<string, strin
           </>
         ) : null}
       </ScrollView>
-      <NavBar active="browse" onPress={(k) => router.navigate(TAB_PATH[k] as never)} />
       <ActionSheet
         visible={adding}
         onClose={() => setAdding(false)}
