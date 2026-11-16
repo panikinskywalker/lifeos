@@ -157,4 +157,19 @@ describe('Ask Money as an agent', () => {
     changes[0]!.undo!();
     expect(os.records.get(a.id)!.title).toBe('ICICI Bank card ••3007');
   });
+
+  it('a card ref in the answer shows as the card name and last digits, which never go to the model', async () => {
+    os.records.create({ object: 'account', title: 'ICICI Bank card', data: { kind: 'credit', institution: 'ICICI Bank', last4: '8013', currency: 'INR', openingBalance: 0 } });
+    await new Promise((r) => setTimeout(r, 3));
+    os.records.create({ object: 'account', title: 'ICICI Bank card', data: { kind: 'credit', institution: 'ICICI Bank', last4: '3007', currency: 'INR', openingBalance: 0 } });
+    const api = fakeApi(() => [
+      { id: 'e1', type: 'session.status_running' },
+      { id: 'e2', type: 'agent.message', content: [{ type: 'text', text: 'Use card-1 for Amazon and Card-2 for the rest; card-9 is not there.' }] },
+      { id: 'e3', type: 'session.status_idle', stop_reason: { type: 'end_turn' } },
+    ]);
+    const h = hooks();
+    await new MoneyAgentChat(os, { apiKey: 'k', fetchImpl: api.fetchImpl }, { wait: async () => undefined }).ask('which card for what', h.hooks);
+    expect(h.out.texts).toEqual(['Use ICICI Bank card ••8013 for Amazon and ICICI Bank card ••3007 for the rest; card-9 is not there.']);
+    expect(JSON.stringify(api.calls)).not.toContain('8013');
+  });
 });

@@ -7,6 +7,15 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.91 · 16 Nov 2026
+
+**Ask Money calls your cards by name.** The agent writes a card's ref and the
+phone puts the card's own name and last digits there ("ICICI Bank card
+••8013"), so answers no longer say "cards 4 and 6"; the digits still never
+leave the phone. The line under an agent's chart now says what Claude really
+saw (rounded totals by category and shop) instead of "0 payments", and the
+sent log names Sonnet 5.5.
+
 ## v0.0.90 · 16 Nov 2026
 
 **Ask Money answers card questions instead of asking first.** When a card is

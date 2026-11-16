@@ -1270,7 +1270,9 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
     the web and every other sandbox tool is off. Cards: `cards_and_spend` gives
     each card's spend by category and shop, rounded, so it can say which card to
     use for what and what that saves; it answers before it asks, and
-    `name_card` renames a card once you say which it is, with Undo): a Claude
+    `name_card` renames a card once you say which it is, with Undo; the agent
+    names a card by its ref (card-4) and the phone shows the card's name and
+    last digits there, so the digits never leave the phone): a Claude
     Managed Agent, first on Claude Haiku
     5.5, with the Claude key already in You › Agent. The app creates the
     agent and its environment once, keeps their IDs, and updates the agent when

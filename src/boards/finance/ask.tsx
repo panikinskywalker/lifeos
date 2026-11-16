@@ -8,7 +8,7 @@ import { Assistant, type AssistantTurn } from '@core/ai/assistant';
 import { classifyFailure } from '@core/ai/limits';
 import { maskPeople, unmask } from '@core/ai/privacy';
 import { peopleNames } from '@modules/finance/filing/moneyIn';
-import { MoneyAgentChat } from '@modules/finance/askAgent';
+import { ASK_AGENT_MODEL, MoneyAgentChat } from '@modules/finance/askAgent';
 import { ManagedError } from '@core/ai/managedAgent';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -267,7 +267,7 @@ function AnswerView({ a, onFollow }: { a: AskAnswer; onFollow: (item: { question
       ) : (
         <Pressable accessibilityRole="link" accessibilityLabel="See what left the phone" onPress={() => router.push('/settings/brain' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, minHeight: 24 }}>
           <Icon name="cloud" size={14} color={t.c.fg.secondary} />
-          <Text color="secondary" style={{ flex: 1, fontSize: 12, lineHeight: 16, fontWeight: '500' }}>{`The model saw ${a.sent ?? 0} payment${a.sent === 1 ? '' : 's'}: payee, amount, date, category`}</Text>
+          <Text color="secondary" style={{ flex: 1, fontSize: 12, lineHeight: 16, fontWeight: '500' }}>{a.sent == null ? 'Claude saw rounded totals by category and shop; people as placeholders, no account digits' : `The model saw ${a.sent} payment${a.sent === 1 ? '' : 's'}: payee, amount, date, category`}</Text>
           <Icon name="chevron-right" size={14} color={t.c.fg.secondary} />
         </Pressable>
       )}
@@ -333,7 +333,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
     setText('');
     const id = `q${Date.now()}`;
     // A starter you tap is answered on the phone at once. Anything you type goes to Ask Money's agent when
-    // there is a Claude key (Claude Haiku 5.5, tools answered here), never to the phone's fixed answers.
+    // there is a Claude key (Claude Sonnet 5.5 with web search, tools answered here), never to the phone's fixed answers.
     const key = starter ? null : await ctx.device?.claudeKey?.().catch(() => null);
     if (key) return askAgent(id, q, key);
     const phone = askOnPhone(ctx, q);
@@ -374,7 +374,7 @@ export function AskScreen({ ctx, params }: { ctx: LifeOSContext; params: Record<
         confirm: (label) => new Promise<boolean>((resolve) => turn((a) => ({ ...a, confirm: { label, resolve: (ok) => { turn((b) => ({ ...b, confirm: undefined })); resolve(ok); } } }))),
       });
       turn((a) => ({ ...a, done: true, texts: end === 'budget' ? [...a.texts, { id: 'budget', text: 'This conversation reached its spend cap. Start a new one from Money home.' }] : a.texts }));
-      ctx.brain.sent.add({ at: Date.now(), pass: 'ask', why: masked, model: 'claude-haiku-5-5', lines: ['Money agent · rounded amounts, dates, categories; people as placeholders'], records: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, outcome: 'ok', error: null });
+      ctx.brain.sent.add({ at: Date.now(), pass: 'ask', why: masked, model: ASK_AGENT_MODEL, lines: ['Money agent · rounded amounts, dates, categories and shops; people as placeholders, no account digits'], records: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, outcome: 'ok', error: null });
     } catch (e) {
       const status = e instanceof ManagedError ? e.status : 0;
       const msg = status === 401 || status === 403 ? 'Your Claude key in You › Agent did not work for Ask Money. It needs Claude Managed Agents, a beta, on for your account.' : `That didn’t work: ${(e as Error).message.slice(0, 140)}`;

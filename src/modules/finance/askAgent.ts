@@ -25,7 +25,7 @@ import type { SpendPeriod } from './spend';
 
 export const ASK_AGENT_MODEL = 'claude-sonnet-5-5';
 const SAVED_KEY = 'finance.askAgent';
-/** A conversation's spend cap at list price, in US cents (Haiku answers cost a fraction of this). */
+/** A conversation's spend cap at list price, in US cents. */
 const SESSION_BUDGET_CENTS = '50';
 
 export const ASK_AGENT_SYSTEM = `You are Money, the user's personal finance guru inside LifeOS, an app on their phone in India. You are sharp, warm and direct, like a friend who is great with money.
@@ -38,7 +38,7 @@ How you work:
 - To put something on the user's Money home (a tracker, a chart), call keep_view with the money query; it stays live.
 - You never move money, pay anyone or settle a debt. If asked, say so and offer to keep a view or note instead.
 - You can search the web (web_search) and read pages (web_fetch) for what is not in the user's records: today's FD and savings rates, a fund's returns and expense ratio, tax rules and deadlines, card offers, prices. Put the figures you find next to theirs and say where they came from. Never put the user's names, account digits or exact figures into a search.
-- Cards: when asked how to spend smarter, or when it would save real money, call cards_and_spend, look up each card's current rewards, cashback and fees on the web, and say which card to use for which kind of spend, with the rupees it saves a month. Mention fees, caps and anything that expires. When a card is named only by its bank ("ICICI Bank card"), never stop at asking: give your best advice now from the bank, what goes through that card (its top shops say a lot: Amazon spend on an ICICI card is probably the Amazon Pay card) and the bank's popular cards, say what you assumed, then ask one short question to confirm. When the user says which card it is, call name_card so it is remembered.
+- Cards: when asked how to spend smarter, or when it would save real money, call cards_and_spend, look up each card's current rewards, cashback and fees on the web, and say which card to use for which kind of spend, with the rupees it saves a month. Mention fees, caps and anything that expires. When a card is named only by its bank ("ICICI Bank card"), never stop at asking: give your best advice now from the bank, what goes through that card (its top shops say a lot: Amazon spend on an ICICI card is probably the Amazon Pay card) and the bank's popular cards, say what you assumed, then ask one short question to confirm. When the user says which card it is, call name_card so it is remembered. In your answer name a card by its ref exactly as cards_and_spend gives it (card-4), every time: the phone shows the card's own name and last digits there, so never write "card 4" or "cards 4 and 6".
 - If a large share of spending is in Other, say so plainly and offer to sort it (recategorise by shop); advice is only as good as the categories.
 - No buy or sell calls on a fund or a stock. Explain what they hold and the general rules (an emergency fund first, stepping a SIP up) instead.
 - People appear as placeholders like "Person 3"; use them as given. Amounts are rounded rupees unless a currency is given.
@@ -170,6 +170,15 @@ export const MONEY_AGENT_TOOLS: AiToolDef[] = [
   },
 ];
 
+/** A card's ref (card-4) in the agent's words becomes the card's name and last digits, on the phone; the digits never leave it. */
+export function cardNames(os: LifeOSContext, text: string): string {
+  const list = cardList(os);
+  return text.replace(/\bcard-(\d+)\b/gi, (m, n: string) => {
+    const a = list[Number(n) - 1];
+    return a ? (a.data.last4 && !a.title.includes(a.data.last4) ? `${a.title} ••${a.data.last4}` : a.title) : m;
+  });
+}
+
 /** Cards and accounts in a stable order, so a ref from cards_and_spend names the same one in name_card. */
 function cardList(os: LifeOSContext) {
   return os.records.query<AccountData>('account', {}, { limit: 100 }).filter((a) => a.data.kind === 'credit' || a.data.kind === 'bank' || a.data.kind === 'wallet').sort((x, y) => x.createdAt - y.createdAt || x.id.localeCompare(y.id));
@@ -300,7 +309,7 @@ export class MoneyAgentChat {
   private async handle(sessionId: string, e: ManagedEvent, hooks: AgentHooks) {
     if (e.type === 'agent.message') {
       const text = ((e.content as Array<{ type: string; text?: string }> | undefined) ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('').trim();
-      if (text) hooks.text(e.id, unmask(this.os, text));
+      if (text) hooks.text(e.id, cardNames(this.os, unmask(this.os, text)));
       return;
     }
     // The web tools run on Anthropic's side; the step says what it looked up, so you see every search.
@@ -317,7 +326,7 @@ export class MoneyAgentChat {
     let result: string;
     if (name === 'money_show') {
       const parsed = MONEY_SHOW.safeParse(stripNulls(e.input));
-      if (parsed.success) hooks.show({ ...parsed.data, sentence: unmask(this.os, parsed.data.sentence), query: parsed.data.query as MoneyQuery });
+      if (parsed.success) hooks.show({ ...parsed.data, sentence: cardNames(this.os, unmask(this.os, parsed.data.sentence)), title: cardNames(this.os, parsed.data.title), query: parsed.data.query as MoneyQuery });
       result = JSON.stringify(parsed.success ? { shown: true } : { error: parsed.error.message.slice(0, 300) });
     } else {
       result = await runAgentTool(this.os, name, e.input, hooks).catch((err: Error) => JSON.stringify({ error: err.message.slice(0, 300) }));
