@@ -5,6 +5,22 @@ through the list together and pick what to push at once (one build where a
 build is needed). Newest discussion first within each group. Keep this file
 current: add as we talk, move items out when they ship.
 
+## To fix on Wednesday 18 Nov
+
+- **Split a receipt reads nothing.** Every receipt photo is refused by the Claude API: the receipt
+  question's answer format (`receiptQuestion` in `src/modules/finance/bills.ts`) leaves its objects
+  open, and structured answers need `additionalProperties: false` with every field required (as
+  Snap the fridge's has). A fix is parked in a git stash on `claude/serene-edison-o0lpvy` ("receipt
+  scanner fix"): the closed format, a longer answer (4,000 tokens) for long receipts, and the reason
+  shown when a read fails. Still to do: test it, check that "From photos" is not stopped by a
+  photo-library permission Android does not need, publish.
+- **Settle up does not match the trip app after importing.** Importing the trip should leave who owes
+  whom in LifeOS equal to the trip app's own Settle up; it does not. To check: how the importer maps
+  each expense's payers and shares (paid for someone else, settlements' direction, the rupee value of
+  yen spends), pair by pair against simplified debts, and finance's older splits (Debts) counted on
+  top. First ask which "actual app" is meant: the trip app's balances, or Splitwise itself (LifeOS has
+  no Splitwise connector; it is under *Offered* below).
+
 ## Agreed in principle
 
 ### Nightly leftovers loop (via Gmail) — 28 Sep
