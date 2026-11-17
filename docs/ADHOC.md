@@ -20,6 +20,14 @@ current: add as we talk, move items out when they ship.
   yen spends), pair by pair against simplified debts, and finance's older splits (Debts) counted on
   top. First ask which "actual app" is meant: the trip app's balances, or Splitwise itself (LifeOS has
   no Splitwise connector; it is under *Offered* below).
+- **Moving between trip pages feels like separate apps.** Pages swap in with no motion: the trip
+  bar replaces one route with the next (`router.replace` in `TripBar`, `src/boards/travel/jp/shell.tsx`),
+  so the header and bar redraw and the content jumps. Make it one app: the header and trip bar stay put
+  while the section underneath moves (a short crossfade or slide in the direction of the tab),
+  pushes into a stop, day, booking or spend slide in and back out, sheets (Log a spend, Pay back,
+  Split a receipt) rise from the bottom, and the artboards' entrance motion runs once per visit, not on
+  every swap. Check the navigator's per-screen animation options (expo-router stack) before adding
+  anything; no new native packages.
 
 ## Agreed in principle
 
