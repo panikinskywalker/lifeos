@@ -2090,6 +2090,15 @@ drawn first on the Money design canvas (*Splitwise* row):
    to Splitwise for linked people.
 7. **Remind**: on someone who owes you, a short friendly message with the amount
    (Haiku), ready to send on WhatsApp.
+**A trip's Bills go to its Splitwise group (18 Nov, Rutvij: "when I synced travel, our Splitwise balances should have been synced too"):**
+a group mapped to a Splitwise group (Udhari › Groups, which now lists groups with Bills, a trip's
+among them) keeps its Bills in step in the same sync: each Bill goes there with who paid and each
+share (paybacks as payments, any currency); a changed Bill is made again there, a deleted one is
+deleted; the first sync of a group matches what Splitwise already has (same kind, currency, amount
+within 0.50, date within three days) instead of doubling it; expenses added on Splitwise come in as
+Bills (with the trip's rate for a foreign currency), and one deleted there is deleted here. A Bill
+with someone not linked waits until they are. Splitwise payments in a mapped group are its Bills, so
+they do not also settle Debts. (`syncBills` in `src/modules/finance/splitwise.ts`.)
 **Its own board, Udhari (18 Nov, Rutvij; v0.0.123, named Udhari in v0.0.124):**
 Splitwise lives in a Browse board called **Udhari** (`src/boards/udhari`, id
 `udhari`), not a Money screen: Browse › Boards › Udhari, shown while Money is.

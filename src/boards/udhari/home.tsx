@@ -37,7 +37,8 @@ export function SplitwiseScreen(_: { ctx: LifeOSContext; params: Record<string, 
   const bottom = useBottomBarInset();
   const c = useLive((o) => swConfig(o), []);
   const people = useLive((o) => o.records.query('person', {}, { limit: 3000 }).map((p) => ({ id: p.id, title: p.title })), []);
-  const groupIds = useLive((o) => [...new Set(o.records.query<DebtData>('debt', {}, { limit: 3000 }).map((d) => d.data.groupId).filter((g): g is string => !!g))].map((id) => ({ id, title: o.records.get(id)?.title ?? 'A group' })), []);
+  // Groups with shares (Debts) or a trip's expenses (Bills): either can go to a Splitwise group.
+  const groupIds = useLive((o) => [...new Set([...o.records.query<DebtData>('debt', {}, { limit: 3000 }).map((d) => d.data.groupId), ...(o.registry.objects.has('bill') ? o.records.query<{ groupId?: string }>('bill', {}, { limit: 3000 }).map((b) => b.data.groupId) : [])].filter((g): g is string => !!g))].map((id) => ({ id, title: o.records.get(id)?.title ?? 'A group' })), []);
   const [signingIn, setSigningIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState<{ id: number; name: string } | null>(null);
