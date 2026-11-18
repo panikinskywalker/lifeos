@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavThemeProvider, useRouter } from 'expo-router';
+import { screenMotion } from '../src/platform/motion';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -147,6 +148,8 @@ function Navigator() {
         <Stack.Screen name="automation/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="dev/components" />
         <Stack.Screen name="search" />
+        <Stack.Screen name="module/[id]/[page]" options={({ route }) => screenMotion(route.params as Record<string, unknown> | undefined)} />
+        <Stack.Screen name="entity/[type]/[id]/index" options={({ route }) => screenMotion(route.params as Record<string, unknown> | undefined)} />
       </Stack>
     </NavThemeProvider>
   );

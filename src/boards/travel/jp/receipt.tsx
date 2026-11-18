@@ -48,8 +48,11 @@ export function ReceiptScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
   const pick = async (camera: boolean) => {
     setError(null);
     try {
-      const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) return setError('LifeOS needs the camera or your photos for this.');
+      // The photo library needs no permission (Android's photo picker); only the camera asks.
+      if (camera) {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) return setError('LifeOS needs the camera for this. Allow it in Android’s settings.');
+      }
       const r = camera ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, exif: false }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, exif: false });
       const a = r.canceled ? null : r.assets[0];
       if (!a?.base64) return;
@@ -57,14 +60,14 @@ export function ReceiptScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
       setPhoto({ uri: a.uri, mime: a.mimeType ?? undefined });
       setBusy(true);
       const model = (await ctx.device?.brain?.model()) ?? null;
-      const res = await askWithPhoto(ctx, model, { ...receiptQuestion(parties.map(n)), image: { mediaType: a.mimeType === 'image/png' ? 'image/png' : 'image/jpeg', data: a.base64 } });
-      if (!res.ok) return setError(res.note === 'no key' || res.note === 'off' ? 'Reading a receipt needs the brain on, with a key (You › Agent).' : res.note === 'over budget' ? 'Over today’s brain budget; try tomorrow or raise it in You › Agent.' : 'Couldn’t read that receipt.');
+      const res = await askWithPhoto(ctx, model, { ...receiptQuestion(parties.map(n)), image: { mediaType: a.mimeType === 'image/png' || a.mimeType === 'image/webp' ? a.mimeType : 'image/jpeg', data: a.base64 } });
+      if (!res.ok) return setError(res.note === 'no key' || res.note === 'off' ? 'Reading a receipt needs the brain on, with a key (You › Agent).' : res.note === 'over budget' ? 'Over today’s brain budget; try tomorrow or raise it in You › Agent.' : `Couldn’t read that receipt${res.error ? ` (${res.error.slice(0, 160)})` : ''}. Try again, or log it by hand.`);
       const rr = parseReceipt(res.answer);
       if (!rr) return setError('That doesn’t look like a receipt.');
       setRead(rr);
       setWho(rr.items.map(() => []));
-    } catch {
-      setError('Couldn’t open the camera or your photos.');
+    } catch (e) {
+      setError(`Couldn’t open the camera or your photos (${(e as Error).message?.slice(0, 120) ?? 'unknown'}).`);
     } finally {
       setBusy(false);
     }
