@@ -11,7 +11,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { Sheet, useToast } from '@ui/kit';
 import { addThing, markOfflineSaved, offlineSheet, searchTrip, stopsOf, tripIcs, type SearchHit, type TripData } from '@modules/travel';
-import { C, tripRoutes } from './shell';
+import { C, tripRoutes, goTrip } from './shell';
 import { MONO } from './kit';
 
 /**
@@ -218,13 +218,13 @@ export function SearchScreen({ ctx, params }: { ctx: LifeOSContext; params: Reco
     else toast.show({ message: 'Couldn’t save the offline copy', icon: 'alert' });
   };
   const views: Array<{ icon: IcoName; title: string; go: () => void }> = [
-    { icon: 'compass', title: 'Overview', go: () => router.push(tripRoutes.overview(trip.id)) },
-    { icon: 'map', title: 'Map and places', go: () => router.push(tripRoutes.plan(trip.id, 'map')) },
-    { icon: 'calendar', title: 'Calendar', go: () => router.push(tripRoutes.plan(trip.id, 'days')) },
-    { icon: 'wallet', title: 'Money', go: () => router.push(tripRoutes.money(trip.id)) },
-    { icon: 'ticket', title: 'Bookings', go: () => router.push(tripRoutes.bookings(trip.id)) },
-    { icon: 'people', title: 'Settle up', go: () => router.push(tripRoutes.money(trip.id, 'settle')) },
-    { icon: 'todo', title: 'To-do', go: () => router.push(tripRoutes.prep(trip.id)) },
+    { icon: 'compass', title: 'Overview', go: () => goTrip(router, tripRoutes.overview(trip.id)) },
+    { icon: 'map', title: 'Map and places', go: () => goTrip(router, tripRoutes.plan(trip.id, 'map')) },
+    { icon: 'calendar', title: 'Calendar', go: () => goTrip(router, tripRoutes.plan(trip.id, 'days')) },
+    { icon: 'wallet', title: 'Money', go: () => goTrip(router, tripRoutes.money(trip.id)) },
+    { icon: 'ticket', title: 'Bookings', go: () => goTrip(router, tripRoutes.bookings(trip.id)) },
+    { icon: 'people', title: 'Settle up', go: () => goTrip(router, tripRoutes.money(trip.id, 'settle')) },
+    { icon: 'todo', title: 'To-do', go: () => goTrip(router, tripRoutes.prep(trip.id)) },
   ];
   const typed = q.trim().toLowerCase();
   const shownViews = views;

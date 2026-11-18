@@ -1749,6 +1749,10 @@ screens checked on the phone → overrides only where the default is wrong)
     the motion and the seigaiha in `jp/kit.tsx`. The Japan touches (the name in its script, mincho station
     names, the hanko, stamps, seigaiha) show only on a trip in Japan. Weather is each stop's month normals
     (`weather.ts`) until live weather is chosen. A Trip gains hidden `wallet` (cash and IC) and `keep`.
+    The trip is one screen with real tabs (`jp/host.tsx`, 18 Nov): the five sections live side by side
+    under one trip bar; a tap shows a section in place (nothing navigates, a section opened once keeps its
+    scroll and state); links between sections switch the tab; a stop, a day or a booking opens on top and
+    its bar returns to the trip on the section tapped.
   - [ ] **8. Trip members** (once a host is chosen): invite the trip's Group; members see, comment and add new
     things; their changes and removals wait in your To check as suggestions; their own ticks; references,
     payment notes and papers stay yours. A synced copy on the host, as Turf web's.

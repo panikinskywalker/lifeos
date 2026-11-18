@@ -8,7 +8,7 @@ import { moneyOf, STATUS_LABEL, statusOf, stayNights, tripBills, type BookingSta
 import { datesLabel, firstName, shortIso, timeOf } from './parts';
 import { Btn, CardHead, Chip, Ico, Line, Lines, openUrl, P, PayChip, StopMark, T, Tile, useAmt } from './jp/bookparts';
 import { JourneyBody, JourneyStats, StationCards } from './day';
-import { C, FACE, isJapan, RoundButton, TripScreen, tripRoutes } from './jp/shell';
+import { C, FACE, isJapan, RoundButton, TripScreen, tripRoutes, goTrip } from './jp/shell';
 import { Anim, MONO, MONO_MED } from './jp/kit';
 
 /**
@@ -200,7 +200,7 @@ export function BookingScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
               <Lines>
                 <Line icon={P.user} color={C.lime} title="Covers" lines={2} sub={`${names.join(', ')}${covers > 1 ? ` · split ${WAYS[covers] ?? `${covers} ways`}` : ''}`} right={<FacePile names={names} />} />
                 {d.payer || paidNote ? (
-                  <Line icon={P.card} color="#8C9DFF" title="Paid by" lines={2} sub={[d.payer ? firstName(d.payer) : null, paidNote].filter(Boolean).join(' · ')} right={m.paid > 0.5 && trip ? <Chip label={d.inSettle ? 'In Settle up' : 'Add to Settle up'} tone={d.inSettle ? 'lime' : 'yellow'} h={26} onPress={() => router.push(tripRoutes.money(trip.id, 'settle'))} /> : undefined} />
+                  <Line icon={P.card} color="#8C9DFF" title="Paid by" lines={2} sub={[d.payer ? firstName(d.payer) : null, paidNote].filter(Boolean).join(' · ')} right={m.paid > 0.5 && trip ? <Chip label={d.inSettle ? 'In Settle up' : 'Add to Settle up'} tone={d.inSettle ? 'lime' : 'yellow'} h={26} onPress={() => goTrip(router, tripRoutes.money(trip.id, 'settle'))} /> : undefined} />
                 ) : null}
                 {e.data.payHow ? <Line icon={P.bank} color="#F26B2B" title="How the rest is paid" sub={e.data.payHow} lines={3} /> : null}
                 {m.toPay > 0.5 || e.data.chargeOn ? (

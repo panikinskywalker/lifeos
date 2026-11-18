@@ -12,7 +12,7 @@ import { useToast } from '@ui/kit';
 import { billInr, type BillData } from '@modules/finance';
 import { nightsOf, stopMark, tripParties, type StopData, type TripData } from '@modules/travel';
 import { Anim, JP_SERIF, MONO } from './jp/kit';
-import { C, isJapan, money, symOf, TripScreen, tripRoutes, useShow } from './jp/shell';
+import { C, isJapan, money, symOf, TripScreen, tripRoutes, useShow, goTrip } from './jp/shell';
 import { catLabel, CAT_ICON, dayMonth, F, Face, faceColor, Ic, Label, LimePill, today, useNames, weekdayDay } from './money';
 
 /**
@@ -64,7 +64,7 @@ export function BillScreen({ ctx, params }: { ctx: LifeOSContext; params: Record
     [params.bill],
   );
   const tripNames = useNames(d?.trip ?? null);
-  const back = () => (router.canGoBack() ? router.back() : d?.trip ? router.replace(tripRoutes.money(d.trip.id, 'settle')) : router.replace(tripRoutes.travel));
+  const back = () => (router.canGoBack() ? router.back() : d?.trip ? goTrip(router, tripRoutes.money(d.trip.id, 'settle')) : router.replace(tripRoutes.travel));
   if (!d) {
     return (
       <View style={{ flex: 1, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', gap: 14, paddingTop: insets.top }}>

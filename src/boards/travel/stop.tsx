@@ -8,7 +8,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { useToast } from '@ui/kit';
 import { addToLine, CROWD_HOURS, crowdBars, dayMonth, legMode, legTimes, nightsOf, planLegs, quietestThing, quietHours, stopsOf, stopSpan, thingsAt, type StopData, type TripData } from '@modules/travel';
-import { C, RoundButton, TripScreen, isJapan, tripRoutes } from './jp/shell';
+import { C, RoundButton, TripScreen, isJapan, tripRoutes, goTrip } from './jp/shell';
 import { Anim, MONO, JP_SANS } from './jp/kit';
 import { openLink, stopHex } from './jp/planparts';
 import { PlaceSheet, StationBoard, useCost } from './plan';
@@ -51,7 +51,7 @@ export function StopPage({ entity, ctx, controls }: Props) {
   const prev = i > 0 ? line[i - 1] : null;
   const next = i >= 0 && i < line.length - 1 ? line[i + 1] : null;
   const go = (id: string) => router.replace(tripRoutes.stop(id));
-  const back = () => (controls ? controls.back() : router.canGoBack() ? router.back() : router.replace(tripRoutes.plan(trip.id)));
+  const back = () => (controls ? controls.back() : router.canGoBack() ? router.back() : goTrip(router, tripRoutes.plan(trip.id)));
   const c = stopHex(stop);
   const eyebrow = stop.data.kind === 'stop' && i >= 0 ? `PLACE · STOP ${i + 1} OF ${line.length}` : stop.data.kind === 'idea' ? 'PLACE · IDEA, NOT ON THE LINE' : 'PLACE · AIRPORT';
   const where = d.pin ? `${d.pin.lat},${d.pin.lng}` : `${stop.title} ${trip.data.destination ?? ''}`;
@@ -145,7 +145,7 @@ export function StopPage({ entity, ctx, controls }: Props) {
         <PillButton icon="nav" a11y="Directions" grow={false} onPress={() => openLink(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(where)}`)} />
       </Anim>
 
-      <PlaceSheet visible={editing} onClose={() => setEditing(false)} ctx={ctx} trip={trip} stop={stop} line={line} onDeleted={() => router.replace(tripRoutes.plan(trip.id))} />
+      <PlaceSheet visible={editing} onClose={() => setEditing(false)} ctx={ctx} trip={trip} stop={stop} line={line} onDeleted={() => goTrip(router, tripRoutes.plan(trip.id))} />
     </TripScreen>
   );
 }

@@ -60,7 +60,7 @@ import {
 import { plural, Row, RowCard, SectionHead } from './parts';
 import { STOP_HEX, StopDisc, stopHex, openLink as openUrl } from './jp/planparts';
 export { STOP_HEX, StopDisc, stopHex } from './jp/planparts';
-import { C, TripBar, TripHeader, TripScreen, money, isJapan, tripRoutes, useShow } from './jp/shell';
+import { C, TripBar, TripHeader, TripScreen, money, isJapan, tripRoutes, useShow, goTrip } from './jp/shell';
 import { Anim, bgImage, JP_SANS, JP_SERIF, MONO } from './jp/kit';
 import { AddThingSheet, Chip, FieldInput, FieldLabel, Glyph, JPSheet, N, PillButton, SegPick, StatusPill, type GlyphName } from './things';
 
@@ -523,7 +523,7 @@ function DaysView({ d, ctx }: { d: PlanData; ctx: LifeOSContext }) {
               const s = g.stopId ? byId.get(g.stopId) : undefined;
               const c = s ? stopHex(s) : null;
               return (
-                <Pressable key={g.from} accessibilityRole="button" accessibilityLabel={`${s?.title ?? (g.kind === 'air' ? 'On the plane' : 'No bed booked')}, ${plural(g.nights, 'night')}`} onPress={() => (g.stayId ? router.push(tripRoutes.stay(g.stayId)) : g.kind === 'gap' ? router.push(tripRoutes.bookings(d.trip.id)) : undefined)} style={{ flexGrow: g.nights, flexShrink: 1, flexBasis: 0, minWidth: 0, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: c ?? (g.kind === 'air' ? N.bar : 'transparent'), borderWidth: g.kind === 'gap' ? 1.5 : 0, borderStyle: 'dashed', borderColor: '#FF5C47' }}>
+                <Pressable key={g.from} accessibilityRole="button" accessibilityLabel={`${s?.title ?? (g.kind === 'air' ? 'On the plane' : 'No bed booked')}, ${plural(g.nights, 'night')}`} onPress={() => (g.stayId ? router.push(tripRoutes.stay(g.stayId)) : g.kind === 'gap' ? goTrip(router, tripRoutes.bookings(d.trip.id)) : undefined)} style={{ flexGrow: g.nights, flexShrink: 1, flexBasis: 0, minWidth: 0, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: c ?? (g.kind === 'air' ? N.bar : 'transparent'), borderWidth: g.kind === 'gap' ? 1.5 : 0, borderStyle: 'dashed', borderColor: '#FF5C47' }}>
                   {s ? <RNText numberOfLines={1} style={{ color: N.ink, fontSize: 13, lineHeight: 15, fontFamily: d.japan && s.data.localName ? JP_SANS : 'PlusJakartaSans_800ExtraBold', fontWeight: '900' }}>{mark(s)}</RNText> : g.kind === 'air' ? <Glyph name="plane" size={12} color={N.mid} /> : null}
                   <RNText style={{ color: c ? 'rgba(11,11,13,0.62)' : N.mid, fontSize: 9, fontFamily: MONO }}>{`${g.nights}N`}</RNText>
                 </Pressable>
@@ -1169,8 +1169,8 @@ export function LineCard({ tripId }: { tripId: string }) {
   const moves = movingDays(d.nights).length;
   return (
     <View style={{ gap: 10 }}>
-      <SectionHead title="The line" sub={d.line.length ? [plural(d.line.length, 'stop'), nights ? plural(nights, 'night') : null, moves ? plural(moves, 'move') : null].filter(Boolean).join(' · ') : 'Where you’ll sleep, in order'} action="Plan" chevron onAction={() => router.push(planRoute(tripId))} />
-      <Pressable accessibilityRole="button" accessibilityLabel="Open the plan" onPress={() => router.push(planRoute(tripId))} style={{ padding: 14, borderRadius: 24, backgroundColor: t.c.bg.tile }}>
+      <SectionHead title="The line" sub={d.line.length ? [plural(d.line.length, 'stop'), nights ? plural(nights, 'night') : null, moves ? plural(moves, 'move') : null].filter(Boolean).join(' · ') : 'Where you’ll sleep, in order'} action="Plan" chevron onAction={() => goTrip(router, planRoute(tripId))} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Open the plan" onPress={() => goTrip(router, planRoute(tripId))} style={{ padding: 14, borderRadius: 24, backgroundColor: t.c.bg.tile }}>
         {d.line.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'flex-start', gap: 0 }}>
             {d.line.map((s, i) => {
@@ -1194,7 +1194,7 @@ export function LineCard({ tripId }: { tripId: string }) {
       </Pressable>
       {b.stays + b.tickets ? (
         <RowCard>
-          <Row lead={<Icon name="bag" size={18} color={t.c.fg.secondary} />} title="Bookings" sub={[plural(b.stays, 'stay'), b.tickets ? plural(b.tickets, 'ticket') : null, ...Object.entries(b.toPay).filter(([, n]) => n > 0.5).map(([cur, n]) => `${money(n, cur)} to pay`)].filter(Boolean).join(' · ')} trailing={<Icon name="chevron-right" size={18} color={t.c.fg.secondary} />} onPress={() => router.push(tripRoutes.bookings(tripId))} />
+          <Row lead={<Icon name="bag" size={18} color={t.c.fg.secondary} />} title="Bookings" sub={[plural(b.stays, 'stay'), b.tickets ? plural(b.tickets, 'ticket') : null, ...Object.entries(b.toPay).filter(([, n]) => n > 0.5).map(([cur, n]) => `${money(n, cur)} to pay`)].filter(Boolean).join(' · ')} trailing={<Icon name="chevron-right" size={18} color={t.c.fg.secondary} />} onPress={() => goTrip(router, tripRoutes.bookings(tripId))} />
         </RowCard>
       ) : null}
     </View>

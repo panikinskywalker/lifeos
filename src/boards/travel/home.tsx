@@ -9,7 +9,7 @@ import { ActionSheet, useBottomBarInset, type BottomBarItem } from '@ui/kit';
 import { Icon as UiIcon } from '@ui/icons';
 import { homeDates, monoDates, travelHomeOf, tripDays, type NextTripCard, type TripRow } from '@modules/travel';
 import { Anim, bgImage, JP_SERIF, MONO, Wave } from './jp/kit';
-import { C, DotMatrix, Faces, isJapan, money, scriptName, tripRoutes, useShow } from './jp/shell';
+import { C, DotMatrix, Faces, isJapan, money, scriptName, tripRoutes, useShow, goTrip } from './jp/shell';
 import { routes } from './parts';
 
 /**
@@ -296,7 +296,7 @@ export function TravelHome(_: { ctx: LifeOSContext; params: Record<string, strin
     return { ...data, people };
   }, []);
   const now = Date.now();
-  const open = (id: string) => router.push(tripRoutes.overview(id));
+  const open = (id: string) => goTrip(router, tripRoutes.overview(id));
   const newTrip = () => router.push(routes.newTrip as never);
   const importTrip = () => router.push(tripRoutes.import);
   const next = d.next;

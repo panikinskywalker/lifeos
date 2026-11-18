@@ -12,7 +12,7 @@ import { useToast } from '@ui/kit';
 import { BILL_CATEGORIES, makeBill, type BillData } from '@modules/finance';
 import { billInrOf, byCategory, CATEGORY_LABEL, categoryLines, costByDay, journeysTable, moneyInsights, notInSettleUp, pendingRefunds, projectedOf, rateFor, thingsCost, tripBalances, tripBills, tripLedger, tripParties, type DayCost, type Insight, type LedgerItem, type TripData } from '@modules/travel';
 import { Anim, bgImage, MONO } from './jp/kit';
-import { C, FACE, money, symOf, TripHeader, TripScreen, tripRoutes, useMoneyUnit, useShow } from './jp/shell';
+import { C, FACE, money, symOf, TripHeader, TripScreen, tripRoutes, useMoneyUnit, useShow, goTrip } from './jp/shell';
 
 /**
  * Money on a trip, drawn to the JP-Money and JP-Settle artboards: Budget
@@ -299,7 +299,7 @@ function Budget({ trip, ctx, names }: { trip: ObjectRecord<TripData>; ctx: LifeO
 
       {d.journeys.length ? (
         <Anim k="jr" delay={530}>
-          <Journeys rows={d.journeys} perPerson={byCategory(d.ledger, 'me').find((c) => c.cat === 'transport')?.inr ?? 0} show={show} onAdd={() => router.push(tripRoutes.plan(trip.id, 'line'))} onOpen={(id) => router.push(tripRoutes.booking(id))} />
+          <Journeys rows={d.journeys} perPerson={byCategory(d.ledger, 'me').find((c) => c.cat === 'transport')?.inr ?? 0} show={show} onAdd={() => goTrip(router, tripRoutes.plan(trip.id, 'line'))} onOpen={(id) => router.push(tripRoutes.booking(id))} />
         </Anim>
       ) : null}
 
@@ -309,7 +309,7 @@ function Budget({ trip, ctx, names }: { trip: ObjectRecord<TripData>; ctx: LifeO
             <CardHead title="Things that cost" sub="from Plan · per person" />
             {([['planned', 'Planned', d.things.planned, 'check'], ['want', 'Want to', d.things.want, 'star']] as const).map(([k, label, g, icon]) =>
               g.count ? (
-                <Pressable key={k} accessibilityRole="button" onPress={() => router.push(tripRoutes.plan(trip.id))} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0, minHeight: 50 }}>
+                <Pressable key={k} accessibilityRole="button" onPress={() => goTrip(router, tripRoutes.plan(trip.id))} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0, minHeight: 50 }}>
                   <View style={{ justifyContent: 'center', alignItems: 'center', flexShrink: 0, width: 36, height: 36, backgroundColor: C.raised, borderRadius: 18 }}>
                     <Ic n={icon} color={k === 'planned' ? C.lime : C.white} />
                   </View>

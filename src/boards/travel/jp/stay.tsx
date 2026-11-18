@@ -9,7 +9,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { useToast } from '@ui/kit';
 import { moneyOf, rateFor, setThingStatus, statusOf, stopsOf, thingsAt, thingStatus, type StopData, type TravelEvent, type TripData } from '@modules/travel';
-import { C, RoundButton, TripScreen, isJapan, money, tripRoutes, useMoneyUnit, useShow } from './shell';
+import { C, RoundButton, TripScreen, isJapan, money, tripRoutes, useMoneyUnit, useShow, goTrip } from './shell';
 import { Anim, JP_SANS, JP_SERIF, MONO } from './kit';
 import { openLink, stopHex } from './planparts';
 import { Glyph, N, PillButton, type GlyphName } from '../things';
@@ -234,7 +234,7 @@ export function StayScreen({ ctx, params }: { ctx: LifeOSContext; params: Record
             <Round icon="nav" label="Directions" onPress={() => openLink(dirUrl)} />
           </View>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Booking papers" onPress={() => (d.papers[0] ? router.push(`/entity/document/${d.papers[0].id}` as never) : trip ? router.push(tripRoutes.prep(trip.id, 'docs')) : undefined)} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: 10, padding: 14, backgroundColor: N.tile, borderRadius: 26 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Booking papers" onPress={() => (d.papers[0] ? router.push(`/entity/document/${d.papers[0].id}` as never) : trip ? goTrip(router, tripRoutes.prep(trip.id, 'docs')) : undefined)} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: 10, padding: 14, backgroundColor: N.tile, borderRadius: 26 }}>
           <View style={{ height: 58 }}>
             {[{ left: 12, rot: '-10deg', top: '#FF5C47' }, { left: 40, rot: '8deg', top: '#6CC6FF' }].map((p) => (
               <View key={p.left} style={{ position: 'absolute', top: 6, left: p.left, width: 36, height: 46, borderRadius: 5, backgroundColor: '#F3F1EC', boxShadow: '0 4px 10px rgba(0,0,0,0.4)', overflow: 'hidden', transform: [{ rotate: p.rot }], opacity: d.papers.length ? 1 : 0.35 }}>

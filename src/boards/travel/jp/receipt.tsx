@@ -10,7 +10,7 @@ import { useToast } from '@ui/kit';
 import { makeBill, parseReceipt, receiptQuestion, receiptShares, type ReceiptRead } from '@modules/finance';
 import { rateFor, tripParties } from '@modules/travel';
 import { Anim, JP_SANS } from './kit';
-import { C, isJapan, money, tripRoutes } from './shell';
+import { C, isJapan, money, tripRoutes, goTrip } from './shell';
 import { F, Face, faceColor, Ic, Label, today, useNames, useTrip } from '../money';
 import { SheetFrame } from './spend';
 
@@ -35,7 +35,7 @@ export function ReceiptScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
   const [photo, setPhoto] = useState<{ uri: string; mime?: string } | null>(null);
   const [who, setWho] = useState<string[][]>([]);
   const [payer, setPayer] = useState<Party>('me');
-  const close = () => (router.canGoBack() ? router.back() : trip ? router.replace(tripRoutes.money(trip.id, 'settle')) : router.replace(tripRoutes.travel));
+  const close = () => (router.canGoBack() ? router.back() : trip ? goTrip(router, tripRoutes.money(trip.id, 'settle')) : router.replace(tripRoutes.travel));
   if (!trip) {
     return (
       <View style={{ flex: 1, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' }}>

@@ -14,7 +14,7 @@ import { toggleTask, type TaskData } from '@modules/projects';
 import { useLive } from '@ui/hooks';
 import { useToast } from '@ui/kit';
 import { Anim, bgImage, JP_SANS, JP_SERIF, MONO } from './kit';
-import { C, DotMatrix, isJapan, money, symOf, TripHeader, TripScreen, tripRoutes, useShow } from './shell';
+import { C, DotMatrix, isJapan, money, symOf, TripHeader, TripScreen, tripRoutes, useShow, goTrip } from './shell';
 
 /**
  * The trip page while you are away (JP-Today in the morning, JP-TodayPM in the
@@ -518,7 +518,7 @@ function DayGrid({ d, ctx, moving }: { d: D; ctx: LifeOSContext; moving: boolean
           })}
           {!tasks.length ? <Text style={{ color: 'rgba(11,11,13,0.62)', fontSize: 12, fontFamily: 'PlusJakartaSans_600SemiBold' }}>All done.</Text> : null}
           <View style={{ flexGrow: 1 }} />
-          <Pressable accessibilityRole="button" onPress={() => router.push(tripRoutes.prep(d.t.id, 'checklist'))} hitSlop={6}>
+          <Pressable accessibilityRole="button" onPress={() => goTrip(router, tripRoutes.prep(d.t.id, 'checklist'))} hitSlop={6}>
             <Text style={{ color: 'rgba(11,11,13,0.62)', fontSize: 11, fontFamily: 'PlusJakartaSans_700Bold' }}>{`${open.length} open on the checklist`}</Text>
           </Pressable>
         </View>
@@ -693,7 +693,7 @@ function CashCard({ d }: { d: D }) {
   const unit = /^₹/.test(showLocal(1)) ? 'rupees' : w.currency === 'JPY' ? 'yen' : w.currency.toLowerCase();
   return (
     <Anim k="jr" delay={710}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Cash for the next five days" onPress={() => router.push(tripRoutes.money(d.t.id))} style={[card(C.tile, 28), { gap: 8 }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Cash for the next five days" onPress={() => goTrip(router, tripRoutes.money(d.t.id))} style={[card(C.tile, 28), { gap: 8 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Label>CASH FOR THE NEXT 5 DAYS</Label>
           <View style={{ flexGrow: 1 }} />

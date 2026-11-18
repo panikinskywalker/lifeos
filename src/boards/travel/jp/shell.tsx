@@ -1,11 +1,11 @@
-import React, { useSyncExternalStore } from 'react';
+import React, { createContext, useContext, useSyncExternalStore } from 'react';
 import { Pressable, ScrollView, Text, View, type ScrollViewProps } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ObjectRecord } from '@core/domain/types';
 import type { TripData } from '@modules/travel';
-import { Anim, JP_SANS, JP_SERIF, markTabSwitch, MONO } from './kit';
+import { Anim, JP_SANS, JP_SERIF, MONO } from './kit';
 
 /**
  * Every trip screen's frame, as the *Trip template · Noir (Japan)* artboards
@@ -233,13 +233,12 @@ const TABS: Array<{ key: Exclude<TripTab, null>; label: string; icon: React.Reac
 export function TripBar({ tripId, active }: { tripId: string; active: TripTab }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const host = useContext(TripHostContext);
+  // Real tabs: inside the trip, a tap shows that section in place; from a stop, a day or a booking, it goes back to the trip on that section.
   const go = (k: Exclude<TripTab, null>) => {
+    if (host && host.tripId === tripId) return host.show(k);
     if (k === active) return;
-    // A section switch: same screen frame, crossfaded (`via: 'tab'`, see src/platform/motion.ts).
-    const r = k === 'overview' ? { pathname: '/entity/[type]/[id]', params: { type: 'trip', id: tripId, via: 'tab' } } : { pathname: '/module/[id]/[page]', params: { id: 'travel', page: k, trip: tripId, via: 'tab' } };
-    markTabSwitch();
-    if (active) router.replace(r as never);
-    else router.push(r as never);
+    goTrip(router, k === 'overview' ? tripRoutes.overview(tripId) : k === 'plan' ? tripRoutes.plan(tripId) : k === 'bookings' ? tripRoutes.bookings(tripId) : k === 'money' ? tripRoutes.money(tripId) : tripRoutes.prep(tripId));
   };
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: Math.max(20, insets.bottom + 8), paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
@@ -260,10 +259,81 @@ export function TripBar({ tripId, active }: { tripId: string; active: TripTab })
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* The trip's host: the five sections as real tabs                      */
+/* ------------------------------------------------------------------ */
+
+export type Section = Exclude<TripTab, null>;
+export interface TripHostApi {
+  tripId: string;
+  tab: Section;
+  /** Show a section in place (with its own params, e.g. Money's settle tab). */
+  show: (tab: Section, params?: Record<string, string>) => void;
+}
+export const TripHostContext = createContext<TripHostApi | null>(null);
+
+/** The host that is on screen now (registered by the host while it has focus). */
+let focusedHost: TripHostApi | null = null;
+/** A section to show when the trip's host comes back on screen (set from a stop, a day, a booking). */
+let pendingSection: { tripId: string; tab: Section; params?: Record<string, string> } | null = null;
+let hostHref: Record<string, unknown> | null = null;
+export function registerFocusedHost(api: TripHostApi | null, href?: Record<string, unknown>) {
+  focusedHost = api;
+  if (api && href) hostHref = { ...href, tripId: api.tripId };
+}
+/** The trip's host left the stack: nothing to go back to any more. */
+export function forgetHost(tripId: string) {
+  if (hostHref?.tripId === tripId) hostHref = null;
+  if (focusedHost?.tripId === tripId) focusedHost = null;
+}
+export function takePendingSection(tripId: string) {
+  const p = pendingSection && pendingSection.tripId === tripId ? pendingSection : null;
+  pendingSection = null;
+  return p;
+}
+
+const SECTION_PAGES: Record<string, Section> = { plan: 'plan', bookings: 'bookings', money: 'money', prep: 'prep' };
+/** Which trip section a route is, if any. */
+export function sectionOf(route: unknown): { tripId: string; tab: Section; params: Record<string, string> } | null {
+  if (typeof route === 'string') {
+    const m = /^\/entity\/trip\/([^/?]+)$/.exec(route);
+    return m ? { tripId: m[1]!, tab: 'overview', params: {} } : null;
+  }
+  const r = route as { pathname?: string; params?: Record<string, string | undefined> } | null;
+  const page = r?.params?.page;
+  if (r?.pathname === '/module/[id]/[page]' && r.params?.id === 'travel' && page && SECTION_PAGES[page] && r.params.trip) {
+    const { id: _i, page: _p, trip, ...rest } = r.params;
+    return { tripId: trip, tab: SECTION_PAGES[page]!, params: Object.fromEntries(Object.entries(rest).filter(([, v]) => v != null)) as Record<string, string> };
+  }
+  return null;
+}
+
+/**
+ * Go to a trip route the way tabs work: a section of the trip on screen is
+ * shown in place; from a stop, a day or a booking over the trip, it goes back to
+ * the trip on that section; anything else is pushed.
+ */
+export function goTrip(router: { push: (r: never) => void; navigate?: (r: never) => void; dismissTo?: (r: never) => void }, route: unknown) {
+  const sec = sectionOf(route);
+  if (sec && focusedHost && focusedHost.tripId === sec.tripId) return focusedHost.show(sec.tab, sec.params);
+  if (sec && hostHref && hostHref.tripId === sec.tripId) {
+    pendingSection = { tripId: sec.tripId, tab: sec.tab, params: sec.params };
+    const { tripId: _t, ...href } = hostHref;
+    if (router.dismissTo) return router.dismissTo(href as never);
+    if (router.navigate) return router.navigate(href as never);
+  }
+  router.push(route as never);
+}
+
 /** A trip screen: the page scrolls under the header; the trip bar floats at the bottom. */
-export function TripScreen({ tripId, active, children, scroll = true, bar = true, contentGap = 12, scrollProps }: { tripId: string; active: TripTab; children: React.ReactNode; scroll?: boolean; bar?: boolean; contentGap?: number; scrollProps?: ScrollViewProps }) {
+export function TripScreen({ tripId, active, children, scroll = true, bar: wantBar = true, contentGap = 12, scrollProps }: { tripId: string; active: TripTab; children: React.ReactNode; scroll?: boolean; bar?: boolean; contentGap?: number; scrollProps?: ScrollViewProps }) {
   const insets = useSafeAreaInsets();
-  const pad = { paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: bar ? 130 + insets.bottom : 28 + insets.bottom, gap: contentGap };
+  // Inside the trip's host the bar is the host's own, drawn once over every section.
+  const host = useContext(TripHostContext);
+  const inHost = !!host && host.tripId === tripId;
+  const bar = wantBar && !inHost;
+  const pad0 = wantBar;
+  const pad = { paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: pad0 ? 130 + insets.bottom : 28 + insets.bottom, gap: contentGap };
   return (
     <View style={{ flex: 1, backgroundColor: C.ink }}>
       {scroll ? (

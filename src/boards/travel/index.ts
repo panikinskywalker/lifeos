@@ -6,15 +6,12 @@ import { PackScreen } from './pack';
 import { TripPage, TripsHere } from './trip';
 import { TripForm } from './form';
 import { travelTiles } from './tile';
-import { PlanScreen } from './plan';
 import { StopPage } from './stop';
 import { ImportTripScreen } from './importTrip';
-import { BookingsScreen } from './bookings';
 import { BookingScreen } from './booking';
 import { DayScreen } from './day';
-import { MoneyScreen } from './money';
 import { BillScreen } from './bill';
-import { PrepScreen } from './prep';
+import { sectionRoute } from './jp/host';
 import { StayScreen } from './jp/stay';
 import { SpendScreen } from './jp/spend';
 import { ReceiptScreen } from './jp/receipt';
@@ -43,14 +40,14 @@ export const travelBoard: BoardManifest = {
     { key: 'index', title: 'Travel', component: TravelHome },
     { key: 'upcoming', title: 'Upcoming', component: UpcomingScreen },
     { key: 'pack', title: 'Packing', component: PackScreen },
-    { key: 'plan', title: 'Plan', component: PlanScreen },
+    { key: 'plan', title: 'Plan', component: sectionRoute('plan') },
     { key: 'import', title: 'Import a trip', component: ImportTripScreen },
-    { key: 'bookings', title: 'Bookings', component: BookingsScreen },
+    { key: 'bookings', title: 'Bookings', component: sectionRoute('bookings') },
     { key: 'booking', title: 'Booking', component: BookingScreen },
     { key: 'day', title: 'A day', component: DayScreen },
-    { key: 'money', title: 'Money', component: MoneyScreen },
+    { key: 'money', title: 'Money', component: sectionRoute('money') },
     { key: 'bill', title: 'Expense', component: BillScreen },
-    { key: 'prep', title: 'Prep', component: PrepScreen },
+    { key: 'prep', title: 'Prep', component: sectionRoute('prep') },
     { key: 'stay', title: 'Stay', component: StayScreen },
     { key: 'spend', title: 'Log a spend', component: SpendScreen },
     { key: 'receipt', title: 'Split a receipt', component: ReceiptScreen },

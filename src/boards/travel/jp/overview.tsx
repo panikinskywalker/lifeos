@@ -40,7 +40,7 @@ import {
   type WayThere,
 } from '@modules/travel';
 import { Anim, bgImage, JP_SANS, JP_SERIF, MONO, MONO_MED, Wave } from './kit';
-import { C, DotMatrix, FACE, Faces, isJapan, money, scriptName, Stepper, TripHeader, TripScreen, tripRoutes, useShow } from './shell';
+import { C, DotMatrix, FACE, Faces, isJapan, money, scriptName, Stepper, TripHeader, TripScreen, tripRoutes, useShow, goTrip } from './shell';
 
 /**
  * The trip page before the trip (JP-Overview): the stage, the hero with the
@@ -217,7 +217,8 @@ export function OverviewPage({ trip }: Props) {
     [trip.id, trip.version],
   );
   const t = d.t;
-  const go = (r: never) => router.push(r);
+  // A section of this trip shows in place (real tabs); anything else opens on top.
+  const go = (r: never) => goTrip(router, r);
   const fly = d.way ? isoOf(d.way.departAt) : t.data.startDate ?? null;
   const toFly = fly ? daysBetween(d.today, fly) : null;
   const nameOf = (party: string) => (party === 'me' ? 'You' : d.people.find((p) => p.id === party)?.name ?? 'Someone');
