@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bankOf, looksLikeBankSender, parseBankSms, parsePaymentNotification, type ParsedTxn } from './bankSms';
+import { bankOf, looksLikeBankSender, parseBankSms, parseCardBill, parsePaymentNotification, type ParsedTxn } from './bankSms';
+import { moneyParser } from './parser';
 
 /** Fixtures in each bank's real shapes (numbers and names changed). */
 const FIXTURES: Array<[sender: string, text: string, expect: Partial<ParsedTxn>]> = [
@@ -56,6 +57,34 @@ const FIXTURES: Array<[sender: string, text: string, expect: Partial<ParsedTxn>]
   ['VM-HSBCIN', 'HSBC Credit Card xx0000 used at FRESHMENU for INR 480.00 on 12/09/26. Avl limit INR 99,000.00; due INR 5,000.00.', { amount: 480, direction: 'debit', counterparty: 'FRESHMENU' }],
   // Paying off a card is a transfer into it, not income.
   ['VM-SBICRD', 'Dear SBI Cardholder, payment of Rs. 12,345.00 for your SBI Credit Card has been successfully processed. ref no : ABC12DE3FG4HIJ.', { amount: 12345, direction: 'credit', transfer: true }],
+  // From Rutvij's phone, 10 Nov 2026 (masked as Message samples mask them).
+  ['JD-SBIUPI-S', 'Dear UPI user A/C X0000 debited by 1720.80 on date 18Oct26 trf to Playo Refno 000000000000 If not u? call-0000000000 for other services-18001234-SBI', { amount: 1720.8, direction: 'debit', counterparty: 'Playo' }],
+  ['JD-SBIUPI-S', 'Dear UPI user A/C X0000 debited by 13428.0 on date 27Oct26 trf to Jio Platforms Li Refno 000000000000 If not u? call-0000000000 for other services-18001234-SBI', { amount: 13428, counterparty: 'Jio' }],
+  ['JD-SBIUPI-S', 'Dear UPI user A/C X0000 debited by 419.00 on date 24Oct26 trf to Mr PIYUSH SUNIL Refno 000000000000 If not u? call-0000000000 for other services-18001234-SBI', { amount: 419, counterparty: 'PIYUSH SUNIL' }],
+  ['JD-SBIUPI-S', 'Dear UPI user A/C X0000 debited by 3000.00 on date 23Oct26 trf to Indian Clearing Refno 000000000000 If not u? call-0000000000 for other services-18001234-SBI', { amount: 3000, investment: true }],
+  ['VM-HSBCIN-S', 'INR 22005.39 is paid from HSBC account XXXXXX0000 to CRED Club on 05-Oct-26 with ref 000000000000. If this is not done by you, call 00000000000 to report.', { amount: 22005.39, direction: 'debit', counterparty: 'CRED Club', bank: 'hsbc', transfer: true }],
+  ['VM-HSBCIN-S', 'INR 3582.60 is paid from HSBC account XXXXXX0000 to P L A Y O on 27-Oct-26 with ref 000000000000. If this is not done by you, call 00000000000 to report.', { amount: 3582.6, counterparty: 'PLAYO' }],
+  ['VM-HSBCIN-S', 'HSBC: A/c 000-004***-006 is credited with INR 196,958.00+ on 29OCT at 13.02.51 with UTR HDFCH00000000000 as NEFT from HDFC A/c ***0000 of ACME TECH (I) *** . Your Avl Bal is 000,000.00', { amount: 196958, direction: 'credit', counterparty: 'ACME TECH' }],
+  ['VM-CBSSBI-S', 'Your A/C XXXXX000000 Debited INR 43,211.00 on 28/10/26 -Transferred to Mr. RUTVIJ ANIL MAHA. Avl Balance INR 00,000.00-SBI', { amount: 43211, direction: 'debit', counterparty: 'RUTVIJ ANIL MAHA' }],
+  ['VM-CBSSBI-S', 'Dear Customer, Your loan A/C XXXXX000000 Credited INR 16,000.00 on 01/10/26,deposit transfer from Mr. RUTVIJ ANIL MAHA.-SBI. Download YONO', { amount: 16000, transfer: true, counterparty: 'RUTVIJ ANIL MAHA' }],
+  ['VM-CBSSBI-S', 'Your A/C XXXXX000000 Credited INR 47,000.00 on 28/10/26 -Deposited by Cash by SELF. Avl Bal INR 00,000.00-SBI', { amount: 47000, direction: 'credit', transfer: true }],
+  ['VM-CBSSBI-S', 'Dear Customer, Your loan A/C XXXXX000000 Credited INR 15,000.00 by cash on 07/09/26.-SBI. Download YONO', { amount: 15000, transfer: true }],
+  ['VA-ICICIT-S', 'Dear Customer, your ICICI Bank Forex Prepaid Card XX0000 has been credited with GBP 92.00 on 10-Nov-26. The current available balance is GBP 000.00', { amount: 92, currency: 'GBP', transfer: true }],
+  ['VA-ICICIT-S', 'Refund of Rs 18,899.50 from ICICI Bank Credit Card XX0000 to Savings Account XX0000 has been successfully transferred.', { amount: 18899.5, direction: 'debit', transfer: true }],
+  ['VA-ICICIT-S', 'Adidas India Marketing Pr refund of Rs 18,899.50 credited to your ICICI Bank Credit Card XX0000 on 05-NOV-26.', { amount: 18899.5, direction: 'credit', refund: true, transfer: false }],
+  ['VA-ICICIT-S', 'ANTHROPIC refund of Rs 1,57,258.45 credited to ICICI Bank Credit Card XX0000 on 16-AUG-26. Revised total due Rs 4,291.05, minimum due Rs .00', { amount: 157258.45, refund: true, counterparty: 'Claude' }],
+  ['VA-ICICIT-S', 'Congrats! Rs 858.00 cashback credited to ICICI Bank Credit Card on 29-Oct-26. For details check Card statement', { amount: 858, refund: true }],
+  ['JD-SBYONO-S', 'Dear Customer, Purchase of GPAI cover Rs 20 lakhs at a premium of Rs 1000 with auto renewal is successful-YONO SBI', { amount: 1000, direction: 'debit', counterparty: null }],
+  ['VM-AXISBK-S', 'Spent USD 40.81 \nusing Axis Bank Credit Card no. XX0000 on 03-11-26 18:47:23 IST at \nWWW*HOSTELW. \nAvl limit: INR 000000.00. Not you? SMS BLOCK 7180 to +000000000000.', { amount: 40.81, currency: 'USD', counterparty: 'Hostelworld' }],
+  // From the 12-month export, 11 Nov 2026 (masked).
+  ['JD-CBSSBI-S', 'Dear Customer, Your A/C XXXXX000000 has a debit by NACH of Rs 500.00 on 05/02/26. Avl Bal Rs 00,000.00. Download YONO - SBI', { amount: 500, direction: 'debit', counterparty: null }],
+  ['JD-CBSSBI-S', 'Your A/C XXXXX000000 credited by Chq no 457015 dt 12/01/2026 in S-3 of GPO of Rs. 2,50,000.00 on 13/01/2026-SBI', { amount: 250000, direction: 'credit', counterparty: null }],
+  ['JD-ICICIT-S', 'INR 395.00 spent using ICICI Bank Card XX0000 on 19-Jan-26 on PhiCom*CHAI POI. Avl Limit: INR 0,00,000.00. If not you, call 1800 2662/SMS BLOCK 8005 to 0000000000', { amount: 395, counterparty: 'CHAI POI' }],
+  ['JD-ICICIT-S', 'We have successfully processed payment of USD 41.30 to Merchant BlackmagicDesignAsiaPteLtd, as per Standing Instruction YNGbfYiyNm on 03/06/2026 for ICICI Bank Credit Card XX0000.', { amount: 41.3, currency: 'USD', counterparty: 'BlackmagicDesignAsiaPteLtd' }],
+  ['JM-DCBANK-S', 'INR 102.43 debited DCB Bank a/c*9284 on 31-01-2026 07:42 PM. Not you?Call 00000000000 or SMS DEACT CustID to 0000000000 to deactivate.', { amount: 102.43, direction: 'debit', counterparty: null, bank: 'dcb' }],
+  ['VM-QCAMZN-S', 'Payment of Rs 399.00 using Apay balance is successful at A.in. Updated balance is Rs 0000.00. If not u? Pls call 00000000000 - SMS via Pine Labs', { amount: 399, direction: 'debit', counterparty: 'Amazon' }],
+  ['VM-ZEPTON-S', 'Dear Customer, Your payment of Rs. 26.00 using Zepto Cash is successful. Updated Zepto Cash balance is Rs.0.00. For help please reach out to - support@zeptonow.com', { amount: 26, direction: 'debit', counterparty: 'Zepto' }],
+  ['VM-AXISBK-S', 'Spent JPY 17182\nAxis Bank Card no. XX0000\n08-09-26 00:24:48 IST\nBKG*Hotel a\nAvl Limit: INR 000000.00\nNot you? SMS BLOCK 7180 to 000000000000', { amount: 17182, currency: 'JPY', counterparty: 'Booking.com' }],
 ];
 
 const SKIPS: Array<[sender: string, text: string, reason: string]> = [
@@ -68,6 +97,21 @@ const SKIPS: Array<[sender: string, text: string, reason: string]> = [
   ['VM-HDFCBK', 'Your HDFC Bank Credit Card XX5678 has an available limit of Rs 1,20,000 as on 26-Sep-26.', 'info'],
   ['VM-HDFCBK', 'Your A/c XX1234 will be debited Rs.1675.60 on 12-09-26 towards ADOBE SYSTEMS under e-mandate. To opt out, visit hdfc.bank/si', 'mandate'],
   ['VM-HDFCBK', 'E-mandate for ADOBE SYSTEMS of up to Rs.5,000 registered successfully on HDFC Bank Credit Card XX5678.', 'mandate'],
+  // From Rutvij's phone, 10 Nov 2026 (masked).
+  ['AD-AXISBK-S', 'INR 11999.00 for Anthropic will be auto-debited via Axis Bank Card no. XX0000 by 02-10-26. Please ensure sufficient limit/balance on your card/account to process the auto debit.', 'mandate'],
+  ['VA-ICICIT-S', "We're unable to confirm txn of INR 52463.00 on ICICI Bank Credit Card XX0000 on 21-AUG-26. To dispute call 18001080 or 000000000000 if not in India", 'declined'],
+  ['VM-ZEPTON-S', 'Payment of Rs. 281.00 for zepto order JJVSNKAN93992 failed. If any amount was deducted, it will be refunded in 5-7 days. For help: name@zeptonow.com', 'declined'],
+  ['JD-SBYONO-S', 'Dear Customer, You initiated GPAI purchase with premium of Rs. 1000 in SBI 08238. Send SMS PAIPYES to 0000000000 to confirm.-YONO SBI', 'info'],
+  ['VM-SMYTTN-S', 'Important alert: Your Smytten account has 6 Points for Rs.1 & Full-size at 3 Pts credited. Click here for more info!- message.smytten.com/DJK49gx', 'promo'],
+  ['VM-EPFOHO-S', 'Dear XXXXXXXX0000, your passbook balance against GNGGN**************0000 is Rs. 72,106/-. Contribution of Rs. 2,350/- for due month Jun-26 has been received.', 'info'],
+  ['VM-MSEDCL-S', 'Pay Energy Bill for cons 000000000000 of Rs.1120 before due date 15-12-2025 click https://rpp.mahadiscom.in/MH_RPP?k=00A00000000000 .Ignore if paid.MSEDCL', 'bill'],
+  ['VM-MSEDCL-S', 'Disconnection notice was issued for Cons 000000000000 of Rs.1130 on dt.16-12-25.Notice period is up to 31-12-25.Pay immediately.Ignore if already paid', 'bill'],
+  ['JD-ICICIT-S', 'Pay total Rs 1891.42 or min Rs 100 for ICICI Bank Credit Card XX0000 at https://icici.co/ICICIT/a/9KbePlnq , missed on 02-Mar-26.', 'bill'],
+  ['VM-PHONPE-S', 'APPLE MEDIA SERVICES has sent you an AutoPay request for up to Rs. 799. Click to approve this request now: https://phone.pe/PHONPE/ou2b0uxm', 'mandate'],
+  ['VM-MMTRIP-S', 'Dear Rutvij Anil, Thank you for booking with us. We are happy to inform you that your flight with booking ID NF00000000000000 is confirmed. Your Trip amount is Rs 18102.', 'info'],
+  ['VM-ZEPTON-S', 'Dear user, refund of Rs 26.00 for your Zepto order UHISJNKAL00000 has been initiated. It should reflect in your account within 5-7 business days!', 'info'],
+  ['VM-ABSLMF-S', 'Systematic Purchase in Folio 0000000000 in ABSL Dynamic Asset Allocation Omni FOF-Regular-Growth for Rs.499.98, NAV 55.347/Trade date 08-Jul-2026 is processed.', 'investment-confirmation'],
+  ['VA-SLCBNK-S', '998257 is your code for device registration. It will be auto-read by the slice app. Do not share this code. 7b06e0 - slice', 'otp'],
 ];
 
 describe('bank SMS', () => {
@@ -92,11 +136,29 @@ describe('bank SMS', () => {
 });
 
 describe('payment app notifications', () => {
+  it('CRED: a bill reminder is not a payment; a card bill paid is a transfer into the card', () => {
+    expect(parsePaymentNotification('com.dreamplug.androidapp', 'electricity bill generated', 'tap to pay ₹5,450.00 towards Maharashtra State Electricity Distbn Co Ltd (MSEDCL) for uninterrupted service. ignore if you\'ve already paid.')).toEqual({ kind: 'skip', reason: 'bill' });
+    expect(parsePaymentNotification('com.dreamplug.androidapp', 'paid instantly to ICICI Bank', 'that was fast: payment of ₹50,000.00 on your ICICI Bank credit card XXXX-8013 has been processed. tap to check your latest bank balance.')).toMatchObject({ kind: 'txn', txn: { amount: 50000, direction: 'credit', transfer: true, last4: '8013' } });
+  });
   it('Google Pay, PhonePe, Paytm', () => {
     expect(parsePaymentNotification('com.google.android.apps.nbu.paisa.user', 'Payment successful', '₹450 paid to Swiggy')).toMatchObject({ kind: 'txn', txn: { amount: 450, direction: 'debit', counterparty: 'Swiggy', channel: 'upi' } });
     expect(parsePaymentNotification('com.phonepe.app', 'Money received', 'Received ₹2,600 from Priya Sharma')).toMatchObject({ kind: 'txn', txn: { amount: 2600, direction: 'credit', counterparty: 'Priya Sharma' } });
     expect(parsePaymentNotification('net.one97.paytm', 'Paid Rs.180 to Canoe', 'From Paytm UPI')).toMatchObject({ kind: 'txn', txn: { amount: 180, direction: 'debit', counterparty: 'Canoe' } });
     expect(parsePaymentNotification('com.google.android.apps.nbu.paisa.user', 'Autopay successful', '₹649 paid to Netflix')).toMatchObject({ kind: 'txn', txn: { amount: 649, counterparty: 'Netflix', recurring: true } });
     expect(parsePaymentNotification('com.snapwork.hdfc', 'HDFC Bank', 'Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On 26/09/26')).toMatchObject({ kind: 'txn', txn: { amount: 450, last4: '1234' } });
+  });
+});
+
+describe('card bills (from Rutvij\'s texts, masked)', () => {
+  it.each([
+    ['JX-ICICIT-S', 'ICICI Bank Credit Card XX3007 Statement is sent to name@gmail.com. Total of Rs 26,046.50 or minimum of Rs 1,310.00 is due by 30-OCT-26.', { total: 26046.5, min: 1310, dueOn: '2026-10-30', last4: '3007' }],
+    ['AX-AXISBK-S', 'Your statement for Axis Bank Credit Card no. XX7180 is generated. Due on: 07-11-26 Total amt: INR Dr. 12494.57 Min amt due: INR Dr. 736.00 Pay at axis.bank.in/ccpaynow', { total: 12494.57, min: 736, dueOn: '2026-11-07', last4: '7180' }],
+    ['JX-ICICIT-S', 'Pay Total Amount Due of Rs 26,046.50 or Minimum Amount Due of Rs 1,310.00 by 30-Oct-26 towards ICICI Bank Credit Card XX3007. Delay/Non-payment is reported to Credit Bureaus. Ignore if paid.', { total: 26046.5, min: 1310, dueOn: '2026-10-30', last4: '3007' }],
+  ])('%s: %s', (sender, text, want) => {
+    expect(parseCardBill(text, sender)).toMatchObject(want);
+    expect(moneyParser.read(null as never, { source: 'sms', from: sender, body: text, receivedAt: 0 })).toMatchObject({ kind: 'card-bill', bill: want });
+  });
+  it('a payment received is not a bill', () => {
+    expect(parseBankSms('Payment of Rs 26,046.50 has been received on your ICICI Bank Credit Card XX3007 through Bharat Bill Payment System on 26-OCT-26.', 'JM-ICICIT-S').kind).toBe('txn');
   });
 });

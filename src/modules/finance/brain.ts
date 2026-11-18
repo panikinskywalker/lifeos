@@ -3,6 +3,9 @@ import { dueWords, pastDay } from '@core/brain/words';
 import type { BrainDef, Candidate, Nudge } from '@core/brain/contract';
 import type { LifeOSContext } from '@core/registry/context';
 import { categoryOf, type InvestmentData, type SubscriptionData, type TransactionData } from './types';
+import { perYear } from './filing/recurring';
+import { monthClose } from './home';
+import { oddFine, oddThings } from './ask';
 
 /**
  * What Money brings the brain (docs/MODEL.md layer 8, *Slices 4 and 6*): its
@@ -91,10 +94,63 @@ export function unusualSpends(os: LifeOSContext, now = Date.now()): Candidate[] 
   return out;
 }
 
+/** A Subscription's price changed in the last 3 days (or changes in the next 10, from a heads-up): Keep it, or open it. */
+export function priceChanges(os: LifeOSContext, now = Date.now()): Candidate[] {
+  if (!os.registry.objects.has('subscription')) return [];
+  const from = iso(now - 3 * DAY);
+  const to = iso(now + 10 * DAY);
+  return os.records.query<SubscriptionData>('subscription', { filter: { and: [{ field: 'status', op: 'eq', value: 'active' }] } }, { limit: 1000 }).flatMap((s): Candidate[] => {
+    const h = s.data.priceHistory ?? [];
+    const last = h[h.length - 1];
+    const prev = h[h.length - 2];
+    if (!last || !prev || last.from < from || last.from > to) return [];
+    const yearly = Math.round(Math.abs(last.amount - prev.amount) * perYear(s.data.rrule));
+    const up = last.amount > prev.amount;
+    const money = (n: number) => os.format.currency(n);
+    return [{ key: `finance:price:${s.id}:${last.from}`, kind: 'coming up', shape: 'check', subjectId: s.id, title: s.data.name, line: `${s.data.name} went from ${money(prev.amount)} to ${money(last.amount)} · ${money(yearly)} ${up ? 'more' : 'less'} a year`, record: { name: s.data.name, from: prev.amount, to: last.amount, since: last.from, per_year: yearly, went: up ? 'up' : 'down' }, rank: 10, yes: 'Keep it' }];
+  });
+}
+
+/** On the 1st: last month, closed (the card on Money home says the rest). */
+export function closeLine(os: LifeOSContext, now = Date.now()): Candidate[] {
+  const d = new Date(now);
+  const c = d.getDate() === 1 ? monthClose(os, d) : null;
+  if (!c) return [];
+  const money = (n: number) => os.format.currency(Math.round(Math.abs(n)));
+  const vs = c.usual ? `, ${money(c.spent - c.usual)} ${c.spent > c.usual ? 'over' : 'under'} your usual` : '';
+  return [{ key: `finance:close:${c.month}`, kind: 'coming up', shape: 'check', route: '/module/finance/index', title: `${c.label}, closed`, line: `${c.label}: spent ${money(c.spent)}${vs}; ${c.saved >= 0 ? `saved ${money(c.saved)}` : `${money(c.saved)} more out than in`}`, record: { month: c.label, spent: Math.round(c.spent), usual: c.usual, came_in: Math.round(c.income), saved: c.saved }, rank: 5, yes: 'Right' }];
+}
+
+/** Charged twice, or a new fee, in the last 2 days (Anything wrong, said in the brief). */
+export function oddNotices(os: LifeOSContext, now = Date.now()): Candidate[] {
+  const o = oddThings(os, new Date(now));
+  const since = iso(now - 2 * DAY);
+  const money = (n: number) => os.format.currency(n);
+  const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  const out: Candidate[] = [];
+  for (const x of o.twice) {
+    const last = x.txs[x.txs.length - 1]!;
+    if (last.data.date < since) continue;
+    const payee = last.data.merchant ?? last.title;
+    out.push({ key: `finance:${x.key}`, kind: 'due', shape: 'check', subjectId: last.id, title: payee, line: `${payee}, ${money(last.data.amount)}, twice on ${day(last.data.date)}`, record: { payee, amount: last.data.amount, day: last.data.date, times: x.txs.length }, rank: 8, yes: 'Both are real', payload: { odd: x.key } });
+  }
+  for (const x of o.fees) {
+    if (x.tx.data.date < since) continue;
+    const payee = x.tx.data.merchant ?? x.tx.title;
+    out.push({ key: `finance:${x.key}`, kind: 'due', shape: 'check', subjectId: x.tx.id, title: payee, line: `${payee} took ${money(x.tx.data.amount)} on ${day(x.tx.data.date)}, a fee you have not paid before`, record: { payee, amount: x.tx.data.amount, day: x.tx.data.date }, rank: 9, yes: 'That is fine', payload: { odd: x.key } });
+  }
+  return out;
+}
+
 export const financeBrain: BrainDef = {
-  candidates: (os, now) => [...cycles(os, now), ...unusualSpends(os, now)],
+  candidates: (os, now) => [...cycles(os, now), ...unusualSpends(os, now), ...priceChanges(os, now), ...closeLine(os, now), ...oddNotices(os, now)],
   act(os, verb, nudge: Nudge) {
-    const p = (nudge.payload ?? {}) as { cycleId?: string; template?: string | null; bill?: { amount: number } };
+    const p = (nudge.payload ?? {}) as { cycleId?: string; template?: string | null; bill?: { amount: number }; odd?: string };
+    // Both are real, That is fine: not asked about again, in the brief or in Anything wrong.
+    if (p.odd) {
+      if (verb === 'yes') oddFine(os, p.odd);
+      return null;
+    }
     if (!p.cycleId) return null;
     // A heads-up (a renewal that bills itself, a SIP, a maturity) needs nothing; a bill marked Paid is logged with its expense.
     if (nudge.shape === 'check') return null;

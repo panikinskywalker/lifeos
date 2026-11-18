@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LinksView } from '@ui/components/LinksView';
+import { LinkMap } from '@ui/components/LinkMap';
 import { ConfirmCard, ReplyCardView } from '@ui/components/ReplyCard';
 import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,15 @@ import { ICON_NAMES } from '@ui/icons';
 import {
   ActionSheet,
   AgentCard,
+  ArcTicks,
+  Dial,
+  Donut,
+  DotNumber,
+  HourTicks,
+  InstrumentCard,
+  RingBadges,
+  Ruler,
+  TrackColumns,
   BentoGrid,
   BottomBar,
   Button,
@@ -654,12 +663,42 @@ function TodayChartsDemo() {
 }
 
 function GraphDemo() {
-  return <LinksView nodes={DEMO_GRAPH.nodes} edges={DEMO_GRAPH.edges} height={340} />;
+  const [centre, ...rest] = DEMO_GRAPH.nodes;
+  return <LinkMap width={340} height={420} centre={centre!} nodes={rest} lines={DEMO_GRAPH.edges.map((e, i) => ({ key: String(i), from: e.from, to: e.to, word: e.kind }))} />;
+}
+
+/** NR-KitCharts and NR-KitInstruments, with the kit's own sample figures. */
+function NoirChartsDemo() {
+  const hours = Array.from({ length: 24 }, (_, i) => [0, 0, 0, 0, 0, 0, 0, 300, 280, 0, 0, 0, 900, 420, 0, 0, 0, 0, 0, 640, 520, 0, 0, 0][i]!);
+  return (
+    <View style={{ gap: 12 }}>
+      <RingBadges total="₹24k" caption="spent in September" format={(n) => `₹${n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n}`} action={{ label: 'Set a budget', onPress: () => {} }} parts={[
+        { key: 'food', label: 'Food', value: 9200, color: '#E8DD7A', icon: 'food' },
+        { key: 'groceries', label: 'Groceries', value: 5800, color: '#A7CD8E', icon: 'bag' },
+        { key: 'home', label: 'Home', value: 4400, color: '#A9BFEF', icon: 'home' },
+        { key: 'travel', label: 'Travel', value: 2900, color: '#F0A9C2', icon: 'plane' },
+        { key: 'health', label: 'Health', value: 1100, color: '#CDB6F0', icon: 'heart' },
+        { key: 'other', label: 'Other', value: 780, color: '#D9D4CC', icon: 'more' },
+      ]} />
+      <Donut title="Shared with Priya" sub="this month" centre="₹3.2k" parts={[{ label: 'You', value: 50, color: '#D7F55C' }, { label: 'Priya', value: 30, color: '#F4A8CE' }, { label: 'Kendal', value: 20, color: '#A9C4FF' }]} />
+      <Dial score={0.78} value="78" title="Upkeep" sub="on time, this quarter" pills={[{ label: 'On time 31', tone: 'good' }, { label: 'Late 2', tone: 'late' }]} note="5 skipped" />
+      <ArcTicks share={0.78} value="78%" label="Balance" period="This month" legend={[{ label: 'Progress · 78%' }, { label: 'Downfall · 22%', dim: true }]} />
+      <HourTicks title="Spending" sub="by hour, this month" values={hours} />
+      <TrackColumns label="Analytics" period="This week" value="₹5.2k" values={[2100, 3400, 1200, 4800, 2200, 3100, 1600]} labels={['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri']} today={6} />
+      <Ruler title="Balance" sub="Vitamin D" delta="+3" display="85" reading={70} min={0} max={100} normal={[30, 70]} note="Good" />
+      <View style={{ padding: 18, borderRadius: 28, backgroundColor: '#1A1A1E', gap: 12 }}>
+        <DotNumber text="0123456789" />
+        <DotNumber text="29 09:56" color="#D7F55C" />
+      </View>
+      <InstrumentCard number="09" title="Money · live" value="1.28k" caption="spent this week" status="Live" line={[12, 25, 15, 36, 28, 45, 37, 64, 49, 56]} footer={{ label: 'vs last week', value: '−8%' }} />
+    </View>
+  );
 }
 
 const SECTIONS: Array<[string, string, React.ComponentType]> = [
+  ['Noir charts', 'NR-KitCharts · NR-KitInstruments · the kit\'s sample figures', NoirChartsDemo],
   ['Today charts', 'mini bars · delta chip (good/bad by metric) · heat map', TodayChartsDemo],
-  ['Links', 'the network around a record · 2 hops · module tints · link words (d3-force)', GraphDemo],
+  ['Links', 'the map around a record · 2 hops · module colours · link words (NR Links L1, L2)', GraphDemo],
   ['Progress bar', '8 tall · pill · optional target tick', Progress],
   ['Charts', 'sparkline · line · columns · legend (Stitch)', ChartsDemo],
   ['Record insights', 'stat trio · attention · quick actions · day timeline (Stitch)', InsightDemo],

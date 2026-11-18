@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isBoardShown } from '@core/registry/shown';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useLive, useOS } from '@ui/hooks';
@@ -17,7 +18,8 @@ export default function SearchRoute() {
   const hits = useLive((o) => (query ? o.records.search.search(query, { types: type ? [type] : undefined, limit: 50 }) : []), [query, type]);
   const recent = useLive((o) => o.records.recent(12), []);
   const tags = useLive((o) => o.tags.counts().slice(0, 12), []);
-  const commands = os.registry.quickActions.filter((a) => !query || a.label.toLowerCase().includes(query.toLowerCase()));
+  const shownActions = os.registry.quickActions.filter((a) => isBoardShown(os, a.board));
+  const commands = shownActions.filter((a) => !query || a.label.toLowerCase().includes(query.toLowerCase()));
   const typesInHits = [...new Set(hits.map((h) => h.object))];
   const run = (a: (typeof commands)[number]) => (a.route ? router.push(a.route as never) : a.run?.(os));
   return (
@@ -56,10 +58,10 @@ export default function SearchRoute() {
         </>
       ) : (
         <>
-          {os.registry.quickActions.length ? (
+          {shownActions.length ? (
             <Section title="Quick add">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {os.registry.quickActions.map((a) => (
+                {shownActions.map((a) => (
                   <Chip key={a.id} label={a.label} icon={a.icon} onPress={() => run(a)} />
                 ))}
               </View>

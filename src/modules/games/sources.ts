@@ -4,6 +4,8 @@ import type { OutboxItem } from '@core/repo/outboxRepo';
 import { applyTurfSync, isSyncPage, SETTING_REV, type TurfSyncPage } from './sync';
 import { localMade, remapLocal, resolveLocal, undoRefused, type TurfAction } from './changes';
 import { SETTING_SUBMISSIONS, type TurfSubmission } from './inbox';
+import { linkVenuePayments } from './venuePay';
+import { matchRecentPayments } from './smsMatch';
 
 /**
  * Turf web as a Source (docs/MODEL.md layer 4, *Turf web*; R9c). Address in
@@ -146,23 +148,31 @@ export async function sendTurfActions(os: LifeOSContext, items: OutboxItem[], do
 }
 
 /**
- * Approve or turn down a profile a friend submitted. Turf web reviews these on
- * `/api/invites`, outside the changes queue, so this needs Turf web to answer
- * now; the approved profile arrives with the next sync.
+ * A call that needs Turf web to answer now: reviews happen outside the changes
+ * queue (their results arrive with the next sync). Errors in plain words.
  */
-export async function reviewTurfSubmission(os: LifeOSContext, submissionId: string, decision: 'approve' | 'reject', doFetch: typeof fetch = fetch): Promise<void> {
+async function turfNow<T>(os: LifeOSContext, method: 'GET' | 'PATCH' | 'POST', path: string, body?: Record<string, unknown>, doFetch: typeof fetch = fetch): Promise<T> {
   const base = turfBase(os);
   const key = await os.device?.secrets?.get(TURF_KEY);
   if (!base || !key) throw new Error('Add Turf web’s address and this phone’s key first');
   let r: Response;
   try {
-    r = await doFetch(`${base}/api/invites`, { method: 'PATCH', headers: { Authorization: `Bearer ${key}`, Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ submissionId, decision }) });
+    r = await doFetch(`${base}${path}`, { method, headers: { Authorization: `Bearer ${key}`, Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
   } catch {
-    throw new Error('Turf web needs to be reachable to review this — try again when you’re online');
+    throw new Error('Turf web needs to be reachable for this: try again when you’re online');
   }
   if (r.status === 401 || r.status === 403) throw new Error('Turf web refused this phone’s key');
-  const body = (await r.json().catch(() => null)) as { error?: string } | null;
-  if (!r.ok) throw new Error(body?.error ?? `Turf web answered ${r.status}`);
+  const answer = (await r.json().catch(() => null)) as (T & { error?: string }) | null;
+  if (!r.ok || !answer) throw new Error(answer?.error ?? `Turf web answered ${r.status}`);
+  return answer;
+}
+
+/**
+ * Approve or turn down a profile a friend submitted (`/api/invites`); the
+ * approved profile arrives with the next sync.
+ */
+export async function reviewTurfSubmission(os: LifeOSContext, submissionId: string, decision: 'approve' | 'reject', doFetch: typeof fetch = fetch): Promise<void> {
+  await turfNow(os, 'PATCH', '/api/invites', { submissionId, decision }, doFetch);
   const subs = os.settings.get<Record<string, TurfSubmission>>(SETTING_SUBMISSIONS, {});
   const s = subs[submissionId];
   if (s) {
@@ -172,10 +182,47 @@ export async function reviewTurfSubmission(os: LifeOSContext, submissionId: stri
   }
 }
 
+/** Turf web's bell (`GET /api/inbox`): what waits for the organiser, and the latest answers to upcoming matches. Ids are Turf web's. */
+export interface TurfInbox {
+  submissions: Array<{ id: string; playerId: string; playerName: string; submittedAt: string; isNewPlayer?: boolean }>;
+  paidClaims: Array<{ id: string; gameId: string; playerId: string; playerName: string; date: string; venue: string; amountCents: number; method: string; owedCents: number }>;
+  claims: Array<{ id: string; gameId: string; playerId: string; playerName: string; date: string; venue: string; goals: number; assists: number; saves: number; note: string | null; now: { goals: number; assists: number; saves: number } }>;
+  suggestions: Array<{ id: string; playerId: string; playerName: string; date: string; time: string | null; venueId: string | null; venue: string; note: string | null; backers: Array<{ id: string; name: string }> }>;
+  replies?: Array<{ playerId: string; playerName: string; status: string; respondedAt: string; promoted?: boolean; gameId: string; date: string; venue: string }>;
+  count: number;
+}
+
+/** Undo a change in Turf web's audit log, as its Undo button does; the reversal and the strike-through come with the next sync. */
+export const undoTurfChange = (os: LifeOSContext, changeId: string, doFetch: typeof fetch = fetch) => turfNow(os, 'POST', '/api/changes', { undo: changeId }, doFetch);
+
+export const fetchTurfInbox = (os: LifeOSContext, doFetch: typeof fetch = fetch) => turfNow<TurfInbox>(os, 'GET', '/api/inbox', undefined, doFetch);
+
+/**
+ * A decision on something in the bell, as Turf web's own buttons make it:
+ * "I've paid" confirmed (all, or `amount` rupees when part came in) or not yet;
+ * numbers a player logged approved or rejected; a join request approved or
+ * turned down; a suggested match declined (booking it goes through New match).
+ */
+export async function decideTurf(os: LifeOSContext, what: 'paid' | 'stats' | 'join' | 'suggestion', id: string, yes: boolean, amount?: number, doFetch: typeof fetch = fetch): Promise<void> {
+  if (what === 'paid') await turfNow(os, 'PATCH', '/api/paid-claims', { id, decision: yes ? 'confirm' : 'dismiss', ...(amount ? { amount } : {}) }, doFetch);
+  else if (what === 'stats') await turfNow(os, 'PATCH', '/api/claims', { id, decision: yes ? 'approve' : 'reject' }, doFetch);
+  else if (what === 'join') await turfNow(os, 'PATCH', '/api/squad-invites', { submissionId: id, decision: yes ? 'approve' : 'reject' }, doFetch);
+  else await turfNow(os, 'PATCH', '/api/suggestions', { id, decision: 'decline' }, doFetch);
+}
+
 /** Sync from the last change number (0: everything). Returns what the page changed. */
+const SETTING_FULL_0029 = 'turf.full0030';
+
 export async function syncTurf(os: LifeOSContext, doFetch: typeof fetch = fetch) {
-  const since = os.settings.get<number>(SETTING_REV, 0);
+  // Once: from the start, for what Turf web began sending (votes, kit wishes and partner picks in its
+  // migration 0029, seasons in 0030); an older build had already moved past them.
+  const full = !os.settings.get<boolean>(SETTING_FULL_0029, false);
+  const since = full ? 0 : os.settings.get<number>(SETTING_REV, 0);
   const r = applyTurfSync(os, await fetchTurfSync(os, since, doFetch));
+  if (full) os.settings.set(SETTING_FULL_0029, true);
+  // Games that just came in may be what a booking payment paid for (Your share).
+  linkVenuePayments(os);
+  matchRecentPayments(os);
   console.log(`[turf] synced ${since} → ${r.rev}: ${r.created} new, ${r.updated} changed, ${r.archived} archived, ${r.payments} payment entries, people ${r.peopleMatched} matched / ${r.peopleCreated} added, ${r.debtsOpen} open debts`);
   return r;
 }

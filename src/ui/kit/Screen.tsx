@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
-import { useBottomBarInset } from './BottomBar';
+import { OnBar, useBottomBarInset } from './BottomBar';
 import { IconButton } from './Button';
 import { Text } from './Text';
 
@@ -32,13 +32,14 @@ export function ScreenHeader({ title, subtitle, eyebrow, onBack, right, compact 
 
 /**
  * Screen scaffold on the ground colour: safe-area top, the header, then blocks
- * 12 apart inside the 20 gutter (Noir). `tab` leaves room for the floating nav.
+ * 12 apart inside the 20 gutter (Noir). `tab` (or a layout that floats the bar) leaves room for the floating nav.
  */
 export function Screen({ title, subtitle, eyebrow, onBack, right, header, tab, scroll = true, children, contentStyle, compact, ...scrollProps }: Omit<ScrollViewProps, 'children'> & { title?: string; subtitle?: string | null; eyebrow?: string; onBack?: () => void; right?: React.ReactNode; header?: React.ReactNode; tab?: boolean; scroll?: boolean; children?: React.ReactNode; contentStyle?: StyleProp<ViewStyle>; compact?: boolean }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const barInset = useBottomBarInset();
-  const bottom = tab ? barInset : insets.bottom + 24;
+  const onBar = useContext(OnBar);
+  const bottom = tab || onBar ? barInset : insets.bottom + 24;
   const head = title ? <ScreenHeader title={title} subtitle={subtitle ?? eyebrow} onBack={onBack} right={right} compact={compact} /> : null;
   const body = (
     <View style={[{ paddingHorizontal: t.layout.gutter, paddingTop: header ? 20 : insets.top + 16, gap: 12 }, contentStyle]}>

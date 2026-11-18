@@ -6,12 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { format, isToday, isYesterday } from 'date-fns';
 import type { ObjectRecord } from '@core/domain/types';
+import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import type { Theme } from '@ui/theme/tokens';
 import { blocks } from '@ui/theme/tokens';
-import { Icon, IconButton, Text } from '@ui/kit';
+import { Disc, Icon, IconButton, SectionHead, Text } from '@ui/kit';
+export { Disc, discColor, SectionHead } from '@ui/kit';
 import { TagChips } from '@ui/components/fields';
 import { categoryOf, type AccountData, type TransactionData } from '@modules/finance/types';
 import type { SplitRecord } from '@modules/finance/split';
@@ -41,27 +43,15 @@ const CATEGORY_COLORS: Record<string, string> = {
   freelance: '#6FD3C8',
 };
 
+/** Amounts as the kit writes them on charts: ₹780, ₹9.2k, ₹1.3L. */
+export function shortMoney(os: LifeOSContext, n: number): string {
+  const sym = os.format.currency(0).replace(/[\d.,\s]/g, '') || '₹';
+  const a = Math.abs(n);
+  const v = a >= 1e5 ? `${(a / 1e5).toFixed(1)}L` : a >= 1e3 ? `${(a / 1e3).toFixed(1)}k` : `${Math.round(a)}`;
+  return `${n < 0 ? '−' : ''}${sym}${v.replace('.0', '')}`;
+}
+
 export const catColor = (value: string | undefined, t: Theme) => CATEGORY_COLORS[value ?? 'other'] ?? t.paletteColor(categoryOf(value)?.color) ?? t.c.fg.tertiary;
-
-const DISC_COLORS = [blocks.yellow, blocks.mint, blocks.lilac, blocks.sky, blocks.pink, '#FF9F5A', '#FF8A6A', '#6FD3C8'];
-
-/** A merchant's or person's colour: fixed per name or id. */
-export function discColor(key: string): string {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return DISC_COLORS[h % DISC_COLORS.length]!;
-}
-
-/** A disc with the first letter (40 in a row, 56 on a record, 32 or 28 in a chip). */
-export function Disc({ name, colorKey, size = 40 }: { name: string; colorKey?: string; size?: number }) {
-  const letter = name.trim().match(/\p{L}|\p{N}/u)?.[0]?.toUpperCase() ?? '?';
-  const fontSize = size >= 56 ? 22 : size >= 40 ? 15 : size >= 32 ? 12 : 11;
-  return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: discColor(colorKey ?? name), alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <Text style={{ fontSize, lineHeight: fontSize + 4, fontWeight: '700', color: '#0B0B0D' }}>{letter}</Text>
-    </View>
-  );
-}
 
 /** A raised 40 disc with an icon. */
 export function IconDisc({ icon, color, size = 40 }: { icon: string; color?: string; size?: number }) {
@@ -83,26 +73,6 @@ export function Caps({ children, color, style }: { children: React.ReactNode; co
     <Text variant="labelCaps" color={color ?? 'secondary'} numberOfLines={1} style={style as never}>
       {children}
     </Text>
-  );
-}
-
-/** Section head: 17/600 title, a 13/400 line under it, an optional link on the right. */
-export function SectionHead({ title, sub, action, chevron, lime, onAction }: { title: string; sub?: string | null; action?: string; chevron?: boolean; lime?: boolean; onAction?: () => void }) {
-  const t = useTheme();
-  const tone = lime ? t.c.accent.gold : t.c.fg.secondary;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6, paddingHorizontal: 4 }}>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="heading" accessibilityRole="header">{title}</Text>
-        {sub ? <Text variant="caption" color="secondary" numberOfLines={1}>{sub}</Text> : null}
-      </View>
-      {action ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={action} hitSlop={14} onPress={onAction} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '600', color: tone }}>{action}</Text>
-          {chevron ? <Icon name="chevron-right" size={14} color={tone} /> : null}
-        </Pressable>
-      ) : null}
-    </View>
   );
 }
 
@@ -240,8 +210,41 @@ export function TxRow({ tx, line, minHeight = 60 }: { tx: ObjectRecord<Transacti
   );
 }
 
-const ACCOUNT_ICONS: Record<AccountData['kind'], string> = { bank: 'bank', credit: 'card', investment: 'trend', cash: 'cash', wallet: 'wallet', loan: 'receipt' };
+const ACCOUNT_ICONS: Record<AccountData['kind'], string> = { bank: 'bank', credit: 'card', debit: 'card', forex: 'globe', investment: 'trend', cash: 'cash', wallet: 'wallet', loan: 'receipt' };
 export const accountIcon = (kind: AccountData['kind']) => ACCOUNT_ICONS[kind] ?? 'card';
+
+/** One of the three numbers under the header: a caps label, 22/700, a 12 line. */
+export function Metric({ label, value, unit, line, color, grow = 1 }: { label: string; value: string; unit?: string; line?: string; color?: string; /** A wider share of the row, for a long figure. */ grow?: number }) {
+  return (
+    <View style={{ flex: grow, minWidth: 0, gap: 2 }}>
+      <Caps>{label}</Caps>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 22, lineHeight: 26, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'], color }}>
+        {value}
+        {unit ? <Text style={{ fontSize: 13, fontWeight: '600', color }}>{` ${unit}`}</Text> : null}
+      </Text>
+      {line ? <Text numberOfLines={1} color="secondary" style={{ fontSize: 12, lineHeight: 15 }}>{line}</Text> : null}
+    </View>
+  );
+}
+
+/** A 56 round action with its word under it. */
+export function Quick({ label, icon, color, onPress }: { label: string; icon: string; color?: string; onPress: () => void }) {
+  const t = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 8, opacity: pressed ? 0.7 : 1 })}>
+      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: t.c.bg.tile, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={20} color={color ?? t.c.accent.gold} />
+      </View>
+      <Text numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, fontWeight: '600' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** What a debt was for: "Turf · Playground Arena" reads "Turf at Playground Arena" (older ones carried the date too). */
+export const debtReason = (d: ObjectRecord<{ reason?: string }>) => (d.data.reason || d.title).replace(/^Turf · /, 'Turf at ').replace(/ · \d{4}-\d{2}-\d{2}$/, '');
+
+/** An account's kind in words. */
+export const KIND_WORD: Record<AccountData['kind'], string> = { bank: 'Bank', cash: 'Cash', credit: 'Credit card', debit: 'Debit card', forex: 'Forex card', investment: 'Investment', wallet: 'Wallet', loan: 'Loan' };
 
 /** "HDFC savings ··4821". */
 export const accountName = (a: ObjectRecord<AccountData>) => [a.title, a.data.last4 ? `··${a.data.last4}` : null].filter(Boolean).join(' ');

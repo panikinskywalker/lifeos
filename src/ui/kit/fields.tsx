@@ -180,7 +180,7 @@ export function DateField({ label, required, hint, error, value, onChange, withT
   };
   return (
     <View style={{ gap: 8 }}>
-      <PressField label={label} required={required} hint={hint} error={error} icon="calendar" text={date ? format(date, withTime ? 'EEE d MMM yyyy, HH:mm' : 'EEE d MMM yyyy') : null} placeholder="Not set" onPress={() => setOpen(true)} onClear={() => emit(null)} />
+      <PressField label={label} required={required} hint={hint} error={error} icon="calendar" text={date ? format(date, `EEE d MMM${date.getFullYear() === new Date().getFullYear() ? '' : ' yyyy'}${withTime ? ', HH:mm' : ''}`) : null} placeholder="Not set" onPress={() => setOpen(true)} onClear={required ? undefined : () => emit(null)} />
       {quick ? (
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           <Chip label="Today" onPress={() => shift(0)} />

@@ -128,10 +128,10 @@ export function rankLeaders(rows: LeaderRow[], c: LeaderCategory, position: Lead
   return { sorted, places, developing, needed };
 }
 
-/** Leaders from the records here (players keyed by Person), every completed match or those since `from`. */
-export function leaderTables(os: LifeOSContext, from?: string) {
+/** Leaders from the records here (players keyed by Person), every completed match or those from `from` to `to` (a season). */
+export function leaderTables(os: LifeOSContext, from?: string, to?: string | null) {
   const { players, history } = squadData(os);
-  const games = from ? history.filter((g) => g.date >= from) : history;
+  const games = history.filter((g) => (!from || g.date >= from) && (!to || g.date <= to));
   const done = games.filter((g) => isDone(g)).sort((a, b) => b.date.localeCompare(a.date));
   const rows = buildRows(players, games, history);
   /** Places before the last match day, for ▲▼. */

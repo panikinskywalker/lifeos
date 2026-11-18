@@ -5,13 +5,18 @@ import { format } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Card, Chip, ColumnChart, EmptyState, IconButton, LineChart, ProgressBar, RowItem, RowList, Screen, Section, Segmented, StackedBar, StatTile, Text } from '@ui/kit';
+import { Card, Chip, ColumnChart, EmptyState, Icon, IconButton, LineChart, ProgressBar, RowItem, RowList, Screen, Section, Segmented, StackedBar, StatTile, Text } from '@ui/kit';
+import { blocks } from '@ui/theme/tokens';
 import { categoryOf } from '@modules/finance/types';
 import { monthReport, netWorthSeries, subscriptionRunRate } from '@modules/finance/reports';
 import { netWorth } from '@modules/finance/lib';
 import { NoSubscriptions } from './screens';
+import { KIND_WORD } from './parts';
 
 type Tab = 'month' | 'subs' | 'worth';
+
+/** One minus sign everywhere (−, not -). */
+const signed = (ctx: LifeOSContext, n: number) => `${n < 0 ? '−' : ''}${ctx.format.currency(Math.abs(n))}`;
 
 /** "₹1.2L", "₹48k", "₹900": axis labels. */
 const short = (n: number) => {
@@ -28,17 +33,17 @@ export function ReportsScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
   const router = useRouter();
   const [tab, setTab] = useState<Tab>((params.tab as Tab) || 'month');
   return (
-    <Screen title="Reports" subtitle="Money" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse'))}>
+    <Screen title="Reports" subtitle="Money" onBack={() => (router.canGoBack() ? router.back() : router.replace('/module/finance' as never))}>
       <Segmented value={tab} onChange={setTab} options={[{ value: 'month', label: 'Month' }, { value: 'subs', label: 'Subscriptions' }, { value: 'worth', label: 'Net worth' }]} />
-      {tab === 'month' ? <MonthView ctx={ctx} /> : tab === 'subs' ? <SubsView ctx={ctx} /> : <WorthView ctx={ctx} />}
+      {tab === 'month' ? <MonthView ctx={ctx} start={Number(params.month) || 0} /> : tab === 'subs' ? <SubsView ctx={ctx} /> : <WorthView ctx={ctx} />}
     </Screen>
   );
 }
 
-function MonthView({ ctx }: { ctx: LifeOSContext }) {
+function MonthView({ ctx, start = 0 }: { ctx: LifeOSContext; start?: number }) {
   const t = useTheme();
   const router = useRouter();
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(Math.min(0, start));
   const r = useLive((o) => monthReport(o, offset), [offset]);
   const todayIdx = offset === 0 ? new Date().getDate() - 1 : undefined;
   const colors = r.byCategory.map((_, i) => t.c.chart[i % t.c.chart.length]!);
@@ -51,10 +56,16 @@ function MonthView({ ctx }: { ctx: LifeOSContext }) {
         </Text>
         <IconButton icon="chevron-right" accessibilityLabel="Next month" filled disabled={offset >= 0} onPress={() => setOffset(offset + 1)} />
       </View>
-      <StatTile size="2x1" tint="finance" icon="wallet" label="Spent" value={ctx.format.currency(r.spend)} caption={r.vsLast == null ? 'Nothing last month to compare' : `${r.vsLast >= 0 ? '+' : '−'}${Math.round(Math.abs(r.vsLast) * 100)}% vs last month`} tone={r.vsLast != null && r.vsLast > 0.1 ? 'alert' : undefined} />
+      {/* Direction A: what came in and what went, then how this month compares, in words. */}
       <View style={{ flexDirection: 'row', gap: 12 }}>
-        <StatTile tint="upkeep" icon="trend" label="Income" value={ctx.format.currency(r.income)} style={{ flex: 1 }} />
-        <StatTile tint={r.net >= 0 ? 'health' : 'people'} icon="chart" label="Left over" value={ctx.format.currency(r.net)} tone={r.net < 0 ? 'alert' : 'ok'} style={{ flex: 1 }} />
+        <FlowTile icon="download" disc={blocks.lime} value={ctx.format.currency(r.income)} label="Came in" />
+        <FlowTile icon="arrow-up" disc={blocks.lilac} value={ctx.format.currency(r.spend)} label="Spent, your share" />
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, paddingHorizontal: 18, borderRadius: 24, backgroundColor: r.net >= 0 ? blocks.sky : '#FF8A7A' }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ fontSize: 18, lineHeight: 23, fontWeight: '700', color: '#0B0B0D' }}>{r.vsLast == null ? `${signed(ctx, r.net)} left over` : `${Math.round(Math.abs(r.vsLast) * 100)}% ${r.vsLast > 0 ? 'more' : 'less'} than last month`}</Text>
+          <Text style={{ fontSize: 13, lineHeight: 17, color: 'rgba(11,11,13,0.68)' }}>{r.vsLast == null ? 'Nothing last month to compare' : `${signed(ctx, r.net)} left over`}</Text>
+        </View>
       </View>
       {r.spend > 0 ? (
         <>
@@ -76,6 +87,21 @@ function MonthView({ ctx }: { ctx: LifeOSContext }) {
         <EmptyState icon="receipt" tint="finance" line={`No spending logged in ${r.month.label}.`} bare />
       )}
     </>
+  );
+}
+
+function FlowTile({ icon, disc, value, label }: { icon: string; disc: string; value: string; label: string }) {
+  const t = useTheme();
+  return (
+    <View style={{ flex: 1, minWidth: 0, padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 14 }}>
+      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: disc, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={16} color="#0B0B0D" />
+      </View>
+      <View style={{ gap: 2 }}>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 22, lineHeight: 26, fontWeight: '700', letterSpacing: -0.6, fontVariant: ['tabular-nums'] }}>{value}</Text>
+        <Text color="secondary" style={{ fontSize: 13, lineHeight: 17 }}>{label}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -120,7 +146,7 @@ function WorthView({ ctx }: { ctx: LifeOSContext }) {
   const delta = last - first;
   return (
     <>
-      <StatTile size="2x1" tint="health" icon="trend" label="Net worth" value={ctx.format.currency(now.total)} caption={`${delta >= 0 ? '+' : '−'}${ctx.format.currency(Math.abs(delta))} over ${months} months · ${ctx.format.currency(now.assets)} assets, ${ctx.format.currency(now.liabilities)} owed`} tone={delta >= 0 ? 'ok' : 'alert'} />
+      <StatTile size="2x1" tint="health" icon="trend" label="Net worth" value={signed(ctx, now.total)} caption={`${delta >= 0 ? '+' : '−'}${ctx.format.currency(Math.abs(delta))} over ${series.length > 1 ? `${series.length - 1} month${series.length === 2 ? '' : 's'}` : 'this month'} · ${ctx.format.currency(now.assets)} assets, ${ctx.format.currency(now.liabilities)} owed`} tone={delta >= 0 ? 'ok' : 'alert'} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {[6, 12, 24].map((m) => (
           <Chip key={m} label={`${m} months`} tone={months === m ? 'accent' : 'neutral'} onPress={() => setMonths(m)} />
@@ -132,7 +158,7 @@ function WorthView({ ctx }: { ctx: LifeOSContext }) {
       <Section title="Accounts" meta={`${now.accounts.length}`}>
         <RowList>
           {now.accounts.map(({ account, balance }) => (
-            <RowItem key={account.id} icon="card" tint="finance" title={account.title} subtitle={account.data.includeInNetWorth === false ? 'Not counted in net worth' : account.data.kind} value={ctx.format.currency(balance)} valueTone={balance < 0 ? 'alert' : 'default'} strong onPress={() => router.push(`/entity/account/${account.id}`)} />
+            <RowItem key={account.id} icon="card" tint="finance" title={account.title} subtitle={account.data.includeInNetWorth === false ? 'Not counted in net worth' : KIND_WORD[account.data.kind]} value={signed(ctx, balance)} valueTone={balance < 0 ? 'alert' : 'default'} strong onPress={() => router.push(`/entity/account/${account.id}`)} />
           ))}
         </RowList>
       </Section>

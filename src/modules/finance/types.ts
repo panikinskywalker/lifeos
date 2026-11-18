@@ -30,16 +30,29 @@ export const categoryOf = (v: string | undefined) => CATEGORIES.find((c) => c.va
 const currencyField = { key: 'currency', label: 'Currency', type: 'select' as const, options: ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'AED', 'SGD'].map((c) => ({ value: c, label: c })), section: 'Details' };
 
 export interface AccountData {
-  kind: 'bank' | 'cash' | 'credit' | 'investment' | 'wallet' | 'loan';
+  /** debit: a debit card kept as its own account; forex: a prepaid forex card, loaded with money for spending abroad (17 Nov, Rutvij). */
+  kind: 'bank' | 'cash' | 'credit' | 'debit' | 'forex' | 'investment' | 'wallet' | 'loan';
   currency?: string;
   openingBalance: number;
   /** The bank / broker as an Organisation record (R1). `institution` is the old free-text name, folded into it on start. */
   institutionId?: string;
   institution?: string;
   last4?: string;
+  /** Last digits of copies merged into this account, so their texts still land here. */
+  alsoLast4?: string[];
   creditLimit?: number;
   includeInNetWorth?: boolean;
   color?: string;
+  /** The balance the bank last stated in a text ("Avl Bal"), the day it was for and when the text came; payments after that day add to it. */
+  knownBalance?: number;
+  knownOn?: string;
+  knownAt?: number;
+  /** A card's latest statement: the total and minimum due, by when (cleared when a payment that covers it arrives). */
+  statement?: { total: number; min?: number; dueOn: string; at: number };
+  /** What to use it for, with commas ("Shopping, Forex"), shown as pills on the card: Ask Money fills it in, or you type it. */
+  useFor?: string;
+  /** A forex card's money in each currency, as you last set it (on that day, at that time); spends in a currency after it come off. */
+  pockets?: Array<{ currency: string; amount: number; on: string; at: number }>;
 }
 
 export const accountType: ObjectDef<AccountData> = {
@@ -49,25 +62,33 @@ export const accountType: ObjectDef<AccountData> = {
   labelPlural: 'Accounts',
   icon: 'creditcard',
   schema: z.object({
-    kind: z.enum(['bank', 'cash', 'credit', 'investment', 'wallet', 'loan']).default('bank'),
+    kind: z.enum(['bank', 'cash', 'credit', 'debit', 'forex', 'investment', 'wallet', 'loan']).default('bank'),
     currency: z.string().optional(),
     openingBalance: z.coerce.number().default(0),
     institutionId: z.string().optional(),
     institution: z.string().optional(),
     last4: z.string().max(4).optional(),
+    alsoLast4: z.array(z.string()).optional(),
     creditLimit: z.coerce.number().optional(),
     includeInNetWorth: z.boolean().default(true),
     color: z.string().optional(),
+    knownBalance: z.coerce.number().optional(),
+    knownOn: z.string().optional(),
+    knownAt: z.coerce.number().optional(),
+    statement: z.object({ total: z.number(), min: z.number().optional(), dueOn: z.string(), at: z.number() }).optional(),
+    useFor: z.string().max(80).optional(),
+    pockets: z.array(z.object({ currency: z.string(), amount: z.number(), on: z.string(), at: z.number() })).optional(),
   }),
   fields: [
     { key: 'kind', label: 'Type', type: 'select', required: true, summary: true, options: [
-      { value: 'bank', label: 'Bank' }, { value: 'cash', label: 'Cash' }, { value: 'credit', label: 'Credit card' }, { value: 'investment', label: 'Investment' }, { value: 'wallet', label: 'Wallet / UPI' }, { value: 'loan', label: 'Loan' },
+      { value: 'bank', label: 'Bank' }, { value: 'cash', label: 'Cash' }, { value: 'credit', label: 'Credit card' }, { value: 'debit', label: 'Debit card' }, { value: 'forex', label: 'Forex card (prepaid)' }, { value: 'investment', label: 'Investment' }, { value: 'wallet', label: 'Wallet / UPI' }, { value: 'loan', label: 'Loan' },
     ] },
     { key: 'openingBalance', label: 'Opening balance', type: 'money', required: true, default: 0 },
     { key: 'institutionId', label: 'Institution', type: 'link', linkTo: 'org', linkWord: 'institution', summary: true, section: 'Details', description: 'The bank, card issuer or broker' },
     { key: 'last4', label: 'Last 4 digits', type: 'text', section: 'Details' },
     currencyField,
     { key: 'creditLimit', label: 'Credit limit', type: 'money', section: 'Details' },
+    { key: 'useFor', label: 'Use it for', type: 'text', section: 'Details', description: 'What this card is best for, with commas: Shopping, Forex, Fuel. Ask Money fills it in.' },
     { key: 'includeInNetWorth', label: 'Include in net worth', type: 'boolean', default: true, section: 'Details' },
   ],
   indexed: ['kind'],
@@ -75,7 +96,7 @@ export const accountType: ObjectDef<AccountData> = {
   links: [{ kind: 'account', label: 'Transactions', to: 'transaction', cardinality: 'many' }, { kind: 'institution', label: 'Institution', to: 'org', cardinality: 'one' }],
 };
 
-export type TransactionSource = 'sms' | 'notification' | 'mail' | 'dump' | 'manual' | 'cycle';
+export type TransactionSource = 'sms' | 'notification' | 'mail' | 'dump' | 'manual' | 'cycle' | 'import';
 
 export interface TransactionData {
   amount: number;
@@ -97,6 +118,10 @@ export interface TransactionData {
   tripId?: string;
   personIds?: string[];
   projectId?: string;
+  /** Your share (MODEL layer 2): the part of the amount that is yours; empty = all of it. A payback is 0. */
+  share?: number;
+  /** Money back for a purchase: not income; it takes its amount off spending in its category. */
+  refund?: boolean;
   /** Where it came from, the source's own id, and the raw text (cleared 60 days after filing). */
   source?: TransactionSource;
   sourceRef?: string;
@@ -109,6 +134,8 @@ export const transactionType: ObjectDef<TransactionData> = {
   label: 'Transaction',
   labelPlural: 'Transactions',
   icon: 'arrow.up.arrow.down',
+  // Payments are not Links (MODEL.md layer 5): each is an Event on the card, the payee and the people it touches, their audit trail.
+  linkRole: { trail: true },
   schema: z.object({
     amount: z.coerce.number().nonnegative(),
     kind: z.enum(['expense', 'income', 'transfer', 'investment']).default('expense'),
@@ -130,7 +157,9 @@ export const transactionType: ObjectDef<TransactionData> = {
     projectId: z.string().optional(),
     /** Split details (split.ts SplitRecord); debts are filed separately. */
     split: z.any().optional(),
-    source: z.enum(['sms', 'notification', 'mail', 'dump', 'manual', 'cycle']).optional(),
+    share: z.coerce.number().nonnegative().optional(),
+    refund: z.boolean().optional(),
+    source: z.enum(['sms', 'notification', 'mail', 'dump', 'manual', 'cycle', 'import']).optional(),
     sourceRef: z.string().optional(),
     rawText: z.string().optional(),
   }),
@@ -148,6 +177,8 @@ export const transactionType: ObjectDef<TransactionData> = {
     { key: 'projectId', label: 'Project', type: 'link', linkTo: 'project', linkWord: 'project', section: 'Links' },
     { key: 'investmentId', label: 'Investment', type: 'link', linkTo: 'investment', linkWord: 'investment', section: 'Links' },
     { key: 'note', label: 'Note', type: 'longtext', section: 'Details' },
+    { key: 'share', label: 'Your share', type: 'money', section: 'Details', description: 'The part that is yours; empty means all of it. A split sets it; a payback is 0' },
+    { key: 'refund', label: 'Refund', type: 'boolean', section: 'Details', description: 'Money back for a purchase: comes off spending, not counted as income' },
     currencyField,
     { key: 'source', label: 'Source', type: 'select', section: 'Source', options: [{ value: 'sms', label: 'SMS' }, { value: 'notification', label: 'Notification' }, { value: 'mail', label: 'Mail' }, { value: 'dump', label: 'Dump' }, { value: 'manual', label: 'Typed' }, { value: 'cycle', label: 'Cycle' }] },
     { key: 'rawText', label: 'Original text', type: 'longtext', section: 'Source', description: 'Kept 60 days after filing' },
@@ -273,6 +304,12 @@ export interface SubscriptionData {
   currency?: string;
   /** Every price it has had, oldest first; the renewal appends when the amount changes. */
   priceHistory?: Array<{ amount: number; from: string }>;
+  /** Charged in another currency: the price in it, so the rupee rate is not taken for a price change. */
+  foreign?: { amount: number; currency: string };
+  /** A bill (electricity, water, an EMI) rather than something you subscribe to: its amount changes and you pay it (docs/MODEL.md, phase D, 5). */
+  bill?: boolean;
+  /** The word that names the biller in a payment ("MSEDCL"). */
+  payee?: string;
 }
 
 export const subscriptionType: ObjectDef<SubscriptionData> = {
@@ -292,6 +329,9 @@ export const subscriptionType: ObjectDef<SubscriptionData> = {
     url: z.string().optional(),
     currency: z.string().optional(),
     priceHistory: z.array(z.object({ amount: z.number(), from: z.string() })).optional(),
+    foreign: z.object({ amount: z.number(), currency: z.string() }).optional(),
+    bill: z.boolean().optional(),
+    payee: z.string().optional(),
   }),
   fields: [
     { key: 'name', label: 'Service', type: 'text', required: true, placeholder: 'Netflix, iCloud, Gym…' },

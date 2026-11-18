@@ -1,4 +1,5 @@
 import type { DatabaseAdapter } from '../db/adapter';
+import type { LLMProvider } from '../ai/provider';
 import type { Registry } from './registry';
 import type { RecordRepo } from '../repo/recordRepo';
 import type { AttachmentRepo, CustomFieldRepo, ModuleRepo, LinkRepo, ReminderRepo, SettingsRepo, TagRepo, ViewRepo } from '../repo/sideRepos';
@@ -212,9 +213,18 @@ export interface DeviceBridge {
    * a time with the scheduled ones. Boards reach it here, never platform code.
    */
   brain?: {
-    model(): Promise<BrainModel | null>;
+    /** The brain's model, or another one by id (a photo is read by `PHOTO_MODEL`). */
+    model(id?: string): Promise<BrainModel | null>;
     pass(why: string): Promise<PassResult>;
   };
+  /**
+   * The agent chain (You › Agent) for boards: Ask Money's typed questions go
+   * through the same providers as the Dump box. Null with no usable key; absent
+   * in demo mode, where nothing leaves the phone.
+   */
+  agent?(): Promise<{ main: LLMProvider; smart?: LLMProvider } | null>;
+  /** The Claude key from You › Agent, for Ask Money's agent (docs/MODEL.md, Ask Money is an agent: how it runs). */
+  claudeKey?(): Promise<string | null>;
   /** The phone's secure store (keys a source needs, e.g. Turf web's): never in settings, never in a backup. */
   secrets?: {
     get(key: string): Promise<string | null>;

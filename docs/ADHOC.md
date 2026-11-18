@@ -43,6 +43,13 @@ What the app couldn't handle goes through a nightly Claude run and comes back fi
 A friendly "LifeOS import" file (records + links, not raw backup rows) that goes through normal filing, opened via Share → LifeOS or the file picker. The results file above is a superset; build them together.
 
 ## Offered, waiting on a decision
+- **Splitwise's group screens in LifeOS** (17 Nov, Rutvij: "we will find a way to integrate this in the future"): groups, members and their balances as Splitwise shows them, beyond what Who owes whom, Turf and trips cover. Needs its own design.
+
+- **Ideas from broke** (15 Nov; an open-source Rocket Money clone, github.com/nextwork-projects/broke, read only, nothing copied):
+  - *Suggested budget:* from your history, a limit per category and "this leaves ₹X to save" against your usual income; one tap **Use these**. Ours has targets and a monthly line but no suggestion.
+  - *One privacy gate for every AI path:* a cloud model gets a summary (rounded amounts, names as tokens); full detail only to a model on the device; answers can never change data. Ours sends Ask Money's query results (exact totals, payee names) as records.
+  - *Statement import:* CSV, OFX, QIF or PDF with column mapping and a preview count, plus **Clear my data** to redo it. Ours has neither import nor CSV export (also in `docs/research/money-basics.md`).
+  - *OpenRouter in one tap:* OAuth PKCE sign-in instead of pasting a key; or use an AI app already on your computer.
 
 - **Notion connector** (28 Sep): internal-integration token pasted once; you share pages / databases with it. Could bring pages in as searchable notes linked to people / projects, a task database as tasks, a journal onto the Time view. *24 Oct: the People CRM part is pushed as R2b (MODEL layer 4, *Notion*); notes, tasks and the journal stay open.*
 - **Other token connectors:** GitHub (commits → an Activity tracker "days coded"), Todoist / Linear (tasks), Splitwise (shared expenses). Strava / Spotify need a sign-in flow like Google.

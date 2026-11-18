@@ -18,13 +18,8 @@ import type { Props } from './common';
  * picker (photos aren't in the sync yet) and no delete (Turf web has none).
  */
 
-/** The format chips: 8+ covers Turf web's 8, 9 and 11 (a 9 or 11 from Turf web stays as it is). */
-const FORMATS: Array<{ size: number; label: string }> = [
-  { size: 5, label: '5-a-side' },
-  { size: 6, label: '6-a-side' },
-  { size: 7, label: '7-a-side' },
-  { size: 8, label: '8+' },
-];
+/** The format chips, as Turf web's (5 to 11 a side). */
+const FORMATS: Array<{ size: number; label: string }> = [5, 6, 7, 8, 9, 10, 11].map((size) => ({ size, label: `${size}-a-side` }));
 
 /** "8:00 pm", "8pm", "20:00", "2030" → "20:00"; null if it isn't a time. */
 function parseKickOff(raw: string): string | null {
@@ -119,7 +114,7 @@ export function TurfVenueEdit({ params }: Props) {
       <Field label="Format">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {FORMATS.map((f) => (
-            <Chip key={f.size} label={f.label} on={f.size === 8 ? (v.sideSize ?? 0) >= 8 : v.sideSize === f.size} onPress={() => set({ sideSize: f.size === 8 && (v.sideSize ?? 0) >= 8 ? v.sideSize : f.size })} />
+            <Chip key={f.size} label={f.label} on={v.sideSize === f.size} onPress={() => set({ sideSize: f.size })} />
           ))}
         </View>
       </Field>

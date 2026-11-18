@@ -9,7 +9,8 @@ import type { BrainModel } from '../brain/model';
  * - the answer constrained to a JSON schema (`output_config.format`);
  * - effort set explicitly (Opus 5.5 defaults to medium);
  * - server-side fallbacks, so a declined request is answered by another model;
- * - a photo only when you sent one on purpose (Snap the fridge), before the text.
+ * - a photo or PDF only when you sent one on purpose (Snap the fridge, an uploaded
+ *   statement), before the text; a PDF goes as a `document` block.
  */
 
 export const BRAIN_MODELS = [
@@ -18,6 +19,10 @@ export const BRAIN_MODELS = [
   { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
 ] as const;
 export const DEFAULT_BRAIN_MODEL = 'claude-opus-5-5';
+/** Reading a photo or PDF you sent (a bill, the fridge) goes to Haiku, whatever the brain's model (17 Nov, Rutvij). */
+export const PHOTO_MODEL = 'claude-haiku-5-5';
+/** A statement or fund screen is a dense table: Sonnet reads it (17 Nov: Haiku missed funds and SIPs). */
+export const STATEMENT_MODEL = 'claude-sonnet-5-5';
 
 export interface ClaudeBrainOptions {
   apiKey: string;
@@ -42,13 +47,13 @@ export function createClaudeBrain(opts: ClaudeBrainOptions): BrainModel {
   return {
     id: 'claude',
     model,
-    async complete({ system, user, maxTokens, schema, image }) {
+    async complete({ system, user, maxTokens, schema, image, effort }) {
       const body: Record<string, unknown> = {
         model,
         max_tokens: maxTokens,
         system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: image ? [{ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }, { type: 'text', text: user }] : user }],
-        output_config: { effort: opts.effort ?? 'medium', ...(schema ? { format: { type: 'json_schema', schema } } : {}) },
+        messages: [{ role: 'user', content: image ? [{ type: image.mediaType === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }, { type: 'text', text: user }] : user }],
+        output_config: { effort: effort ?? opts.effort ?? 'medium', ...(schema ? { format: { type: 'json_schema', schema } } : {}) },
       };
       if (fallbacks) body.fallbacks = 'default';
       let res: Response;

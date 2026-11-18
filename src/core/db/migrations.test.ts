@@ -33,6 +33,7 @@ const SHIPPED: Record<number, string> = {
   14: '55a64433',
   15: 'cac7e96b',
   16: 'eb28da8d',
+  17: '62786690',
 };
 const hash = (m: (typeof migrations)[number]) => createHash('sha256').update(JSON.stringify(m)).digest('hex').slice(0, 8);
 

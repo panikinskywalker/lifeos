@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, formatDistanceToNow } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
-import { allAppearances, allPlayers, auditLog, duesTexts, isSending, markPaid, owedOn, recordPayment, rupees, turfDues, youPersonId, type AuditEntry, type DueGame, type DuePerson, type Dues } from '@modules/games';
+import { allAppearances, allPlayers, auditLog, duesTexts, undoTurfChange, isSending, markPaid, owedOn, payPart, recordPayment, rupees, turfDues, youPersonId, type AuditEntry, type DueGame, type DuePerson, type Dues } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { monoFonts } from '@ui/theme/tokens';
+import { fonts, monoFonts } from '@ui/theme/tokens';
 import { ChipRow, FilterChip, Icon, IconButton, Screen, Text, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Face, Mono, SyncPill } from './teams';
 import { useCopyShare } from './switcher';
 import { NotConnected, type Props, useBack } from './common';
+import { SearchBox, found } from './search';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir money screens: 1b Dues (TF-Dues) and 1c Audit log (TF-Audit),
@@ -36,11 +38,12 @@ export const todayIso = () => format(new Date(), 'yyyy-MM-dd');
 /* ------------------------------------------------------------------ */
 
 /** The top bar's right side on Turf screens: "Synced 9:40" and a round ⋯ (Turf web settings). */
-export function HeaderRight() {
+export function HeaderRight({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
   return (
     <>
       <SyncPill />
+      {children}
       <IconButton icon="more" filled accessibilityLabel="Turf web settings" onPress={() => router.push('/settings/turf' as never)} />
     </>
   );
@@ -164,6 +167,29 @@ interface JustPaid {
 
 const keyOf = (p: Pick<DuePerson, 'playerId' | 'direction'>) => `${p.direction}:${p.playerId}`;
 
+/** Turf web's AmountBox: ₹ and an amount in a pill, and Record (it pays the oldest open games first; more than is open becomes credit). */
+function AmountBox({ placeholder, value, onChange, onSave }: { placeholder: string; value: number | undefined; onChange: (v: number | undefined) => void; onSave: (rupees: number) => void }) {
+  const t = useTheme();
+  const [text, setText] = useState(value ? String(value) : '');
+  const set = (raw: string) => {
+    const clean = raw.replace(/[^\d.]/g, '').slice(0, 8);
+    setText(clean);
+    onChange(Number(clean) > 0 ? Number(clean) : undefined);
+  };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ flex: 1, minWidth: 0, height: 36, paddingHorizontal: 12, borderRadius: 999, backgroundColor: t.c.bg.tileRaised, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <Text variant="caption" color="tertiary">₹</Text>
+        <TextInput value={text} onChangeText={set} inputMode="decimal" keyboardType="decimal-pad" placeholder={placeholder} placeholderTextColor={t.c.fg.tertiary} accessibilityLabel="Amount paid" style={{ flex: 1, minWidth: 0, height: 36, padding: 0, fontFamily: fonts[600], fontSize: 14, color: t.c.fg.primary }} />
+      </View>
+      <PillButton title="Record" height={36} disabled={!(Number(text) > 0)} onPress={() => {
+        onSave(Number(text));
+        setText('');
+      }} />
+    </View>
+  );
+}
+
 /**
  * "Who still owes": one line per person (face, name, "2 games · since 3 Oct",
  * amount, tick); tap to open their games, each with its own tick, and Settle
@@ -179,6 +205,7 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
   const { copy, share } = useCopyShare();
   const [open, setOpen] = useState<string | null>(null);
   const [paid, setPaid] = useState<JustPaid[]>([]);
+  const [part, setPart] = useState<number | undefined>(undefined);
   const live = useLive((o) => ({ you: youPersonId(o), sending: new Set(paid.filter((x) => isSending(o, x.appearanceId)).map((x) => x.appearanceId)), reminders: duesTexts(o) }), [paid]);
 
   const settle = (p: DuePerson, gameIds?: string[]) => {
@@ -202,6 +229,28 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
       undo: () => {
         for (const [id, amount] of owed) recordPayment(os, id, { amount: -amount, kind: 'correction', note: 'Mark paid undone' });
         setPaid((prev) => prev.filter((x) => !owed.has(x.appearanceId)));
+        void pull(true);
+      },
+    });
+    void pull(true);
+  };
+
+  // Part of what they owe, oldest games first; anything over waits as credit.
+  const payDown = (p: DuePerson, amount: number) => {
+    const apps = sharesOf(os, p).filter((a) => owedOn(a.data) > 0).sort((a, b) => a.data.gameDate.localeCompare(b.data.gameDate));
+    let items;
+    try {
+      items = payPart(os, apps.map((a) => a.id), amount);
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+      return;
+    }
+    setPart(undefined);
+    toast.show({
+      message: `${firstName(p.name)} paid ${os.format.currency(amount)}`,
+      icon: 'check',
+      undo: () => {
+        for (const it of items) recordPayment(os, it.recordId!, { amount: -Number(it.payload.body.amount), kind: 'correction', note: 'Part payment undone' });
         void pull(true);
       },
     });
@@ -232,7 +281,7 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
     const games = [...r.ticked.map((x) => ({ g: x.game, ticked: true, sending: live.sending.has(x.appearanceId) })), ...r.open.map((g) => ({ g, ticked: false, sending: false }))].sort((a, b) => a.g.date.localeCompare(b.g.date));
     items.push(
       <View key={r.key} style={{ gap: 8 }}>
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityLabel={`${p.name}, ${rupees(done ? doneTotal : total)}`} onPress={() => setOpen(isOpen ? null : r.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityLabel={`${p.name}, ${rupees(done ? doneTotal : total)}`} onPress={() => (setOpen(isOpen ? null : r.key), setPart(undefined))} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
           <Face id={p.playerId} name={p.name} size={36} />
           <View style={{ flex: 1, minWidth: 0, gap: 1, opacity: done ? 0.55 : 1 }}>
             <Text variant="tileTitle" numberOfLines={1} style={{ lineHeight: 20 }}>
@@ -283,6 +332,9 @@ export function DueRows({ people, settled = [], pull }: { people: DuePerson[]; s
                 </View>
               ))}
             </View>
+            {!youOwe && !done ? (
+              <AmountBox placeholder={`Part of ${rupees(total)}, oldest first`} value={part} onChange={setPart} onSave={(amount) => payDown(p, amount)} />
+            ) : null}
             {!youOwe && !done ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                 <PillButton title="Settle up" height={36} onPress={() => settle(p)} />
@@ -341,14 +393,33 @@ function SendingNote({ caps }: { caps?: boolean }) {
 }
 
 /** Copy all · ₹1,170 and a share disc, under the rows. */
-export function CopyAllRow({ height = 48 }: { height?: number }) {
-  const { copy, share } = useCopyShare();
+/** Home's "Who still owes" buttons, as Turf web's: Copy details and Copy short. */
+export function CopyAllRow({ height = 40 }: { height?: number }) {
+  const t = useTheme();
+  const { copy } = useCopyShare();
   const d = useLive((o) => ({ texts: duesTexts(o), total: turfDues(o).owedToYou.totalCents }), []);
   if (!d.total) return null;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <PillButton title={`Copy all · ${rupees(d.total)}`} icon="file" height={height} full onPress={() => void copy(d.texts.all, 'Copied · everyone’s dues')} />
-      <Disc icon="share" label="Share everyone’s dues" size={height} onPress={() => share(d.texts.all)} />
+      <PillButton title="Copy details" icon="file" height={height} full onPress={() => void copy(d.texts.all, 'Details copied')} />
+      <PillButton title="Copy short" icon="file" height={height} full bg="transparent" style={{ borderWidth: 1, borderColor: t.c.line }} onPress={() => void copy(d.texts.short, 'Short version copied')} />
+    </View>
+  );
+}
+
+/** Turf web's Dues buttons: Copy details, Copy short, Share on WhatsApp. */
+function DuesTexts({ total }: { total: number }) {
+  const t = useTheme();
+  const { copy, share } = useCopyShare();
+  const texts = useLive((o) => duesTexts(o), []);
+  const ghost = { bg: 'transparent', style: { borderWidth: 1, borderColor: t.c.line } } as const;
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <PillButton title="Copy details" icon="file" height={48} full onPress={() => void copy(texts.all, 'Details copied')} />
+        <PillButton title="Copy short" icon="file" height={48} full {...ghost} onPress={() => void copy(texts.short, 'Short version copied')} />
+      </View>
+      <PillButton title={`Share on WhatsApp · ${rupees(total)}`} icon="send" height={44} bg="transparent" style={{ alignSelf: 'stretch', borderWidth: 1, borderColor: t.c.line }} onPress={() => share(texts.all)} />
     </View>
   );
 }
@@ -371,6 +442,7 @@ export function TurfDues(_props: Props) {
   const back = useBack();
   const { busy, pull } = usePull();
   const [filter, setFilter] = useState<DuesFilter>('all');
+  const [q, setQ] = useState('');
   const data = useLive((o) => {
     if (!allPlayers(o).length) return null;
     const today = todayIso();
@@ -383,37 +455,38 @@ export function TurfDues(_props: Props) {
   else {
     const { d } = data;
     const youOwe = d.people.filter((p) => p.direction === 'you_owe');
-    const shown = filter === 'settled' ? [] : filter === 'all' ? d.people : d.people.filter((p) => p.direction === filter);
+    const shown = (filter === 'settled' ? [] : filter === 'all' ? d.people : d.people.filter((p) => p.direction === filter)).filter((p) => found(q, p.name, p.creditorName));
     const oldestFirst = [...shown].sort((a, b) => a.since.localeCompare(b.since) || b.totalCents - a.totalCents);
-    const settled = filter === 'all' || filter === 'settled' ? d.settled : [];
-    const empty = filter === 'you_owe' ? 'You don’t owe anyone.' : filter === 'settled' ? 'Nobody has settled in the last 30 days.' : 'Nothing open. Every share is paid.';
+    const settled = (filter === 'all' || filter === 'settled' ? d.settled : []).filter((x) => found(q, x.name));
+    const empty = filter === 'you_owe' ? 'You don’t owe anyone.' : filter === 'settled' ? 'Nobody has settled in the last 30 days.' : 'Nothing open.';
     body = (
       <>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <StatTile label="Owed to you" value={rupees(d.owedToYou.totalCents)} sub={d.owedToYou.people ? `${plural(d.owedToYou.people, 'person', 'people')} · oldest ${dayMonth(d.owedToYou.oldest!)}` : 'all paid'} accent onPress={() => setFilter('owes_you')} />
-          <StatTile label="You owe" value={rupees(d.youOwe.totalCents)} sub={youOwe.length ? youOwe.map((p) => `${firstName(p.name)} · ${day(p.since)}`).join(', ') : data.you ? 'nothing' : 'set which player is you'} onPress={() => (data.you ? setFilter('you_owe') : router.push('/settings/turf' as never))} />
+          <StatTile label="Owed to you" value={rupees(d.owedToYou.totalCents)} sub={d.owedToYou.people ? `${plural(d.owedToYou.people, 'person', 'people')} · oldest ${dayMonth(d.owedToYou.oldest!)}` : 'all paid'} accent />
+          <StatTile label="You owe" value={rupees(d.youOwe.totalCents)} sub={youOwe.length ? youOwe.map((p) => `${firstName(p.name)} · ${day(p.since)}`).join(', ') : data.you ? 'nothing' : 'set who you are in Settings'} />
         </View>
         <TurfCard padding={10} radius={20}>
           <Pressable accessibilityRole="link" onPress={() => router.push('/board/turf/audit' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 40 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.dim, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="history" size={16} />
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="history" size={16} color="#F5F5F7" />
             </View>
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text variant="rowTitle">Audit log</Text>
               <Text variant="caption" color="secondary" numberOfLines={1}>
-                {data.changes.length ? `${plural(data.changes.length, 'change')} today · last ${format(new Date(data.changes[0]!.at), 'H:mm')}` : 'Every change Turf web logged'}
+                {data.changes.length ? `${plural(data.changes.length, 'change')} today · last ${format(new Date(data.changes[0]!.at), 'H:mm')} · undo any` : 'every change, with undo'}
               </Text>
             </View>
             <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} />
           </Pressable>
         </TurfCard>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        <ChipRow>
           {DUES_FILTERS.map((f) => (
             <FilterChip key={f.key} label={f.label} selected={filter === f.key} onPress={() => setFilter(f.key)} />
           ))}
-        </View>
+        </ChipRow>
+        <SearchBox value={q} onChange={setQ} placeholder="Search people" />
         <Text variant="caption" color="tertiary">
-          Oldest first · the checkbox marks every game paid · tap a row for one game at a time
+          Oldest first · the checkbox marks every game paid · tap a row for one game at a time or a part payment
         </Text>
         <TurfCard gap={8}>
           {oldestFirst.length || settled.length ? (
@@ -424,7 +497,7 @@ export function TurfDues(_props: Props) {
             </Text>
           )}
         </TurfCard>
-        {d.credits.length && filter === 'all' ? (
+        {d.credits.length ? (
           <TurfCard gap={8}>
             <Text variant="labelCaps" color="tertiary" style={{ textTransform: 'uppercase' }}>
               Credit held
@@ -440,16 +513,16 @@ export function TurfDues(_props: Props) {
               </View>
             ))}
             <Text variant="caption" color="tertiary">
-              Paid more than their share. Turf web takes it off their next match.
+              Paid more than their share. It comes off their next match automatically, and the move shows in the audit log.
             </Text>
           </TurfCard>
         ) : null}
-        <CopyAllRow />
+        {d.owedToYou.totalCents > 0 || d.credits.length ? <DuesTexts total={d.owedToYou.totalCents} /> : null}
       </>
     );
   }
   return (
-    <Screen title="Dues" subtitle="Turf · Home" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+    <Screen title="Dues" subtitle="Turf · Home" onBack={back} right={<HeaderRight><BellButton /></HeaderRight>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       {body}
     </Screen>
   );
@@ -459,17 +532,9 @@ export function TurfDues(_props: Props) {
 /* 1c · Audit log                                                      */
 /* ------------------------------------------------------------------ */
 
-type AuditFilter = 'all' | AuditEntry['kind'];
-const AUDIT_FILTERS: Array<{ key: AuditFilter; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'dues', label: 'Dues' },
-  { key: 'teams', label: 'Teams' },
-  { key: 'stats', label: 'Stats' },
-  { key: 'match', label: 'Matches' },
-];
 const KIND_WORD: Record<AuditEntry['kind'], string> = { dues: 'Dues', teams: 'Teams', stats: 'Stats', match: 'Match' };
 
-function AuditRows({ entries }: { entries: AuditEntry[] }) {
+export function AuditRows({ entries, onUndo }: { entries: AuditEntry[]; onUndo?: (c: AuditEntry) => void }) {
   const t = useTheme();
   return (
     <>
@@ -499,6 +564,12 @@ function AuditRows({ entries }: { entries: AuditEntry[] }) {
                 <Text variant="labelCaps" color="tertiary" style={{ textTransform: 'uppercase' }}>
                   Undone
                 </Text>
+              ) : onUndo && c.undoable !== false && !c.undoOf ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={`Undo: ${c.summary}`} hitSlop={8} onPress={() => onUndo(c)}>
+                  <Text variant="label" color={t.c.accent.gold} style={{ fontWeight: '700' }}>
+                    Undo
+                  </Text>
+                </Pressable>
               ) : null}
             </View>
           </View>
@@ -508,11 +579,28 @@ function AuditRows({ entries }: { entries: AuditEntry[] }) {
   );
 }
 
+/** Undo a logged change on Turf web, then sync so the reversal shows. */
+export function useUndo(pull: (quiet?: boolean) => Promise<void>) {
+  const os = useOS();
+  const toast = useToast();
+  return async (c: AuditEntry) => {
+    try {
+      await undoTurfChange(os, c.id);
+      toast.show({ message: `Undone · ${c.summary}`, icon: 'check' });
+      await pull(true);
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+    }
+  };
+}
+
 export function TurfAudit(_props: Props) {
   const back = useBack();
   const { busy, pull } = usePull();
-  const [filter, setFilter] = useState<AuditFilter>('all');
-  const entries = useLive((o) => auditLog(o, filter === 'all' ? undefined : filter), [filter]);
+  const undo = useUndo(pull);
+  // Money only, as Turf web's audit log: payments, marked paid and undone, credit. Each match keeps its own history.
+  const [q, setQ] = useState('');
+  const entries = useLive((o) => auditLog(o, 'dues'), []).filter((e) => found(q, e.summary, e.actor, e.device));
   const today = todayIso();
   const yesterday = format(new Date(Date.now() - 86_400_000), 'yyyy-MM-dd');
   const byDay = new Map<string, AuditEntry[]>();
@@ -521,28 +609,24 @@ export function TurfAudit(_props: Props) {
     byDay.set(d, [...(byDay.get(d) ?? []), e]);
   }
   return (
-    <Screen title="Audit log" subtitle="Turf · Dues" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
-      <ChipRow>
-        {AUDIT_FILTERS.map((f) => (
-          <FilterChip key={f.key} label={f.label} selected={filter === f.key} onPress={() => setFilter(f.key)} />
-        ))}
-      </ChipRow>
+    <Screen title="Audit log" subtitle="Turf · Dues" onBack={back} right={<HeaderRight><BellButton /></HeaderRight>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       <Text variant="caption" color="tertiary">
-        What Turf web logged, newest first. Undo stays on Turf web for now: a change undone there shows here struck through.
+        Money only: payments, marked paid and undone, credit, newest first. Goals, sides and edits are in each match’s history.
       </Text>
+      <SearchBox value={q} onChange={setQ} placeholder="Search names or amounts" />
       {byDay.size ? (
         [...byDay.entries()].map(([d, items]) => (
           <TurfCard key={d || 'undated'} gap={8}>
             <Text variant="labelCaps" color="tertiary" style={{ textTransform: 'uppercase' }}>
               {d === today ? 'Today' : d === yesterday ? 'Yesterday' : d ? day(d) : 'Undated'}
             </Text>
-            <AuditRows entries={items} />
+            <AuditRows entries={items} onUndo={(c) => void undo(c)} />
           </TurfCard>
         ))
       ) : (
         <TurfCard>
           <Text variant="caption" color="secondary">
-            {filter === 'all' ? 'No changes yet. Payments, stats, teams and matches changed in Turf web or here show up after the next sync.' : `No ${AUDIT_FILTERS.find((f) => f.key === filter)!.label.toLowerCase()} changes yet.`}
+            No money changes yet. Payments changed in Turf web or here show up after the next sync.
           </Text>
         </TurfCard>
       )}

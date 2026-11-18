@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { PROVIDER_PRESETS, type ProviderConfig, type ProviderKind } from '@core/ai/providers';
 import { listModels, pickModel } from '@core/ai/openaiCompat';
@@ -13,6 +13,7 @@ import { useOS, useLive, useSettings } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Button, Card, Chip, ChipRow, FilterChip, IconButton, NumberField, ProgressBar, Screen, Section, Sparkline, StatTrio, SwitchField, Text, TextField, useToast } from '@ui/kit';
 import { getProviderKey, setProviderKey } from '../../src/platform/boot';
+import { connectOpenRouter, exchangeCode, openCodePage } from '../../src/platform/openrouterAuth';
 
 const ALL: ProviderKind[] = ['groq', 'gemini', 'openrouter', 'ollama', 'claude', 'custom'];
 const SMART = [
@@ -162,9 +163,20 @@ function ProviderCard({ cfg, first, last, onChange, onMove, cap, onCap }: { cfg:
       <SwitchField label="Use this provider" hint={preset.note} value={enabled} onChange={(v) => onChange({ enabled: v })} />
       {enabled ? (
         <>
+          {cfg.kind === 'openrouter' && Platform.OS !== 'web' ? (
+            <OpenRouterConnect
+              connected={!!stored}
+              onKey={async (v) => {
+                await setProviderKey('openrouter', v);
+                setKey(v);
+                setStored(v);
+                toast.show({ message: 'OpenRouter connected · free models', icon: 'check' });
+              }}
+            />
+          ) : null}
           {preset.needsKey ? (
             <View style={{ gap: 8 }}>
-              <TextField label="API key" value={key} onChange={setKey} placeholder="Paste your key" autoCapitalize="none" autoCorrect={false} secureTextEntry />
+              <TextField label={cfg.kind === 'openrouter' ? 'Or paste a key' : 'API key'} value={key} onChange={setKey} placeholder="Paste your key" autoCapitalize="none" autoCorrect={false} secureTextEntry />
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Button title={key.trim() === (stored ?? '') && stored ? 'Saved' : 'Save key'} icon="check" size="sm" disabled={key.trim() === (stored ?? '')} onPress={() => void saveKey()} style={{ flex: 1 }} />
                 {preset.keyUrl ? <Button title="Get a key" icon="link" size="sm" variant="secondary" onPress={() => void Linking.openURL(preset.keyUrl!)} style={{ flex: 1 }} /> : null}
@@ -203,6 +215,57 @@ function ProviderCard({ cfg, first, last, onChange, onMove, cap, onCap }: { cfg:
           ) : null}
         </>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * OpenRouter in one tap (docs/MODEL.md, Connect your AI): sign in on its page
+ * and the key comes back. If it doesn't, its page can show a code to paste once.
+ */
+function OpenRouterConnect({ connected, onKey }: { connected: boolean; onKey: (key: string) => Promise<void> }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [verifier, setVerifier] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const fail = (e: unknown) => toast.show({ message: `Couldn’t connect: ${(e as Error).message.slice(0, 80)}`, icon: 'alert' });
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const r = await connectOpenRouter();
+      if (r.key) await onKey(r.key);
+      else toast.show({ message: 'Not connected. If OpenRouter showed a code, use “Paste a code”', icon: 'info' });
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const finish = async () => {
+    if (!verifier || !code.trim()) return;
+    setBusy(true);
+    try {
+      await onKey(await exchangeCode(code, verifier));
+      setVerifier(null);
+      setCode('');
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View style={{ gap: 8 }}>
+      <Button title={busy ? 'Connecting…' : connected ? 'Connect again' : 'Connect OpenRouter'} icon="link" disabled={busy} variant={connected ? 'secondary' : 'primary'} onPress={() => void connect()} />
+      <Text variant="caption" color="secondary">Sign in on OpenRouter’s page; the key comes back to this phone. Nothing to copy.</Text>
+      {verifier ? (
+        <View style={{ gap: 8 }}>
+          <TextField label="Code from OpenRouter" value={code} onChange={setCode} autoCapitalize="none" autoCorrect={false} />
+          <Button title="Finish connecting" icon="check" size="sm" disabled={busy || !code.trim()} onPress={() => void finish()} />
+        </View>
+      ) : (
+        <Button title="Paste a code instead" icon="file" size="sm" variant="secondary" disabled={busy} onPress={() => void openCodePage().then(setVerifier)} />
+      )}
     </View>
   );
 }

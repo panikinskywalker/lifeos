@@ -4,7 +4,7 @@
  * how they start. Anything else is filed — a statement is never lost.
  */
 const ASK_START =
-  /^(?:who|whom|whose|what|what's|whats|which|why|how|when (?:did|do|does|is|was|will|are|were|am)|where (?:did|do|does|is|was|are|were|am)|show me|list|find|search|tell me|give me|remind me (?:what|who|when|where)|do i|did i|am i|have i|has|had i|is there|are there|was there|were there|is my|are my|can you (?:tell|show|find|list)|should i|could you (?:tell|show|find))\b/i;
+  /^(?:who|whom|whose|what|what's|whats|which|why|how|when (?:did|do|does|is|was|will|are|were|am)|where (?:did|do|does|is|was|are|were|am)|show me|list|find|search|tell me|give me|remind me (?:what|who|when|where)|do i|did i|did anything|can i afford|am i|have i|has|had i|is there|are there|was there|were there|is my|are my|can you (?:tell|show|find|list)|should i|could you (?:tell|show|find))\b/i;
 
 export type InputKind = 'ask' | 'tell';
 

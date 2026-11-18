@@ -3,6 +3,7 @@ import { applyTurfSync } from '@modules/games';
 import { sampleSync } from '@modules/games/fixtures/sampleSync';
 import type { DeviceBridge, FolderFile, LifeOSContext } from '@core/registry/context';
 import { fileMessage } from '@core/filing/messages';
+import { noteSample } from '@core/filing/samples';
 import { BLINKIT_APP, buy, ensureSpaces, halfLeft, setLife, spaceNamed, useOne } from '@modules/inventory';
 import { saveHealthDays } from '@modules/health';
 import { saveUsageDays } from '@core/sources/deviceData';
@@ -18,6 +19,15 @@ const daysAgo = (n: number) => {
 const daysAhead = (n: number) => daysAgo(-n);
 /** The nth of this month, or today if that hasn't come yet. */
 const thisMonth = (n: number) => daysAgo(Math.max(0, new Date().getDate() - n));
+
+const DEMO_TEXTS = [
+  ['VM-HDFCBK', 'Sent Rs.450.00 From HDFC Bank A/C *1234 To SWIGGY On 26/09/26 Ref 426912345693. Not You? Call 18002586161'],
+  ['AX-ICICIB', 'INR 3,499.00 spent using ICICI Bank Card XX9012 on 26-Sep-26 on AMAZON PAY IN. Avl Limit: INR 1,20,000.00.'],
+  ['JM-DLVERY', 'Your Delhivery shipment 4823106745121 from Amazon is out for delivery today.'],
+  ['VM-AIRTEL', 'Your Airtel bill of Rs.799 is due on 28 Oct. Pay now to avoid late charges.'],
+  ['VK-LICIND', 'Premium of Rs 12,450 for policy 912345678 falls due on 05/11/2026.'],
+  ['AD-MYNTRA', 'Flat 60% off on your favourites. Sale ends tonight. Shop now.'],
+];
 
 const DEMO_FOLDER = { uri: 'demo://Documents', name: 'Documents' };
 const demoFile = (name: string, kb: number, ago: number, path = ''): FolderFile => ({ uri: `demo://Documents/${encodeURIComponent(name)}`, name, mime: name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg', size: kb * 1024, modified: Date.now() - ago * 86_400_000, path });
@@ -94,6 +104,8 @@ export function seedDemoData(os: LifeOSContext) {
       const tx = os.records.create({ object: 'transaction', data: { amount, kind, category, merchant, date, accountId, personIds: personId ? [personId] : undefined, tripId: merchant.includes('Goa') ? goa.id : merchant.includes('JAL') ? japan.id : undefined } });
       if (merchant === 'Rent') os.links.link(tx.id, landlord.id, 'person');
     }
+    // A double charge, for "did anything get charged twice?".
+    for (const hour of [0, 1]) os.records.create({ object: 'transaction', data: { amount: 799, kind: 'expense', category: 'shopping', merchant: 'Amazon', date: daysAgo(4), accountId: hdfc.id, note: hour ? undefined : 'Phone case' } });
     os.records.create({ object: 'transaction', data: { amount: 50000, kind: 'transfer', category: 'transfer', merchant: 'Card payment', date: daysAgo(6), accountId: hdfc.id, toAccountId: card.id } });
 
     setCategoryTarget(os, 'food', 8000);
@@ -239,6 +251,16 @@ function seedHome(os: LifeOSContext) {
     buy(os, { name, size, quantity, price, at: ago(0, 18), ...blinkit });
   }
   fileMessage(os, { source: 'notification', from: BLINKIT_APP, title: 'Order delivered', body: 'Your Blinkit order of ₹437 has been delivered. Enjoy!', receivedAt: ago(0, 18) });
+  // Money on its own (MODEL phase D), through the parser as on the phone: a nameless NACH debit (asked: a SIP?),
+  // an electricity bill, and a heads-up before Netflix at a new price. (Spotted subscriptions need three months of
+  // payments, more history than the demo has: phase F.)
+  const ahead = (d: number) => Date.now() + d * DAY;
+  const ddmmyy = (at: number) => { const d = new Date(at); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(2)}`; };
+  fileMessage(os, { source: 'sms', from: 'VA-CBSSBI-S', body: `Dear Customer, Your A/C XXXXXXX4421 has a debit by NACH of Rs 2,500.00 on ${ddmmyy(ago(2, 9))}. Download YONO - SBI`, receivedAt: ago(2, 9) });
+  fileMessage(os, { source: 'sms', from: 'JM-MSEDCL-S', body: `Energy Bill for Cons. 170012345678 of Rs. 1,240 is due on ${ddmmyy(ahead(5))}. View Bill: https://billpdf.mahadiscom.in/BD Pay Bill: https://rpp.mahadiscom.in`, receivedAt: ago(1, 10) });
+  fileMessage(os, { source: 'sms', from: 'JD-ICICIT-T', body: `Payment of INR 799.00 towards Merchant Netflix to be debited from ICICI Bank Credit Card 3007, as per Standing Instruction YNG7fYiyN, is due by ${ddmmyy(ahead(4)).slice(0, 5)}`, receivedAt: ago(0, 9) });
+  // Message samples: what filing's own texts add, plus some no parser reads yet, in the shapes real ones come in.
+  for (const [from, body] of DEMO_TEXTS) noteSample(os, { source: 'sms', from, body, receivedAt: ago(3) });
   // Clothes are Assets (R7a), kept in Clothes: 6 shirts (2 in the wash), 3 jeans, the Turf kit packed for Thursday.
   const clothes = spaceNamed(os, 'Clothes')?.id;
   if (clothes && os.registry.objects.has('asset')) {

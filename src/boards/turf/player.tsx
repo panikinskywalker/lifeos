@@ -1,21 +1,23 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Share, View } from 'react-native';
+import { Image, Pressable, RefreshControl, ScrollView, Share, Text as RNText, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Polygon, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { format } from 'date-fns';
 import type { ObjectRecord } from '@core/domain/types';
-import { KIT_PRESETS, createPlayer, duesTexts, editPlayer, faceStats, isDone, mePersonId, playerInputOf, ratingPlayer, rupees, setAvailability, squadData, squadRatings, statsFor, turfBase, turfDues, type AvailabilityInput, type GameData, type PlayerInput, type PlayerProfileData } from '@modules/games';
+import { KIT_PRESETS, allAppearances, createPlayer, currentSeason, duesTexts, isUpcomingGame, markPaid, moreOf, owedOn, payPart, playerPositionCode, profileGames, profileOf, squadMax, startedSeasons, editPlayer, faceStats, isDone, mePersonId, playerInputOf, ratingPlayer, rupees, setAvailability, squadData, squadRatings, turfBase, turfDues, type AvailabilityInput, type GameData, type PlayerInput, type PlayerProfileData } from '@modules/games';
 import { statsCardText } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { OnBlock, useTheme } from '@ui/theme/ThemeProvider';
 import { blocks, displayFont, fonts, monoFonts } from '@ui/theme/tokens';
-import { Button, DateField, EmptyState, FilterChip, Icon, IconButton, NumberField, Screen, Text, TextField, Toggle, useToast } from '@ui/kit';
+import { Button, ChipRow, DateField, EmptyState, FilterChip, Icon, IconButton, NumberField, Screen, Text, TextField, Toggle, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
-import { Face, SyncPill } from './teams';
+import { Face, SyncPill, useTurfPhoto } from './teams';
+import { SearchBox, found } from './search';
 import { CopyShare } from './switcher';
 import { type Props, shortDay, useBack } from './common';
 import { availabilityColour } from './players';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir 6 Player profile (TF-Player), 6b the stats card (TF-StatsCard)
@@ -46,7 +48,6 @@ const MODES: Array<{ value: NonNullable<PlayerProfileData['availabilityMode']>; 
 /** The six attributes as the chart and the card name them, in the artboard's order (clockwise from the top). */
 const OUTFIELD: Array<[string, string]> = [['PAC', 'Pace'], ['PHY', 'Stamina'], ['DEF', 'Defending'], ['PAS', 'Passing'], ['DRI', 'Dribbling'], ['SHO', 'Shooting']];
 const KEEPER: Array<[string, string]> = [['DIV', 'Diving'], ['HAN', 'Handling'], ['KIC', 'Kicking'], ['REF', 'Reflexes'], ['SPE', 'Speed'], ['POS', 'Positioning']];
-const PROFILE_ATTRS: Array<[keyof PlayerProfileData, string]> = [['pace', 'Pace'], ['stamina', 'Stamina'], ['defending', 'Defending'], ['passing', 'Passing'], ['dribbling', 'Dribbling'], ['shooting', 'Shooting']];
 
 const firstOf = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -66,23 +67,6 @@ function roleLine(p: PlayerProfileData) {
   return [p.position, p.speciality || p.playingStyle, foot ? (foot === 'both' ? 'both feet' : `${foot} foot`) : null].filter(Boolean).join(' · ');
 }
 
-/** Kit colours as written ("#A50044, #004D98", "Red / Navy"): swatches for what reads as a colour, the rest as words. */
-function kitSwatches(text: string | undefined) {
-  const swatches: string[] = [];
-  const words: string[] = [];
-  for (const raw of (text ?? '').split(/[,/&+]|\band\b/i)) {
-    const v = raw.trim();
-    if (!v) continue;
-    if (/^#?[0-9a-f]{6}$/i.test(v)) swatches.push(v.startsWith('#') ? v : `#${v}`);
-    else {
-      const preset = KIT_PRESETS.find((k) => k.name.toLowerCase() === v.toLowerCase());
-      if (preset) swatches.push(preset.hex);
-      else words.push(v);
-    }
-  }
-  return { swatches, words };
-}
-
 /** "2 – 9 Nov", "28 Oct – 3 Nov", "from 2 Nov". */
 function rangeText(from: string, to?: string | null) {
   const a = day(from);
@@ -91,7 +75,6 @@ function rangeText(from: string, to?: string | null) {
   if (from === to) return format(a, 'd MMM');
   return a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear() ? `${format(a, 'd')} – ${format(b, 'd MMM')}` : `${format(a, 'd MMM')} – ${format(b, 'd MMM')}`;
 }
-const whenOf = (p: Period, now = today()) => (p.endsAt && p.endsAt < now ? 'past' : p.startsAt > now ? 'upcoming' : 'now');
 
 function useProfile(id: string | undefined) {
   return useLive((o) => {
@@ -109,59 +92,6 @@ function Missing({ title }: { title: string }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* The attributes chart                                                */
-/* ------------------------------------------------------------------ */
-
-const CX = 118;
-const CY = 118;
-const R = 90;
-/** Label anchors from the artboard, clockwise from the top. */
-const LABEL_AT: Array<[number, number]> = [[118, 14], [211.5, 68], [211.5, 176], [118, 230], [24.5, 176], [24.5, 68]];
-const point = (i: number, v: number) => {
-  const a = (-90 + i * 60) * (Math.PI / 180);
-  return [CX + Math.cos(a) * R * v, CY + Math.sin(a) * R * v] as const;
-};
-const ring = (v: number) => Array.from({ length: 6 }, (_, i) => point(i, v).map((n) => n.toFixed(1)).join(',')).join(' ');
-
-/** A hexagon of the six (out of 100), rings at a quarter each, the shape lime. */
-function AttributesChart({ stats }: { stats: Array<{ label: string; value: number }> }) {
-  const t = useTheme();
-  const shape = stats.map((s, i) => point(i, Math.max(0, Math.min(100, s.value)) / 100));
-  const pts = shape.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ');
-  return (
-    <Svg width={236} height={246} viewBox="0 0 236 246" accessibilityLabel={stats.map((s) => `${s.label} ${s.value}`).join(', ')}>
-      {[0.25, 0.5, 0.75, 1].map((v) => (
-        <Polygon key={v} points={ring(v)} fill="none" stroke={t.c.fg.primary} strokeWidth={1} opacity={v === 1 ? 0.22 : 0.1} />
-      ))}
-      {stats.map((s, i) => {
-        const [x, y] = point(i, 1);
-        const [lx, ly] = LABEL_AT[i]!;
-        return (
-          <G key={s.label}>
-            <Line x1={CX} y1={CY} x2={x} y2={y} stroke={t.c.fg.primary} strokeWidth={1} opacity={0.1} />
-            <SvgText x={lx} y={ly} textAnchor="middle" fontSize={11} fontFamily={fonts[600]} fill={t.c.fg.secondary}>
-              {s.label}
-            </SvgText>
-            <SvgText x={lx} y={ly + 14} textAnchor="middle" fontSize={11} fontFamily={fonts[700]} fill={t.c.fg.primary}>
-              {String(s.value)}
-            </SvgText>
-          </G>
-        );
-      })}
-      <Polygon points={pts} fill={t.c.accent.mustard} opacity={0.22} />
-      <Polygon points={pts} fill="none" stroke={t.c.accent.mustard} strokeWidth={2.5} strokeLinejoin="round" />
-      {shape.map(([x, y], i) => (
-        <Circle key={i} cx={x} cy={y} r={4} fill={t.c.accent.mustard} />
-      ))}
-    </Svg>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* 6 · Player profile                                                  */
-/* ------------------------------------------------------------------ */
-
 /** The warm backdrop where a photo goes (TF-Player's hero, without the blur). */
 const BLOBS: Array<[number, number, number, string, number]> = [
   [-35, 543, 250, '#E0A98E', 0.44],
@@ -172,53 +102,6 @@ const BLOBS: Array<[number, number, number, string, number]> = [
   [335, 252, 209, '#8A5A52', 0.69],
   [148, 556, 283, '#C98B74', 0.58],
 ];
-function Backdrop() {
-  return (
-    <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
-      <Svg width="100%" height={1180} viewBox="0 0 390 1180" preserveAspectRatio="xMidYMin slice">
-        <Defs>
-          <LinearGradient id="pl-bg" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#5A3A3C" />
-            <Stop offset="0.55" stopColor="#2B1A1F" />
-            <Stop offset="1" stopColor="#120C0E" />
-          </LinearGradient>
-          {['#E0A98E', '#C98B74', '#8A5A52'].map((c) => (
-            <RadialGradient key={c} id={`pl-${c.slice(1)}`} cx="0.5" cy="0.5" r="0.5">
-              <Stop offset="0" stopColor={c} stopOpacity={1} />
-              <Stop offset="0.55" stopColor={c} stopOpacity={0.6} />
-              <Stop offset="1" stopColor={c} stopOpacity={0} />
-            </RadialGradient>
-          ))}
-          <RadialGradient id="pl-glow" cx="0.5" cy="0.5" r="0.5">
-            <Stop offset="0" stopColor="#FFD6BE" stopOpacity={0.55} />
-            <Stop offset="1" stopColor="#FFD6BE" stopOpacity={0} />
-          </RadialGradient>
-          <RadialGradient id="pl-shade" cx="0.5" cy="0.5" r="0.5">
-            <Stop offset="0" stopColor="#000000" stopOpacity={0.35} />
-            <Stop offset="1" stopColor="#000000" stopOpacity={0} />
-          </RadialGradient>
-          <LinearGradient id="pl-dim" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0.4" stopColor="#000000" stopOpacity={0} />
-            <Stop offset="1" stopColor="#000000" stopOpacity={0.35} />
-          </LinearGradient>
-          <LinearGradient id="pl-fade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#0B0B0D" stopOpacity={0} />
-            <Stop offset="1" stopColor="#0B0B0D" stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect x={0} y={0} width={390} height={1180} fill="url(#pl-bg)" />
-        <Ellipse cx={195} cy={507} rx={110} ry={320} fill="url(#pl-shade)" />
-        <Circle cx={312} cy={78} r={117} fill="url(#pl-glow)" />
-        {BLOBS.map(([x, y, s, c, op], i) => (
-          <Circle key={i} cx={x + s / 2} cy={y + s / 2} r={s / 2} fill={`url(#pl-${c.slice(1)})`} opacity={op} />
-        ))}
-        <Rect x={0} y={0} width={390} height={1180} fill="url(#pl-dim)" />
-        <Rect x={0} y={880} width={390} height={300} fill="url(#pl-fade)" />
-      </Svg>
-    </View>
-  );
-}
-
 /** A round 40 button over the photo: a dark see-through disc with a light hairline. */
 function GlassButton({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
   return (
@@ -228,255 +111,772 @@ function GlassButton({ icon, label, onPress }: { icon: string; label: string; on
   );
 }
 
-function Pill({ label, bg, fg }: { label: string; bg: string; fg: string }) {
+/* ------------------------------------------------------------------ */
+/* 6 · Player profile, 1:1 with Turf web's (app/ui/player.tsx,        */
+/* profile-page.tsx): hero, then Overview · Matches · Stats · Dues     */
+/* ------------------------------------------------------------------ */
+
+const W = {
+  lime: '#D7F55C', limeSoft: 'rgba(215,245,92,0.16)', ink: '#F5F5F7', ink62: 'rgba(245,245,247,0.62)', ink42: 'rgba(245,245,247,0.42)', ink22: 'rgba(245,245,247,0.22)',
+  line: 'rgba(255,255,255,0.08)', pill: 'rgba(255,255,255,0.07)', card: '#1A1A1E', raised: '#26262B', dark: '#0B0B0D',
+  coral: '#FF5C47', coralSoft: 'rgba(255,92,71,0.18)', coralInk: '#FF8A7A', sky: '#A9C4FF', sun: '#F6E27F', mint: '#9BE7C4', sand: '#F3D98B',
+};
+const BAND_BG = { lime: W.lime, mint: W.mint, sand: W.sand, coral: W.coralInk };
+const bandOf = (r: number): keyof typeof BAND_BG => (r >= 8 ? 'lime' : r >= 7 ? 'mint' : r >= 6 ? 'sand' : 'coral');
+const OUT_TONE: Record<'W' | 'D' | 'L', string> = { W: W.lime, D: W.ink62, L: W.coralInk };
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MO3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dayMonth = (iso: string) => `${Number(iso.slice(8, 10))} ${MO3[Number(iso.slice(5, 7)) - 1]}`;
+
+/** Turf web's text styles (T.*) and mono / Bebas. */
+function Tx({ children, size = 13, weight = 400, lh, color = W.ink, style, lines }: { children: React.ReactNode; size?: number; weight?: 400 | 500 | 600 | 700 | 800; lh?: number; color?: string; style?: object; lines?: number }) {
   return (
-    <View style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: bg }}>
-      <Text variant="labelMicro" color={fg} numberOfLines={1}>
-        {label}
-      </Text>
+    <RNText numberOfLines={lines} style={[{ fontFamily: fonts[weight as 400 | 500 | 600 | 700] ?? fonts[700], fontWeight: weight === 800 ? '800' : undefined, fontSize: size, lineHeight: lh ?? Math.round(size * 1.3), color }, style]}>
+      {children}
+    </RNText>
+  );
+}
+const Faint = ({ children, style, lines }: { children: React.ReactNode; style?: object; lines?: number }) => <Tx color={W.ink42} lh={17} style={style} lines={lines}>{children}</Tx>;
+const CardTitle = ({ children }: { children: React.ReactNode }) => <Tx size={15} weight={600} lh={19}>{children}</Tx>;
+const Section = ({ children }: { children: React.ReactNode }) => <Tx size={17} weight={600} lh={22} style={{ letterSpacing: -0.2 }}>{children}</Tx>;
+function MonoT({ children, color = W.ink42, weight = 500, size = 9, style }: { children: React.ReactNode; color?: string; weight?: 500 | 700; size?: number; style?: object }) {
+  return <RNText style={[{ fontFamily: monoFonts[weight], fontSize: size, lineHeight: size + 3, letterSpacing: size * 0.06, textTransform: 'uppercase', color }, style]}>{children}</RNText>;
+}
+function Disp({ children, size, color = W.ink, lh }: { children: React.ReactNode; size: number; color?: string; lh?: number }) {
+  return <RNText numberOfLines={1} style={{ fontFamily: displayFont, fontSize: size, lineHeight: lh ?? Math.round(size * 0.9), letterSpacing: Math.round(size * 0.02 * 10) / 10, color, textTransform: 'uppercase' }}>{children}</RNText>;
+}
+function WCard({ children, padding = 14, gap = 0, style }: { children: React.ReactNode; padding?: number | [number, number]; gap?: number; style?: object }) {
+  const [v, h] = Array.isArray(padding) ? padding : [padding, padding];
+  return <View style={[{ paddingVertical: v, paddingHorizontal: h, gap, borderRadius: 24, backgroundColor: W.card, overflow: 'hidden' }, style]}>{children}</View>;
+}
+type Tone = 'plain' | 'lime' | 'limeSolid' | 'coral' | 'white' | 'dark' | 'sky';
+function WPill({ children, tone = 'plain' }: { children: React.ReactNode; tone?: Tone }) {
+  const [bg, fg] = tone === 'lime' ? [W.limeSoft, W.lime] : tone === 'limeSolid' ? [W.lime, W.dark] : tone === 'coral' ? [W.coralSoft, W.coralInk] : tone === 'white' ? [W.ink, W.dark] : tone === 'dark' ? [W.dark, W.ink] : tone === 'sky' ? ['rgba(169,196,255,0.16)', W.sky] : [W.pill, W.ink62];
+  return (
+    <View style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, backgroundColor: bg, justifyContent: 'center', flexShrink: 0 }}>
+      <Tx size={12} weight={600} lh={16} color={fg} lines={1}>{children}</Tx>
+    </View>
+  );
+}
+const Divider = () => <View style={{ height: 1, backgroundColor: W.line }} />;
+
+function MiniToggle<V extends string>({ value, onChange, options }: { value: V; onChange: (v: V) => void; options: Array<{ value: V; label: string }> }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 2, padding: 3, borderRadius: 999, backgroundColor: W.raised, alignSelf: 'flex-start' }}>
+      {options.map((o) => (
+        <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: o.value === value }} onPress={() => onChange(o.value)} style={{ height: 28, paddingHorizontal: 12, borderRadius: 999, justifyContent: 'center', backgroundColor: o.value === value ? W.ink : 'transparent' }}>
+          <Tx size={12} weight={700} lh={16} color={o.value === value ? W.dark : W.ink62}>{o.label}</Tx>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+function RatingChip({ r, size = 'md', star }: { r: number; size?: 'sm' | 'md'; star?: boolean }) {
+  return (
+    <View style={{ minWidth: size === 'sm' ? 34 : 40, height: size === 'sm' ? 22 : 26, paddingHorizontal: 7, borderRadius: 8, backgroundColor: BAND_BG[bandOf(r)], alignItems: 'center', justifyContent: 'center' }}>
+      <Tx size={size === 'sm' ? 12 : 14} weight={800} lh={size === 'sm' ? 16 : 18} color={W.dark}>{r.toFixed(1)}</Tx>
+      {star ? (
+        <View style={{ position: 'absolute', top: -7, right: -6, width: 14, height: 14, borderRadius: 7, backgroundColor: W.ink, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="star" size={8} color={W.dark} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <View style={{ flex: 1, minWidth: 0, gap: 2, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 11, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+      <MonoT>{label}</MonoT>
+      <Tx size={value.length > 5 ? 20 : 26} weight={800} lh={30} color={tone ?? W.ink} lines={1} style={{ letterSpacing: -0.8 }}>{value}</Tx>
+      {sub ? <Faint>{sub}</Faint> : null}
+    </View>
+  );
+}
+function LimeTabs<V extends string>({ options, value, onChange }: { options: Array<{ value: V; label: string }>; value: V; onChange: (v: V) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 6 }}>
+      {options.map((o) => (
+        <Pressable key={o.value} accessibilityRole="tab" accessibilityState={{ selected: o.value === value }} onPress={() => onChange(o.value)} style={{ flex: 1, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: o.value === value ? W.lime : W.card }}>
+          <Tx size={13} weight={700} lh={17} color={o.value === value ? W.dark : W.ink62}>{o.label}</Tx>
+        </Pressable>
+      ))}
     </View>
   );
 }
 
-const Hairline = () => {
-  const t = useTheme();
-  return <View style={{ height: 1, backgroundColor: t.c.line }} />;
-};
+/** Turf web's Radar: the six from the profile (1 to 5, shown out of 100), clockwise from Pace. */
+const RADAR: Array<[keyof PlayerProfileData, string]> = [['pace', 'Pace'], ['shooting', 'Shooting'], ['passing', 'Passing'], ['dribbling', 'Dribbling'], ['defending', 'Defending'], ['stamina', 'Stamina']];
+function Radar({ player }: { player: PlayerProfileData }) {
+  const width = 300, size = 236, cx = width / 2, cy = size / 2, r = 76;
+  const values = RADAR.map(([k]) => { const v = player[k] as number | undefined; return v == null ? null : Math.round(v * 20); });
+  const pts = values.map((v, i) => { const a = -Math.PI / 2 + (i * Math.PI) / 3; const s = (v ?? 0) / 100; return [cx + Math.cos(a) * r * s, cy + Math.sin(a) * r * s] as const; });
+  const ring = (k: number) => Array.from({ length: 6 }, (_, i) => { const a = -Math.PI / 2 + (i * Math.PI) / 3; return `${cx + Math.cos(a) * r * k},${cy + Math.sin(a) * r * k}`; }).join(' ');
+  return (
+    <Svg width={width} height={size} viewBox={`0 0 ${width} ${size}`}>
+      {[1, 0.75, 0.5, 0.25].map((k) => <Polygon key={k} points={ring(k)} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={1} />)}
+      {Array.from({ length: 6 }, (_, i) => { const a = -Math.PI / 2 + (i * Math.PI) / 3; return <Line key={i} x1={cx} y1={cy} x2={cx + Math.cos(a) * r} y2={cy + Math.sin(a) * r} stroke="rgba(255,255,255,0.08)" />; })}
+      <Polygon points={pts.map((p) => p.join(',')).join(' ')} fill="rgba(215,245,92,0.22)" stroke={W.lime} strokeWidth={2} strokeLinejoin="round" />
+      {pts.map((p, i) => <Circle key={i} cx={p[0]} cy={p[1]} r={3} fill={W.lime} />)}
+      {RADAR.map(([, label], i) => {
+        const a = -Math.PI / 2 + (i * Math.PI) / 3; const lx = cx + Math.cos(a) * (r + 24); const ly = cy + Math.sin(a) * (r + 20);
+        const anchor = Math.abs(Math.cos(a)) < 0.2 ? 'middle' : Math.cos(a) > 0 ? 'start' : 'end';
+        return (
+          <G key={label}>
+            <SvgText x={lx} y={ly - 2} textAnchor={anchor} fontSize={10} fontWeight="600" fill={W.ink42}>{label}</SvgText>
+            <SvgText x={lx} y={ly + 11} textAnchor={anchor} fontSize={12} fontWeight="800" fill={W.ink}>{values[i] ?? '–'}</SvgText>
+          </G>
+        );
+      })}
+    </Svg>
+  );
+}
 
-export function TurfPlayer({ ctx, params }: Props) {
-  const t = useTheme();
+function ProfileHero({ p, turfId, overall, delta, onBack, onShare, onEdit }: { p: PlayerProfileData; turfId: string | null; overall: number | null; delta: number | null; onBack: () => void; onShare: () => void; onEdit: () => void }) {
+  const insets = useSafeAreaInsets();
+  const photo = useTurfPhoto(p.photoPath && turfId ? `/api/players/${encodeURIComponent(turfId)}/photo?v=${encodeURIComponent(p.photoPath)}` : null);
+  const [failed, setFailed] = useState(false);
+  const has = !!photo && !failed;
+  const [first, ...rest] = p.name.trim().split(/\s+/);
+  const code = playerPositionCode(p.position);
+  const role = [code === 'FWD' ? 'ST' : code, p.playingStyle].filter(Boolean).join(' · ');
+  return (
+    <View style={{ minHeight: has ? 500 : 360, marginHorizontal: -20, paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: 20, justifyContent: 'space-between', overflow: 'hidden' }}>
+      <Svg style={{ position: 'absolute', left: 0, top: 0 }} width="100%" height="100%">
+        <Defs><LinearGradient id="heroBg" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#5A3A3C" /><Stop offset="0.6" stopColor="#2B1A1F" /><Stop offset="1" stopColor="#0B0B0D" /></LinearGradient></Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroBg)" />
+      </Svg>
+      {photo && !failed ? <Image source={photo} onError={() => setFailed(true)} resizeMode="cover" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }} /> : null}
+      <Svg style={{ position: 'absolute', left: 0, top: 0 }} width="100%" height="100%">
+        <Defs>
+          {has ? (
+            <LinearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#0B0B0D" stopOpacity={0.45} /><Stop offset="0.18" stopColor="#0B0B0D" stopOpacity={0} /><Stop offset="0.52" stopColor="#0B0B0D" stopOpacity={0} /><Stop offset="0.76" stopColor="#0B0B0D" stopOpacity={0.75} /><Stop offset="1" stopColor="#0B0B0D" stopOpacity={1} /></LinearGradient>
+          ) : (
+            <LinearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#0B0B0D" stopOpacity={0.25} /><Stop offset="0.4" stopColor="#0B0B0D" stopOpacity={0.2} /><Stop offset="1" stopColor="#0B0B0D" stopOpacity={1} /></LinearGradient>
+          )}
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroFade)" />
+        {p.jersey ? (
+          <SvgText x={has ? '96%' : '97%'} y={has ? '96%' : 250} textAnchor="end" fontFamily={displayFont} fontSize={has ? 140 : 220} fill="none" stroke={W.lime} strokeWidth={2} opacity={has ? 0.85 : 0.9}>
+            {p.jersey}
+          </SvgText>
+        ) : null}
+      </Svg>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <GlassButton icon="chevron-left" label="Back" onPress={onBack} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <GlassButton icon="send" label="Share profile" onPress={onShare} />
+          <GlassButton icon="edit" label="Edit player" onPress={onEdit} />
+        </View>
+      </View>
+      <View style={{ gap: 12, marginTop: 120, paddingRight: has && p.jersey ? 110 : 0 }}>
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+          {role ? <WPill tone="limeSolid">{role}</WPill> : null}
+          {p.jersey ? <WPill tone="white">{`#${p.jersey}`}</WPill> : null}
+          {overall !== null ? <WPill tone={has ? 'dark' : 'plain'}>{`Overall ${overall}${delta ? ` ${delta > 0 ? '▲' : '▼'}${Math.abs(delta)}` : ''}`}</WPill> : null}
+        </View>
+        <RNText style={{ fontFamily: displayFont, fontSize: 64, lineHeight: 56, color: W.ink, textTransform: 'uppercase', letterSpacing: 1.3, textShadowColor: has ? 'rgba(0,0,0,0.45)' : undefined, textShadowRadius: has ? 18 : 0 }}>
+          {rest.length ? `${first}\n${rest.join(' ')}` : first}
+        </RNText>
+      </View>
+    </View>
+  );
+}
+
+type ProfileTab = 'overview' | 'matches' | 'stats' | 'dues';
+type Scope = 'season' | 'all';
+
+export function TurfPlayer({ params }: Props) {
   const router = useRouter();
   const back = useBack();
-  const insets = useSafeAreaInsets();
   const { busy, pull } = usePull();
   const profile = useProfile(params.player);
+  const os = useOS();
+  const toast = useToast();
+  const [tab, setTab] = useState<ProfileTab>('overview');
+  const [scopeChoice, setScope] = useState<Scope | null>(null);
+  const [perGame, setPerGame] = useState(false);
+  const [traitGroup, setTraitGroup] = useState<'squad' | 'position'>('squad');
+  const [matchFilter, setMatchFilter] = useState('all');
+  const [matchQuery, setMatchQuery] = useState('');
+  const [part, setPart] = useState<number | undefined>(undefined);
+
   const d = useLive(
     (o) => {
       if (!profile) return null;
       const pid = profile.data.personId;
-      const me = mePersonId(o);
-      const dues = turfDues(o).people.filter((p) => p.playerId === pid);
+      const dues = turfDues(o);
+      const person = o.records.get<{ phone?: string; email?: string; upi?: string }>(pid);
+      const partnerKeys = new Set((profile.data.partners ?? []).map((id) => `turf:players:${id}`));
+      const all = o.records.query<PlayerProfileData>('player', {}, { limit: 100_000 });
+      // Their shares, for money (the fronter's own share counts as paid; tentative matches don't count).
+      const shares = allAppearances(o).filter((a) => a.data.personId === pid).flatMap((a) => {
+        const g = o.records.get<GameData>(a.data.gameId);
+        if (!g || g.data.paymentTerms === 'tentative') return [];
+        const share = Math.round((a.data.share ?? 0) * 100);
+        return [{ date: g.data.date, share, put: g.data.frontedById === pid ? share : Math.min(share, Math.round((a.data.amountPaid ?? 0) * 100)) }];
+      });
       return {
-        stats: statsFor(o, pid),
-        rating: squadRatings(o).players.get(pid) ?? null,
-        me: pid === me,
-        dues: dues.flatMap((p) => p.games.map((g) => ({ p, g, fronted: o.records.get<GameData>(g.gameId)?.data.frontedById ?? null }))),
-        meId: me,
+        pg: profileGames(o),
+        seasons: startedSeasons(o),
+        open: dues.people.filter((x) => x.playerId === pid && x.direction === 'owes_you'),
+        credit: dues.credits.find((c) => c.playerId === pid)?.creditCents ?? 0,
         reminder: duesTexts(o).reminder(pid),
-        nameOf: (id: string | null) => (id ? o.records.get(id)?.title ?? null : null),
+        me: mePersonId(o),
+        person: person?.data ?? {},
+        picks: all.filter((x) => partnerKeys.has(x.data.sourceKey ?? '')).map((x) => ({ id: x.id, name: x.data.name })),
+        profileOfPerson: new Map(all.map((x) => [x.data.personId, x.id])),
+        shares,
       };
     },
     [profile],
   );
-  if (!profile || !d) return <Missing title="Player" />;
+  const season = d ? currentSeason(d.seasons) : null;
+  const scope: Scope = scopeChoice ?? (season ? 'season' : 'all');
+  const computed = useMemo(() => {
+    if (!profile || !d) return null;
+    const player = d.pg.players.find((x) => x.id === profile.data.personId);
+    if (!player) return null;
+    const games = scope === 'season' && season ? d.pg.games.filter((g) => g.date >= season.startsOn && (!season.endsOn || g.date <= season.endsOn)) : d.pg.games;
+    return {
+      player, games,
+      profile: profileOf(player, d.pg.players, games, d.seasons),
+      more: moreOf(player, d.pg.players, games, d.pg.games),
+      allProfile: profileOf(player, d.pg.players, d.pg.games, d.seasons),
+    };
+  }, [profile, d, scope, season]);
+
+  if (!profile || !d || !computed) return <Missing title="Player" />;
   const p = profile.data;
-  const attrs = attributesOf(p);
-  const missing = attrs.keeper ? (p.keeperRating == null ? ['Keeper rating'] : []) : PROFILE_ATTRS.filter(([k]) => p[k] == null).map(([, l]) => l);
-  const decided = d.stats.wins + d.stats.draws + d.stats.losses;
-  const [given, ...rest] = p.name.trim().split(/\s+/);
-  const kit = kitSwatches(p.kitColors);
-  const fanOf = [p.clubs, p.countries].filter(Boolean).join(', ');
-  const extras = [p.boots ? `Boots: ${p.boots}` : null, p.favouritePlayer ? `Favourite player: ${p.favouritePlayer}` : null, p.startingLevel ? `Level: ${p.startingLevel}` : null].filter(Boolean).join(' · ');
-  const periods = [...(p.periods ?? [])].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  const f = (cents: number) => rupees(cents);
+  const { player, games, profile: pr, more, allProfile } = computed;
+  const turfId = p.sourceKey?.replace('turf:players:', '') ?? null;
+  const done = games.filter((g) => !isUpcomingGame(g));
+  const regulars = d.pg.players.filter((x) => done.filter((g) => g.participants.some((y) => y.playerId === x.id && y.attendanceStatus !== 'no_show')).length >= 3).length;
+  const firstEver = allProfile.firstGame;
+  const joined = firstEver ? `${MO3[Number(firstEver.slice(5, 7)) - 1]} ${firstEver.slice(0, 4)}` : null;
+  const scopeTitle = scope === 'season' && season ? season.name : 'All time';
+  const scopeSub = scope === 'season' && season ? `since ${dayMonth(season.startsOn)} · ${pr.apps} of ${done.length} games` : firstEver ? `since ${dayMonth(firstEver)} · ${pr.apps} of ${done.length} games` : 'no matches yet';
+  const openPeople = d.open;
+  const owed = openPeople.reduce((s, x) => s + x.totalCents, 0);
+  const openGames = openPeople.reduce((s, x) => s + x.games.length, 0);
+  const scoped = d.shares.filter((s) => games.some((g) => g.date === s.date));
+  const spent = scoped.reduce((s, x) => s + x.put, 0);
+  const shareCount = scoped.length;
+  const shareCents = scoped.reduce((s, x) => s + x.share, 0);
+  const paidFull = scoped.filter((x) => x.put >= x.share).length;
+  const openApps = () => {
+    const ids = new Set(openPeople.flatMap((x) => x.games.map((g) => g.gameId)));
+    return allAppearances(os).filter((a) => a.data.personId === p.personId && ids.has(a.data.gameId) && owedOn(a.data) > 0).sort((a, b) => a.data.gameDate.localeCompare(b.data.gameDate));
+  };
+  // Everything open, or with an amount, a part payment (oldest games first; anything over waits as credit).
+  const settle = (amount?: number) => {
+    try {
+      const apps = openApps();
+      if (amount) payPart(os, apps.map((a) => a.id), amount);
+      else for (const a of apps) markPaid(os, a.id);
+      setPart(undefined);
+      toast.show({ message: `${firstOf(p.name)} ${amount ? 'paid' : 'marked paid ·'} ${rupees((amount ? amount * 100 : owed))} · sending`, icon: 'check' });
+      void pull(true);
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+    }
+  };
+  const openPlayer = (personId: string) => {
+    const id = d.profileOfPerson.get(personId);
+    if (id) router.push(`/board/turf/player?player=${id}` as never);
+  };
+  const openGame = (gameId: string) => router.push(`/board/turf/game?game=${gameId}` as never);
+  const keeper = p.keeperWilling === true ? ((p.keeperRating ?? 0) >= 4 ? 'Happily' : 'If I must') : p.keeperWilling === false ? 'Never' : '–';
+  const firstNight = more.nights.at(-1)?.date;
+  const decided = pr.wins + pr.draws + pr.losses;
+  const now = p.availability;
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const t = more.turnout;
+  const per = (v: number) => (perGame && pr.apps ? v / pr.apps : v);
+  const fmt = (v: number) => (perGame ? per(v).toFixed(2) : String(v));
+  const aGame = (v: number) => (pr.apps ? `${(v / pr.apps).toFixed(2)} a game` : undefined);
+  const max = squadMax(done);
 
-  const chips: Array<{ label: string; tone: 'lime' | 'white' | 'quiet' }> = [];
-  if (p.position) chips.push({ label: `${p.position} · preferred`, tone: 'lime' });
-  if (p.secondaryPosition) chips.push({ label: `${p.secondaryPosition} · second`, tone: 'white' });
-  for (const c of (p.comfortable ?? '').split(',').map((x) => x.trim()).filter(Boolean)) if (c !== p.position && c !== p.secondaryPosition) chips.push({ label: `${c} · comfortable`, tone: 'white' });
-  if (p.keeperWilling && p.position?.toUpperCase() !== 'GK') chips.push({ label: 'GK · emergency', tone: 'quiet' });
-  if (p.guest) chips.push({ label: 'Guest', tone: 'quiet' });
-
-  const stat = (value: string, label: string, i: number) => (
-    <View key={label} style={{ flex: 1, minWidth: 0, gap: 2, paddingVertical: 2, paddingLeft: i ? 14 : 0, borderLeftWidth: i ? 1 : 0, borderLeftColor: '#FFFFFF1F' }}>
-      <Text variant="metric" numberOfLines={1}>
-        {value}
-      </Text>
-      <Text variant="labelMicro" color="#FFFFFF99" numberOfLines={1} style={{ fontWeight: '500' }}>
-        {label}
-      </Text>
-    </View>
-  );
-
-  return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ flexGrow: 1 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
-      <View style={{ flexGrow: 1 }}>
-        <Backdrop />
-        <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <GlassButton icon="chevron-left" label="Back" onPress={back} />
-          <Text variant="label" style={{ flex: 1, textAlign: 'center' }}>
-            Player
-          </Text>
-          <GlassButton icon="edit" label="Edit player" onPress={() => router.push(`/board/turf/player-edit?player=${profile.id}` as never)} />
-          <GlassButton icon="send" label="Stats card" onPress={() => router.push(`/board/turf/card?player=${profile.id}` as never)} />
+  const statGroup = (title: string, sub: string | undefined, lines: Array<{ label: string; value: number; display?: string; sub?: string; max?: number; tone?: string }>) => (
+    <WCard key={title}>
+      <View style={{ marginBottom: 6 }}><CardTitle>{title}</CardTitle>{sub ? <Faint>{sub}</Faint> : null}</View>
+      {lines.map((l, i) => (
+        <View key={l.label} style={{ paddingTop: 10, paddingBottom: 8, borderTopWidth: i ? 1 : 0, borderTopColor: W.line, gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+            <Tx size={15} weight={600} lh={21} style={{ flex: 1 }}>{l.label}</Tx>
+            {l.sub ? <Faint>{l.sub}</Faint> : null}
+            <View style={{ minWidth: 30, alignItems: 'flex-end' }}><Disp size={26}>{l.display ?? String(l.value)}</Disp></View>
+          </View>
+          {l.max !== undefined && l.max > 0 ? <View style={{ height: 4, borderRadius: 2, backgroundColor: W.pill, overflow: 'hidden' }}><View style={{ width: `${Math.min(100, (l.value / l.max) * 100)}%`, height: '100%', backgroundColor: l.tone ?? W.lime }} /></View> : null}
         </View>
-        <View style={{ marginTop: 170, flexGrow: 1, paddingTop: 20, paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 14, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: '#16161A9E', borderTopWidth: 1, borderTopColor: '#FFFFFF1F' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="body" style={{ fontSize: 36, lineHeight: 38, letterSpacing: -1, fontWeight: '600' }}>
-                {rest.length ? `${given}\n${rest.join(' ')}` : given}
-              </Text>
-              <Text variant="caption" color="#FFFFFFB3">
-                {[roleLine(p), d.me ? 'you' : null].filter(Boolean).join(' · ') || 'No position yet'}
-              </Text>
-            </View>
-            {p.jersey ? (
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text variant="body" color={t.c.accent.mustard} style={{ fontSize: 44, lineHeight: 44, letterSpacing: -2, fontWeight: '800' }}>
-                  {p.jersey}
-                </Text>
-                <Text variant="mono" color="tertiary" style={{ fontSize: 9, lineHeight: 12, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                  jersey
-                </Text>
-              </View>
-            ) : null}
+      ))}
+    </WCard>
+  );
+  const linesCard = (title: string, lines: typeof pr.months) =>
+    lines.length ? (
+      <WCard gap={8}>
+        <CardTitle>{title}</CardTitle>
+        <View style={{ flexDirection: 'row' }}>
+          {['', 'Apps', 'Goals', 'Assists', 'W-D-L'].map((h, i) => <View key={h || 'label'} style={{ flex: i ? 1 : 1.4, alignItems: i ? 'flex-end' : 'flex-start' }}><MonoT>{h}</MonoT></View>)}
+        </View>
+        {lines.map((m) => (
+          <View key={m.month} style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+            <View style={{ flex: 1.4, minWidth: 0 }}><Tx color={W.ink} lh={17} lines={1}>{m.label}</Tx></View>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}><Tx color={W.ink62} lh={17}>{String(m.apps)}</Tx></View>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}><Tx color={m.goals ? W.lime : W.ink42} lh={17}>{String(m.goals)}</Tx></View>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}><Tx color={m.assists ? W.sky : W.ink42} lh={17}>{String(m.assists)}</Tx></View>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}><Tx color={W.ink62} lh={17}>{`${m.wins}-${m.draws}-${m.losses}`}</Tx></View>
           </View>
-          {chips.length ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-              {chips.map((c) => (
-                <Pill key={c.label} label={c.label} bg={c.tone === 'lime' ? t.c.accent.mustard : c.tone === 'white' ? t.c.fg.primary : t.c.bg.dim} fg={c.tone === 'quiet' ? t.c.fg.secondary : t.c.bg.ground} />
-              ))}
-            </View>
-          ) : null}
-          <Hairline />
+        ))}
+      </WCard>
+    ) : null;
 
-          <View style={{ gap: 4 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="tileTitle">Attributes</Text>
-                <Text variant="caption" color="secondary" style={{ fontWeight: '500' }}>
-                  six, from the profile
-                </Text>
-              </View>
-              {d.rating ? (
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                  <Text variant="body" style={{ fontSize: 26, lineHeight: 30, fontWeight: '800' }}>
-                    {String(d.rating.overall)}
-                  </Text>
-                  <Text variant="caption" color="tertiary">
-                    overall
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <AttributesChart stats={attrs.stats} />
-            </View>
-            {missing.length ? (
-              <Text variant="caption" color="tertiary">
-                {missing.length === PROFILE_ATTRS.length ? 'No attributes on the profile yet' : `${missing.join(', ')} ${missing.length === 1 ? 'isn’t' : 'aren’t'} rated yet`} — shown 5 under the base overall; treat it as a guess.
-              </Text>
-            ) : null}
-            {d.rating ? (
-              <Text variant="caption" color="tertiary">
-                {`Profile ${d.rating.base} · form ${d.rating.boost > 0 ? '+' : ''}${d.rating.boost} over ${plural(d.rating.matches, 'rated match', 'rated matches')}${d.rating.formScore !== null ? ` · last five ${d.rating.formScore.toFixed(1)}` : ''}${d.rating.provisional ? ' · provisional' : ''}`}
-              </Text>
-            ) : null}
-          </View>
-          <Hairline />
+  // ---- Overview pieces ----
+  const formLast = more.nights.slice(0, 5).reverse();
+  const formScore = formLast.length >= 3 ? Math.round((formLast.reduce((s, n) => s + n.rating, 0) / formLast.length) * 10 + 1e-9) / 10 : null;
+  const traits = traitGroup === 'squad' ? more.traits.squad : more.traits.position;
+  const rated = (['pace', 'shooting', 'passing', 'dribbling', 'defending', 'stamina'] as const).filter((k) => p[k] != null).length;
+  const series = more.overall.series;
+  const zoneName: Record<string, string> = { GK: 'GK', DEF: 'DEF', MID: 'MID', FWD: 'ST' };
+  const zoneX: Record<string, number> = { GK: 9, DEF: 30, MID: 52, FWD: 78 };
+  const code = playerPositionCode(p.position);
+  const comfortable = [p.secondaryPosition, ...(p.comfortable ?? '').split(',')].map((x) => playerPositionCode(x?.trim())).filter((c, i, a): c is NonNullable<typeof c> => !!c && c !== code && a.indexOf(c) === i);
+  const periods = [...(p.periods ?? [])].sort((a, b) => b.startsAt.localeCompare(a.startsAt)).slice(0, 3);
+  const about: Array<[string, string | undefined]> = [['Speciality', p.speciality], ['Boots', p.boots], ['Favourite player', p.favouritePlayer], ['Clubs', p.clubs], ['Countries', p.countries]];
+  const colours = (p.kitColors ?? '').split(/[,/ ]+/).filter((c) => /^#[0-9a-f]{3,8}$/i.test(c)).slice(0, 3);
 
-          <View style={{ flexDirection: 'row', gap: 14 }}>{[stat(String(d.stats.games), 'apps', 0), stat(String(d.stats.goals), 'goals', 1), stat(String(d.stats.assists), 'assists', 2)]}</View>
-          <View style={{ flexDirection: 'row', gap: 14 }}>{[stat(String(d.stats.saves), 'saves', 0), stat(String(d.stats.wins), 'wins', 1), stat(decided ? `${Math.round((d.stats.wins / decided) * 100)}%` : '—', 'win rate', 2)]}</View>
-          <Hairline />
-
-          {kit.swatches.length || kit.words.length || fanOf ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Text variant="caption" color="tertiary">
-                Kit
-              </Text>
-              {kit.swatches.map((hex, i) => (
-                <View key={`${hex}${i}`} style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: hex, borderWidth: 1.5, borderColor: '#FFFFFF40' }} />
-              ))}
-              <Text variant="caption" color="secondary" style={{ flexShrink: 1 }}>
-                {[kit.words.join(', '), fanOf].filter(Boolean).map((x, i) => (i || kit.swatches.length ? `· ${x}` : x)).join(' ') || ''}
-              </Text>
-            </View>
-          ) : null}
-          {extras ? (
-            <Text variant="caption" color="secondary">
-              {extras}
-            </Text>
-          ) : null}
-
-          <View style={{ gap: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: availabilityColour(p.availability, t) }} />
-              <Text variant="caption" style={{ flex: 1, fontWeight: '600' }}>
-                {[statusLabel(p.availability), WEEKLY.find((w) => w.value === (p.weekly ?? 'all_week'))!.label.toLowerCase(), p.availabilityMode === 'window_only' ? 'only in windows' : 'regular'].join(' · ')}
-              </Text>
-              {periods.length ? (
-                <Text variant="caption" color="tertiary">
-                  periods
-                </Text>
-              ) : null}
-            </View>
-            {periods.map((x, i) => (
-              <View key={x.id ?? i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: availabilityColour(x.status, t) }} />
-                <Text variant="caption" color="secondary" style={{ flex: 1 }}>
-                  {[statusLabel(x.status), rangeText(x.startsAt, x.endsAt), x.note].filter(Boolean).join(' · ')}
-                </Text>
-                <Text variant="caption" color="tertiary">
-                  {whenOf(x)}
-                </Text>
-              </View>
-            ))}
-          </View>
-          <Hairline />
-
-          <View style={{ gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingTop: 6, paddingHorizontal: 4 }}>
-              <Text variant="heading">{d.me ? 'Your dues' : `${firstOf(p.name)}’s dues`}</Text>
-              <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                {d.dues.length ? `${d.dues.length} open` : 'all paid'}
-              </Text>
-            </View>
-            {d.dues.map(({ p: due, g, fronted }) => {
-              const pill = due.direction === 'owes_you' ? { label: `owes you ${f(g.balanceCents)}`, bg: t.c.accent.mustardSoft, fg: t.c.accent.mustard } : due.direction === 'you_owe' ? { label: `you owe ${f(g.balanceCents)}`, bg: t.c.alert.coralFill, fg: t.c.alert.coralText } : { label: `owes ${due.creditorName ? firstOf(due.creditorName) : 'the fronter'} ${f(g.balanceCents)}`, bg: t.c.bg.dim, fg: t.c.fg.secondary };
-              const who = fronted ? (fronted === d.meId ? 'you fronted' : `${d.nameOf(fronted) ?? 'someone'} fronted`) : null;
-              return (
-                <Pressable key={`${due.direction}${g.gameId}`} accessibilityRole="button" accessibilityLabel={`${shortDay(g.date)}, ${pill.label}`} onPress={() => router.push(`/board/turf/game?game=${g.gameId}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 48, opacity: pressed ? 0.75 : 1 })}>
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.c.bg.tileRaised, alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name="activity" size={17} color={t.c.accent.mustard} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="rowTitle" numberOfLines={1}>
-                      {`${shortDay(g.date)} · ${g.venue}`}
-                    </Text>
-                    <Text variant="caption" color="secondary" numberOfLines={1}>
-                      {[`${f(g.shareCents)} share`, g.paidCents ? `${f(g.paidCents)} paid` : null, who].filter(Boolean).join(' · ')}
-                    </Text>
-                  </View>
-                  <Pill label={pill.label} bg={pill.bg} fg={pill.fg} />
-                </Pressable>
-              );
-            })}
-            {d.dues.length ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
-                <Button title="Settle up" variant="secondary" size="sm" style={{ height: 40 }} onPress={() => router.push('/board/turf/dues' as never)} />
-                <CopyShare text={d.reminder} what="Reminder copied" />
-              </View>
-            ) : (
-              <Text variant="caption" color="tertiary" style={{ paddingHorizontal: 4 }}>
-                Nothing open with {d.me ? 'you' : firstOf(p.name)}.
-              </Text>
-            )}
-          </View>
-          {p.notes ? (
-            <>
-              <Hairline />
-              <Text variant="caption" color="secondary">
-                {p.notes}
-              </Text>
-            </>
-          ) : null}
-          <Text variant="caption" color="tertiary">
-            Spent on turf {ctx.format.currency(d.stats.paid)}
-            {d.stats.unpaid ? ` · ${ctx.format.currency(d.stats.unpaid)} still open` : ''}
-            {d.stats.lastPlayed ? ` · last played ${shortDay(d.stats.lastPlayed)}` : ''}
-          </Text>
+  const rivalRow = (r: NonNullable<typeof more.hardest>, against: boolean) => (
+    <Pressable key={`${against}${r.id}`} accessibilityRole="link" onPress={() => openPlayer(r.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <Face id={r.id} name={r.name} size={36} />
+      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+        <Tx size={15} weight={600} lh={21} lines={1}>{r.name}</Tx>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: W.pill, overflow: 'hidden' }}><View style={{ width: `${r.winRate}%`, height: '100%', backgroundColor: against ? W.coral : W.lime }} /></View>
+          <Faint style={{ fontSize: 11 }}>{`${r.games} ${against ? 'against' : 'together'}`}</Faint>
         </View>
       </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Tx size={16} weight={800} lh={20} color={against ? W.coralInk : W.lime}>{`${r.winRate}%`}</Tx>
+        <MonoT size={8}>won</MonoT>
+      </View>
+    </Pressable>
+  );
+
+  // ---- Matches ----
+  const venues = [...new Set(more.nights.map((n) => n.venue))].slice(0, 4);
+  const shownNights = more.nights.filter((n) => (matchFilter === 'all' || (matchFilter === 'won' ? n.outcome === 'W' : matchFilter === 'potm' ? n.potm : n.venue === matchFilter)) && found(matchQuery, n.venue, shortDay(n.date)));
+  const byMonth = new Map<string, typeof shownNights>();
+  for (const n of shownNights) byMonth.set(n.date.slice(0, 7), [...(byMonth.get(n.date.slice(0, 7)) ?? []), n]);
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: W.dark }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, gap: 12 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
+      <ProfileHero p={p} turfId={turfId} overall={more.overall.now ?? pr.rating.value} delta={more.overall.delta} onBack={back} onShare={() => router.push(`/board/turf/card?player=${profile.id}` as never)} onEdit={() => router.push(`/board/turf/player-edit?player=${profile.id}` as never)} />
+      <LimeTabs<ProfileTab> value={tab} onChange={setTab} options={[{ value: 'overview', label: 'Overview' }, { value: 'matches', label: 'Matches' }, { value: 'stats', label: 'Stats' }, { value: 'dues', label: 'Dues' }]} />
+
+      {tab === 'overview' ? (
+        <>
+          <WCard padding={[14, 16]}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 }}>
+              {([
+                ['Jersey', p.jersey ? `#${p.jersey}` : '–'],
+                ['Foot', p.preferredFoot || '–'],
+                ['Style', p.playingStyle || '–'],
+                ['Keeps goal', keeper],
+                ['Joined', firstNight ? `${MO3[Number(firstNight.slice(5, 7)) - 1]} ${firstNight.slice(0, 4)}` : '–'],
+                ['Plays', p.weekly === 'weekends' ? 'Weekends' : p.weekly === 'weekdays' ? 'Weekdays' : 'All week'],
+              ] as Array<[string, string]>).map(([l, v]) => (
+                <View key={l} style={{ width: '33.33%', paddingRight: 10, minWidth: 0 }}>
+                  <MonoT>{l}</MonoT>
+                  <Tx size={15} weight={600} style={{ marginTop: 3 }} lines={1}>{v}</Tx>
+                </View>
+              ))}
+            </View>
+          </WCard>
+
+          <WCard gap={12}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+              <View style={{ flex: 1, minWidth: 0 }}><CardTitle>{scopeTitle}</CardTitle><Faint>{scopeSub}</Faint></View>
+              {season ? <MiniToggle<Scope> value={scope} onChange={setScope} options={[{ value: 'season', label: 'Season' }, { value: 'all', label: 'All time' }]} /> : null}
+            </View>
+            <View style={{ flexDirection: 'row' }}>
+              {([[pr.apps, 'Apps'], [pr.goals, 'Goals'], [pr.assists, 'Assists'], [pr.potm, 'POTM']] as Array<[number, string]>).map(([v, l], i) => (
+                <View key={l} style={{ flex: 1, alignItems: 'center', borderLeftWidth: i ? 1 : 0, borderLeftColor: W.line }}>
+                  <Disp size={40} lh={40}>{String(v)}</Disp>
+                  <MonoT>{l}</MonoT>
+                </View>
+              ))}
+            </View>
+            {decided > 0 ? (
+              <>
+                <View style={{ flexDirection: 'row', gap: 3, height: 6 }}>
+                  <View style={{ flex: pr.wins, backgroundColor: W.lime, borderRadius: 3 }} />
+                  <View style={{ flex: pr.draws, backgroundColor: W.ink42, borderRadius: 3 }} />
+                  <View style={{ flex: pr.losses, backgroundColor: W.coral, borderRadius: 3 }} />
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Faint>{`${pr.wins} won · ${pr.draws} drawn · ${pr.losses} lost`}</Faint>
+                  <Faint>{`${pr.winRate}% win rate`}</Faint>
+                </View>
+              </>
+            ) : null}
+          </WCard>
+
+          {formLast.length ? (
+            <WCard gap={12}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={{ flex: 1 }}><CardTitle>Form</CardTitle><Faint>{`last ${plural(formLast.length, 'match', 'matches')} · match rating${more.avgRating !== null ? ` · ${more.avgRating.toFixed(1)} on average` : ''}`}</Faint></View>
+                {formScore !== null ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><MonoT>Form</MonoT><RatingChip r={formScore} /></View> : null}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                {formLast.map((n) => (
+                  <View key={n.gameId} style={{ flex: 1, alignItems: 'center', gap: 4, minWidth: 0, opacity: n.partial ? 0.6 : 1 }}>
+                    <RatingChip r={n.rating} size="sm" star={n.potm} />
+                    <Tx size={11} weight={800} lh={14} color={n.outcome ? OUT_TONE[n.outcome] : W.ink42}>{n.outcome || '–'}</Tx>
+                    <MonoT size={8}>{dayMonth(n.date)}</MonoT>
+                  </View>
+                ))}
+                {Array.from({ length: 5 - formLast.length }, (_, i) => <View key={`e${i}`} style={{ flex: 1 }} />)}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                {(['lime', 'mint', 'sand', 'coral'] as const).map((b, i) => <View key={b} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: BAND_BG[b] }} /><Faint>{['8+', '7s', '6s', 'under 6'][i]}</Faint></View>)}
+              </View>
+              {formLast.some((n) => n.partial) ? <Faint>Faded: no score was logged, so the result doesn’t count in that rating.</Faint> : null}
+              <Faint>A match rating starts at 6.0; goals, assists, saves, the result, a clean sheet, player of the match and best on your team move it. You can set one by hand in the match (it then says “edited”).</Faint>
+            </WCard>
+          ) : null}
+
+          {more.traits.squad.length ? (
+            <WCard gap={14}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <View style={{ flex: 1 }}><CardTitle>Player traits</CardTitle><Faint>{`against the ${traitGroup === 'squad' ? `${regulars} regulars` : more.traits.positionLabel.toLowerCase()}`}</Faint></View>
+                <MiniToggle<'squad' | 'position'> value={traitGroup} onChange={setTraitGroup} options={[{ value: 'squad', label: 'Squad' }, { value: 'position', label: more.traits.positionLabel }]} />
+              </View>
+              {traits.map((tr) => {
+                const pct = tr.top === null ? 0 : Math.max(4, 100 - tr.top);
+                return (
+                  <View key={tr.key} style={{ gap: 5 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                      <Tx size={15} weight={600} lh={21} style={{ flex: 1 }}>{tr.label}</Tx>
+                      <Tx size={16} weight={800} lh={20}>{tr.display}</Tx>
+                      <View style={{ width: 56, alignItems: 'flex-end' }}><MonoT weight={700} color={tr.top !== null && tr.top <= 25 ? W.lime : W.ink42}>{tr.top === null ? '–' : tr.key === 'defending' && tr.rank ? `${tr.rank}${tr.rank === 1 ? 'ST' : tr.rank === 2 ? 'ND' : tr.rank === 3 ? 'RD' : 'TH'}` : `TOP ${tr.top}%`}</MonoT></View>
+                    </View>
+                    <View style={{ height: 5, borderRadius: 3, backgroundColor: W.pill, overflow: 'hidden' }}><View style={{ width: `${pct}%`, height: '100%', backgroundColor: tr.key === 'defending' ? W.coral : W.lime }} /></View>
+                    {tr.note ? <Faint>{tr.note}</Faint> : null}
+                  </View>
+                );
+              })}
+            </WCard>
+          ) : null}
+
+          <WCard gap={8}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <View style={{ flex: 1 }}><CardTitle>Attributes</CardTitle><Faint>rated by the squad</Faint></View>
+              {pr.rating.value !== null ? <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}><Disp size={44} color={W.lime}>{String(pr.rating.value)}</Disp><MonoT>Overall</MonoT></View> : null}
+            </View>
+            <View style={{ alignItems: 'center' }}><Radar player={p} /></View>
+            <View style={{ gap: 4 }}>
+              <View style={{ height: 5, borderRadius: 3, backgroundColor: W.pill, overflow: 'hidden' }}><View style={{ width: `${pr.rating.confidence}%`, height: '100%', backgroundColor: W.lime }} /></View>
+              <Faint>{`${pr.rating.level} · ${pr.rating.confidenceLabel.toLowerCase()} · from ${plural(pr.apps, 'match', 'matches')} and the profile`}</Faint>
+            </View>
+            {rated < 6 ? <Faint>{rated ? `${6 - rated} attribute${6 - rated === 1 ? '' : 's'} not rated yet, so treat the shape as a guess.` : 'No attributes rated yet.'}</Faint> : null}
+            {pr.rating.missing.length ? <Faint>{`For a surer rating, add ${pr.rating.missing.slice(0, 4).join(', ')}${pr.rating.missing.length > 4 ? ` and ${pr.rating.missing.length - 4} more` : ''} in Edit player.`}</Faint> : null}
+          </WCard>
+
+          {series.length >= 2 ? (() => {
+            const w = 320, h = 120, pad = 14;
+            const lo = Math.min(...series.map((s) => s.value)) - 3, hi = Math.max(...series.map((s) => s.value)) + 3;
+            const x = (i: number) => pad + (i * (w - pad * 2)) / (series.length - 1);
+            const y = (v: number) => h - 18 - ((v - lo) / Math.max(1, hi - lo)) * (h - 40);
+            const path = series.map((s, i) => `${i ? 'L' : 'M'}${x(i)},${y(s.value)}`).join(' ');
+            const last = series[series.length - 1]!;
+            return (
+              <WCard gap={8}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1 }}><CardTitle>Overall over time</CardTitle><Faint>{joined ? `since they joined · ${joined}` : 'month by month'}</Faint></View>
+                  {more.overall.delta ? <WPill tone={more.overall.delta > 0 ? 'lime' : 'coral'}>{`${more.overall.delta > 0 ? '▲' : '▼'}${Math.abs(more.overall.delta)} since ${more.overall.since}`}</WPill> : null}
+                </View>
+                <Svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
+                  <Path d={`${path} L${x(series.length - 1)},${h - 18} L${x(0)},${h - 18} Z`} fill="rgba(215,245,92,0.10)" />
+                  <Path d={path} fill="none" stroke={W.lime} strokeWidth={2.5} strokeLinejoin="round" />
+                  {series.map((s, i) => <Circle key={i} cx={x(i)} cy={y(s.value)} r={i === series.length - 1 ? 5 : 3} fill={i === series.length - 1 ? W.lime : W.card} stroke={W.lime} strokeWidth={2} />)}
+                  <Rect x={x(series.length - 1) - 16} y={y(last.value) - 28} width={32} height={20} rx={10} fill={W.ink} />
+                  <SvgText x={x(series.length - 1)} y={y(last.value) - 14} textAnchor="middle" fontSize={12} fontWeight="800" fill={W.dark}>{String(last.value)}</SvgText>
+                  {series.map((s, i) => <SvgText key={`l${i}`} x={x(i)} y={h - 3} textAnchor="middle" fontSize={9} fill={W.ink42}>{s.label}</SvgText>)}
+                </Svg>
+                <Faint>Moves with the squad’s ratings and their nights; a new player’s number settles after about ten matches.</Faint>
+              </WCard>
+            );
+          })() : null}
+
+          {more.zones.length ? (
+            <WCard gap={10}>
+              <View><CardTitle>Where they play</CardTitle><Faint>{more.zones.map((z) => `${zoneName[z.zone]} ${z.zone === more.zones[0]!.zone ? 'mostly' : 'sometimes'}`).slice(0, 2).join(' · ')}</Faint></View>
+              <View style={{ height: 150, borderRadius: 16, backgroundColor: '#1F4D2B', overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)' }}>
+                <View style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, borderLeftWidth: 1.5, borderLeftColor: 'rgba(255,255,255,0.2)' }} />
+                <View style={{ position: 'absolute', left: '50%', top: '50%', width: 50, height: 50, marginLeft: -25, marginTop: -25, borderRadius: 25, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' }} />
+                <View style={{ position: 'absolute', left: 0, top: '28%', bottom: '28%', width: '12%', borderWidth: 1.5, borderLeftWidth: 0, borderColor: 'rgba(255,255,255,0.2)' }} />
+                <View style={{ position: 'absolute', right: 0, top: '28%', bottom: '28%', width: '12%', borderWidth: 1.5, borderRightWidth: 0, borderColor: 'rgba(255,255,255,0.2)' }} />
+                <Svg style={{ position: 'absolute', left: 0, top: 0 }} width="100%" height="100%">
+                  <Defs>
+                    {more.zones.map((z) => (
+                      <RadialGradient key={z.zone} id={`zone${z.zone}`} cx="50%" cy="50%" r="50%">
+                        <Stop offset="0" stopColor={W.lime} stopOpacity={0.25 + z.share / 200} />
+                        <Stop offset="0.7" stopColor={W.lime} stopOpacity={0} />
+                      </RadialGradient>
+                    ))}
+                  </Defs>
+                  {more.zones.map((z) => <Circle key={z.zone} cx={`${zoneX[z.zone]}%`} cy="50%" r={(40 + z.share * 0.9) / 2} fill={`url(#zone${z.zone})`} />)}
+                </Svg>
+                {more.zones.map((z) => (
+                  <View key={z.zone} style={{ position: 'absolute', left: `${zoneX[z.zone]}%`, top: '50%', transform: [{ translateX: -40 }, { translateY: -10 }], width: 80, alignItems: 'center' }}>
+                    <View style={{ paddingVertical: 3, paddingHorizontal: 8, borderRadius: 999, backgroundColor: z.zone === more.zones[0]!.zone ? W.lime : W.dark }}>
+                      <Tx size={11} weight={800} lh={14} color={z.zone === more.zones[0]!.zone ? W.dark : W.ink}>{`${zoneName[z.zone]} · ${z.zone === 'GK' ? plural(z.games, 'game') : `${z.share}%`}`}</Tx>
+                    </View>
+                  </View>
+                ))}
+                <View style={{ position: 'absolute', right: 8, bottom: 6 }}><MonoT size={8} color="rgba(255,255,255,0.5)">Attacking →</MonoT></View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                {code ? <WPill tone="limeSolid">{`${zoneName[code]} · preferred`}</WPill> : null}
+                {comfortable.map((c) => <WPill key={c} tone="white">{`${zoneName[c]} · comfortable`}</WPill>)}
+                {p.keeperWilling && code !== 'GK' ? <WPill>{`GK · ${(p.keeperRating ?? 0) >= 4 ? 'happily' : 'emergency'}`}</WPill> : null}
+              </View>
+            </WCard>
+          ) : null}
+
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}><View style={{ flex: 1 }}><Section>Trophy case</Section></View><Faint>{`${more.trophies.filter((x) => x.unlocked).length} of ${more.trophies.length}`}</Faint></View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {more.trophies.slice(0, 6).map((tr) => (
+                <View key={tr.key} style={{ width: '31.5%', gap: 8, padding: 12, borderRadius: 20, backgroundColor: W.card, borderWidth: tr.unlocked ? 0 : 1.5, borderStyle: 'dashed', borderColor: W.ink22, opacity: tr.unlocked ? 1 : 0.75 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: tr.unlocked ? W.lime : W.raised, alignItems: 'center', justifyContent: 'center' }}><Icon name={tr.icon} size={16} color={tr.unlocked ? W.dark : W.ink42} /></View>
+                    <Disp size={26} color={tr.unlocked ? W.ink : W.ink42}>{tr.value}</Disp>
+                  </View>
+                  <View style={{ minWidth: 0 }}>
+                    <Tx size={13} weight={700} lh={17} lines={1}>{tr.label}</Tx>
+                    <Faint style={{ fontSize: 11 }} lines={1}>{tr.sub}</Faint>
+                  </View>
+                  {tr.progress !== undefined ? <View style={{ height: 4, borderRadius: 2, backgroundColor: W.pill, overflow: 'hidden' }}><View style={{ width: `${Math.round(tr.progress * 100)}%`, height: '100%', backgroundColor: W.ink42 }} /></View> : null}
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {more.partners.length || more.hardest ? (
+            <View style={{ gap: 10 }}>
+              <Section>Plays best with</Section>
+              <WCard gap={14}>
+                {more.partners.map((r) => rivalRow(r, false))}
+                {more.hardest ? (
+                  <>
+                    <MonoT>Hardest to beat</MonoT>
+                    {rivalRow(more.hardest, true)}
+                  </>
+                ) : null}
+              </WCard>
+            </View>
+          ) : null}
+
+          {d.picks.length ? (
+            <WCard gap={6}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}><View style={{ flex: 1 }}><CardTitle>Plays well with</CardTitle></View><Faint>their picks · used by Suggest teams</Faint></View>
+              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>{d.picks.map((x) => <WPill key={x.id} tone="lime">{x.name}</WPill>)}</View>
+            </WCard>
+          ) : null}
+
+          <WCard gap={8}>
+            <View><CardTitle>Availability</CardTitle><Faint>{`${p.weekly === 'weekends' ? 'Weekends' : p.weekly === 'weekdays' ? 'Weekdays' : 'All week'} · ${p.availabilityMode === 'window_only' ? 'when free' : 'regular'} · ${now === 'INJ' ? 'injured now' : now === 'OOS' ? 'away now' : 'available now'}`}</Faint></View>
+            {periods.map((x, i) => (
+              <View key={x.id ?? i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: x.status === 'INJ' ? W.coral : W.ink42 }} />
+                <Tx color={W.ink62} lh={17} lines={1} style={{ flex: 1 }}>{`${x.status === 'INJ' ? 'Injured' : x.status === 'OOS' ? 'Out of station' : 'Available'} · ${rangeText(x.startsAt, x.endsAt)}${x.note ? ` · ${x.note}` : ''}`}</Tx>
+                <WPill>{x.startsAt > today ? 'upcoming' : x.endsAt && x.endsAt < today ? 'past' : 'now'}</WPill>
+              </View>
+            ))}
+          </WCard>
+
+          {about.some(([, v]) => v) || colours.length ? (
+            <WCard gap={4}>
+              <View style={{ marginBottom: 4 }}><CardTitle>About</CardTitle></View>
+              {about.filter(([, v]) => v).map(([l, v]) => (
+                <View key={l} style={{ flexDirection: 'row', gap: 12, minHeight: 26, alignItems: 'baseline' }}>
+                  <Faint style={{ width: 120 }}>{l}</Faint>
+                  <Tx color={W.ink} lh={17} style={{ flex: 1 }}>{v}</Tx>
+                </View>
+              ))}
+              {colours.length ? (
+                <View style={{ flexDirection: 'row', gap: 12, minHeight: 26, alignItems: 'center' }}>
+                  <Faint style={{ width: 120 }}>Kit colours</Faint>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>{colours.map((c) => <View key={c} style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: c, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)' }} />)}</View>
+                </View>
+              ) : null}
+            </WCard>
+          ) : null}
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button title="Edit player" icon="edit" variant="secondary" style={{ flex: 1, height: 48 }} onPress={() => router.push(`/board/turf/player-edit?player=${profile.id}` as never)} />
+            <Button title="Stats card" icon="send" variant="secondary" style={{ flex: 1, height: 48 }} onPress={() => router.push(`/board/turf/card?player=${profile.id}` as never)} />
+          </View>
+        </>
+      ) : null}
+
+      {tab === 'matches' ? (
+        <>
+          <WCard padding={[14, 16]}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+              <View style={{ flex: 1 }}><MonoT>Played</MonoT><Disp size={30}>{String(more.nights.length)}</Disp></View>
+              <View style={{ flex: 1 }}><MonoT>Missed</MonoT><Disp size={30} color={W.ink42}>{String(more.missed)}</Disp></View>
+              <View style={{ flex: 1, gap: 2 }}><MonoT>Avg rating</MonoT>{more.avgRating !== null ? <View style={{ alignSelf: 'flex-start' }}><RatingChip r={more.avgRating} /></View> : <Tx>–</Tx>}</View>
+              <View style={{ flex: 1, gap: 2 }}><MonoT>Best</MonoT>{more.best !== null ? <View style={{ alignSelf: 'flex-start' }}><RatingChip r={more.best} /></View> : <Tx>–</Tx>}</View>
+            </View>
+          </WCard>
+          <SearchBox value={matchQuery} onChange={setMatchQuery} placeholder="Search grounds or dates" />
+          <ChipRow>
+            {[{ value: 'all', label: 'All' }, { value: 'won', label: 'Won' }, { value: 'potm', label: 'POTM' }, ...venues.map((v) => ({ value: v, label: v.split(/\s+[-–·]\s+/)[0] ?? v }))].map((o) => (
+              <FilterChip key={o.value} label={o.label} selected={matchFilter === o.value} onPress={() => setMatchFilter(o.value)} />
+            ))}
+          </ChipRow>
+          {[...byMonth.entries()].map(([month, ns]) => (
+            <View key={month} style={{ gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}><View style={{ flex: 1 }}><Section>{MONTHS_LONG[Number(month.slice(5)) - 1]}</Section></View><Faint>{plural(ns.length, 'game')}</Faint></View>
+              <WCard padding={[4, 16]}>
+                {ns.map((n, i) => {
+                  const bits = [n.goals ? plural(n.goals, 'goal') : null, n.assists ? plural(n.assists, 'assist') : null, n.inGoal ? `in goal · ${plural(n.saves, 'save')}` : null, n.ownGoals ? plural(n.ownGoals, 'own goal') : null, n.potm ? 'POTM' : null, n.captain ? 'captain' : null].filter(Boolean).join(' · ') || 'played';
+                  return (
+                    <View key={n.gameId}>
+                      {i > 0 ? <Divider /> : null}
+                      <Pressable accessibilityRole="link" onPress={() => openGame(n.gameId)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 }}>
+                        <View style={{ width: 34, alignItems: 'center' }}><Disp size={26} lh={24}>{String(Number(n.date.slice(8, 10)))}</Disp><MonoT size={8}>{MO3[Number(n.date.slice(5, 7)) - 1]}</MonoT></View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: n.kit.hex, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }} />
+                            <Tx size={15} weight={600} lh={21} lines={1} style={{ flexShrink: 1 }}>{n.venue}</Tx>
+                            {n.outcome ? <Tx size={13} weight={800} lh={17} color={OUT_TONE[n.outcome]}>{`${n.outcome} ${n.for}–${n.against}`}</Tx> : null}
+                          </View>
+                          <Tx color={W.ink62} lh={17} lines={1}>{`${bits}${n.edited ? ' · rating edited' : ''}`}</Tx>
+                        </View>
+                        <RatingChip r={n.rating} />
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </WCard>
+            </View>
+          ))}
+          {!shownNights.length ? <WCard><Tx color={W.ink62} lh={17}>No matches here.</Tx></WCard> : null}
+          <Faint style={{ textAlign: 'center' }}>Tap a night for the match · ratings in colour: 8+ lime, 7s mint, 6s sand, under 6 coral</Faint>
+        </>
+      ) : null}
+
+      {tab === 'stats' ? (
+        <>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            {season ? <MiniToggle<Scope> value={scope} onChange={setScope} options={[{ value: 'season', label: season.name }, { value: 'all', label: 'All time' }]} /> : <View />}
+            <MiniToggle<'total' | 'per'> value={perGame ? 'per' : 'total'} onChange={(v) => setPerGame(v === 'per')} options={[{ value: 'total', label: 'Total' }, { value: 'per', label: 'Per game' }]} />
+          </View>
+          <Faint>Counted from the stats logged each match · the bar is where they sit in the squad</Faint>
+          {statGroup('Scoring', 'goals and own goals', [
+            { label: 'Goals', value: pr.goals, display: fmt(pr.goals), sub: perGame ? undefined : aGame(pr.goals), max: max.goals },
+            { label: 'Hat-tricks', value: more.hatTricks, max: max.hatTricks },
+            { label: 'Most in a game', value: more.mostInGame?.goals ?? 0, sub: more.mostInGame ? dayMonth(more.mostInGame.date) : undefined },
+            { label: 'Own goals', value: more.ownGoals },
+          ])}
+          {statGroup('Creating', undefined, [
+            { label: 'Assists', value: pr.assists, display: fmt(pr.assists), sub: perGame ? undefined : aGame(pr.assists), max: max.assists },
+            { label: 'Goals + assists', value: pr.goals + pr.assists, display: fmt(pr.goals + pr.assists), sub: perGame ? undefined : aGame(pr.goals + pr.assists), max: max.ga },
+          ])}
+          {statGroup('Team', undefined, [
+            { label: 'Won', value: pr.wins, sub: `of ${pr.apps}`, max: pr.apps, tone: W.sun },
+            { label: 'Drawn', value: pr.draws },
+            { label: 'Lost', value: pr.losses },
+            { label: 'Player of the match', value: pr.potm, sub: pr.potm ? `1 in ${Math.round(pr.apps / pr.potm)}` : undefined, max: max.potm },
+            { label: 'Captain', value: more.captain },
+          ])}
+          {pr.keeperApps > 0 ? statGroup('In goal', pr.keeperApps < 3 ? 'now and then' : undefined, [
+            { label: 'Games in goal', value: pr.keeperApps },
+            { label: 'Saves', value: pr.saves, sub: `${(pr.saves / pr.keeperApps).toFixed(1)} a game in goal`, max: max.saves, tone: W.coral },
+            { label: 'Clean sheets', value: pr.cleanSheets },
+          ]) : null}
+          {statGroup('Turning up', t.saidYes ? 'said yes, then came' : 'since RSVPs started', [
+            { label: 'Said yes', value: t.saidYes },
+            { label: 'Played', value: t.played, sub: t.saidYes ? `${Math.round((Math.min(t.played, t.saidYes) / t.saidYes) * 100)}%` : undefined, max: Math.max(t.saidYes, t.played) },
+            { label: 'Late', value: t.late },
+            { label: 'No-show', value: t.noShow, max: Math.max(1, t.played), tone: t.noShow ? W.coral : W.lime },
+          ])}
+          <WCard>
+            <View style={{ marginBottom: 6 }}><CardTitle>Money</CardTitle><Faint>only you see this</Faint></View>
+            {([['Shares', `${shareCount} matches`, rupees(shareCents)], ['Paid in full', `of ${shareCount}`, String(paidFull)], ['Open now', openPeople[0]?.games[0] ? shortDay(openPeople[0].games[0].date) : '', owed ? rupees(owed) : '–']] as Array<[string, string, string]>).map(([l, sub, v], i) => (
+              <View key={l} style={{ paddingTop: 10, paddingBottom: 8, borderTopWidth: i ? 1 : 0, borderTopColor: W.line, flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                <Tx size={15} weight={600} lh={21} style={{ flex: 1 }}>{l}</Tx>
+                <Faint>{sub}</Faint>
+                <Disp size={26} color={l === 'Open now' && owed ? W.coralInk : W.ink}>{v}</Disp>
+              </View>
+            ))}
+          </WCard>
+          {pr.bests.length ? (
+            <WCard gap={8}>
+              <CardTitle>Bests</CardTitle>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {pr.bests.map((b) => <View key={b.label} style={{ width: '48.5%' }}><Tile label={b.label} value={b.value} sub={b.sub} /></View>)}
+              </View>
+            </WCard>
+          ) : null}
+          {linesCard('Season by season', allProfile.seasons)}
+          {linesCard('Month by month', pr.months)}
+        </>
+      ) : null}
+
+      {tab === 'dues' ? (
+        <>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Tile label={owed ? 'Owes you' : 'Dues'} value={owed ? rupees(owed) : 'Clear'} tone={owed ? W.coralInk : W.lime} sub={owed ? plural(openGames, 'match', 'matches') : 'settled'} />
+            <Tile label="Total spent" value={rupees(spent)} sub={pr.apps ? `${rupees(Math.round(spent / Math.max(1, shareCount)))} a match` : undefined} />
+            <Tile label="Credit" value={d.credit ? `+${rupees(d.credit)}` : '–'} tone={d.credit ? W.sky : W.ink42} sub={d.credit ? 'off their next' : 'none held'} />
+          </View>
+          <WCard gap={8}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingTop: 6, paddingHorizontal: 4 }}>
+              <Section>{p.personId === d.me ? 'Your dues' : 'Open'}</Section>
+              <Tx size={13} weight={600} color={W.ink62}>{openPeople.length ? `${openGames} open` : 'clear'}</Tx>
+            </View>
+            {openPeople.flatMap((x) => x.games.map((g) => {
+              const credit = Math.min(g.creditCents ?? 0, g.paidCents);
+              const cash = g.paidCents - credit;
+              return (
+                <Pressable key={g.gameId} accessibilityRole="link" onPress={() => openGame(g.gameId)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 48 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: W.raised, alignItems: 'center', justifyContent: 'center' }}><Icon name="wallet" size={17} color={W.ink} /></View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Tx size={16} weight={600} lh={21} lines={1}>{`${shortDay(g.date)} · ${g.venue}`}</Tx>
+                    <Tx color={W.ink62} lh={17} lines={1}>{`${rupees(g.shareCents)} share${cash > 0 ? ` · ${rupees(cash)} paid` : ''}${credit > 0 ? ` · ${rupees(credit)} credit used` : ''}`}</Tx>
+                  </View>
+                  <WPill tone="coral">{rupees(g.balanceCents)}</WPill>
+                </Pressable>
+              );
+            }))}
+            {!openPeople.length ? <Tx color={W.ink62} lh={17}>Nothing open.</Tx> : null}
+            {openPeople.length ? (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
+                <View style={{ flex: 1 }}><NumberField label={`Part of ${rupees(owed)}, oldest first`} value={part} onChange={setPart} unit="₹" /></View>
+                <Button title="Record" variant="secondary" size="sm" style={{ height: 44 }} disabled={!(part && part > 0)} onPress={() => part && settle(part)} />
+              </View>
+            ) : null}
+            {openPeople.length ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                <Button title="Settle up" variant="secondary" size="sm" style={{ height: 40 }} onPress={() => settle()} />
+                <CopyShare text={d.reminder} what={`Reminder for ${firstOf(p.name)} copied`} />
+              </View>
+            ) : null}
+          </WCard>
+          <WCard gap={4}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}><View style={{ flex: 1 }}><CardTitle>Contact and notes</CardTitle></View><Faint>only you</Faint></View>
+            {([['Phone', d.person.phone], ['UPI / payment ID', d.person.upi], ['Email', d.person.email], ['Notes', p.notes]] as Array<[string, string | undefined]>).map(([l, v]) => (
+              <View key={l} style={{ flexDirection: 'row', gap: 12, minHeight: 26, alignItems: 'baseline' }}>
+                <Faint style={{ width: 120 }}>{l}</Faint>
+                <Tx color={W.ink} lh={17} style={{ flex: 1 }}>{v || '–'}</Tx>
+              </View>
+            ))}
+          </WCard>
+        </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -566,7 +966,7 @@ export function TurfStatsCard({ params }: Props) {
   );
 
   return (
-    <Screen title="Stats card" subtitle={`Player · ${p.name}`} onBack={back} right={<SyncPill />}>
+    <Screen title="Stats card" subtitle={`Player · ${p.name}`} onBack={back} right={<><SyncPill /><BellButton /></>}>
       <View style={{ padding: 18, gap: 12, borderRadius: 28, backgroundColor: blocks.lime }}>
         <OnBlock>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -772,7 +1172,7 @@ export function TurfPlayerEdit({ params }: Props) {
   const toggleSwatch = (name: string) => set('kitColors', (swatchOn(name) ? list(v.kitColors).filter((x) => x.toLowerCase() !== name.toLowerCase()) : [...list(v.kitColors), name]).join(', ') || undefined);
 
   return (
-    <Screen title={id ? 'Edit player' : 'Add player'} subtitle="Turf › Players" onBack={back} right={<SyncPill />} contentStyle={{ gap: 14 }}>
+    <Screen title={id ? 'Edit player' : 'Add player'} subtitle="Turf › Players" onBack={back} right={<><SyncPill /><BellButton /></>} contentStyle={{ gap: 14 }}>
       <Field label="Name">
         <TextField value={v.name} onChange={(s) => set('name', s)} placeholder="As the squad calls them" autoCapitalize="words" error={error ?? undefined} />
       </Field>

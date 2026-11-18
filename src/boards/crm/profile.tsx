@@ -7,12 +7,13 @@ import Svg, { Defs, Line, LinearGradient, Rect, Stop } from 'react-native-svg';
 import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import type { RecordControls } from '@core/registry/types';
+import { linkGroups } from '@core/graph/read';
 import { useLive } from '@ui/hooks';
-import { Icon, Text, useToast } from '@ui/kit';
+import { Donut, Icon, Text, useToast } from '@ui/kit';
 import { ThemeProvider } from '@ui/theme/ThemeProvider';
 import { blocks, monoFonts } from '@ui/theme/tokens';
 import { birthdayParts, cadenceLabel, daysSince, listItems, type GroupData, type PersonData } from '@modules/crm';
-import { balanceWith, settleUp, undoSettle, type DebtData } from '@modules/finance/split';
+import { balanceWith, settleUp, sharedWith, undoSettle, type DebtData } from '@modules/finance/split';
 import { Face, FaceStack, faceColor, initials, KeepInTouchNudge, shortSpan } from './parts';
 import { birthdayIn, GiftIdeasSlot, useGiftIdeas, weekdayDay, WishCard } from './birthday';
 
@@ -67,8 +68,6 @@ const OBJECT_LOOK: Record<string, { color: string; icon: string }> = {
 };
 export const lookFor = (object: string) => OBJECT_LOOK[object] ?? { color: blocks.yellow, icon: 'doc' };
 
-/** The link word a person-side reader expects ("with", "paid") for a Link kind. */
-const WORD: Record<string, string> = { person: 'with', payee: 'paid', member: 'in', player: 'played', vendor: 'vendor for', captain: 'captain', 'fronted by': 'fronted' };
 
 const firstOf = (title: string) => title.trim().split(/\s+/)[0] ?? title;
 const dayMonth = (t: number) => {
@@ -413,7 +412,7 @@ interface LinkRow {
 function LinksMap({ centre, rows, onOpen }: { centre: { id: string; name: string; photo?: string | null }; rows: LinkRow[]; onOpen: () => void }) {
   const [w, setW] = useState(0);
   const h = 170;
-  const nodes = rows.slice(0, 10);
+  const nodes = rows.filter((r, k) => rows.findIndex((x) => x.id === r.id) === k).slice(0, 10);
   const cx = w / 2;
   const cy = h / 2;
   const rx = Math.max(0, w / 2 - 34);
@@ -570,26 +569,29 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
     (os) => {
       const links = os.links.forEntity(id).filter((l) => l.relation.kind !== 'mention');
       const seen = new Set<string>();
-      const rows: LinkRow[] = [];
       const linked: ObjectRecord[] = [];
       for (const l of links) {
         if (seen.has(l.other.id)) continue;
         seen.add(l.other.id);
         const r = os.records.get<Record<string, unknown>>(l.other.id);
-        if (!r) continue;
-        linked.push(r);
-        const when = r.occurredAt ? dayMonth(r.occurredAt) : null;
-        const amount = r.object === 'transaction' && typeof r.data.amount === 'number' ? os.format.currency(r.data.amount as number) : null;
-        rows.push({
-          id: r.id,
-          object: r.object,
-          title: r.title,
-          sub: [amount, r.subtitle && r.subtitle !== r.title ? r.subtitle : null, when].filter(Boolean).join(' · ') || os.registry.objects.get(r.object)?.label || null,
-          word: WORD[l.relation.kind] ?? l.relation.kind,
-          guessed: (l.relation.confidence ?? 1) < 1,
-          photo: r.object === 'person' ? ((r.data.photo as { uri?: string } | undefined)?.uri ?? null) : null,
-        });
+        if (r) linked.push(r);
       }
+      // The Links card reads as core's Links do (MODEL.md layer 5): one game once, not the game, her Appearance and a Debt.
+      const rows: LinkRow[] = linkGroups(os, id).flatMap((g) =>
+        g.items.map((i) => {
+          const r = os.records.get<Record<string, unknown>>(i.id);
+          const amount = i.amount != null ? os.format.currency(Math.abs(i.amount)) : null;
+          return {
+            id: i.id,
+            object: i.type,
+            title: i.title,
+            sub: [amount, i.context ?? i.subtitle, i.at && !i.via ? dayMonth(i.at) : null].filter(Boolean).join(' · ') || os.registry.objects.get(i.type)?.label || null,
+            word: g.word,
+            guessed: i.guessed,
+            photo: i.type === 'person' ? ((r?.data.photo as { uri?: string } | undefined)?.uri ?? null) : null,
+          };
+        }),
+      );
       const facts = os.facts.list({ subjectId: id, limit: 200 });
       const dumpFacts = facts.filter((f) => f.source === 'dump');
       if (dumpFacts.length) {
@@ -600,6 +602,10 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
       const cover = os.attachments.cover(id)?.uri ?? null;
       const hasDebts = os.registry.objects.has('debt');
       const balance = hasDebts ? balanceWith(os, id) : 0;
+      // The kit's donut (NR-KitCharts): what you shared with them this month, from the splits they are in.
+      const now = new Date();
+      const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const sharedMonth = os.registry.objects.has('transaction') ? sharedWith(os, id, isoDay(new Date(now.getFullYear(), now.getMonth(), 1)), isoDay(now)) : { total: 0, shares: [] };
       const debts = hasDebts ? os.records.query<DebtData>('debt', { filter: { and: [{ field: 'status', op: 'neq', value: 'settled' }, { field: 'data.personId', op: 'eq', value: id }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 50 }) : [];
       const everDebts = hasDebts && (debts.length > 0 || os.records.count('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: id }] } }) > 0);
       // Groups they're in: a member row, or the record's member list.
@@ -635,7 +641,7 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
       const cycles = os.cycles.forEntity(id).filter((c) => c.enabled);
       const contact = cycles.find((c) => c.template === 'person.contact');
       const contactStatus = contact ? os.cycles.status(contact) : null;
-      return { rows, linked, facts, photos, cover, balance, debts, everDebts, groupRows, jobs, player, events, tags, worksAt, livesIn, contact, contactStatus, shared: seen.size };
+      return { rows, linked, facts, photos, cover, balance, sharedMonth, debts, everDebts, groupRows, jobs, player, events, tags, worksAt, livesIn, contact, contactStatus, shared: seen.size };
     },
     [id, entity.version],
   );
@@ -654,6 +660,12 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
   const edit = () => controls?.edit();
   // Balances can carry paise from a split or a yen spend; People shows whole rupees.
   const fmt = (n: number) => ctx.format.currency(Math.round(n));
+  // Short amounts for the donut's centre, as the kit writes them (₹3.2k, ₹1.3L).
+  const short = (n: number) => {
+    const sym = ctx.format.currency(0).replace(/[\d.,\s]/g, '') || '₹';
+    const v = n >= 1e5 ? `${(n / 1e5).toFixed(1)}L` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : `${Math.round(n)}`;
+    return `${sym}${v.replace('.0', '')}`;
+  };
 
   const logContact = () => {
     const prev = p.data.lastContactAt;
@@ -855,10 +867,18 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
           </View>
         </SheetCard>
 
-        {view.debts.length || view.balance !== 0 ? (
+        {view.debts.length || view.balance !== 0 || view.sharedMonth.total ? (
           <>
             <Hairline />
             <SectionHead title="Money" />
+            {view.sharedMonth.total ? (
+              <Donut
+                title={`Shared with ${first}`}
+                sub="this month"
+                centre={short(view.sharedMonth.total)}
+                parts={(view.sharedMonth.shares.length > 4 ? [...view.sharedMonth.shares.slice(0, 3), { party: 'others', amount: view.sharedMonth.shares.slice(3).reduce((a, x) => a + x.amount, 0) }] : view.sharedMonth.shares).map((x, i) => ({ label: x.party === 'me' ? 'You' : x.party === 'others' ? 'Others' : (ctx.records.get(x.party)?.title ?? 'Someone').split(' ')[0]!, value: x.amount, color: [blocks.lime, blocks.pink, blocks.sky, blocks.lilac][i]! }))}
+              />
+            ) : null}
             <Rows>
               {view.debts.slice(0, 6).map((d) => (
                 <Row

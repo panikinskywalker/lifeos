@@ -3,6 +3,7 @@ import type { ObjectRecord } from '../domain/types';
 import type { Dump } from '../repo/dumpRepo';
 import type { Row } from '../db/adapter';
 import { daily, isoDay, type MetricId } from '../dashboard/metrics';
+import { incomeSql, MONEY_KINDS_SQL, spentSql } from '../dashboard/money';
 
 /**
  * The Almanac (M4.4, PRODUCT v4 §1.2): a reference book of your life.
@@ -185,17 +186,18 @@ export function periodSummary(os: LifeOSContext, period: Period): PeriodSummary 
   let income = 0;
   let count = 0;
   if (has('transaction')) {
-    const rows = os.db.all<{ kind: string; category: string | null; total: number; n: number }>(
-      `SELECT json_extract(data,'$.kind') AS kind, json_extract(data,'$.category') AS category, SUM(json_extract(data,'$.amount')) AS total, COUNT(*) AS n
-       FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY kind, category`,
+    // Your share (MODEL layer 2): spent at your share less refunds, by category; what came in leaves out refunds and paybacks.
+    const rows = os.db.all<{ category: string | null; total: number; n: number; inc: number }>(
+      `SELECT json_extract(data,'$.category') AS category, SUM(${spentSql()}) AS total, SUM(json_extract(data,'$.kind')='expense') AS n, SUM(${incomeSql()}) AS inc
+       FROM records WHERE object='transaction' AND deleted_at IS NULL AND ${MONEY_KINDS_SQL()} AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY category`,
       [from, to],
     );
     for (const r of rows) {
-      if (r.kind === 'expense') {
-        total += r.total;
-        count += r.n;
-        byCategory.push({ category: r.category ?? 'other', total: r.total, count: r.n });
-      } else if (r.kind === 'income') income += r.total;
+      income += r.inc;
+      if (!r.n) continue;
+      total += r.total;
+      count += r.n;
+      byCategory.push({ category: r.category ?? 'other', total: r.total, count: r.n });
     }
     byCategory.sort((x, y) => y.total - x.total);
   }

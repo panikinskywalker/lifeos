@@ -66,10 +66,17 @@ export interface GameData {
   captainAId?: string;
   captainBId?: string;
   motmId?: string;
+  /** Turf web counted the player-of-the-match vote (its window closed). */
+  potmSettled?: boolean;
   goalData?: 'complete' | 'partial' | 'inconsistent' | 'missing';
   shareSlug?: string;
   /** RSVPs by Turf web player id ("in" / "maybe" / "out"): a player can answer before they're in the lineup. */
   rsvps?: Record<string, string>;
+  /** From Turf web (migration 0029), keyed by its player ids: who each voter picked, best on their own team, kit wished for, side wished for. */
+  potmVotes?: Record<string, string>;
+  teamVotes?: Record<string, string>;
+  kitPicks?: Record<string, 'dark' | 'light'>;
+  sides?: Record<string, 'A' | 'B'>;
   sourceKey?: string;
 }
 
@@ -101,9 +108,14 @@ export const gameObject: ObjectDef<GameData> = {
     captainAId: z.string().optional(),
     captainBId: z.string().optional(),
     motmId: z.string().optional(),
+    potmSettled: z.boolean().optional(),
     goalData: z.enum(['complete', 'partial', 'inconsistent', 'missing']).optional(),
     shareSlug: z.string().optional(),
     rsvps: z.record(z.string(), z.string()).optional(),
+    potmVotes: z.record(z.string(), z.string()).optional(),
+    teamVotes: z.record(z.string(), z.string()).optional(),
+    kitPicks: z.record(z.string(), z.enum(['dark', 'light'])).optional(),
+    sides: z.record(z.string(), z.enum(['A', 'B'])).optional(),
     sourceKey: z.string().optional(),
   }),
   fields: [
@@ -201,8 +213,10 @@ export const appearanceObject: ObjectDef<AppearanceData> = {
   ],
   occurredAtField: 'gameDate',
   computeTitle: (d) => `Game on ${shortDay(d.gameDate)}`,
-  computeSubtitle: (d, { formatCurrency }) => [formatCurrency(d.share), d.paid ? 'paid' : 'unpaid', d.goals ? `${d.goals} goal${d.goals === 1 ? '' : 's'}` : null].filter(Boolean).join(' · '),
+  computeSubtitle: (d, { formatCurrency }) => [formatCurrency(d.share), d.paid ? 'paid' : (d.amountPaid ?? 0) > 0 ? `${formatCurrency(d.amountPaid!)} paid` : 'unpaid', d.goals ? `${d.goals} goal${d.goals === 1 ? '' : 's'}` : null].filter(Boolean).join(' · '),
   indexed: ['gameId', 'personId', 'paid', 'gameDate', 'sourceKey'],
+  // In Links an Appearance is Priya playing in a game, not a record of its own (MODEL.md layer 5).
+  linkRole: { joins: ['personId', 'gameId'], words: { personId: 'players' } },
 };
 
 /* ------------------------------------------------------------------ */
@@ -247,6 +261,8 @@ export interface PlayerProfileData {
   availability: 'AVL' | 'INJ' | 'OOS';
   periods?: AvailabilityPeriod[];
   /** Turf web's photo key (fetched with the same key). */
+  /** "Plays well with" picks: Turf web player ids. */
+  partners?: string[];
   photoPath?: string;
   shareSlug?: string;
   notes?: string;
@@ -294,6 +310,7 @@ export const playerProfileObject: ObjectDef<PlayerProfileData> = {
     availability: z.enum(['AVL', 'INJ', 'OOS']).default('AVL'),
     periods: z.array(z.object({ id: z.string().optional(), status: z.enum(['AVL', 'INJ', 'OOS']), startsAt: z.string(), endsAt: z.string().nullable().optional(), note: z.string().nullable().optional() })).optional(),
     guest: z.boolean().optional(),
+    partners: z.array(z.string()).optional(),
     photoPath: z.string().optional(),
     shareSlug: z.string().optional(),
     notes: z.string().optional(),
@@ -330,6 +347,8 @@ export const playerProfileObject: ObjectDef<PlayerProfileData> = {
   computeSubtitle: (d) => [d.position, AVAILABILITY.find((a) => a.value === d.availability && a.value !== 'AVL')?.label].filter(Boolean).join(' · ') || undefined,
   searchText: (d) => [d.name, d.position, d.speciality, d.clubs].filter(Boolean).join(' '),
   indexed: ['personId', 'sourceKey'],
+  // In Links a Player profile is its Person.
+  linkRole: { aspectOf: 'personId' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -353,6 +372,8 @@ export const venueObject: ObjectDef<VenueData> = {
   module: 'games',
   label: 'Venue',
   labelPlural: 'Venues',
+  // In Links a Venue is its Place: the turf you book is the place you go.
+  linkRole: { aspectOf: 'placeId' },
   icon: 'location',
   color: GAMES_COLOR,
   schema: z.object({

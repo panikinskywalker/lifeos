@@ -1,10 +1,14 @@
 import type { LifeOSContext } from '@core/registry/context';
-import { findTwin, sourceLabel, type RawMessage } from '@core/filing/queue';
+import { sourceLabel, type RawMessage } from '@core/filing/queue';
 import type { FileContext, FileOutcome } from '@core/filing/contract';
 import { toInr } from './fx';
-import { askWhoIs, linkPayee, payeeFor } from './payee';
+import { askWhoIs, isMyName, linkPayee, payeeFor } from './payee';
+import { sortMoneyIn } from './moneyIn';
 import { categoryFor, learnedCategory, payeeOf, rangeRule, ruleCategory } from './rules';
 import { accountFor } from './accounts';
+import { askSip, isNamelessNach, sipFor } from './sip';
+import { findSubscription, notePrice, spotSubscription } from './recurring';
+import { payBill } from './bills';
 import type { ParsedTxn } from './bankSms';
 
 /**
@@ -15,18 +19,51 @@ import type { ParsedTxn } from './bankSms';
  */
 
 const DAY = 86_400_000;
-const WINDOW = 10 * 60_000;
+const WINDOW = 30 * 60_000;
 const iso = (t: number) => {
   const d = new Date(t);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
-/** The same money already seen: another message within 10 minutes, or a transaction you already filed that day. */
+/** Messages that could be about the same money share this ("debit:161.00"); `twinOf` decides if one is. */
 export const dedupeKey = (t: ParsedTxn) => `${t.direction}:${t.amount.toFixed(2)}`;
 
-export function findDuplicateFor(os: LifeOSContext, itemId: string, t: ParsedTxn, at: number): { ingestId?: string; entityId?: string } | null {
-  const twin = findTwin(os, itemId, dedupeKey(t), at, WINDOW);
+const REF_WINDOW = 3 * DAY;
+const sameText = (a: string, b: string) => a.toLowerCase().replace(/\s+/g, ' ').trim() === b.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * The same payment seen again (docs/MODEL.md, Duplicates, 15 Nov), never on
+ * amount alone: the same bank reference within 3 days; the bank's text and its
+ * app's notification within 30 minutes, unless they name different accounts;
+ * or the same text twice (banks send one text from two sender ids). Three
+ * friends each sending ₹161 are three payments.
+ */
+function twinOf(os: LifeOSContext, itemId: string, t: ParsedTxn, m: RawMessage): { id: string; recordId: string | null } | null {
+  const at = m.receivedAt;
+  const rows = os.db.all<{ id: string; source: string; received_at: number; raw_text: string; parsed: string | null; record_id: string | null }>(
+    `SELECT id, source, received_at, raw_text, parsed, record_id FROM ingest_queue WHERE dedupe_key=? AND id<>? AND received_at BETWEEN ? AND ? AND status IN ('confirmed','proposed','duplicate') ORDER BY received_at`,
+    [dedupeKey(t), itemId, at - REF_WINDOW, at + REF_WINDOW],
+  );
+  for (const r of rows) {
+    let o: Partial<ParsedTxn> | null = null;
+    try {
+      o = r.parsed ? (JSON.parse(r.parsed) as { read?: { txn?: ParsedTxn } }).read?.txn ?? null : null;
+    } catch {
+      o = null;
+    }
+    const twin = { id: r.id, recordId: r.record_id };
+    if (t.ref && o?.ref && t.ref === o.ref) return twin;
+    if (Math.abs(r.received_at - at) > WINDOW) continue;
+    if (t.last4 && o?.last4 && t.last4 !== o.last4) continue;
+    if (r.source !== m.source || sameText(r.raw_text, m.body)) return twin;
+  }
+  return null;
+}
+
+export function findDuplicateFor(os: LifeOSContext, itemId: string, t: ParsedTxn, m: RawMessage): { ingestId?: string; entityId?: string } | null {
+  const at = m.receivedAt;
+  const twin = twinOf(os, itemId, t, m);
   if (twin) return { ingestId: twin.id, entityId: twin.recordId ?? undefined };
   if (!os.registry.objects.has('transaction')) return null;
   // Said it before the SMS came ("spent 450 on lunch"): same amount, same kind, same or previous day, not from a message.
@@ -54,6 +91,9 @@ export function enrichFrom(os: LifeOSContext, entityId: string, t: ParsedTxn, m:
   }
   if (!e.data.merchant && t.counterparty) patch.merchant = t.counterparty;
   if (Object.keys(patch).length) os.records.update(entityId, { data: patch }, 'assistant');
+  // The second sighting may be the one with the balance ("Avl Bal").
+  const acc = (patch.accountId ?? e.data.accountId) as string | undefined;
+  if (acc && t.balance != null && t.currency === 'INR') noteBalance(os, acc, t.balance, (e.data.date as string | undefined) ?? iso(m.receivedAt), m.receivedAt);
   os.records.timeline.add({ entityId, kind: m.source, title: `Seen in ${sourceLabel(os, m)}`, body: m.body.slice(0, 300), actor: 'system', occurredAt: m.receivedAt, meta: { ingest: true } });
 }
 
@@ -63,7 +103,14 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
   const id = ctx.id;
   const item = { source: m.source, from: m.from, text: m.body, title: m.title ?? null, account: m.account ?? null, receivedAt: m.receivedAt };
   const created: string[] = [];
-  const date = t.date ?? iso(item.receivedAt);
+  // A text's date after the day it came is a misread ("13 Feb" for a salary that came on 16 Nov): the day it came instead.
+  const date = t.date && t.date <= iso(item.receivedAt + 86_400_000) ? t.date : iso(item.receivedAt);
+  // To or from your own name: money moving between your accounts.
+  if (!t.investment && !t.transfer && isMyName(os, t.counterparty)) t = { ...t, transfer: true };
+  // A nameless debit by NACH for one of your SIPs is that SIP; any other is asked about once it is filed.
+  const nach = !t.investment && !t.transfer && t.direction === 'debit' && t.currency === 'INR' && isNamelessNach(item.text, t.counterparty);
+  const sipId = nach ? sipFor(os, t.amount, date) : null;
+  if (sipId) t = { ...t, investment: true, fund: os.records.get(sipId)?.title ?? null };
 
   // Spent abroad: rupees from the message when it says, else the day's rate (converted later if none yet).
   let amount = t.amount;
@@ -80,9 +127,10 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
   if (t.investment) {
     // A mutual fund SIP / redemption (R1): an investment transaction on its Investment record, out of spend; invested moves with it.
     const bank = t.last4 ? accountFor(os, { ...t, investment: false }, item.from, created) : null;
-    const inv = investmentFor(os, t.fund, created);
+    const inv = sipId ?? investmentFor(os, t.fund, created);
     const out = t.direction === 'debit';
-    data = { amount, kind: 'investment', category: 'investment', merchant: t.fund ?? 'Mutual fund', date, accountId: bank ?? undefined, investmentId: inv ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined };
+    // A buy leaves the bank account; a redemption arrives in it.
+    data = { amount, kind: 'investment', category: 'investment', merchant: t.fund ?? 'Mutual fund', date, accountId: out ? (bank ?? undefined) : undefined, toAccountId: out ? undefined : (bank ?? undefined), investmentId: inv ?? undefined, note: t.ref ? `Ref ${t.ref}` : undefined };
     if (inv) {
       const cur = os.records.get<{ invested?: number }>(inv);
       os.records.update(inv, { data: { invested: Math.max(0, (cur?.data.invested ?? 0) + (out ? amount : -amount)) } }, 'assistant');
@@ -90,15 +138,28 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
     label = `${out ? 'Invested' : 'Redeemed'} ${os.format.currency(amount)} · ${t.fund ?? 'mutual fund'}`;
   } else {
     const accountId = accountFor(os, t, item.from, created);
+    const paired = accountId ? pairTransfer(os, t, accountId, amount, date) : null;
+    if (paired) {
+      for (const a of created) os.filings.add({ source: item.source, sourceRef: id, kind: 'account', entityId: a, label: `Account: ${os.records.get(a)?.title ?? 'new account'}` });
+      os.filings.add({ source: item.source, sourceRef: id, kind: 'transaction', action: 'updated', entityId: paired, label: `Transfer · ${os.format.currency(amount)} · both halves joined, not spending or income` });
+      return { status: 'duplicate', entityId: paired, note: 'the other half of a transfer between your accounts' };
+    }
     const kind = t.transfer || t.channel === 'atm' ? 'transfer' : t.direction === 'credit' ? 'income' : 'expense';
+    // The bank says what is left ("Avl Bal"): the account starts from that, so its balance follows the bank (not a card: its figure is the limit).
+    if (accountId && t.balance != null && t.currency === 'INR') noteBalance(os, accountId, t.balance, date, item.receivedAt);
+    // Cash out of an ATM lands in your Cash account.
+    const cashId = t.channel === 'atm' && t.direction === 'debit' ? cashAccount(os, created) : null;
     const merchant = t.counterparty ?? (t.channel === 'atm' ? 'ATM withdrawal' : undefined);
-    let category = t.channel === 'atm' || t.transfer ? 'transfer' : categoryFor(os, merchant, item.text, amount, t.direction);
+    // A refund comes back in the category of what it refunds (Adidas → Shopping), so it can come off that spending.
+    let category = t.channel === 'atm' || t.transfer ? 'transfer' : categoryFor(os, merchant, item.text, amount, t.refund ? 'debit' : t.direction);
     // An autopay / e-mandate / SI charge from somewhere we don't know is still a subscription.
-    if (category === 'other' && kind === 'expense' && t.recurring) category = 'subscriptions';
+    if (category === 'other' && kind === 'expense' && t.recurring && t.counterparty) category = 'subscriptions';
     const note = [item.source === 'email' ? `From ${item.account ?? 'email'}` : null, t.ref ? `Ref ${t.ref}` : null].filter(Boolean).join(' · ');
-    data = { amount, kind, category, merchant, date, accountId: accountId ?? undefined, note: note || undefined, ...fx };
+    // Money coming in by transfer arrives at this account; going out leaves it.
+    const arrives = kind === 'transfer' && t.direction === 'credit';
+    data = { amount, kind, category, merchant, date, accountId: arrives ? undefined : (accountId ?? undefined), toAccountId: arrives ? (accountId ?? undefined) : (cashId ?? undefined), note: note || undefined, ...(t.refund && kind === 'income' ? { refund: true } : {}), ...fx };
     const shown = t.currency !== 'INR' ? `${t.currency} ${t.amount.toLocaleString('en-IN')}${fx.fxRate ? ` (${os.format.currency(amount)})` : ''}` : os.format.currency(amount);
-    label = `${kind === 'income' ? 'Received' : kind === 'transfer' ? (t.channel === 'atm' ? 'Cash' : 'Transfer') : 'Spent'} ${shown}${merchant ? ` · ${merchant}` : ''}${t.last4 ? ` · ••${t.last4}` : ''}`;
+    label = `${kind === 'income' ? (t.refund ? 'Refund' : 'Received') : kind === 'transfer' ? (t.channel === 'atm' ? 'Cash' : 'Transfer') : 'Spent'} ${shown}${merchant ? ` · ${merchant}` : ''}${t.last4 ? ` · ••${t.last4}` : ''}`;
     if (category === 'other' && kind === 'expense') flag = 'Category unknown — set it once and it’s learned (or add a keyword rule)';
     if (t.currency !== 'INR' && !fx.fxRate) flag = `No ${t.currency} rate yet — converted to rupees when the app is next online`;
     if (item.source === 'email') label += ` · from ${item.account ?? 'email'}`;
@@ -107,12 +168,16 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
   data.sourceRef = id;
   data.rawText = (item.source === 'email' ? `${item.title ?? ''}\n${item.text}` : item.text).slice(0, 2000);
   const e = os.records.create({ object: 'transaction', data }, 'assistant');
+  if (data.kind === 'transfer' && typeof data.toAccountId === 'string') payStatement(os, data.toAccountId, amount);
   // Everyone you pay or get paid by is one record; this payment joins theirs.
   if (!t.investment && !t.transfer && t.channel !== 'atm' && (t.counterparty || t.vpa)) {
     const pm = payeeFor(os, t.counterparty, t.vpa, { business: data.category !== 'other' && data.category !== 'transfer' ? true : undefined });
     if (pm) {
       linkPayee(os, e.id, pm, t.counterparty, t.vpa, item.source);
       if (pm.guess) flag = pm.guess;
+      // One name per payee: "PLAYO" and "Playo" both read Playo (the bank's spelling stays in the merchant Field).
+      const name = pm.guess ? null : os.records.get(pm.id)?.title;
+      if (name && name !== e.title) os.records.update(e.id, { title: name }, 'assistant');
       // A UPI ID no one has, under a person's name: To check asks who it is (in place of "Payee: …").
       const asked = askWhoIs(os, e.id, pm, t.counterparty, t.vpa, item.source, id);
       if (pm.created && !asked) created.push(pm.id);
@@ -137,8 +202,13 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
       if (!rr.sure) flag = `Guessed ${name}: ${rr.why}. Change the category if not — it won’t guess for this payer again`;
     }
   }
+  // Money in from a friend is money back; from a shop you paid, a refund (docs/MODEL.md, Counting money).
+  if (data.kind === 'income') {
+    const sorted = sortMoneyIn(os, e.id);
+    if (sorted) label += sorted === 'back' ? ' · money back, not income' : ' · a refund';
+  }
   if (!t.investment && !t.transfer && t.direction === 'debit' && data.category === 'subscriptions' && typeof data.merchant === 'string') {
-    linkSubscription(os, e.id, data.merchant, amount, date, (data.accountId as string | undefined) ?? undefined, created, item.source as 'sms' | 'notification' | 'email');
+    linkSubscription(os, e.id, data.merchant, amount, date, (data.accountId as string | undefined) ?? undefined, created, item.source as 'sms' | 'notification' | 'email', fx.originalCurrency ? { amount: fx.originalAmount as number, currency: fx.originalCurrency as string } : undefined);
   }
   os.records.timeline.add({ entityId: e.id, kind: item.source, title: `From ${sourceLabel(os, m)}`, body: (item.source === 'email' ? `${item.title ?? ''}\n${item.text}` : item.text).slice(0, 300), actor: 'system', occurredAt: item.receivedAt, meta: { ingestId: id } });
   for (const a of created) {
@@ -148,6 +218,9 @@ export function fileTxn(os: LifeOSContext, m: RawMessage, t: ParsedTxn, ctx: Fil
     os.filings.add({ source: item.source, sourceRef: id, kind, entityId: a, label });
   }
   os.filings.add({ source: item.source, sourceRef: id, kind: 'transaction', entityId: e.id, label, flag });
+  if (nach && !sipId) askSip(os, e.id, amount, date, item.source, id);
+  // Paid a month apart, three times: perhaps a subscription.
+  if (data.kind === 'expense' && !payBill(os, e.id)) spotSubscription(os, e.id);
   // A ticket or booking filed from the same mail: this payment paid for it.
   for (const r of ctx.related) os.links.link(e.id, r.id, r.word, {}, 'assistant', { source: item.source, sourceId: id });
   return { status: 'confirmed', entityId: e.id };
@@ -180,13 +253,11 @@ const cycleMonths = (rrule = '') => (/YEARLY/.test(rrule) ? 12 : /MONTHLY/.test(
  * bring each renewal), kept current after. When an auto-posted bill for the
  * same renewal already exists, the real charge replaces it.
  */
-function linkSubscription(os: LifeOSContext, txId: string, name: string, amount: number, date: string, accountId: string | undefined, created: string[], via: 'sms' | 'notification' | 'email' = 'sms') {
+function linkSubscription(os: LifeOSContext, txId: string, name: string, amount: number, date: string, accountId: string | undefined, created: string[], via: 'sms' | 'notification' | 'email' = 'sms', foreign?: { amount: number; currency: string }) {
   if (!os.registry.objects.has('subscription')) return;
-  const key = norm(name);
-  const subs = os.records.query<{ name: string; amount: number; nextBillingAt: string; rrule?: string; accountId?: string }>('subscription', {}, { limit: 500 });
-  const sub = subs.find((s) => s.status !== 'cancelled' && (norm(s.data.name) === key || norm(s.data.name).startsWith(`${key} `) || key.startsWith(`${norm(s.data.name)} `)));
+  const sub = findSubscription(os, name);
   if (!sub) {
-    const s = os.records.create({ object: 'subscription', data: { name, amount, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: addMonths(date), category: 'subscriptions', accountId, autoPost: false } }, 'assistant');
+    const s = os.records.create({ object: 'subscription', data: { name, amount, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: addMonths(date), category: 'subscriptions', accountId, autoPost: false, foreign } }, 'assistant');
     os.links.link(txId, s.id, 'subscription', {}, 'assistant', { source: via });
     created.push(s.id);
     return;
@@ -199,23 +270,95 @@ function linkSubscription(os: LifeOSContext, txId: string, name: string, amount:
     const tx = os.records.get<{ note?: string; date?: string }>(r.other.id);
     if (tx?.data.note === 'Auto-posted subscription' && tx.data.date && Math.abs(new Date(`${tx.data.date}T12:00:00`).getTime() - at) <= 5 * DAY_MS) os.records.delete(tx.id, 'assistant');
   }
-  const patch: Record<string, unknown> = {};
-  if (sub.data.amount !== amount) patch.amount = amount;
+  const patch: Record<string, unknown> = { ...notePrice(sub, amount, foreign, date) };
   if (!sub.data.accountId && accountId) patch.accountId = accountId;
   // Billed now: the next renewal is a cycle on (only when this charge is the one that was due).
   if (sub.data.nextBillingAt <= iso(at + 5 * DAY_MS)) patch.nextBillingAt = addMonths(date, cycleMonths(sub.data.rrule));
   if (Object.keys(patch).length) os.records.update(sub.id, { data: patch }, 'assistant');
 }
 
-/** A transaction for this amount within a day either side (from any source). */
-export function sameMoneyFor(os: LifeOSContext, amount: number, kind: string, day: string): string | null {
+/**
+ * One movement between two of your accounts often comes as two texts: a card
+ * bill (the debit, and the card's "payment received"), a card's credit balance
+ * sent to savings, money into your loan account. Whichever comes second joins
+ * the first as one transfer, from → to, so it is never counted as spending or
+ * income. A plain spend only joins a transfer in, and plain income only a
+ * transfer out, so a friend's ₹200 never cancels your ₹200 lunch. Returns the
+ * transaction it joined.
+ */
+function pairTransfer(os: LifeOSContext, t: ParsedTxn, accountId: string, amount: number, date: string): string | null {
+  if (t.investment || t.currency !== 'INR') return null;
+  const d = new Date(`${date}T12:00:00`).getTime();
+  const legs = os.db.all<{ id: string; kind: string; acc: string | null; to: string | null }>(
+    `SELECT id, json_extract(data,'$.kind') AS kind, json_extract(data,'$.accountId') AS acc, json_extract(data,'$.toAccountId') AS "to" FROM records
+       WHERE object='transaction' AND deleted_at IS NULL AND ABS(json_extract(data,'$.amount') - ?) < 0.01 AND json_extract(data,'$.date') BETWEEN ? AND ?`,
+    [amount, iso(d - DAY_MS), iso(d + DAY_MS)],
+  );
+  const out = (r: (typeof legs)[number]) => !!r.acc && r.acc !== accountId && ((r.kind === 'transfer' && !r.to) || (t.transfer && r.kind === 'expense'));
+  const into = (r: (typeof legs)[number]) => (r.kind === 'transfer' ? !!r.to && !r.acc && r.to !== accountId : t.transfer && r.kind === 'income' && !!r.acc && r.acc !== accountId);
+  if (t.direction === 'credit') {
+    const leg = legs.find(out);
+    if (!leg) return null;
+    os.records.update(leg.id, { data: { kind: 'transfer', category: 'transfer', toAccountId: accountId } }, 'assistant');
+    payStatement(os, accountId, amount);
+    return leg.id;
+  }
+  const leg = legs.find(into);
+  if (!leg) return null;
+  os.records.update(leg.id, { data: { kind: 'transfer', category: 'transfer', accountId, toAccountId: leg.to ?? leg.acc } }, 'assistant');
+  if (leg.to ?? leg.acc) payStatement(os, (leg.to ?? leg.acc)!, amount);
+  return leg.id;
+}
+
+/** A payment into a card that covers its bill clears the bill. */
+function payStatement(os: LifeOSContext, cardId: string, amount: number) {
+  const st = os.records.get<{ kind?: string; statement?: { total: number } }>(cardId)?.data;
+  if (st?.kind === 'credit' && st.statement && amount >= st.statement.total - 0.5) os.records.update(cardId, { data: { statement: undefined } }, 'assistant');
+}
+
+/** Keep the balance a bank text stated on its account, when it is the newest one heard. */
+/** A card statement's total is what you owe on its day: the card's balance from there (negative), when it is the newest figure heard. */
+export function noteOwed(os: LifeOSContext, cardId: string, owed: number, day: string, at: number) {
+  const a = os.records.get<{ kind?: string; knownAt?: number }>(cardId);
+  if (!a || a.data.kind !== 'credit' || (a.data.knownAt ?? 0) > at) return;
+  os.records.update(cardId, { data: { knownBalance: -owed, knownOn: day, knownAt: at } }, 'assistant');
+}
+
+export function noteBalance(os: LifeOSContext, accountId: string, balance: number, day: string, at: number) {
+  const a = os.records.get<{ kind?: string; knownAt?: number }>(accountId);
+  if (!a || a.data.kind === 'credit' || (a.data.knownAt ?? 0) > at) return;
+  os.records.update(accountId, { data: { knownBalance: balance, knownOn: day, knownAt: at } }, 'assistant');
+}
+
+/** Your Cash account: the one you have, else one made (kind cash). */
+export function cashAccount(os: LifeOSContext, created: string[] = []): string | null {
+  if (!os.registry.objects.has('account')) return null;
+  const have = os.records.query<{ kind?: string }>('account', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'cash' }] } }, { limit: 5 })[0];
+  if (have) return have.id;
+  const a = os.records.create({ object: 'account', title: 'Cash', data: { kind: 'cash', openingBalance: 0, currency: 'INR' } }, 'assistant');
+  created.push(a.id);
+  return a.id;
+}
+
+/**
+ * A transaction for this amount within a day either side (from any source),
+ * nearest first. With a name (a receipt mail's "Adobe"), one whose payee or
+ * merchant shares a word with it, or one with no name to compare; never a
+ * different named shop that happens to cost the same.
+ */
+export function sameMoneyFor(os: LifeOSContext, amount: number, kind: string, day: string, name?: string | null): string | null {
   if (!os.registry.objects.has('transaction')) return null;
   const d = new Date(`${day}T12:00:00`).getTime();
-  return (
-    os.db.get<{ id: string }>(
-      `SELECT id FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')=? AND ABS(json_extract(data,'$.amount') - ?) < 0.5
-         AND json_extract(data,'$.date') BETWEEN ? AND ? ORDER BY ABS(julianday(json_extract(data,'$.date')) - julianday(?)) LIMIT 1`,
-      [kind, amount, iso(d - DAY), iso(d + DAY), day],
-    )?.id ?? null
+  const rows = os.db.all<{ id: string; title: string | null; merchant: string | null }>(
+    `SELECT id, title, json_extract(data,'$.merchant') AS merchant FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')=? AND ABS(json_extract(data,'$.amount') - ?) < 0.5
+       AND json_extract(data,'$.date') BETWEEN ? AND ? ORDER BY ABS(julianday(json_extract(data,'$.date')) - julianday(?))`,
+    [kind, amount, iso(d - DAY), iso(d + DAY), day],
   );
+  const words = (s: string | null | undefined) => new Set(norm(s ?? '').split(' ').filter((w) => w.length >= 3 && !/^\d+$/.test(w)));
+  const want = words(name);
+  if (!want.size) return rows[0]?.id ?? null;
+  const named = (r: (typeof rows)[number]) => words(`${r.title ?? ''} ${r.merchant ?? ''}`);
+  // A code or a payment gateway ("PYU*00412", PayU, Razorpay) is not the shop's name: nothing to compare.
+  const nameless = (r: (typeof rows)[number]) => !r.merchant || /\d{4,}|\*|\b(payu|razorpay|ccavenue|billdesk|cashfree|juspay|pine ?labs|stripe|paypal)\b/i.test(r.merchant);
+  return (rows.find((r) => [...named(r)].some((w) => want.has(w))) ?? rows.find(nameless))?.id ?? null;
 }

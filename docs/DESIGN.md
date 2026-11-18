@@ -59,6 +59,34 @@ scores and formations; crests, faces, the L / S toggle and the pitch live in
 `src/boards/turf/teams.tsx` (v0.0.5: Match, Team view, Pick teams). The light theme keeps the v1.1 colours
 until it is redrawn or dropped (Rutvij's call).
 
+**Every screen is built from the kit (14 Nov).** A screen's sections map to kit
+components; a piece the kit has is used even when the module's own artboards
+don't show it, and a screen with no artboard is put together from kit parts,
+never left on a generic page. Check this list before building: a missing piece
+is built in `src/ui/kit` first.
+
+| NR-KitCharts | In code |
+|---|---|
+| Line with dots | `LineChart` |
+| Week columns · today lime | `ColumnChart`, `MiniBars` |
+| Segmented bar | `StackedBar` |
+| Timeline · v2 | `DayTimeline`, `Timeline` |
+| Breakdown · scales | in Money's ring breakdown (`RingBadges`) |
+| **Ring with badges · the big one** | **`RingBadges`** (14 Nov; Money home, Where it went) |
+| Sparklines in rows | `Sparkline` |
+| Week of ticks | `WeekStrip` |
+| Year heat | `HeatMap` |
+| Donut · four or fewer | `Donut` |
+| Dial · a score | `Dial` (`Ring` stays the progress ring) |
+| Arc ticks · a share | `ArcTicks` |
+| Hour ticks · when | `HourTicks` |
+| Columns in tracks | `TrackColumns` |
+| Ruler · a reading in its range | `Ruler` |
+| Numerals (dot matrix) | `DotNumber` (5 × 7, read off the kit) |
+| NR-KitInstruments (dot-drawn cards) | `InstrumentCard` (the Money · live card; `instrument` tokens) |
+
+Every NR-KitCharts and NR-KitInstruments piece is now in code (14 Nov), in `src/ui/kit/KitCharts.tsx` and `RingBadges.tsx`, shown with the kit's own figures in You › Component gallery › Noir charts. NR-KitComponents was already in code.
+
 ## History: v1.1 Calm bento (25 Sep 2026, retired 22 Oct)
 
 Sources of truth: **colours** from the Stitch "LifeOS Android design system" (M1.5, `stitch_lifeos_android_design_system.zip`, Material 3 roles); **layout and components** from the **LifeOS** Claude Design canvas (https://claude.ai/artifact/RVT9hLfcQ7tvgXvZN1x6cF) and, phase by phase (MILESTONES M1.5), the Stitch screens. Code lives in `src/ui/theme/tokens.ts`.

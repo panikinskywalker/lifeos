@@ -2,117 +2,330 @@ import React, { useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { ChipRow, Icon, IconButton, ProgressBar, Sheet, Text } from '@ui/kit';
-import { accountBalance, dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange, targetStatuses } from '@modules/finance/lib';
+import { Icon, IconButton, ProgressBar, RingBadges, ScreenHeader, Sheet, Text, TrackColumns, useBottomBarInset, useToast } from '@ui/kit';
+import { blocks } from '@ui/theme/tokens';
+import { sortWithAI, undoSort } from '@modules/finance/aiSort';
+import { suggestBudget, undoBudget, adoptBudget } from '@modules/finance/budget';
+import { dailySpend, incomeInRange, monthRange, netWorth, spendByCategory, spendInRange, targetStatuses } from '@modules/finance/lib';
 import { subscriptionRunRate } from '@modules/finance/reports';
+import { comingUp, monthClose, pace, type MonthClose, type Pace } from '@modules/finance/home';
+import { balances } from '@modules/finance/split';
 import { PAYEE_WHO } from '@modules/finance/filing/payee';
-import { categoryOf, INSTRUMENTS, type AccountData, type TransactionData } from '@modules/finance/types';
+import { categoryOf, INSTRUMENTS, type TransactionData } from '@modules/finance/types';
 import { ToCheckBell } from '../../screens/ToCheckBell';
 import { PayeeGuess } from './payeeGuess';
-import { Caps, SectionHead, Hairline, IconDisc, Rows, Spark, SplitBar, TxRow, accountIcon, catColor, day, kindWord, relDay, splitOf } from './parts';
+import { YourViews } from './ask';
+import { walletTotals } from './wallet';
+import { AddSheet } from './addSheet';
+import { UploadSheet } from './uploadSheet';
+import { Caps, Disc, KIND_WORD, SectionHead, Hairline, IconDisc, Rows, Spark, TxRow, accountIcon, catColor, shortMoney, day, kindWord, relDay, splitOf } from './parts';
 
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
-/** Money's home (NR-Money-Home): this month, subscriptions and net worth, what needs you, where it went, targets, accounts, investments, recent. */
+/**
+ * Money's home (docs/MODEL.md, Money redesign: direction C): where it went (the
+ * kit's ring), the pace, this week in tracks, what needs you, before payday as
+ * day cards, your views, one line each for accounts and who owes whom, recent.
+ * Money's own bar holds Spend, Accounts and cards, Subscriptions and Ask.
+ */
 export function FinanceHome(_: { ctx: LifeOSContext; params: Record<string, string> }) {
+  const os = useOS();
   const router = useRouter();
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const scroll = useRef<ScrollView>(null);
-  const anchors = useRef<{ accounts?: number; investments?: number }>({});
-  const [offset, setOffset] = useState(0);
-  const [openDay, setOpenDay] = useState<string | null>(null);
-  const m = monthRange(offset);
+  const bottom = useBottomBarInset();
+  const [menu, setMenu] = useState(false);
+  const [budget, setBudget] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('This week');
+  const chart = useLive((o) => chartSeries(o, chartPeriod), [chartPeriod]);
+  const m = monthRange(0);
   const data = useLive(
-    (os) => {
-      const usualMonths = [1, 2, 3].map((k) => { const r = monthRange(offset - k); return spendInRange(os, r.start, r.end); }).filter((x) => x > 0);
+    (o) => {
+      const now = new Date();
       const inMonth = { filter: { and: [{ field: 'data.date', op: 'gte' as const, value: m.start }, { field: 'data.date', op: 'lte' as const, value: m.end }] } };
-      const salary = os.records.query<TransactionData>('transaction', { filter: { and: [...inMonth.filter.and, { field: 'data.kind', op: 'eq', value: 'income' }, { field: 'data.category', op: 'eq', value: 'salary' }] }, sort: [{ field: 'data.date', dir: 'asc' }] }, { limit: 1 })[0];
-      const incomes = os.records.count('transaction', { filter: { and: [...inMonth.filter.and, { field: 'data.kind', op: 'eq', value: 'income' }] } });
       return {
-        spent: spendInRange(os, m.start, m.end),
-        usual: usualMonths.length ? usualMonths.reduce((a, b) => a + b, 0) / usualMonths.length : null,
-        income: incomeInRange(os, m.start, m.end),
-        incomeLine: salary ? `salary on the ${ordinal(day(salary.data.date).getDate())}` : incomes ? `${incomes} payment${incomes === 1 ? '' : 's'}` : null,
-        byCat: spendByCategory(os, m.start, m.end).sort((a, b) => b.total - a.total),
-        days: dailySpend(os, m.start, m.end),
-        monthCount: os.records.count('transaction', inMonth),
-        count: os.records.count('transaction'),
-        recent: os.records.query<TransactionData>('transaction', { sort: [{ field: 'data.date', dir: 'desc' }, { field: 'createdAt', dir: 'desc' }] }, { limit: 5 }),
-        nw: netWorth(os),
-        subs: subscriptionRunRate(os),
-        targets: targetStatuses(os, day(m.start)),
+        spent: spendInRange(o, m.start, m.end),
+        byCat: spendByCategory(o, m.start, m.end).sort((a, b) => b.total - a.total),
+        monthCount: o.records.count('transaction', inMonth),
+        count: o.records.count('transaction'),
+        recent: o.records.query<TransactionData>('transaction', { sort: [{ field: 'data.date', dir: 'desc' }, { field: 'createdAt', dir: 'desc' }] }, { limit: 5 }),
+        nw: netWorth(o),
+        subs: subscriptionRunRate(o),
+        targets: targetStatuses(o, day(m.start)),
+        pace: pace(o),
+        owes: balances(o).map((b) => ({ ...b, name: o.records.get(b.personId)?.title ?? 'Someone' })),
+        coming: comingUp(o),
+        close: monthClose(o),
       };
     },
     [m.start],
   );
   const isEmpty = !data.count && !data.nw.accounts.length && !data.nw.holdings.length && !data.subs.rows.length;
-  const goAnchor = (key: 'accounts' | 'investments') => scroll.current?.scrollTo({ y: Math.max(0, (anchors.current[key] ?? 0) - 12), animated: true });
-  const add = (
-    <IconButton icon="plus" accessibilityLabel="Add a transaction" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} onPress={() => router.push('/entity/transaction/new' as never)} />
+  const monthName = m.label.split(' ')[0]!;
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/browse' as never));
+  const header = (
+    <ScreenHeader
+      title="Money"
+      subtitle={isEmpty ? 'No payments yet' : `${monthName} · ${data.monthCount} payment${data.monthCount === 1 ? '' : 's'}`}
+      onBack={back}
+      right={
+        <>
+          <IconButton icon="grid" accessibilityLabel="Money screens" filled onPress={() => setMenu(true)} />
+          <ToCheckBell />
+          <IconButton icon="plus" accessibilityLabel="Add a payment" filled={t.c.accent.mustard} color={t.c.accent.mustardInk} onPress={() => setAdding(true)} />
+        </>
+      }
+    />
   );
-  const header = (sub: string, right: React.ReactNode) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
-      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-        <Text variant="caption" color="secondary" numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>{sub}</Text>
-        <Text variant="title" accessibilityRole="header">Money</Text>
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>{right}</View>
-    </View>
+  const sheets = (
+    <>
+      <MoneyScreens visible={menu} onClose={() => setMenu(false)} onUpload={() => setUploading(true)} />
+      <UploadSheet visible={uploading} onClose={() => setUploading(false)} />
+      <AddSheet visible={adding} onClose={() => setAdding(false)} onUpload={() => setUploading(true)} />
+      <Sheet visible={budget} onClose={() => setBudget(false)} title="A budget for you">
+        <SuggestedBudget bare onDone={() => setBudget(false)} />
+      </Sheet>
+    </>
   );
 
   if (isEmpty) {
     return (
-      <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: t.layout.gutter, paddingBottom: insets.bottom + 32, gap: 20 }}>
-        {header('No payments yet', add)}
+      <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 20 }}>
+        {header}
         <EmptyHome />
+        {sheets}
       </ScrollView>
     );
   }
 
-  const monthName = m.label.split(' ')[0];
   return (
-    <ScrollView ref={scroll} style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top, paddingHorizontal: t.layout.gutter, paddingBottom: insets.bottom + 32, gap: 24 }}>
-      {header(`${monthName} · ${data.monthCount} transaction${data.monthCount === 1 ? '' : 's'}`, <><ToCheckBell />{add}</>)}
+    <ScrollView style={{ flex: 1, backgroundColor: t.c.bg.ground }} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 22 }}>
+      {header}
 
-      <ChipRow>
-        <NavChip label="Spend" icon="pie" onPress={() => router.push('/spend' as never)} />
-        <NavChip label="Transactions" icon="arrow.up.arrow.down" onPress={() => router.push({ pathname: '/spend', params: { period: 'all', kind: 'all' } } as never)} />
-        <NavChip label="Accounts" icon="card" onPress={() => goAnchor('accounts')} />
-        <NavChip label="Subscriptions" icon="repeat" onPress={() => router.push('/entity/subscription' as never)} />
-        <NavChip label="Investments" icon="trend" onPress={() => goAnchor('investments')} />
-        <NavChip label="Reports" icon="chart" onPress={() => router.push('/module/finance/reports' as never)} />
-      </ChipRow>
+      {data.close ? <MonthClosed c={data.close} /> : null}
 
-      <MonthCard label={m.label} offset={offset} setOffset={setOffset} spent={data.spent} usual={data.usual} income={data.income} incomeLine={data.incomeLine} days={data.days} onDay={setOpenDay} />
+      {data.byCat.length ? <WhereItWent byCat={data.byCat} total={data.spent} month={monthName} offset={0} onBudget={data.targets.length ? undefined : () => setBudget(true)} /> : null}
 
-      <SummaryTiles subs={data.subs} nw={data.nw} onNetWorth={() => goAnchor('accounts')} />
+      {data.pace ? <PaceLine p={data.pace} /> : null}
+
+      <TrackColumns
+        label="ANALYTICS"
+        period={chartPeriod}
+        periods={[...CHART_PERIODS]}
+        onPeriod={(p) => setChartPeriod(p as ChartPeriod)}
+        value={shortMoney(os, chart.values.reduce((a, b) => a + b, 0))}
+        values={chart.values}
+        labels={chart.labels}
+        today={chart.today}
+        axis={(n) => shortMoney(os, n)}
+      />
 
       <NeedsYou />
+      <SortOther />
 
-      {data.byCat.length ? <WhereItWent byCat={data.byCat} total={data.spent} month={monthName!} offset={offset} /> : null}
+      {data.coming.items.length ? <ComingUp coming={data.coming} /> : null}
+
+      <YourViews />
+
+      {data.nw.accounts.length ? <AccountsLine nw={data.nw} /> : null}
+      {data.owes.length ? <OwesLine owes={data.owes} /> : null}
 
       {data.targets.length ? <Targets targets={data.targets} /> : null}
 
-      <View onLayout={(e) => (anchors.current.accounts = e.nativeEvent.layout.y)}>
-        <Accounts nw={data.nw} />
-      </View>
+      <Recent items={data.recent} count={data.count} />
+      {sheets}
+    </ScrollView>
+  );
+}
 
-      {data.nw.holdings.length ? (
-        <View onLayout={(e) => (anchors.current.investments = e.nativeEvent.layout.y)}>
-          <Investments holdings={data.nw.holdings} />
+const CHART_PERIODS = ['This week', 'This month', 'Last month', '3 months', 'This year'] as const;
+type ChartPeriod = (typeof CHART_PERIODS)[number];
+
+/** What the Analytics columns show for a period: days for a week, weeks for a month, months for longer. */
+function chartSeries(os: LifeOSContext, p: ChartPeriod): { values: number[]; labels: string[]; today?: number } {
+  const now = new Date();
+  const iso = (d: Date) => format(d, 'yyyy-MM-dd');
+  if (p === 'This week') {
+    const days = dailySpend(os, iso(subDays(now, 6)), iso(now));
+    return { values: days.map((d) => d.total), labels: days.map((d) => format(day(d.date), 'EEE')), today: days.length - 1 };
+  }
+  if (p === 'This month' || p === 'Last month') {
+    const m = monthRange(p === 'This month' ? 0 : -1);
+    const days = dailySpend(os, m.start, m.end);
+    const weeks = [0, 7, 14, 21, 28].filter((s) => s < days.length).map((s) => days.slice(s, s + 7));
+    return { values: weeks.map((w) => w.reduce((a, d) => a + d.total, 0)), labels: weeks.map((w) => `${Number(w[0]!.date.slice(8))}-${Number(w[w.length - 1]!.date.slice(8))}`), today: p === 'This month' ? Math.min(weeks.length - 1, Math.floor((now.getDate() - 1) / 7)) : undefined };
+  }
+  const months = p === '3 months' ? [-2, -1, 0] : Array.from({ length: now.getMonth() + 1 }, (_, i) => i - now.getMonth());
+  return {
+    values: months.map((k) => { const r = monthRange(k); return spendInRange(os, r.start, r.end); }),
+    labels: months.map((k) => format(new Date(now.getFullYear(), now.getMonth() + k, 1), p === '3 months' ? 'MMM' : 'MMMMM')),
+    today: months.length - 1,
+  };
+}
+
+/** The pace in one line: what a day can be and stay under your line, or how far over it you are. */
+function PaceLine({ p }: { p: Pace }) {
+  const os = useOS();
+  const t = useTheme();
+  const money = os.format.currency;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 24, backgroundColor: t.c.bg.tileRaised, marginTop: -8 }}>
+      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.over ? t.c.alert.coralText : t.c.accent.mustard }} />
+      <Text style={{ flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '600' }}>
+        {p.over ? (
+          <>
+            <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.alert.coralText }}>{money(-p.left)} over</Text> your {p.yours ? 'line' : 'usual month'} of {shortMoney(os, p.line)}
+          </>
+        ) : (
+          <>
+            <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.accent.gold }}>{money(p.perDay)} a day</Text> keeps it under {shortMoney(os, p.line)}
+            {p.yours ? '' : ', your usual month'}
+          </>
+        )}
+      </Text>
+    </View>
+  );
+}
+
+/** The other Money screens, from the grid button in the header. */
+function MoneyScreens({ visible, onClose, onUpload }: { visible: boolean; onClose: () => void; onUpload: () => void }) {
+  const router = useRouter();
+  const go = (to: string | { pathname: string; params: Record<string, string> }) => {
+    onClose();
+    if (to === 'upload') return onUpload();
+    router.push(to as never);
+  };
+  const rows: Array<[string, string, string | { pathname: string; params: Record<string, string> }]> = [
+    ['Spend', 'pie', '/module/finance/spend'],
+    ['Transactions', 'arrow.up.arrow.down', { pathname: '/module/finance/spend', params: { period: 'all', kind: 'all' } }],
+    ['Accounts and cards', 'card', '/module/finance/wallet'],
+    ['Subscriptions', 'repeat', '/module/finance/subscriptions'],
+    ['Who owes whom', 'people', '/module/finance/debts'],
+    ['Udhari', 'link', '/board/udhari'],
+    ['Reports', 'chart', '/module/finance/reports'],
+    ['Import & export', 'file', '/module/finance/files'],
+    ['Ask Money', 'sparkle', '/module/finance/ask'],
+    ['Upload a statement', 'file', 'upload'],
+  ];
+  return (
+    <Sheet visible={visible} onClose={onClose} title="Money">
+      <View>
+        {rows.map(([label, icon, to], i) => (
+          <React.Fragment key={label}>
+            {i ? <Hairline /> : null}
+            <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => go(to)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, opacity: pressed ? 0.7 : 1 })}>
+              <IconDisc icon={icon} />
+              <Text variant="rowTitle" style={{ flex: 1 }}>{label}</Text>
+              <Icon name="chevron-right" size={16} />
+            </Pressable>
+          </React.Fragment>
+        ))}
+      </View>
+    </Sheet>
+  );
+}
+
+/** One line for the accounts: what is in them and what the cards owe; opens Accounts and cards. */
+function AccountsLine({ nw }: { nw: ReturnType<typeof netWorth> }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const w = walletTotals(nw);
+  const money = (n: number) => os.format.currency(Math.round(n));
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${money(w.inAccounts)} in accounts${w.owe ? `, you owe ${money(w.owe)} on cards` : ''}. Opens Accounts and cards`} onPress={() => router.push('/module/finance/wallet' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, opacity: pressed ? 0.85 : 1 })}>
+      <View style={{ flexDirection: 'row' }}>
+        {[blocks.lime, blocks.lilac, blocks.orange].map((c, i) => (
+          <View key={c} style={{ width: 28, height: 40, borderRadius: 8, backgroundColor: c, marginLeft: i ? -14 : 0, borderWidth: i ? 2 : 0, borderColor: t.c.bg.tile }} />
+        ))}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text numberOfLines={1} style={{ fontSize: 17, lineHeight: 22, fontWeight: '700', color: blocks.sky, fontVariant: ['tabular-nums'] }}>{money(w.inAccounts)} in accounts</Text>
+        <Text variant="caption" color="secondary" numberOfLines={1}>{w.owe ? `you owe ${money(w.owe)} on ${w.cards} card${w.cards === 1 ? '' : 's'}` : `${nw.accounts.length} account${nw.accounts.length === 1 ? '' : 's'}`}</Text>
+      </View>
+      <Icon name="chevron-right" size={16} color={t.c.fg.secondary} />
+    </Pressable>
+  );
+}
+
+/** One line for who owes whom: owed to you in lime, what you owe after it; opens the list. */
+function OwesLine({ owes }: { owes: Array<{ personId: string; amount: number; name: string }> }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const toYou = owes.filter((o) => o.amount > 0).reduce((a, o) => a + o.amount, 0);
+  const youOwe = owes.filter((o) => o.amount < 0);
+  const money = (n: number) => os.format.currency(Math.round(n));
+  const line = youOwe.length === 1 ? `you owe ${youOwe[0]!.name.split(' ')[0]} ${money(-youOwe[0]!.amount)}` : youOwe.length ? `you owe ${money(youOwe.reduce((a, o) => a - o.amount, 0))}` : `${owes.length} ${owes.length === 1 ? 'person' : 'people'}`;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${money(toYou)} owed to you, ${line}. Opens Who owes whom`} onPress={() => router.push('/module/finance/debts' as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, paddingHorizontal: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, marginTop: -10, opacity: pressed ? 0.85 : 1 })}>
+      <View style={{ flexDirection: 'row' }}>
+        {owes.slice(0, 3).map((o, i) => (
+          <View key={o.personId} style={{ marginLeft: i ? -10 : 0, borderRadius: 22, borderWidth: 3, borderColor: t.c.bg.tile }}>
+            <Disc name={o.name} colorKey={o.personId} size={36} />
+          </View>
+        ))}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text numberOfLines={1} style={{ fontSize: 17, lineHeight: 22, fontWeight: '700', color: toYou ? t.c.accent.gold : t.c.alert.coralText, fontVariant: ['tabular-nums'] }}>{toYou ? `${money(toYou)} owed to you` : 'You owe'}</Text>
+        <Text variant="caption" color="secondary" numberOfLines={1}>{line}</Text>
+      </View>
+      <Icon name="chevron-right" size={16} color={t.c.fg.secondary} />
+    </Pressable>
+  );
+}
+
+/** Last month, closed (MODEL phase D, 6; the 1st to the 3rd): three numbers, the biggest changes, what is new; opens that month in Reports. */
+function MonthClosed({ c }: { c: MonthClose }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const money = (n: number) => os.format.currency(Math.round(Math.abs(n)));
+  const extras = [...c.newSubs.map((x) => `New: ${x.name} ${money(x.amount)}`), ...c.prices.map((x) => `${x.name} went ${x.to > x.from ? 'up' : 'down'} to ${money(x.to)}`)];
+  const num = (label: string, value: string, line?: string, color?: string) => (
+    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+      <Caps>{label}</Caps>
+      <Text numberOfLines={1} style={{ fontSize: 20, lineHeight: 25, fontWeight: '700', letterSpacing: -0.4, fontVariant: ['tabular-nums'], color }}>{value}</Text>
+      {line ? <Text numberOfLines={1} color="secondary" style={{ fontSize: 12, lineHeight: 15 }}>{line}</Text> : null}
+    </View>
+  );
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${c.label}, closed: spent ${money(c.spent)}, saved ${money(c.saved)}. Opens ${c.label} in Reports`} onPress={() => router.push({ pathname: '/module/finance/reports', params: { tab: 'month', month: '-1' } } as never)} style={({ pressed }) => ({ padding: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 14, opacity: pressed ? 0.9 : 1 })}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Icon name="check" size={16} color={t.c.accent.gold} />
+        <Caps color={t.c.accent.gold}>{`${c.label.toUpperCase()}, CLOSED`}</Caps>
+        <View style={{ flex: 1 }} />
+        <Icon name="chevron-right" size={16} color={t.c.fg.secondary} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        {num('SPENT', shortMoney(os, c.spent), c.usual ? `${shortMoney(os, Math.abs(c.spent - c.usual))} ${c.spent > c.usual ? 'over' : 'under'} usual` : undefined)}
+        {num('CAME IN', shortMoney(os, c.income))}
+        {num(c.saved >= 0 ? 'SAVED' : 'MORE OUT', shortMoney(os, Math.abs(c.saved)), undefined, c.saved >= 0 ? t.c.accent.gold : t.c.alert.coralText)}
+      </View>
+      {c.changes.length ? (
+        <View>
+          {c.changes.map((x, i) => (
+            <React.Fragment key={x.category}>
+              {i ? <Hairline /> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 40 }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: catColor(x.category, t) }} />
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, lineHeight: 18, fontWeight: '600' }}>{categoryOf(x.category).label}</Text>
+                <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '700', fontVariant: ['tabular-nums'], color: x.delta > 0 ? t.c.alert.coralText : t.c.accent.gold }}>{`${x.delta > 0 ? '+' : '−'}${money(x.delta)}`}</Text>
+                <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, width: 62, textAlign: 'right' }}>vs usual</Text>
+              </View>
+            </React.Fragment>
+          ))}
         </View>
       ) : null}
-
-      <Recent items={data.recent} count={data.count} />
-
-      <DaySheet date={openDay} onClose={() => setOpenDay(null)} />
-    </ScrollView>
+      {extras.length ? <Text variant="caption" color="secondary">{extras.join(' · ')}</Text> : null}
+    </Pressable>
   );
 }
 
@@ -137,7 +350,7 @@ function Big({ label, value, line, color }: { label: string; value: string; line
   );
 }
 
-function MonthCard({ label, offset, setOffset, spent, usual, income, incomeLine, days, onDay }: { label: string; offset: number; setOffset: (n: number) => void; spent: number; usual: number | null; income: number; incomeLine: string | null; days: Array<{ date: string; total: number }>; onDay: (date: string) => void }) {
+function MonthCard({ label, offset, setOffset, spent, usual, income, incomeLine, days, onDay, pace: p }: { label: string; offset: number; setOffset: (n: number) => void; spent: number; usual: number | null; income: number; incomeLine: string | null; days: Array<{ date: string; total: number }>; onDay: (date: string) => void; pace?: Pace | null }) {
   const os = useOS();
   const t = useTheme();
   const money = os.format.currency;
@@ -166,6 +379,21 @@ function MonthCard({ label, offset, setOffset, spent, usual, income, incomeLine,
         <Big label="SPENT" value={money(spent)} line={usual ? `usual ${money(Math.round(usual))}` : null} />
         <Big label="CAME IN" value={money(income)} line={incomeLine} color={income ? t.c.accent.gold : undefined} />
       </View>
+      {p ? (
+        // The kit's text widget: the sentence is the figure, its key words bright.
+        <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '500', color: t.c.fg.secondary }}>
+          {p.over ? (
+            <>
+              <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.alert.coralText }}>{money(-p.left)} over</Text> your {p.yours ? 'line' : 'usual month'} of {shortMoney(os, p.line)}
+            </>
+          ) : (
+            <>
+              <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.fg.primary }}>{money(p.perDay)} a day</Text> keeps it under {shortMoney(os, p.line)}
+              {p.yours ? '' : ', your usual month'}
+            </>
+          )}
+        </Text>
+      ) : null}
       <View accessibilityLabel={`Spend by day in ${label}`} style={{ flexDirection: 'row', gap: 3 }}>
         {days.map((d) => {
           const n = day(d.date).getDate();
@@ -224,7 +452,7 @@ function SummaryTiles({ subs, nw, onNetWorth }: { subs: ReturnType<typeof subscr
       {subs.rows.length || hasWorth ? (
         <View style={{ flexDirection: 'row', gap: 12 }}>
           {subs.rows.length ? (
-            <SummaryTile icon="repeat" label="SUBSCRIPTIONS" value={money(Math.round(subs.monthly))} unit="/mo" line={`${subs.rows.length} active · ${nextLine}`} onPress={() => router.push('/entity/subscription' as never)} />
+            <SummaryTile icon="repeat" label="SUBSCRIPTIONS" value={money(Math.round(subs.monthly))} unit="/mo" line={`${subs.rows.length} active · ${nextLine}`} onPress={() => router.push('/module/finance/subscriptions' as never)} />
           ) : null}
           {hasWorth ? (
             <SummaryTile icon="trend" label="NET WORTH" value={money(Math.round(nw.total))} line={`${nw.accounts.length} account${nw.accounts.length === 1 ? '' : 's'} · ${nw.holdings.length} holding${nw.holdings.length === 1 ? '' : 's'}`} onPress={onNetWorth} />
@@ -298,6 +526,98 @@ function EmptyHome() {
 }
 
 /** From To check: payments asking who the payee is, answered right here. */
+/** Who owes whom: everyone with a balance (Turf, splits, IOUs), net, biggest first; a row opens their page, where Settle is. */
+function WhoOwes({ owes }: { owes: Array<{ personId: string; amount: number; name: string }> }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const toYou = owes.filter((o) => o.amount > 0).reduce((a, o) => a + o.amount, 0);
+  const youOwe = owes.filter((o) => o.amount < 0).reduce((a, o) => a - o.amount, 0);
+  const sub = [toYou ? `${shortMoney(os, toYou)} to you` : null, youOwe ? `${shortMoney(os, youOwe)} you owe` : null].filter(Boolean).join(' · ');
+  return (
+    <View style={{ gap: 10 }}>
+      <SectionHead title="Who owes whom" sub={sub} action={`All ${owes.length}`} chevron onAction={() => router.push('/module/finance/debts' as never)} />
+      <Rows padding={14} gap={4}>
+        {owes.slice(0, 5).map((o) => (
+          <Pressable key={o.personId} accessibilityRole="button" accessibilityLabel={`${o.name} ${o.amount > 0 ? 'owes you' : 'you owe'} ${os.format.currency(Math.abs(o.amount))}`} onPress={() => router.push(`/entity/person/${o.personId}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, opacity: pressed ? 0.7 : 1 })}>
+            <Disc name={o.name} colorKey={o.personId} />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text variant="rowTitle" numberOfLines={1}>{o.name}</Text>
+              <Text variant="caption" color="secondary">{o.amount > 0 ? 'owes you' : 'you owe'}</Text>
+            </View>
+            <Text style={{ fontSize: 16, lineHeight: 21, fontWeight: '700', fontVariant: ['tabular-nums'], color: o.amount > 0 ? t.c.accent.gold : t.c.alert.coralText }}>{os.format.currency(Math.abs(o.amount))}</Text>
+          </Pressable>
+        ))}
+      </Rows>
+    </View>
+  );
+}
+
+/** Before payday as day cards you swipe: card bills (a late one first, in coral), renewals and SIPs, soonest first, with their total. */
+function ComingUp({ coming }: { coming: ReturnType<typeof comingUp> }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const total = coming.items.reduce((a, i) => a + i.amount, 0);
+  const until = format(new Date(`${coming.until}T12:00:00`), 'EEE d MMM');
+  return (
+    <View style={{ gap: 10 }}>
+      <SectionHead title={coming.payday ? 'Before payday' : 'Coming up'} sub={`${coming.payday ? until : `by ${until}`} · ${shortMoney(os, total)}`} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -t.layout.gutter }} contentContainerStyle={{ paddingHorizontal: t.layout.gutter, gap: 10 }}>
+        {coming.items.map((i) => {
+          const d = new Date(`${i.due}T12:00:00`);
+          // Each kind has its colour, from the kit's blocks (NR-Money-Home v34): late coral, a bill or card bill sky, a renewal lilac, a SIP mint.
+          const kind = i.late ? 'LATE' : i.kind === 'card' ? 'CARD BILL' : i.kind === 'sip' ? 'SIP' : i.bill ? 'BILL' : 'RENEWS';
+          const bg = i.late ? t.c.alert.coralText : i.kind === 'card' || i.bill ? blocks.sky : i.kind === 'sip' ? blocks.mint : blocks.lilac;
+          const cat = i.kind === 'card' ? 'Card bill' : categoryOf(i.category).label;
+          return (
+            <Pressable key={i.key} accessibilityRole="button" accessibilityLabel={`${i.title}, ${cat}, ${os.format.currency(i.amount)}, ${i.late ? 'late, was due' : kind === 'RENEWS' ? 'renews' : 'due'} ${format(d, 'EEE d MMM')}`} onPress={() => router.push(`/entity/${i.object}/${i.id}` as never)} style={({ pressed }) => ({ width: 140, padding: 14, borderRadius: 24, gap: 10, backgroundColor: bg, opacity: pressed ? 0.85 : 1 })}>
+              <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: 'rgba(11,11,13,0.68)' }}>{`${kind} · ${format(d, 'EEE d').toUpperCase()}`}</Text>
+              <Text numberOfLines={1} style={{ alignSelf: 'flex-start', fontSize: 11, lineHeight: 14, fontWeight: '700', color: '#0B0B0D', backgroundColor: 'rgba(11,11,13,0.12)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' }}>{cat}</Text>
+              <View style={{ gap: 1 }}>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 20, lineHeight: 24, fontWeight: '700', letterSpacing: -0.4, color: '#0B0B0D', fontVariant: ['tabular-nums'] }}>{os.format.currency(Math.round(i.amount))}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, color: 'rgba(11,11,13,0.68)' }}>{i.title.replace(/ bill$/, '').replace(/ SIP$/, '')}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <View accessible accessibilityLabel="Colours: coral late, blue bill due, lilac renews, green SIP" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 4 }}>
+        {([[t.c.alert.coralText, 'Late'], [blocks.sky, 'Bill due'], [blocks.lilac, 'Renews'], [blocks.mint, 'SIP']] as const).map(([c, w]) => (
+          <View key={w} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c }} />
+            <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, fontWeight: '600' }}>{w}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** Payments still in Other: your model sorts the shops (names and rounded amounts only), with Undo (docs/MODEL.md, Better categories). */
+function SortOther() {
+  const os = useOS();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const n = useLive((o) => o.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')='expense' AND json_extract(data,'$.category')='other'`)?.n ?? 0, []);
+  if (n < 1) return null;
+  const sort = async () => {
+    setBusy(true);
+    try {
+      const agent = await os.device?.agent?.().catch(() => null);
+      if (!agent) return toast.show({ message: 'Connect OpenRouter in You › Agent first (one tap, free models)', icon: 'info' });
+      const done = await sortWithAI(os, agent.main);
+      if (!done || !done.shops.length) return toast.show({ message: 'Nothing it was sure of. Set one yourself and it is learned', icon: 'info' });
+      toast.show({ message: `Sorted ${done.shops.length} shop${done.shops.length === 1 ? '' : 's'} · ${done.changed.length} payments`, icon: 'check', undo: () => undoSort(os, done) });
+    } catch (e) {
+      toast.show({ message: `Couldn’t sort: ${(e as Error).message.slice(0, 80)}`, icon: 'alert' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <SectionHead title="No category yet" sub={`${n} payment${n === 1 ? '' : 's'} in Other`} action={busy ? 'Sorting…' : 'Sort with AI'} lime onAction={busy ? undefined : () => void sort()} />;
+}
+
 function NeedsYou() {
   const os = useOS();
   const items = useLive((o) => {
@@ -320,31 +640,23 @@ function NeedsYou() {
   );
 }
 
-function WhereItWent({ byCat, total, month, offset }: { byCat: Array<{ category: string; total: number; count: number }>; total: number; month: string; offset: number }) {
+function WhereItWent({ byCat, total, month, offset, onBudget }: { byCat: Array<{ category: string; total: number; count: number }>; total: number; month: string; offset: number; onBudget?: () => void }) {
   const os = useOS();
-  const t = useTheme();
   const router = useRouter();
+  const t = useTheme();
   const period = offset === 0 ? 'month' : 'last_month';
+  const hasTargets = useLive((o) => targetStatuses(o).length > 0, []);
+  const short = (n: number) => shortMoney(os, n);
   return (
     <View style={{ gap: 10 }}>
-      <SectionHead title="Where it went" sub={`${month} · ${byCat.length} categor${byCat.length === 1 ? 'y' : 'ies'}`} action="Spend" chevron onAction={() => router.push({ pathname: '/spend', params: { period } } as never)} />
-      <View style={{ padding: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 14 }}>
-        <SplitBar parts={byCat.map((c) => ({ key: c.category, share: c.total / (total || 1), color: catColor(c.category, t) }))} />
-        <View style={{ gap: 2 }}>
-          {byCat.map((c, i) => {
-            // The big four read in full; the rest step back.
-            const tone = i < 4 ? t.c.fg.primary : t.c.fg.secondary;
-            return (
-              <Pressable key={c.category} accessibilityRole="button" accessibilityLabel={`${categoryOf(c.category).label}, ${os.format.currency(c.total)}`} hitSlop={{ top: 4, bottom: 4 }} onPress={() => router.push({ pathname: '/spend', params: { category: c.category, period } } as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 36 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: catColor(c.category, t), opacity: i < 4 ? 1 : 0.7 }} />
-                <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, lineHeight: 18, fontWeight: '600', color: tone }}>{categoryOf(c.category).label}</Text>
-                <Text variant="caption" color="secondary" style={{ fontVariant: ['tabular-nums'] }}>{Math.round((c.total / (total || 1)) * 100)}%</Text>
-                <Text style={{ minWidth: 84, textAlign: 'right', fontSize: 14, lineHeight: 18, fontWeight: '700', color: tone, fontVariant: ['tabular-nums'] }}>{os.format.currency(c.total)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+      <SectionHead title="Where it went" sub={`${month} · ${byCat.length} categor${byCat.length === 1 ? 'y' : 'ies'}`} action="Spend" chevron onAction={() => router.push({ pathname: '/module/finance/spend', params: { period } } as never)} />
+      <RingBadges
+        total={short(total)}
+        caption={`spent in ${month.split(' ')[0]}`}
+        format={short}
+        action={hasTargets ? undefined : { label: 'Set a budget', onPress: onBudget ?? (() => router.push('/settings/categories' as never)) }}
+        parts={byCat.map((c) => ({ key: c.category, label: categoryOf(c.category).label, value: c.total, color: catColor(c.category, t), icon: categoryOf(c.category).icon, onPress: () => router.push({ pathname: '/module/finance/spend', params: { category: c.category, period } } as never) }))}
+      />
     </View>
   );
 }
@@ -376,7 +688,45 @@ function Targets({ targets }: { targets: ReturnType<typeof targetStatuses> }) {
   );
 }
 
-const KIND_WORD: Record<AccountData['kind'], string> = { bank: 'Bank', cash: 'Cash', credit: 'Credit card', investment: 'Investment', wallet: 'Wallet', loan: 'Loan' };
+/** No targets yet: a budget from your last 3 months, and what it leaves to save; one tap makes it yours (docs/MODEL.md, Suggested budget). */
+function SuggestedBudget({ bare, onDone }: { bare?: boolean; onDone?: () => void } = {}) {
+  const os = useOS();
+  const t = useTheme();
+  const toast = useToast();
+  const s = useLive((o) => suggestBudget(o), []);
+  if (!s) return null;
+  const money = os.format.currency;
+  const take = () => {
+    const before = adoptBudget(os, s);
+    toast.show({ message: `Budget set · ${money(s.total)} a month across ${s.items.length} categories`, icon: 'check', undo: () => undoBudget(os, s, before) });
+    onDone?.();
+  };
+  return (
+    <View style={{ gap: 10 }}>
+      {bare ? <Text variant="caption" color="secondary">From your last 3 months</Text> : <SectionHead title="A budget for you" sub="From your last 3 months" />}
+      <View style={{ padding: bare ? 0 : 18, borderRadius: 28, backgroundColor: bare ? 'transparent' : t.c.bg.tile, gap: 12 }}>
+        {s.items.map((i) => (
+          <View key={i.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: catColor(i.category, t) }} />
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, lineHeight: 18, fontWeight: '600' }}>{categoryOf(i.category).label}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 18, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{money(i.monthly)}</Text>
+          </View>
+        ))}
+        <Hairline />
+        {s.income > 0 ? (
+          <Text style={{ fontSize: 14, lineHeight: 20, fontWeight: '500' }}>
+            About {money(s.income)} comes in a month. {s.save >= 0 ? <Text style={{ fontWeight: '700', color: t.c.accent.gold }}>This leaves {money(s.save)} to save.</Text> : <Text style={{ fontWeight: '700', color: t.c.alert.coralText }}>That is {money(-s.save)} more than comes in.</Text>}
+          </Text>
+        ) : (
+          <Text variant="caption" color="secondary">No income filed in these months, so nothing to compare it with yet.</Text>
+        )}
+        <Pressable accessibilityRole="button" accessibilityLabel={`Use these, ${money(s.total)} a month`} onPress={take} style={({ pressed }) => ({ height: 48, borderRadius: 999, backgroundColor: t.c.accent.mustard, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}>
+          <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', color: t.c.accent.mustardInk }}>Use these · {money(s.total)}/mo</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 function Accounts({ nw }: { nw: ReturnType<typeof netWorth> }) {
   const os = useOS();
@@ -386,7 +736,7 @@ function Accounts({ nw }: { nw: ReturnType<typeof netWorth> }) {
   const lines = useLive((o) => Object.fromEntries(nw.accounts.map(({ account: a }) => [a.id, a.data.institutionId ? o.records.ref(a.data.institutionId)?.title : a.data.institution])), [nw.accounts.map((a) => a.account.id).join()]);
   return (
     <View style={{ gap: 10 }}>
-      <SectionHead title="Accounts" action={nw.accounts.length ? `All ${nw.accounts.length}` : undefined} chevron onAction={() => router.push('/entity/account' as never)} />
+      <SectionHead title="Accounts" action={nw.accounts.length ? `All ${nw.accounts.length}` : undefined} chevron onAction={() => router.push({ pathname: '/module/finance/reports', params: { tab: 'worth' } } as never)} />
       <Rows padding={14} gap={8}>
         <View style={{ padding: 4, paddingBottom: 6, gap: 2 }}>
           <Caps>NET WORTH</Caps>
@@ -397,6 +747,10 @@ function Accounts({ nw }: { nw: ReturnType<typeof netWorth> }) {
           const inst = lines[a.id];
           const held = nw.holdings.filter((h) => h.investment.data.accountId === a.id).length;
           const limit = a.data.kind === 'credit' && a.data.creditLimit ? Math.max(0, -balance) / a.data.creditLimit : null;
+          // A card's bill (from its statement text): due in a few days in white, late in coral.
+          const st = a.data.kind === 'credit' ? a.data.statement : undefined;
+          const late = !!st && st.dueOn < format(new Date(), 'yyyy-MM-dd');
+          const billLine = st ? `${money(st.total)} ${late ? 'was due' : 'due'} ${format(new Date(`${st.dueOn}T12:00:00`), 'EEE d MMM')}` : null;
           const line = a.data.kind === 'investment' ? `Investment · ${held} holding${held === 1 ? '' : 's'}` : a.data.kind === 'cash' ? 'In the wallet' : [inst ?? KIND_WORD[a.data.kind], a.data.last4 ? `··${a.data.last4}` : null].filter(Boolean).join(' · ');
           return (
             <Pressable key={a.id} accessibilityRole="button" accessibilityLabel={`${a.title}, ${money(balance, a.data.currency)}`} onPress={() => router.push(`/entity/account/${a.id}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, opacity: pressed ? 0.7 : 1 })}>
@@ -410,7 +764,10 @@ function Accounts({ nw }: { nw: ReturnType<typeof netWorth> }) {
                     </View>
                     <Text variant="caption" color="secondary" numberOfLines={1} style={{ flex: 1 }}>{[inst, `${Math.round(limit * 100)}% of limit`].filter(Boolean).join(' · ')}</Text>
                   </View>
-                ) : (
+                ) : null}
+                {billLine ? (
+                  <Text variant="caption" numberOfLines={1} style={{ fontWeight: '600', color: late ? t.c.alert.coralText : t.c.fg.primary }}>{billLine}</Text>
+                ) : limit != null ? null : (
                   <Text variant="caption" color="secondary" numberOfLines={1}>{line}</Text>
                 )}
               </View>
@@ -471,53 +828,13 @@ function Recent({ items, count }: { items: Array<ObjectRecord<TransactionData>>;
   if (!items.length) return null;
   return (
     <View style={{ gap: 10 }}>
-      <SectionHead title="Recent" action={`All ${count}`} chevron onAction={() => router.push({ pathname: '/spend', params: { period: 'all', kind: 'all' } } as never)} />
+      <SectionHead title="Recent" action={`All ${count}`} chevron onAction={() => router.push({ pathname: '/module/finance/spend', params: { period: 'all', kind: 'all' } } as never)} />
       <Rows padding={14} gap={8}>
         {items.map((x) => {
           const split = splitOf(x.data);
           return <TxRow key={x.id} tx={x} minHeight={52} line={[kindWord(x.data), relDay(x.data.date), split ? `split ${split.parts.length} ways` : null].filter(Boolean).join(' · ')} />;
         })}
       </Rows>
-    </View>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* An Account's page (no artboard): the balance and its payments        */
-/* ------------------------------------------------------------------ */
-
-export function AccountSection({ entity, ctx }: { entity: ObjectRecord<any>; ctx: LifeOSContext }) { // eslint-disable-line @typescript-eslint/no-explicit-any
-  const router = useRouter();
-  const t = useTheme();
-  const a = entity as ObjectRecord<AccountData>;
-  const balance = useLive((os) => accountBalance(os, a), [entity.id, entity.version]);
-  const txns = useLive((os) => os.records.query<TransactionData>('transaction', { filter: { or: [{ field: 'data.accountId', op: 'eq', value: entity.id }, { field: 'data.toAccountId', op: 'eq', value: entity.id }] }, sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 10 }), [entity.id]);
-  const money = ctx.format.currency;
-  const used = a.data.kind === 'credit' && a.data.creditLimit ? Math.max(0, -balance) : null;
-  return (
-    <View style={{ gap: 16 }}>
-      <View style={{ padding: 18, borderRadius: 28, backgroundColor: t.c.bg.tile, gap: 10 }}>
-        <Caps>CURRENT BALANCE</Caps>
-        <Text variant="display" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} color={balance < 0 ? t.c.alert.coralText : undefined}>{balance < 0 ? `−${money(-balance, a.data.currency)}` : money(balance, a.data.currency)}</Text>
-        {used != null ? (
-          <View style={{ gap: 6 }}>
-            <ProgressBar value={Math.min(1, used / a.data.creditLimit!)} color={t.tints.finance.ink} height={8} />
-            <Text variant="caption" color="secondary">{money(used)} of {money(a.data.creditLimit!)} limit used</Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={{ gap: 10 }}>
-        <SectionHead title="Transactions" action="Add" lime onAction={() => router.push({ pathname: '/entity/[type]/new', params: { type: 'transaction', accountId: entity.id } } as never)} />
-        {txns.length ? (
-          <Rows>
-            {txns.map((x) => (
-              <TxRow key={x.id} tx={x} line={[kindWord(x.data), relDay(x.data.date)].join(' · ')} />
-            ))}
-          </Rows>
-        ) : (
-          <Text variant="caption" color="secondary" style={{ paddingHorizontal: 4 }}>No transactions on this account.</Text>
-        )}
-      </View>
     </View>
   );
 }

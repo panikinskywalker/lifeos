@@ -4,7 +4,7 @@ import { createLifeOS } from '@core/lifeos';
 import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
-import { spendQuery } from './spend';
+import { spendByHour, spendQuery } from './spend';
 import { accountType, transactionType } from './types';
 
 let os: LifeOSContext;
@@ -39,5 +39,23 @@ describe('Spend screen query', () => {
     expect(spendQuery(os, { period: 'month', kind: 'investments' }, NOW).total).toBe(5000);
     expect(spendQuery(os, { period: 'month', kind: 'income' }, NOW).total).toBe(50000);
     expect(spendQuery(os, { period: 'all', kind: 'spending', sort: 'oldest' }, NOW).items[0]!.data.date).toBe('2026-08-15');
+  });
+});
+
+describe('spend by hour (the kit hour ticks)', () => {
+  it("takes each spend's hour from when its text arrived, or when you typed it that day; others are left out", () => {
+    const hour = (new Date().getHours() + 6) % 24;
+    const at = new Date(2026, 10, 5, hour, 20).getTime();
+    os.db.run(`INSERT INTO ingest_queue(id,source,package,received_at,raw_title,raw_text,status,created_at,updated_at) VALUES ('q1','sms','VM-HDFCBK',?,NULL,'x','confirmed',?,?)`, [at, at, at]);
+    os.records.create({ object: 'transaction', data: { amount: 450, kind: 'expense', category: 'food', merchant: 'Swiggy', date: '2026-11-05', sourceRef: 'q1' } });
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    os.records.create({ object: 'transaction', data: { amount: 200, kind: 'expense', category: 'food', merchant: 'Chai', date: today } });
+    os.records.create({ object: 'transaction', data: { amount: 999, kind: 'expense', category: 'shopping', merchant: 'Old', date: '2026-01-02' } });
+    os.records.create({ object: 'transaction', data: { amount: 5000, kind: 'income', category: 'salary', merchant: 'Pay', date: '2026-11-05', sourceRef: 'q1' } });
+    const h = spendByHour(os, null, '2099-12-31');
+    expect(h[hour]).toBe(450);
+    expect(h[now.getHours()]).toBeGreaterThanOrEqual(200);
+    expect(h.reduce((a, b) => a + b, 0)).toBe(650);
   });
 });

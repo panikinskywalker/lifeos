@@ -1,31 +1,29 @@
-import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { senders, setSenderTrusted } from '@core/filing/messages';
 import { BANK_NAMES } from '@modules/finance/filing/bankSms';
+import { rereadTexts, undoReread } from '@modules/finance/filing/reread';
 import { useLive, useOS } from '@ui/hooks';
 import { Button, EmptyState, RowList, Screen, Section, SwitchField, Text, useToast } from '@ui/kit';
 import { importSmsHistory } from '../../src/platform/sources';
-import { exportParserDataset } from '../../src/platform/parserDataset';
 
 /** You › Data sources › SMS: which senders to trust (banks and cards are ticked for you; untick any). */
 export default function SmsSendersScreen() {
   const os = useOS();
   const router = useRouter();
   const toast = useToast();
-  const [exporting, setExporting] = useState(false);
   const list = useLive((o) => senders(o), []);
   const trusted = list.filter((s) => s.trusted);
   const other = list.filter((s) => !s.trusted);
   return (
     <Screen title="SMS senders" subtitle="Only ticked senders are read as money" onBack={() => router.back()}>
       <View style={{ gap: 16 }}>
-        {!list.length ? <EmptyState icon="comment" line="No senders yet — they appear as bank messages are read." /> : null}
+        {!list.length ? <EmptyState icon="comment" line="No senders yet. They appear as bank messages are read." /> : null}
         {trusted.length ? (
           <Section title="Read as money">
             <RowList>
               {trusted.map((s) => (
-                <SwitchField key={s.address} label={`${s.address}${s.bank ? ` · ${BANK_NAMES[s.bank]}` : ''}`} hint={`${s.count} message${s.count === 1 ? '' : 's'}${s.sample ? ` · “${s.sample.slice(0, 60)}…”` : ''}`} value onChange={() => setSenderTrusted(os, s.address, false)} />
+                <SwitchField key={s.address} label={`${s.address}${s.bank && s.bank !== 'undefined' ? ` · ${BANK_NAMES[s.bank] ?? s.bank}` : ''}`} hint={`${s.count} message${s.count === 1 ? '' : 's'}${s.sample ? ` · “${s.sample.slice(0, 60)}…”` : ''}`} value onChange={() => setSenderTrusted(os, s.address, false)} />
               ))}
             </RowList>
           </Section>
@@ -53,21 +51,17 @@ export default function SmsSendersScreen() {
             })
           }
         />
-        <Section title="Help fix the parser">
+        <Section title="Read my texts again">
           <Text variant="caption" color="secondary">
-            One file with the last 12 months of texts from banks, shops and services, word for word, with what LifeOS read in each and what it filed. One-time codes and texts from people’s numbers are left out. It includes amounts, account endings and payee names, so only send it where you mean to.
+            Files the texts LifeOS still has (the last 60 days) again with today’s rules. Payments it filed itself are replaced; any you edited, split or linked by hand stay as they are. Undo puts the old ones back.
           </Text>
           <Button
-            title={exporting ? 'Preparing the file…' : 'Export texts for the parser'}
-            icon="share"
+            title="Read my texts again"
+            icon="refresh"
             variant="secondary"
-            disabled={exporting}
             onPress={() => {
-              setExporting(true);
-              exportParserDataset(os)
-                .then((r) => toast.show({ message: `${r.included} texts in the file`, icon: 'check' }))
-                .catch((e: Error) => toast.show({ message: e.message, icon: 'info' }))
-                .finally(() => setExporting(false));
+              const r = rereadTexts(os);
+              toast.show({ message: `${r.read} texts read again · ${r.removed.length} payments replaced, ${r.kept} you changed kept`, icon: 'check', undo: () => void undoReread(os) });
             }}
           />
         </Section>

@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import type { LifeOSContext } from '@core/registry/context';
 import { askWithPhoto } from '@core/brain';
+import { PHOTO_MODEL } from '@core/ai/brainModel';
 import type { Party } from '@core/money/split';
 import { useToast } from '@ui/kit';
 import { makeBill, parseReceipt, receiptQuestion, receiptShares, type ReceiptRead } from '@modules/finance';
@@ -59,7 +60,8 @@ export function ReceiptScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
       if (a.base64.length > MAX_BASE64) return setError('That photo is too big to send. Try again a little further back.');
       setPhoto({ uri: a.uri, mime: a.mimeType ?? undefined });
       setBusy(true);
-      const model = (await ctx.device?.brain?.model()) ?? null;
+      // Haiku reads receipts, as Money's + does (docs/MODEL.md, Photos and PDFs are read by Haiku).
+      const model = (await ctx.device?.brain?.model(PHOTO_MODEL)) ?? null;
       const res = await askWithPhoto(ctx, model, { ...receiptQuestion(parties.map(n)), image: { mediaType: a.mimeType === 'image/png' || a.mimeType === 'image/webp' ? a.mimeType : 'image/jpeg', data: a.base64 } });
       if (!res.ok) return setError(res.note === 'no key' || res.note === 'off' ? 'Reading a receipt needs the brain on, with a key (You › Agent).' : res.note === 'over budget' ? 'Over today’s brain budget; try tomorrow or raise it in You › Agent.' : `Couldn’t read that receipt${res.error ? ` (${res.error.slice(0, 160)})` : ''}. Try again, or log it by hand.`);
       const rr = parseReceipt(res.answer);

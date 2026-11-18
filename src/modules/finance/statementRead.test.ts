@@ -1,0 +1,160 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createBetterSqliteAdapter } from '@core/db/betterSqliteAdapter';
+import { createLifeOS } from '@core/lifeos';
+import { Registry } from '@core/registry/registry';
+import type { LifeOSContext } from '@core/registry/context';
+import { bus } from '@core/events/bus';
+import { crmModule } from '@modules/crm';
+import { financeModule } from '@modules/finance';
+import { accountBalance } from './lib';
+import { proposeChanges, readStatement } from './statementRead';
+import type { AccountData, InvestmentData, SubscriptionData } from './types';
+
+/** Upload a statement (docs/MODEL.md): read once, matched on the phone, nothing changes until you apply, each with Undo. */
+
+let os: LifeOSContext;
+beforeEach(async () => {
+  bus.clear();
+  os = await createLifeOS({ db: createBetterSqliteAdapter(':memory:'), modules: [crmModule, financeModule], registry: new Registry() });
+});
+afterEach(() => os.db.close());
+
+const card = () => os.records.create<AccountData>({ object: 'account', title: 'ICICI Bank card', data: { kind: 'credit', institution: 'ICICI Bank', last4: '8013', currency: 'INR', openingBalance: 0 } as AccountData });
+const bank = () => os.records.create<AccountData>({ object: 'account', title: 'SBI', data: { kind: 'bank', institution: 'SBI', last4: '1234', currency: 'INR', openingBalance: 0 } as AccountData });
+
+describe('Upload a statement', () => {
+  it('a card statement sets what you owe and its bill; a bank screenshot sets the balance; Undo puts them back', () => {
+    const c = card();
+    const b = bank();
+    const read = readStatement({
+      accounts: [
+        { bank: 'ICICI', last4: '8013', kind: 'credit', balance: 0, owed: 14768.76, minDue: 740, dueOn: '2026-11-26', asOf: '2026-11-12' },
+        { bank: 'SBI', last4: 'XX1234', kind: 'bank', balance: 52180, owed: 0, minDue: 0, dueOn: '', asOf: '2026-11-14' },
+      ],
+      holdings: [],
+    });
+    const ps = proposeChanges(os, read, Date.parse('2026-11-16T10:00:00'));
+    expect(ps.map((p) => p.label)).toEqual(['ICICI Bank card ••8013: you owe ₹14,768.76', 'SBI ••1234: balance ₹52,180']);
+    // Nothing changed yet.
+    expect(os.records.get<AccountData>(c.id)!.data.knownBalance).toBeUndefined();
+    const undos = ps.map((p) => p.apply());
+    expect(accountBalance(os, os.records.get<AccountData>(c.id)!)).toBeCloseTo(-14768.76, 2);
+    expect(os.records.get<AccountData>(c.id)!.data.statement).toMatchObject({ total: 14768.76, min: 740, dueOn: '2026-11-26' });
+    expect(accountBalance(os, os.records.get<AccountData>(b.id)!)).toBe(52180);
+    undos.forEach((u) => u());
+    expect(os.records.get<AccountData>(c.id)!.data.knownBalance).toBeUndefined();
+    expect(os.records.get<AccountData>(b.id)!.data.knownBalance).toBeUndefined();
+  });
+
+  it('a fund summary updates the holding it matches by name and adds the one it does not', () => {
+    const pp = os.records.create<InvestmentData>({ object: 'investment', title: 'Parag Parikh Flexi Cap', data: { instrument: 'mutual_fund', invested: 540000, currentValue: 682400 } as InvestmentData });
+    const read = readStatement({ accounts: [], holdings: [
+      { name: 'Parag Parikh Flexi Cap Fund - Direct Growth', units: 812.3, value: 691200, invested: 545000, sip: 5000, sipDay: 5 },
+      { name: 'HDFC Index Nifty 50 Fund', units: 0, value: 124600, invested: 112000, sip: 2000, sipDay: 5 },
+    ] });
+    const ps = proposeChanges(os, read);
+    expect(ps.map((p) => p.label)).toEqual(['Parag Parikh Flexi Cap: worth ₹6,91,200 · ₹5,45,000 in · SIP ₹5,000 on the 5', 'New holding: HDFC Index Nifty 50 Fund']);
+    const undos = ps.map((p) => p.apply());
+    expect(os.records.get<InvestmentData>(pp.id)!.data).toMatchObject({ currentValue: 691200, invested: 545000, sip: 5000, sipDay: 5, units: 812.3 });
+    expect(os.records.query('investment')).toHaveLength(2);
+    undos.forEach((u) => u());
+    expect(os.records.get<InvestmentData>(pp.id)!.data).toMatchObject({ currentValue: 682400, invested: 540000 });
+    expect(os.records.query('investment')).toHaveLength(1);
+  });
+
+  it('the last digits win over a misread bank, and an account named with its digits is not named twice', () => {
+    const c = card();
+    os.records.create<AccountData>({ object: 'account', title: 'HSBC ••355', data: { kind: 'bank', institution: 'HSBC', last4: '355', currency: 'INR', openingBalance: 0 } as AccountData });
+    const ps = proposeChanges(os, readStatement({ accounts: [
+      { bank: 'Axis', last4: '8013', kind: 'credit', balance: 0, owed: 15036, minDue: 0, dueOn: '', asOf: '' },
+      { bank: 'HSBC', last4: '355', kind: 'bank', balance: 296958, owed: 0, minDue: 0, dueOn: '', asOf: '' },
+    ], holdings: [] }));
+    expect(ps.map((p) => p.label)).toEqual(['ICICI Bank card ••8013: you owe ₹15,036', 'HSBC ••355: balance ₹2,96,958']);
+    expect(c.id).toBeTruthy();
+  });
+
+  it('a SIP from a dashboard or SIP screenshot becomes the monthly SIP, on its day, for a new fund and a known one', () => {
+    const known = os.records.create<InvestmentData>({ object: 'investment', title: 'Parag Parikh Flexi Cap', status: 'active', data: { instrument: 'mutual_fund', invested: 540000 } as InvestmentData });
+    expect(os.cycles.forEntity(known.id)).toHaveLength(0);
+    const ps = proposeChanges(os, readStatement({ accounts: [], holdings: [
+      { name: 'Parag Parikh Flexi Cap Fund', units: 0, value: 0, invested: 0, sip: 5000, sipDay: 5 },
+      { name: 'Motilal Oswal Midcap Fund', units: 0, value: 0, invested: 0, sip: 3000, sipDay: 12 },
+    ] }));
+    ps.forEach((p) => p.apply());
+    const sipOf = (id: string) => os.cycles.forEntity(id).find((c) => c.template === 'investment.sip');
+    expect(sipOf(known.id)).toBeTruthy();
+    expect(new Date(sipOf(known.id)!.nextDueAt!).getDate()).toBe(5);
+    const fresh = os.records.query<InvestmentData>('investment').find((i) => i.title.startsWith('Motilal'))!;
+    expect(fresh.data.sip).toBe(3000);
+    expect(new Date(sipOf(fresh.id)!.nextDueAt!).getDate()).toBe(12);
+  });
+
+  it('a loan statement finds the loan by its last digits, makes it a loan and sets what you owe; Undo puts it back', () => {
+    const l = os.records.create<AccountData>({ object: 'account', title: 'SBI', data: { kind: 'bank', institution: 'SBI', last4: '1176', currency: 'INR', openingBalance: 0, knownBalance: 20000, knownOn: '2026-11-10', knownAt: 1 } as AccountData });
+    const ps = proposeChanges(os, readStatement({ accounts: [{ bank: 'SBI', last4: '43283101176', kind: 'loan', balance: 0, owed: 504583.36, minDue: 49747, dueOn: '', asOf: '2026-11-05' }], holdings: [] }));
+    expect(ps.map((p) => p.label)).toEqual(['SBI ••1176 is a loan: you owe ₹5,04,583.36']);
+    const undo = ps[0]!.apply();
+    expect(os.records.get<AccountData>(l.id)!.data.kind).toBe('loan');
+    expect(accountBalance(os, os.records.get<AccountData>(l.id)!)).toBeCloseTo(-504583.36, 2);
+    undo();
+    expect(os.records.get<AccountData>(l.id)!.data).toMatchObject({ kind: 'bank', knownBalance: 20000 });
+  });
+
+  it('a balance that could be one of several accounts asks which; the one you pick is set', () => {
+    const one = os.records.create<AccountData>({ object: 'account', title: 'SBI', data: { kind: 'bank', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
+    const two = os.records.create<AccountData>({ object: 'account', title: 'SBI salary', data: { kind: 'bank', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
+    os.records.create<AccountData>({ object: 'account', title: 'SBI education loan', data: { kind: 'loan', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
+    os.records.create<AccountData>({ object: 'account', title: 'SBI forex card', data: { kind: 'forex', institution: 'SBI', currency: 'INR', openingBalance: 0 } as AccountData });
+    const [p] = proposeChanges(os, readStatement({ accounts: [{ bank: 'SBI', last4: '', kind: 'bank', balance: 20000, owed: 0, minDue: 0, dueOn: '', asOf: '' }], holdings: [] }));
+    expect(p!.label).toBe('SBI: balance ₹20,000');
+    expect(p!.choices!.map((c) => c.label)).toEqual(['SBI', 'SBI salary']);
+    const undo = p!.apply(two.id);
+    expect(accountBalance(os, os.records.get<AccountData>(two.id)!)).toBe(20000);
+    expect(os.records.get<AccountData>(one.id)!.data.knownBalance).toBeUndefined();
+    undo();
+    expect(os.records.get<AccountData>(two.id)!.data.knownBalance).toBeUndefined();
+  });
+
+  it('a subscriptions screenshot adds the new ones and updates a known one', () => {
+    const known = os.records.create<SubscriptionData>({ object: 'subscription', title: 'Spotify', data: { name: 'Spotify', amount: 119, rrule: 'FREQ=MONTHLY;INTERVAL=1', nextBillingAt: '2026-11-20', category: 'subscriptions' } as SubscriptionData });
+    const ps = proposeChanges(os, readStatement({ accounts: [], holdings: [], subscriptions: [{ name: 'Spotify Premium', amount: 139, every: 'month', next: '2026-12-02' }, { name: 'YouTube Premium', amount: 1290, every: 'year', next: '' }] }), Date.parse('2026-11-16T10:00:00'));
+    expect(ps.map((p) => p.label)).toEqual(['Spotify: ₹139 a month, next 2026-12-02', 'New subscription: YouTube Premium']);
+    const undos = ps.map((p) => p.apply());
+    expect(os.records.get<SubscriptionData>(known.id)!.data).toMatchObject({ amount: 139, nextBillingAt: '2026-12-02' });
+    expect(os.records.query<SubscriptionData>('subscription').find((s) => s.data.name === 'YouTube Premium')!.data).toMatchObject({ amount: 1290, rrule: 'FREQ=YEARLY;INTERVAL=1' });
+    undos.forEach((u) => u());
+    expect(os.records.get<SubscriptionData>(known.id)!.data).toMatchObject({ amount: 119, nextBillingAt: '2026-11-20' });
+    expect(os.records.query('subscription')).toHaveLength(1);
+  });
+
+  it('a copy merges into the real account: payments move, the real balance stays, its digits are learned; Undo puts it back', async () => {
+    const { mergeAccount } = await import('./lib');
+    const { accountFor } = await import('./filing/accounts');
+    const real = os.records.create<AccountData>({ object: 'account', title: 'HSBC', data: { kind: 'bank', institution: 'HSBC', last4: '3006', currency: 'INR', openingBalance: 0, knownBalance: 163424.4, knownOn: '2026-11-16', knownAt: Date.parse('2026-11-16T15:00:00') } as AccountData });
+    const copy = os.records.create<AccountData>({ object: 'account', title: 'HSBC ••355', data: { kind: 'bank', institution: 'HSBC', last4: '355', currency: 'INR', openingBalance: 0, knownBalance: 296958 } as AccountData });
+    const tx = os.records.create({ object: 'transaction', title: 'Swiggy', data: { amount: 300, kind: 'expense', category: 'food', date: '2026-11-10', accountId: copy.id } });
+    // The salary the bank's figure already holds: on the copy, heard after that figure was read.
+    os.records.create({ object: 'transaction', title: 'Tech Uniapps', data: { amount: 196958, kind: 'income', category: 'salary', date: '2026-11-16', accountId: copy.id } });
+    const undo = mergeAccount(os, copy.id, real.id);
+    expect(os.records.get(copy.id)).toBeUndefined();
+    expect((os.records.get(tx.id)!.data as { accountId: string }).accountId).toBe(real.id);
+    expect(accountBalance(os, os.records.get<AccountData>(real.id)!)).toBeCloseTo(163424.4, 2);
+    expect(os.records.get<AccountData>(real.id)!.data.alsoLast4).toEqual(['355']);
+    expect(accountFor(os, { last4: '355' } as never, 'HSBC')).toBe(real.id);
+    undo();
+    expect(os.records.get(copy.id)).toBeDefined();
+    expect((os.records.get(tx.id)!.data as { accountId: string }).accountId).toBe(copy.id);
+    expect(os.records.get<AccountData>(real.id)!.data.alsoLast4).toBeUndefined();
+  });
+
+  it('a payment dated after today never counts in a balance (a misread date)', () => {
+    const acc = os.records.create<AccountData>({ object: 'account', title: 'HSBC', data: { kind: 'bank', institution: 'HSBC', currency: 'INR', openingBalance: 1000 } as AccountData });
+    os.records.create({ object: 'transaction', title: 'Tech Uniapps', data: { amount: 196958, kind: 'income', category: 'salary', date: '2034-02-13', accountId: acc.id } });
+    os.records.create({ object: 'transaction', title: 'Swiggy', data: { amount: 300, kind: 'expense', category: 'food', date: '2026-11-01', accountId: acc.id } });
+    expect(accountBalance(os, os.records.get<AccountData>(acc.id)!)).toBe(700);
+  });
+
+  it('keeps only what makes sense from a reading', () => {
+    expect(readStatement({ accounts: [{ bank: '', last4: '', kind: 'bank', balance: 1, owed: 0, minDue: 0, dueOn: 'soon', asOf: '' }], holdings: [{ name: 'X', units: 0, value: 0, invested: 0, sip: 0, sipDay: 0 }] })).toEqual({ accounts: [], holdings: [], subscriptions: [] });
+  });
+});

@@ -19,6 +19,12 @@ import {
   setStats,
   splitShare,
   toggleCaptain,
+  turfPlayerId,
+  turfVenueId,
+  autoPick,
+  kitOf,
+  DEFAULT_KITS,
+  KIT_PRESETS,
   ATTENDANCE,
   PAYMENT_TERMS,
   type AppearanceData,
@@ -28,9 +34,12 @@ import {
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { fonts } from '@ui/theme/tokens';
-import { Button, DateField, EmptyState, FilterChip, Icon, NumberField, RowItem, RowList, Screen, Segmented, Sheet, StatTrio, SwitchField, Text, TextField, useToast } from '@ui/kit';
+import { Button, ChipRow, DateField, EmptyState, FilterChip, Icon, NumberField, RowItem, RowList, Screen, Segmented, Sheet, StatTrio, SwitchField, Text, TextField, useToast } from '@ui/kit';
 import { usePull } from './useTurfSync';
-import { Face, SyncPill } from './teams';
+import { Crest, Face, SyncPill } from './teams';
+import { BellButton } from './bell-button';
+import { SearchBox } from './search';
+import { PillButton } from './dues';
 
 /**
  * The Turf board's match screens (docs/MODEL.md layer 3, *Match*; R9c.3):
@@ -55,6 +64,22 @@ function useBack() {
 /* ------------------------------------------------------------------ */
 
 /** New match (no `game`) or Edit match (TF-NewMatch): the venue fills format, cost and kick-off; pick players; the shares split. */
+/** A match a player suggested, from the bell's Book it: its day, kick-off and ground, and whoever suggested or backed it. */
+function fromSuggestion(os: LifeOSContext, params: Record<string, string>): MatchInput {
+  const venue = allVenues(os).find((v) => params.venueTurf && turfVenueId(v.data) === params.venueTurf);
+  const ids = (params.players ?? '').split(',');
+  return {
+    paymentTerms: 'postpaid',
+    totalCost: 0,
+    ...(venue ? matchDefaults(os, venue.id) : {}),
+    date: params.date || today(),
+    time: params.time || (venue ? matchDefaults(os, venue.id).time : undefined),
+    venueId: venue?.id ?? '',
+    playerIds: allPlayers(os).filter((p) => ids.includes(turfPlayerId(p.data) ?? '')).map((p) => p.id),
+    suggestionId: params.suggestion,
+  };
+}
+
 export function TurfMatchForm({ ctx, params }: Props) {
   const os = useOS();
   const t = useTheme();
@@ -72,11 +97,23 @@ export function TurfMatchForm({ ctx, params }: Props) {
     for (const g of allGames(o)) if (g.data.frontedById) n.set(g.data.frontedById, (n.get(g.data.frontedById) ?? 0) + 1);
     return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
   }, []);
-  const [m, setM] = useState<MatchInput>(() => (editing ? matchInputOf(os, editing) : null) ?? { date: today(), venueId: '', totalCost: 0, paymentTerms: 'postpaid', playerIds: [] });
+  const [m, setM] = useState<MatchInput>(() => (editing ? matchInputOf(os, editing) : null) ?? (params.suggestion ? fromSuggestion(os, params) : null) ?? { date: today(), venueId: '', totalCost: 0, paymentTerms: 'postpaid', playerIds: [] });
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'available' | 'regulars' | 'guests'>('all');
-  const [pickDay, setPickDay] = useState(false);
-  const [otherTime, setOtherTime] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'available' | 'last' | 'regulars' | 'in'>('all');
+  const [showAll, setShowAll] = useState(false);
+  // The squad's habits, as Turf web's New match reads them: appearances, last match's players, regulars, who said In.
+  const facts = useLive((o) => {
+    const games = allGames(o).filter((g) => g.id !== editing && g.data.date <= today());
+    const apps = o.records.query<AppearanceData>('appearance', {}, { limit: 100_000 }).filter((a) => !a.archived && a.data.attendance !== 'no_show');
+    const count = new Map<string, number>();
+    for (const a of apps) count.set(a.data.personId, (count.get(a.data.personId) ?? 0) + 1);
+    const last = games[0];
+    const lastIds = new Set(apps.filter((a) => a.data.gameId === last?.id).map((a) => a.data.personId));
+    const recent = games.slice(0, 12).map((g) => new Set(apps.filter((a) => a.data.gameId === g.id).map((a) => a.data.personId)));
+    const regular = (pid: string) => recent.filter((x) => x.has(pid)).length >= Math.max(2, Math.ceil(recent.length / 3));
+    const said = editing ? o.records.get<GameData>(editing)?.data.rsvps ?? {} : {};
+    return { count, lastIds, lastDate: last?.data.date ?? null, regular, said };
+  }, [editing]);
   const [everyone, setEveryone] = useState(false);
   const set = (patch: Partial<MatchInput>) => setM((x) => ({ ...x, ...patch }));
 
@@ -95,8 +132,12 @@ export function TurfMatchForm({ ctx, params }: Props) {
     return [...squad]
       .sort((a, b) => (a.id === meProfile ? -1 : b.id === meProfile ? 1 : a.data.name.localeCompare(b.data.name)))
       .filter((p) => !q || p.data.name.toLowerCase().includes(q) || (p.data.position ?? '').toLowerCase().includes(q))
-      .filter((p) => (filter === 'available' ? p.data.availability === 'AVL' : filter === 'regulars' ? !p.data.guest && p.data.availabilityMode !== 'window_only' : filter === 'guests' ? !!p.data.guest : true));
-  }, [squad, search, filter, meProfile]);
+      .filter((p) => !m.playerIds.includes(p.id))
+      .filter((p) => (filter === 'available' ? p.data.availability === 'AVL' : filter === 'last' ? facts.lastIds.has(p.data.personId) : filter === 'regulars' ? facts.regular(p.data.personId) : filter === 'in' ? facts.said[turfPlayerId(p.data) ?? ''] === 'going' : true));
+  }, [squad, search, filter, meProfile, m.playerIds, facts]);
+  // Taking off someone with money here: it goes with them (to their latest other match), so say so before saving.
+  const paidHere = useLive((o) => (editing ? o.records.query<AppearanceData>('appearance', { filter: { and: [{ field: 'data.gameId', op: 'eq', value: editing }] } }, { limit: 500 }) : []).filter((a) => (a.data.amountPaid ?? 0) > 0), [editing]);
+  const leaving = paidHere.map((a) => ({ a, p: squad.find((x) => x.data.personId === a.data.personId) })).filter(({ p }) => p && !m.playerIds.includes(p.id));
   const each = splitShare(m.totalCost || 0, m.playerIds.length);
   const expected = m.expectedPlayers ?? (m.sideSize ? m.sideSize * 2 : m.playerIds.length);
   const f = ctx.format.currency;
@@ -106,7 +147,6 @@ export function TurfMatchForm({ ctx, params }: Props) {
   const usual = picked.filter((p) => p.id === meProfile || fronters.slice(0, 3).includes(p.data.personId)).slice(0, 3);
   const frontChips = everyone ? picked : [...usual, ...picked.filter((p) => p.id === m.frontedById && !usual.includes(p))];
   const suggested = nextOn(m.date, venue ? usualDay(os, venue.id) : null);
-  const times = [...new Set([m.time, ...venues.map((v) => v.data.defaultTime)].filter((x): x is string => !!x))].sort().slice(0, 3);
 
   const save = () => {
     try {
@@ -154,46 +194,64 @@ export function TurfMatchForm({ ctx, params }: Props) {
   );
   const divider = <View style={{ height: 1, backgroundColor: HAIR }} />;
   return (
-    <Screen title={editing ? 'Edit match' : 'New match'} subtitle="Turf" onBack={back} right={<SyncPill />}>
+    <Screen title={editing ? 'Edit match' : 'New match'} subtitle="Turf" onBack={back} right={<><SyncPill /><BellButton /></>}>
       {card(
         'Venue',
         <>
-          {wrap(
-            <>
-              {venues.map((v) => (
-                <FilterChip key={v.id} label={v.data.name} icon={m.venueId === v.id ? 'location' : undefined} selected={m.venueId === v.id} onPress={() => pickVenue(v.id)} />
-              ))}
-              <FilterChip label="Add…" icon="plus" onPress={() => router.push('/board/turf/venue' as never)} />
-            </>,
-          )}
-          {venue ? wrap([m.sideSize ? `${m.sideSize}-a-side` : null, m.totalCost ? f(m.totalCost) : null, m.time ? clock12(m.time) : null, termWord(m.paymentTerms)].filter((x): x is string => !!x).map(white)) : null}
-          <Text variant="caption" color="tertiary">
-            {editing ? 'Changing the venue keeps the format, cost and kick-off set below.' : 'Picking a venue fills format, usual cost and kick-off. Change any below.'}
-          </Text>
+          {venues.map((v, i) => {
+            const on = m.venueId === v.id;
+            return (
+              <React.Fragment key={v.id}>
+                {i > 0 ? divider : null}
+                <Pressable accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={v.data.name} onPress={() => pickVenue(v.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 48 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: on ? LIME : DIM, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="location" size={16} color={on ? INK : WHITE} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="rowTitle" numberOfLines={1}>{v.data.name}</Text>
+                    <Text variant="caption" color="secondary" numberOfLines={1}>{[v.data.sideSize ? `${v.data.sideSize}-a-side` : null, v.data.defaultCost ? f(v.data.defaultCost) : null, v.data.defaultTime ? clock12(v.data.defaultTime) : null, termWord(v.data.paymentTerms ?? 'postpaid')].filter(Boolean).join(' · ')}</Text>
+                  </View>
+                  <Tick on={on} />
+                </Pressable>
+              </React.Fragment>
+            );
+          })}
+          {divider}
+          <Pressable accessibilityRole="button" onPress={() => router.push('/board/turf/venue' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 46 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: DIM, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="plus" size={16} color={WHITE} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="rowTitle">Somewhere else</Text>
+              <Text variant="caption" color="secondary">add the ground under Venues, then pick it here</Text>
+            </View>
+            <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} />
+          </Pressable>
+          <Text variant="caption" color="tertiary">Picking a venue fills format, usual cost, kick-off and terms. Change any below.</Text>
+          {wrap([5, 6, 7, 8, 9, 10, 11].map((n) => <FilterChip key={n} label={`${n}-a-side`} selected={m.sideSize === n} onPress={() => set({ sideSize: n, expectedPlayers: n * 2 })} />))}
         </>,
+        venue ? white([venue.data.sideSize ? `${venue.data.sideSize}-a-side` : null, venue.data.defaultCost ? f(venue.data.defaultCost) : null].filter(Boolean).join(' · ') || venue.data.name) : undefined,
       )}
 
       {card(
         'When',
         <>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 3 }}>
+              <DateField label="Day" value={m.date} onChange={(v) => set({ date: typeof v === 'string' ? v : today() })} />
+            </View>
+            <View style={{ flex: 2 }}>
+              <TextField label="Kick-off" value={m.time ?? ''} onChange={(time) => set({ time })} placeholder="20:00" keyboardType="numbers-and-punctuation" />
+            </View>
+          </View>
           {wrap(
             <>
-              <FilterChip label={shortDay(m.date)} icon="calendar" selected onPress={() => setPickDay((x) => !x)} />
-              {suggested ? <FilterChip label={shortDay(suggested)} onPress={() => set({ date: suggested })} /> : null}
-              <FilterChip label="Pick a day" selected={pickDay} onPress={() => setPickDay((x) => !x)} />
+              {suggested && suggested !== m.date ? <FilterChip label={shortDay(suggested)} icon="calendar" onPress={() => set({ date: suggested })} /> : null}
+              {venue?.data.defaultTime && m.time !== venue.data.defaultTime ? <FilterChip label={`${clock12(venue.data.defaultTime)} · usual here`} icon="clock" onPress={() => set({ time: venue.data.defaultTime })} /> : null}
             </>,
           )}
-          {pickDay ? <DateField value={m.date} onChange={(v) => set({ date: typeof v === 'string' ? v : today() })} /> : null}
-          {wrap(
-            <>
-              {times.map((time) => (
-                <FilterChip key={time} label={clock12(time)} icon={m.time === time && !otherTime ? 'clock' : undefined} selected={m.time === time && !otherTime} onPress={() => (setOtherTime(false), set({ time }))} />
-              ))}
-              <FilterChip label="Other" selected={otherTime || (!m.time && !times.length)} onPress={() => setOtherTime(true)} />
-            </>,
-          )}
-          {otherTime ? <TextField label="Kick-off" value={m.time ?? ''} onChange={(time) => set({ time })} placeholder="20:00" keyboardType="numbers-and-punctuation" /> : null}
         </>,
+        <Text variant="caption" color="secondary">{shortDay(m.date)}</Text>,
       )}
 
       {card(
@@ -203,26 +261,9 @@ export function TurfMatchForm({ ctx, params }: Props) {
             <View style={{ flex: 1 }}>
               <MoneyInput value={m.totalCost} onChange={(totalCost) => set({ totalCost })} label="Turf cost" />
             </View>
-            <PillStepper value={expected} onChange={(expectedPlayers) => set({ expectedPlayers })} label="Expected players" min={1} max={30} />
+            <PillStepper value={expected} onChange={(expectedPlayers) => set({ expectedPlayers })} label="Expected players" min={2} max={30} />
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text variant="caption" color="tertiary">
-              Turf cost
-            </Text>
-            <Text variant="caption" color="tertiary">
-              Expected players
-            </Text>
-          </View>
-          {divider}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text variant="label">Format</Text>
-              <Text variant="caption" color="tertiary">
-                {m.sideSize ? `${m.sideSize}-a-side` : 'Any size'}
-              </Text>
-            </View>
-            <PillStepper value={m.sideSize ?? 0} onChange={(v) => set({ sideSize: v || undefined })} label="Players a side" min={0} max={11} />
-          </View>
+          <Text variant="caption" color="tertiary">{`Expected players · ${m.playerIds.length} added${m.playerIds.length && m.totalCost ? ` · ${f(each)} each` : ''}`}</Text>
         </>,
       )}
 
@@ -233,103 +274,144 @@ export function TurfMatchForm({ ctx, params }: Props) {
             PAYMENT_TERMS.map((x) => <FilterChip key={x.value} label={termWord(x.value as MatchInput['paymentTerms'])} selected={m.paymentTerms === x.value} onPress={() => set({ paymentTerms: x.value as MatchInput['paymentTerms'] })} />),
           )}
           <View style={{ gap: 8 }}>
-            <Text variant="caption" color="secondary">
-              {needsFronter(m.paymentTerms) ? 'Who fronted the money?' : 'Who fronted the money? Counts as paid'}
-            </Text>
+            <Text variant="caption" color="secondary">Who fronted the money?</Text>
             {picked.length ? (
               wrap(
                 <>
-                  {!needsFronter(m.paymentTerms) ? <FilterChip label="Nobody" selected={!m.frontedById} onPress={() => set({ frontedById: undefined })} /> : null}
                   {frontChips.map((p) => {
                     const on = m.frontedById === p.id;
                     return (
-                      <Pressable key={p.id} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={p.data.name} onPress={() => set({ frontedById: p.id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingLeft: 6, paddingRight: 12, borderRadius: 999, backgroundColor: on ? WHITE : CHARCOAL }}>
+                      <Pressable key={p.id} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={p.data.name} onPress={() => set({ frontedById: on ? undefined : p.id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingLeft: 6, paddingRight: 12, borderRadius: 999, backgroundColor: on ? WHITE : CHARCOAL }}>
                         <Face id={p.data.personId} name={p.data.name} size={24} />
-                        <Text variant="caption" color={on ? INK : WHITE} style={{ fontWeight: on ? '700' : '600' }}>
-                          {label(p)}
-                        </Text>
+                        <Text variant="caption" color={on ? INK : WHITE} style={{ fontWeight: on ? '700' : '600' }}>{label(p)}</Text>
                       </Pressable>
                     );
                   })}
                   {!everyone && picked.length > frontChips.length ? <FilterChip label="Someone else…" onPress={() => setEveryone(true)} /> : null}
+                  {!m.frontedById ? white('nobody yet · pick them below first') : null}
                 </>,
               )
             ) : (
-              <Text variant="caption" color="tertiary">
-                Pick the players first.
-              </Text>
+              <Text variant="caption" color="tertiary">nobody yet · pick them below first</Text>
             )}
-            {m.paymentTerms === 'advance_paid' ? <MoneyInput value={m.advance ?? 0} onChange={(advance) => set({ advance })} label="Advance" hint="advance paid" /> : null}
-            {m.paymentTerms === 'prepaid' && m.totalCost ? <MoneyInput value={m.totalCost} label="Paid up front" hint="paid up front" /> : null}
+            {m.paymentTerms === 'advance_paid' ? <MoneyInput value={m.advance ?? 0} onChange={(advance) => set({ advance })} label="Advance" hint="paid up front" /> : null}
+            {m.paymentTerms === 'tentative' ? <Text variant="caption" color="tertiary">Tentative: no dues until it’s confirmed.</Text> : null}
           </View>
         </>,
       )}
 
       {card(
-        'Add players',
+        'Kits',
         <>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingHorizontal: 18, borderRadius: 14, backgroundColor: t.c.bg.tile, borderWidth: 1, borderColor: HAIR }}>
-            <Icon name="search" size={18} color={t.c.fg.tertiary} />
-            <TextInput value={search} onChangeText={setSearch} placeholder="Name or position" placeholderTextColor={t.c.fg.tertiary} accessibilityLabel="Search the squad" style={{ flex: 1, height: 48, color: t.c.fg.primary, fontFamily: fonts[500], fontSize: 15 }} />
-          </View>
-          {wrap(
-            (
-              [
-                ['all', 'All'],
-                ['available', 'Available'],
-                ['regulars', 'Regulars'],
-                ['guests', 'Guests'],
-              ] as const
-            ).map(([k, l]) => <FilterChip key={k} label={l} selected={filter === k} onPress={() => setFilter(k)} />),
-          )}
-          {list.map((p) => {
-            const on = m.playerIds.includes(p.id);
-            const away = p.data.availability === 'INJ' ? 'injured' : p.data.availability === 'OOS' ? 'out' : null;
+          {(['A', 'B'] as const).map((side) => {
+            const now = side === 'A' ? m.colorA ?? DEFAULT_KITS.A : m.colorB ?? DEFAULT_KITS.B;
             return (
-              <React.Fragment key={p.id}>
-                {divider}
-                <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={p.data.name} onPress={() => togglePlayer(p.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: on ? LIME : 'transparent', borderWidth: on ? 0 : 1.5, borderColor: 'rgba(245,245,247,0.22)', alignItems: 'center', justifyContent: 'center' }}>
-                    {on ? <Icon name="check" size={15} color={INK} /> : null}
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="rowTitle" numberOfLines={1}>
-                      {p.id === meProfile ? `${p.data.name} (you)` : p.data.name}
-                    </Text>
-                    <Text variant="caption" color="secondary" numberOfLines={1}>
-                      {[p.data.position, away, p.data.guest ? 'guest' : null].filter(Boolean).join(' · ') || ' '}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.data.availability === 'INJ' ? '#FF5C47' : p.data.availability === 'OOS' ? 'rgba(245,245,247,0.42)' : LIME }} />
-                    <Face id={p.data.personId} name={p.data.name} size={30} />
-                  </View>
-                </Pressable>
-              </React.Fragment>
+              <View key={side} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Crest kit={kitOf(now, side === 'A' ? DEFAULT_KITS.A : DEFAULT_KITS.B)} size={32} />
+                <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {KIT_PRESETS.map((k) => (
+                    <Pressable key={k.hex} accessibilityRole="radio" accessibilityState={{ checked: now === k.hex }} accessibilityLabel={`Team ${side} kit ${k.name}`} onPress={() => set(side === 'A' ? { colorA: k.hex } : { colorB: k.hex })} style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: k.hex, borderWidth: now === k.hex ? 3 : 1, borderColor: now === k.hex ? WHITE : 'rgba(245,245,247,0.22)' }} />
+                  ))}
+                </View>
+              </View>
             );
           })}
-          {list.length ? null : (
-            <Text variant="caption" color="tertiary">
-              Nobody matches.
-            </Text>
-          )}
-          {divider}
-          <Pressable accessibilityRole="button" onPress={() => router.push('/board/turf/player-edit' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        </>,
+        <Text variant="caption" color="secondary">{`${kitOf(m.colorA, DEFAULT_KITS.A).name} v ${kitOf(m.colorB, DEFAULT_KITS.B).name}`}</Text>,
+      )}
+
+      {card(
+        'Add players',
+        <>
+          <SearchBox value={search} onChange={setSearch} placeholder="Name or position" />
+          <Pressable accessibilityRole="button" onPress={() => router.push('/board/turf/player-edit' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 46 }}>
             <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: DIM, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="plus" size={16} />
+              <Icon name="user" size={14} color={WHITE} />
             </View>
-            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text variant="rowTitle">Add someone new</Text>
-              <Text variant="caption" color="secondary">
-                Not in the squad yet · joins as a guest
-              </Text>
+              <Text variant="caption" color="secondary">{search.trim() ? `Add “${search.trim()}” · not in the squad yet` : 'Not in the squad yet · added as a player and picked'}</Text>
             </View>
             <Icon name="chevron-right" size={18} color={t.c.fg.tertiary} />
           </Pressable>
+          <ChipRow>
+            {([['all', 'Everyone'], ['available', 'Available that day'], ['last', facts.lastDate ? `Played ${shortDay(facts.lastDate)}` : 'Last match'], ['regulars', 'Regulars'], ...(Object.values(facts.said).some((x) => x === 'going') ? [['in', `Said In · ${Object.values(facts.said).filter((x) => x === 'going').length}`]] : [])] as Array<[typeof filter, string]>).map(([k, l]) => (
+              <FilterChip key={k} label={l} selected={filter === k} onPress={() => setFilter(k)} />
+            ))}
+          </ChipRow>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text variant="caption" color="tertiary" style={{ flex: 1 }}>{`${squad.filter((p) => p.data.availability === 'AVL').length} available on ${shortDay(m.date)} · auto-pick skips the rest; tick anyone by hand`}</Text>
+            {m.sideSize || m.expectedPlayers ? (
+              <PillButton
+                title={`Auto-pick to ${expected}`}
+                icon="star"
+                height={36}
+                disabled={m.playerIds.length >= expected}
+                onPress={() => {
+                  const add = autoPick(os, m.playerIds, expected, editing ?? undefined);
+                  if (!add.length) return toast.show({ message: 'Nobody else is available', icon: 'info' });
+                  set({ playerIds: [...m.playerIds, ...add] });
+                  toast.show({ message: `Picked ${add.length}`, icon: 'check' });
+                }}
+              />
+            ) : null}
+          </View>
+          {divider}
+          {picked.length ? (
+            <View style={{ gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                <Text variant="label" style={{ flex: 1 }}>{`In this match · ${picked.length}`}</Text>
+                <Pressable accessibilityRole="button" onPress={() => set({ playerIds: [], frontedById: undefined })}>
+                  <Text variant="caption" color="tertiary">clear</Text>
+                </Pressable>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {[...picked].sort((a, b) => a.data.name.localeCompare(b.data.name)).map((p) => (
+                  <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`Take ${p.data.name} out`} onPress={() => togglePlayer(p.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingLeft: 4, paddingRight: 6, borderRadius: 999, backgroundColor: 'rgba(215,245,92,0.16)' }}>
+                    <Face id={p.data.personId} name={p.data.name} size={26} />
+                    <Text variant="caption" color={WHITE} style={{ fontWeight: '600' }}>{`${label(p)}${p.id === meProfile ? ' (you)' : ''}`}</Text>
+                    <Icon name="x" size={13} color="rgba(245,245,247,0.42)" />
+                  </Pressable>
+                ))}
+              </View>
+              {divider}
+            </View>
+          ) : null}
+          {(() => {
+            const limited = !showAll && !search.trim() && filter === 'all';
+            const shown = limited ? list.slice(0, 12) : list;
+            return (
+              <>
+                {shown.map((p, i) => {
+                  const letter = p.data.name[0]?.toUpperCase() ?? '#';
+                  const newLetter = !limited && (i === 0 || shown[i - 1]!.data.name[0]?.toUpperCase() !== letter);
+                  const apps = facts.count.get(p.data.personId) ?? 0;
+                  const away = p.data.availability === 'INJ' ? 'injured' : p.data.availability === 'OOS' ? 'out of station' : null;
+                  return (
+                    <React.Fragment key={p.id}>
+                      {newLetter ? <Text variant="labelCaps" color="tertiary" style={{ paddingTop: i ? 6 : 0 }}>{letter}</Text> : i > 0 ? divider : null}
+                      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: false }} accessibilityLabel={`${p.data.name} in`} onPress={() => togglePlayer(p.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 46 }}>
+                        <Tick on={false} />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text variant="rowTitle" numberOfLines={1}>{`${p.data.name}${p.id === meProfile ? ' (you)' : ''}`}</Text>
+                          <Text variant="caption" color="secondary" numberOfLines={1}>{[p.data.position, `${apps} ${apps === 1 ? 'app' : 'apps'}`, facts.lastIds.has(p.data.personId) ? 'last match' : null, away].filter(Boolean).join(' · ')}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.data.availability === 'INJ' ? '#FF5C47' : p.data.availability === 'OOS' ? 'rgba(245,245,247,0.42)' : LIME }} />
+                          <Face id={p.data.personId} name={p.data.name} size={30} />
+                        </View>
+                      </Pressable>
+                    </React.Fragment>
+                  );
+                })}
+                {!shown.length ? <Text variant="caption" color="tertiary" style={{ paddingVertical: 8 }}>{search.trim() ? 'No one by that name. Add them above.' : 'Everyone here is in.'}</Text> : null}
+                {limited && list.length > shown.length ? <PillButton title={`Show all ${list.length} · A to Z`} height={40} full onPress={() => setShowAll(true)} /> : null}
+                {showAll && !search.trim() && filter === 'all' ? <PillButton title="Show fewer" height={36} full onPress={() => setShowAll(false)} /> : null}
+              </>
+            );
+          })()}
         </>,
-        <View style={{ height: 28, paddingHorizontal: 11, borderRadius: 999, justifyContent: 'center', backgroundColor: WHITE }}>
-          <Text variant="labelMicro" color={INK}>{`${m.playerIds.length} of ${expected}`}</Text>
-        </View>,
+        white(`${m.playerIds.length} of ${expected}`),
       )}
 
       {picked.length ? (
@@ -360,9 +442,12 @@ export function TurfMatchForm({ ctx, params }: Props) {
         )
       ) : null}
 
+      {leaving.map(({ a, p }) => (
+        <Text key={a.id} variant="caption" color="secondary">{`${p!.data.name}’s ${f(a.data.amountPaid ?? 0)} here goes with them, as credit on their latest other match.`}</Text>
+      ))}
       <Button title={editing ? 'Save match' : 'Create match'} icon="check" block disabled={!m.venueId || !m.playerIds.length} onPress={save} />
       <Text variant="caption" color="tertiary">
-        {editing ? 'Everyone kept keeps their team, stats and payments; shares are split again. Someone who has paid needs a refund before they can be taken off.' : 'Saved to Turf web when you tap Create; offline it waits in order.'}
+        {editing ? 'Everyone kept keeps their team, stats and payments; shares are split again. Anyone taken off takes their money with them.' : 'Saved to Turf web when you tap Create; offline it waits in order.'}
       </Text>
     </Screen>
   );
@@ -376,6 +461,14 @@ const DIM = 'rgba(255,255,255,0.07)';
 const HAIR = 'rgba(255,255,255,0.08)';
 
 /** Turf web's words for the booking terms. */
+/** Turf web's Tick: a 26 ring, lime with a check when on. */
+function Tick({ on }: { on: boolean }) {
+  return (
+    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: on ? LIME : 'transparent', borderWidth: on ? 0 : 1.5, borderColor: 'rgba(245,245,247,0.22)', alignItems: 'center', justifyContent: 'center' }}>
+      {on ? <Icon name="check" size={15} color={INK} /> : null}
+    </View>
+  );
+}
 const termWord = (terms: MatchInput['paymentTerms']) => (terms === 'postpaid' ? 'Postpaid' : PAYMENT_TERMS.find((x) => x.value === terms)?.label ?? terms);
 const shortDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '');
 /** "20:00" → "8:00 pm". */

@@ -155,6 +155,10 @@ export function parseMessage(os: LifeOSContext, raw: string): ParsedPlan | null 
       },
     };
   }
+  for (const tool of os.registry.aiTools.values()) {
+    const input = tool.answers?.(text, os);
+    if (input) return { intent: tool.name, steps: [() => ({ name: tool.name, input })], reply: (r) => (r[0] as { answer?: string })?.answer ?? 'Nothing on that yet.' };
+  }
   m = /^what (?:did i (?:say|tell you)|do you know) about (.+?)\??$/i.exec(text);
   if (m) {
     const q = m[1]!.replace(/^(?:the|my)\s+/i, '');

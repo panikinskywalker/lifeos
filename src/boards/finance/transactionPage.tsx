@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
@@ -9,7 +9,11 @@ import { messageItem, sourceLabel } from '@core/filing/messages';
 import { useLive } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { monoFonts } from '@ui/theme/tokens';
-import { Icon, Text } from '@ui/kit';
+import { Icon, Sheet, Text, useToast } from '@ui/kit';
+import { linkPaymentToPlayer, playersOwing, undoSmsPayment } from '@modules/games';
+import { learnMyName, unlearnMyName } from '@modules/finance/filing/payee';
+import { payeeOf } from '@modules/finance/filing/rules';
+import { countAsIncome, undoCountAsIncome } from '@modules/finance/filing/moneyIn';
 import { categoryOf, type AccountData, type TransactionData } from '@modules/finance/types';
 import type { DebtData } from '@modules/finance/split';
 import { PayeeGuess } from './payeeGuess';
@@ -33,6 +37,7 @@ function Stat({ value, label, color }: { value: string; label: string; color?: s
 export function TransactionPage({ entity, ctx, controls, say }: { entity: ObjectRecord<any>; ctx: LifeOSContext; controls?: RecordControls; say?: React.ReactNode }) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const t = useTheme();
   const router = useRouter();
+  const toast = useToast();
   const tx = entity as ObjectRecord<TransactionData>;
   const d = tx.data;
   const money = ctx.format.currency;
@@ -56,6 +61,12 @@ export function TransactionPage({ entity, ctx, controls, say }: { entity: Object
 
   const payeeLink = v.links.find((l) => l.relation.kind === 'payee') ?? v.links.find((l) => l.relation.kind === 'person' && l.relation.meta.as != null);
   const people = v.links.filter((l) => l.other.object === 'person' && l !== payeeLink);
+  // Not a shop: it may be you, under the name your bank writes (a transfer between your own accounts).
+  const maybeMe = !!payeeLink && !!d.merchant && (d.kind === 'expense' || d.kind === 'income') && (payeeLink.other.object === 'person' || ctx.records.get<{ kind?: string }>(payeeLink.other.id)?.data.kind === 'payee');
+  const thatsMe = () => {
+    const u = learnMyName(ctx, d.merchant!);
+    toast.show({ message: `${d.merchant} is you · ${u.changed.length === 1 ? 'a transfer' : `${u.changed.length} payments are transfers`}, and every one after`, icon: 'check', undo: () => unlearnMyName(ctx, u) });
+  };
   const others = v.links.filter((l) => l !== payeeLink && l.other.object !== 'person' && l.other.object !== 'account' && l.other.object !== 'debt');
   const open = (object: string, id: string) => router.push(`/entity/${object}/${id}` as never);
   const objectWord = (object: string) => (ctx.registry.hasObject(object) ? ctx.registry.object(object).label : object);
@@ -96,6 +107,8 @@ export function TransactionPage({ entity, ctx, controls, say }: { entity: Object
       <PayeeGuess entity={tx} ctx={ctx} />
 
       <SplitBlock entity={tx} ctx={ctx} />
+      <NotIncome tx={tx} ctx={ctx} />
+      <TurfShare tx={tx} ctx={ctx} />
 
       <View style={{ gap: 10 }}>
         <SectionHead title="Fields" />
@@ -107,6 +120,11 @@ export function TransactionPage({ entity, ctx, controls, say }: { entity: Object
                   <Icon name={payeeLink.other.object === 'person' ? 'user' : 'bank'} size={14} color={t.c.fg.primary} />
                   <Text variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>{payeeLink.other.title}</Text>
                 </Pressable>
+                {maybeMe ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${d.merchant} is me: a transfer between my accounts`} hitSlop={8} onPress={thatsMe} style={{ minHeight: 32, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '600', color: t.c.accent.gold }}>That’s me</Text>
+                  </Pressable>
+                ) : null}
               </FieldRow>
             ) : null,
             d.merchant ? (
@@ -230,6 +248,57 @@ export function TransactionPage({ entity, ctx, controls, say }: { entity: Object
       <RecordExtras entity={tx} module="finance" />
 
       {say}
+    </View>
+  );
+}
+
+/** Money in that is not counted as income (docs/MODEL.md, Counting money): says why, and Count as income turns it back (remembered for that person). */
+function NotIncome({ tx, ctx }: { tx: ObjectRecord<TransactionData>; ctx: LifeOSContext }) {
+  const toast = useToast();
+  const turf = useLive((o) => o.links.forEntity(tx.id, 'pays').length > 0, [tx.id, tx.version]);
+  const payee = useLive((o) => payeeOf(o, tx.id), [tx.id, tx.version]);
+  const d = tx.data;
+  if (d.kind !== 'income' || turf || !(d.refund || d.share === 0)) return null;
+  const who = payee?.title ?? d.merchant ?? 'them';
+  const sub = d.refund ? `Refund from ${who} · off ${categoryOf(d.category).label}` : `Money back from ${who}`;
+  const count = () => {
+    const u = countAsIncome(ctx, tx.id);
+    toast.show({ message: u.personId ? `Counted as income · and money from ${who} from now on` : 'Counted as income', icon: 'check', undo: () => undoCountAsIncome(ctx, u) });
+  };
+  return <SectionHead title="Not income" sub={sub} action="Count as income" onAction={count} />;
+}
+
+/** Money in from a friend for a game: pick who paid; their oldest open Turf shares are marked paid (with Undo). */
+function TurfShare({ tx, ctx }: { tx: ObjectRecord<TransactionData>; ctx: LifeOSContext }) {
+  const t = useTheme();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const has = ctx.registry.modules.has('games');
+  const linked = useLive((o) => o.links.forEntity(tx.id, 'pays').some((l) => l.other.object === 'appearance'), [tx.id, tx.version]);
+  const owing = useLive((o) => (has ? playersOwing(o) : []), [open, has]);
+  if (!has || tx.data.kind !== 'income' || linked || !owing.length) return null;
+  const pick = (personId: string, name: string) => {
+    setOpen(false);
+    const id = linkPaymentToPlayer(ctx, tx.id, personId);
+    if (id) toast.show({ message: `Marked paid · ${name} · ${ctx.format.currency(tx.data.amount)}`, icon: 'check', undo: () => undoSmsPayment(ctx, id) });
+  };
+  return (
+    <View style={{ gap: 10 }}>
+      <SectionHead title="Turf" sub="From a friend who owes you for a game?" action="Who paid" lime onAction={() => setOpen(true)} />
+      <Sheet visible={open} onClose={() => setOpen(false)} title="Who paid this?">
+        <View>
+          {owing.map((p, i) => (
+            <React.Fragment key={p.personId}>
+              {i ? <Hairline /> : null}
+              <Pressable accessibilityRole="button" accessibilityLabel={`${p.name}, owes ${ctx.format.currency(p.owed)}`} onPress={() => pick(p.personId, p.name)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, opacity: pressed ? 0.7 : 1 })}>
+                <Disc name={p.name} colorKey={p.personId} />
+                <Text variant="rowTitle" numberOfLines={1} style={{ flex: 1 }}>{p.name}</Text>
+                <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '700', fontVariant: ['tabular-nums'], color: t.c.accent.gold }}>{ctx.format.currency(p.owed)}</Text>
+              </Pressable>
+            </React.Fragment>
+          ))}
+        </View>
+      </Sheet>
     </View>
   );
 }

@@ -57,6 +57,25 @@ export function recordPayment(os: LifeOSContext, appearanceId: string, input: { 
   return item;
 }
 
+/**
+ * Part of what someone owes, over their open shares oldest first (as Turf web's
+ * Dues does it): each takes what it still owes, the last takes anything over,
+ * which then waits there as credit. `appearanceIds` oldest first; rupees.
+ */
+export function payPart(os: LifeOSContext, appearanceIds: string[], amount: number): OutboxItem<TurfAction>[] {
+  if (!(amount > 0)) throw new Error('Enter an amount above ₹0');
+  const shares = appearanceIds.map((id) => os.records.get<AppearanceData>(id)).filter((a): a is NonNullable<typeof a> => !!a);
+  let left = Math.round(amount * 100) / 100;
+  const items: OutboxItem<TurfAction>[] = [];
+  for (const [i, a] of shares.entries()) {
+    const part = i === shares.length - 1 ? left : Math.min(left, owedOn(a.data));
+    if (part <= 0) continue;
+    items.push(recordPayment(os, a.id, { amount: part, note: 'Part payment' }));
+    left = Math.round((left - part) * 100) / 100;
+  }
+  return items;
+}
+
 /** What's still owed on the share, as one payment. Null when nothing is owed. */
 export function markPaid(os: LifeOSContext, appearanceId: string): OutboxItem<TurfAction> | null {
   const a = os.records.get<AppearanceData>(appearanceId);

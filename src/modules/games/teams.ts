@@ -9,9 +9,8 @@ import { DEFAULT_KITS, defaultFormation, kitOf, type Kit } from './kits';
  * Teams (docs/MODEL.md layer 3, *Match*; R9c.4): Turf web's ratings and team
  * generator (copied in ratings.ts / balance.ts) fed from the records here, so
  * Suggest teams works offline and gives the split Turf web would. Players are
- * keyed by their Person. Turf web doesn't sync "play well with" picks, side
- * wishes or kit votes yet, so here the generator balances on ratings,
- * positions and chemistry alone.
+ * keyed by their Person. "Plays well with" picks, side wishes and kit wishes
+ * come from Turf web's sync (its migration 0029) and break ties, as there.
  */
 
 const live = <T>(rs: ObjectRecord<T>[]) => rs.filter((r) => !r.archived);
@@ -38,8 +37,25 @@ export function ratingPlayer(p: PlayerProfileData): RatingPlayer {
 }
 
 /** A Game and its Appearances as the ratings and the generator read them. */
-export function ratingGame(g: ObjectRecord<GameData>, apps: AppearanceData[], nameOf: (personId: string) => string): RatingGame & RatedGame {
+/** Best on each side by their teammates' votes, once counted, a clear leader only (Turf web's teamBestOf). `personOf`: Turf web player id → Person. */
+export function teamBestOf(g: GameData, apps: Array<Pick<AppearanceData, 'personId' | 'team'>>, personOf: Map<string, string>): string[] {
+  if (!g.potmSettled || !g.teamVotes) return [];
+  const n = new Map<string, number>();
+  for (const nominee of Object.values(g.teamVotes)) {
+    const pid = personOf.get(nominee);
+    if (pid) n.set(pid, (n.get(pid) ?? 0) + 1);
+  }
+  const out: string[] = [];
+  for (const side of ['A', 'B']) {
+    const list = [...n.entries()].filter(([id]) => apps.some((a) => a.personId === id && a.team === side)).sort((a, b) => b[1] - a[1]);
+    if (list.length && (!list[1] || list[1][1] < list[0]![1])) out.push(list[0]![0]);
+  }
+  return out;
+}
+
+export function ratingGame(g: ObjectRecord<GameData>, apps: AppearanceData[], nameOf: (personId: string) => string, personOf?: Map<string, string>): RatingGame & RatedGame {
   return {
+    teamBest: personOf ? teamBestOf(g.data, apps, personOf) : [],
     id: g.id,
     date: g.data.date,
     sideSize: g.data.sideSize ?? null,
@@ -72,9 +88,10 @@ export function squadData(os: LifeOSContext, before?: ObjectRecord<GameData>) {
   for (const a of apps) byGame.set(a.data.gameId, [...(byGame.get(a.data.gameId) ?? []), a.data]);
   const names = new Map(profiles.map((p) => [p.data.personId, p.data.name]));
   const nameOf = (id: string) => names.get(id) ?? os.records.get(id)?.title ?? 'Player';
+  const personOf = new Map(profiles.map((p) => [p.data.sourceKey?.replace('turf:players:', '') ?? '', p.data.personId]));
   const history = games
     .filter((g) => !before || (g.id !== before.id && g.data.date <= before.data.date))
-    .map((g) => ratingGame(g, byGame.get(g.id) ?? [], nameOf));
+    .map((g) => ratingGame(g, byGame.get(g.id) ?? [], nameOf, personOf));
   return { players: profiles.map((p) => ratingPlayer(p.data)), history, profiles };
 }
 
@@ -112,8 +129,19 @@ export function suggestTeams(os: LifeOSContext, gameId: string, random?: () => n
   const squad = side.map((a) => byPerson.get(a.data.personId)).filter((p): p is RatingPlayer => !!p);
   if (squad.length < 2) return null;
   const rated = rateSquad(players, history).players;
+  // Wishes, as Turf web feeds its generator: "plays well with", the side asked for, the kit wished for; they only break ties.
+  const profiles = live(os.records.query<PlayerProfileData>('player', {}, { limit: 100_000 }));
+  const personOf = new Map(profiles.map((p) => [p.data.sourceKey?.replace('turf:players:', '') ?? '', p.data.personId]));
+  const byTurf = <V,>(m: Record<string, V> | undefined) => Object.fromEntries(Object.entries(m ?? {}).flatMap(([id, v]) => (personOf.get(id) ? [[personOf.get(id)!, v]] : []))) as Record<string, V>;
+  const wishes = profiles.flatMap((p) => (p.data.partners ?? []).flatMap((id): Array<[string, string]> => (personOf.get(id) ? [[p.data.personId, personOf.get(id)!]] : [])));
+  const kits = kitsOf(g.data);
+  const darkSide = kits.A.ink === 'light' && kits.B.ink === 'dark' ? 'A' : kits.B.ink === 'light' && kits.A.ink === 'dark' ? 'B' : null;
   const result = generateBestBalance(squad, history, {}, {
     ratings: new Map(squad.map((p) => [p.id, { overall: rated.get(p.id)?.overall ?? 60, provisional: rated.get(p.id)?.provisional ?? true }])),
+    wishes,
+    sides: byTurf(g.data.sides),
+    kits: byTurf(g.data.kitPicks),
+    darkSide,
     random,
   });
   if (!result) return null;
@@ -126,4 +154,35 @@ export function shuffleTeams(apps: Array<ObjectRecord<AppearanceData>>, keeper: 
   const pool = [...apps].sort(() => random() - 0.5);
   const order = [...pool.filter((a) => keeper(a.data)), ...pool.filter((a) => !keeper(a.data))];
   return Object.fromEntries(order.map((a, i) => [a.id, i % 2 === 0 ? 'A' : 'B']));
+}
+
+/**
+ * Auto-pick up to `expected` (Turf web's New match, docs/RATINGS.md): who said
+ * In, keepers until there are two, who said Maybe, last match's players, then
+ * most appearances; only those available. Takes and returns Player profile ids.
+ */
+export function autoPick(os: LifeOSContext, picked: string[], expected: number, gameId?: string): string[] {
+  const everyone = live(os.records.query<PlayerProfileData>('player', {}, { limit: 100_000 }));
+  const profiles = everyone.filter((p) => p.data.availability === 'AVL');
+  const games = live(os.records.query<GameData>('game', {}, { limit: 100_000 })).filter((g) => g.id !== gameId).sort((a, b) => b.data.date.localeCompare(a.data.date));
+  const apps = live(os.records.query<AppearanceData>('appearance', {}, { limit: 100_000 })).filter((a) => a.data.attendance !== 'no_show');
+  const count = new Map<string, number>();
+  for (const a of apps) count.set(a.data.personId, (count.get(a.data.personId) ?? 0) + 1);
+  const last = new Set(apps.filter((a) => a.data.gameId === games[0]?.id).map((a) => a.data.personId));
+  const said = gameId ? os.records.get<GameData>(gameId)?.data.rsvps ?? {} : {};
+  const turfId = (p: (typeof profiles)[number]) => p.data.sourceKey?.replace('turf:players:', '') ?? '';
+  const byApps = [...profiles].sort((a, b) => (count.get(b.data.personId) ?? 0) - (count.get(a.data.personId) ?? 0));
+  const keeper = (p: (typeof profiles)[number]) => /goal|^gk$/i.test(p.data.position ?? '');
+  const have = new Set(picked);
+  const add: string[] = [];
+  const take = (id: string) => {
+    if (!have.has(id) && !add.includes(id) && have.size + add.length < expected) add.push(id);
+  };
+  for (const p of profiles) if (said[turfId(p)] === 'going') take(p.id);
+  const keepers = () => [...have, ...add].filter((id) => everyone.some((x) => x.id === id && keeper(x))).length;
+  for (const p of byApps) if (keeper(p) && keepers() < 2) take(p.id);
+  for (const p of profiles) if (said[turfId(p)] === 'maybe') take(p.id);
+  for (const p of profiles) if (last.has(p.data.personId)) take(p.id);
+  for (const p of byApps) take(p.id);
+  return add;
 }

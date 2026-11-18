@@ -80,6 +80,46 @@ export function payeeFor(os: LifeOSContext, name: string | null | undefined, vpa
   return { id: e.id, type: 'org', created: true, guess: null, confidence: 1 };
 }
 
+/** What an older parser left on a payee's name: "Playo Refno 387827321234", "Piyush Sunil If not u?". */
+const NAME_JUNK = /\s+(?:refno|ref\s*no\.?|ref\b|utr\b|rrn\b|if not u\b|upi\s*ref\b).*$|\s+\d{6,}.*$/i;
+
+/**
+ * Once (15 Nov): payees an older parser named with a reference number get their
+ * name back, a copy of one that exists is merged into it (links and UPI ids
+ * move), and the payments named after the old name take the clean one.
+ */
+export function tidyPayeeNames(os: LifeOSContext): number {
+  if (!os.registry.objects.has('org')) return 0;
+  const orgs = os.records.query<{ upi?: string }>('org', {}, { limit: 5000 });
+  let n = 0;
+  for (const o of orgs) {
+    if (!NAME_JUNK.test(o.title)) continue;
+    const clean = o.title.replace(NAME_JUNK, '').trim();
+    if (!clean) continue;
+    const into = orgs.find((x) => x.id !== o.id && !NAME_JUNK.test(x.title) && norm(x.title) === norm(clean) && os.records.get(x.id));
+    const target = into ?? o;
+    os.db.transaction(() => {
+      for (const { relation, other, direction } of os.links.forEntity(o.id)) {
+        if (other.object === 'transaction') {
+          const tx = os.records.get(other.id);
+          if (tx && tx.title === o.title) os.records.update(tx.id, { title: into ? into.title : clean }, 'system');
+        }
+        if (!into) continue;
+        if (direction === 'in') os.links.link(other.id, into.id, relation.kind, relation.meta, 'system');
+        else os.links.link(into.id, other.id, relation.kind, relation.meta, 'system');
+        os.links.remove(relation.id, 'system');
+      }
+      if (into) {
+        const upi = [into.data.upi, o.data.upi].filter(Boolean).join(', ');
+        if (upi && upi !== into.data.upi) os.records.update(into.id, { data: { upi } }, 'system');
+        os.records.delete(o.id, 'system');
+      } else os.records.update(target.id, { title: clean }, 'system');
+    });
+    n++;
+  }
+  return n;
+}
+
 /** Link a payment to its payee (people as 'person', everyone else as 'payee'), remembering what the message called them. */
 export function linkPayee(os: LifeOSContext, txId: string, m: PayeeMatch, said: string | null, vpa: string | null, source = 'sms') {
   const kind = m.type === 'person' ? 'person' : 'payee';
@@ -229,4 +269,56 @@ export function keepWhoAsOrg(os: LifeOSContext, filingId: string): string | null
     os.filings.setChecked(filingId);
   });
   return orgId;
+}
+
+/* ------------------------------------------------------------------ */
+/* Your own name (10 Nov): money to or from it is a transfer.           */
+/* ------------------------------------------------------------------ */
+
+const MY_NAMES = 'finance.myNames';
+
+/** The names your banks write for you, each as lower-case words ("rutvij anil mahakale"). */
+export const myNames = (os: LifeOSContext): string[] => os.settings.get<string[]>(MY_NAMES, []);
+
+/** Banks cut names short ("RUTVIJ ANIL MAHA", "RUTVIJ AN", "Mr RUTVIJ"): yours when the first word is yours and every word after starts the next of yours. */
+export function isMyName(os: LifeOSContext, said: string | null | undefined): boolean {
+  const a = tokens(said ?? '');
+  if (!a.length) return false;
+  return myNames(os).some((n) => {
+    const b = n.split(' ');
+    return a.length <= b.length && a[0] === b[0] && a.every((w, i) => b[i]!.startsWith(w));
+  });
+}
+
+/**
+ * "That's me" on a payment: the name the bank wrote is yours. It is kept (a
+ * longer one replaces a shorter one it covers), and this payment and every one
+ * to or from that name become transfers between your accounts. Returns what
+ * Undo needs.
+ */
+export function learnMyName(os: LifeOSContext, said: string): { name: string; before: string[]; changed: Array<{ id: string; kind: string; category: string; accountId?: string }> } {
+  const name = tokens(said).join(' ');
+  const before = myNames(os);
+  const covers = (long: string, short: string) => short.split(' ').every((w, i) => long.split(' ')[i]?.startsWith(w));
+  const kept = before.filter((n) => !covers(name, n));
+  os.settings.set(MY_NAMES, kept.some((n) => covers(n, name)) ? kept : [...kept, name]);
+  const changed: Array<{ id: string; kind: string; category: string; accountId?: string }> = [];
+  os.db.transaction(() => {
+    for (const t of os.records.query<{ merchant?: string; kind: string; category: string; accountId?: string }>('transaction', {}, { limit: 50_000 })) {
+      if ((t.data.kind !== 'expense' && t.data.kind !== 'income') || !isMyName(os, t.data.merchant)) continue;
+      changed.push({ id: t.id, kind: t.data.kind, category: t.data.category, accountId: t.data.accountId });
+      // Money from yourself arrives at this account; money to yourself leaves it.
+      const arrives = t.data.kind === 'income';
+      os.records.update(t.id, { data: { kind: 'transfer', category: 'transfer', accountId: arrives ? undefined : t.data.accountId, toAccountId: arrives ? t.data.accountId : undefined } }, 'user');
+    }
+  });
+  return { name, before, changed };
+}
+
+/** Undo "That's me": the names as they were, the payments back to what they were. */
+export function unlearnMyName(os: LifeOSContext, u: ReturnType<typeof learnMyName>): void {
+  os.db.transaction(() => {
+    os.settings.set(MY_NAMES, u.before);
+    for (const c of u.changed) if (os.records.get(c.id)) os.records.update(c.id, { data: { kind: c.kind, category: c.category, accountId: c.accountId, toAccountId: undefined } }, 'user');
+  });
 }

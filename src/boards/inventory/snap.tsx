@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { File } from 'expo-file-system';
 import type { LifeOSContext } from '@core/registry/context';
 import { askWithPhoto } from '@core/brain';
+import { PHOTO_MODEL } from '@core/ai/brainModel';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Icon, IconButton, Screen, Sheet, Text, useToast } from '@ui/kit';
 import { fonts } from '@ui/theme/tokens';
@@ -69,7 +70,7 @@ export function FridgeSnap({ ctx }: { ctx: LifeOSContext; params: Record<string,
     if (a.base64.length > MAX_BASE64) return setPhase({ at: 'failed', uri: a.uri, why: 'That photo is too big to send. Try again from a little further back.' });
     setAnswers({});
     setPhase({ at: 'reading', uri: a.uri });
-    const model = (await ctx.device?.brain?.model()) ?? null;
+    const model = (await ctx.device?.brain?.model(PHOTO_MODEL)) ?? null;
     const mediaType = a.mimeType === 'image/png' || a.mimeType === 'image/webp' ? a.mimeType : 'image/jpeg';
     const res = await askWithPhoto(ctx, model, { ...q.ask, image: { mediaType, data: a.base64 } });
     if (!res.ok) return setPhase({ at: 'failed', uri: a.uri, why: WHY[res.note] ?? WHY.error! });

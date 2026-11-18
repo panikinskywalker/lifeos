@@ -233,6 +233,9 @@ function LinksSection({ e, controls }: { e: Delivery; controls?: RecordControls 
       return x?.amount != null ? os.format.currency(x.amount, x.currency) : null;
     };
     const rows = linkGroups(os, e.id).flatMap((g) => g.items.map((i) => ({ word: i.id === e.data.shopId ? 'FROM' : i.id === e.data.paymentId ? 'ORDER' : g.word.toUpperCase(), id: i.id, type: i.type, title: i.title, line: line(i.type, i.id), amount: i.type === 'transaction' ? money(i.id) : null })));
+    // Payments are audit trail, not Links (MODEL.md layer 5), so the order's own payment is shown from its Order field.
+    const pay = e.data.paymentId ? os.records.get(e.data.paymentId) : null;
+    if (pay && !rows.some((r) => r.id === pay.id)) rows.push({ word: 'ORDER', id: pay.id, type: pay.object, title: pay.title, line: line(pay.object, pay.id), amount: money(pay.id) });
     const words = [...new Set(rows.map((r) => r.word))].sort((a, b) => Number(b === 'FROM') - Number(a === 'FROM') || Number(b === 'ORDER') - Number(a === 'ORDER'));
     return words.map((word) => ({ word, rows: rows.filter((r) => r.word === word) }));
   }, [e.id, e.data.shopId, e.data.paymentId]);

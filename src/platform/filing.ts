@@ -17,6 +17,8 @@ import { buildAgentFromSettings } from './agentProvider';
  * sentences with no key at all.
  */
 let running: Promise<void> | null = null;
+/** Work arrived while a run was going (a dump saved just after the screen started one): run once more after it. */
+let again = false;
 let wake: ReturnType<typeof setTimeout> | null = null;
 let retry: ReturnType<typeof setTimeout> | null = null;
 const RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000];
@@ -35,8 +37,14 @@ export function saveDump(os: LifeOSContext, body: string, source: DumpSource = '
  * resetting). Also runs on every app foreground and from the background task.
  */
 export function runFiling(os: LifeOSContext): Promise<void> {
-  if (running) return running;
+  if (running) {
+    again = true;
+    return running;
+  }
   running = (async () => {
+    // Start on the next tick: with nothing due the run would finish synchronously, its finally clearing
+    // `running` before this assignment, leaving a settled promise that every later call returned (dumps stuck on "Reading it…").
+    await null;
     try {
       // Once a day, logged: To check auto-approve and dumps cleared (15 days), the 60-day clean-up (MODEL layer 6, R15).
       pruneIfDue(os);
@@ -60,6 +68,10 @@ export function runFiling(os: LifeOSContext): Promise<void> {
       console.warn('[dumps] extraction failed', (e as Error).message);
     } finally {
       running = null;
+      if (again) {
+        again = false;
+        void runFiling(os);
+      }
     }
   })();
   return running;

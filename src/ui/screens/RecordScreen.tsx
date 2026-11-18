@@ -20,6 +20,7 @@ import { persistAttachment } from '../lib/files';
 import { CyclesSection, MeterSheet } from '../components/cycles';
 import { backlinks } from '@core/links';
 import { LinksCard, LinkSheet } from '../components/LinksCard';
+import { trailOf } from '@core/graph/view';
 
 type Panel = null | 'menu' | 'status' | 'remind' | 'attach' | 'link' | 'tags' | 'cover' | 'meter';
 
@@ -499,24 +500,33 @@ function FactsCard({ entity }: { entity: ObjectRecord }) {
 function TimelineCard({ entity, tint }: { entity: ObjectRecord; tint: TintKey }) {
   const os = useOS();
   const t = useTheme();
-  const events = useLive((o) => o.records.timeline.forEntity(entity.id, 60), [entity.id]);
+  const own = useLive((o) => o.records.timeline.forEntity(entity.id, 60), [entity.id]);
+  // Payments are this record's audit trail (MODEL.md layer 5): each an Event here, not a Link; their "Linked from" lines give way to them.
+  const trail = useLive((o) => trailOf(o, entity.id, 60), [entity.id]);
   const [all, setAll] = useState(false);
+  const trailIds = new Set(trail.map((x) => x.id));
+  const dot = (actor: string) => (actor === 'assistant' ? t.tints.memory.ink : actor === 'automation' ? t.tints.tasks.ink : t.tints[tint].ink);
+  const money = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${os.format.currency(Math.abs(n))}`;
+  const events = [
+    ...own
+      .filter((e) => !(e.kind === 'relation' && (trailIds.has(String((e.meta as { toId?: string }).toId)) || trailIds.has(String((e.meta as { fromId?: string }).fromId)))))
+      .map((e) => ({
+        at: e.occurredAt,
+        id: e.id,
+        title: e.title,
+        body: [os.format.dateTime(e.occurredAt), e.body].filter(Boolean).join(' · '),
+        meta: e.actor === 'assistant' ? 'agent' : e.actor === 'automation' ? 'automation' : undefined,
+        value: typeof (e.meta as { cost?: number })?.cost === 'number' ? os.format.currency((e.meta as { cost: number }).cost) : undefined,
+        color: dot(e.actor),
+      })),
+    ...trail.map((x) => ({ at: x.at, id: `pay:${x.id}`, title: x.title, body: [os.format.dateTime(x.at), x.line].filter(Boolean).join(' · '), meta: 'payment', value: x.amount != null ? money(x.amount) : undefined, color: t.tints.finance.ink })),
+  ].sort((a, b) => b.at - a.at);
   if (!events.length) return null;
   const shown = all ? events : events.slice(0, 6);
-  const dot = (actor: string) => (actor === 'assistant' ? t.tints.memory.ink : actor === 'automation' ? t.tints.tasks.ink : t.tints[tint].ink);
   return (
     <Section title="Recent" meta="timeline" action={events.length > 6 ? (all ? 'Less' : `All ${events.length}`) : undefined} onAction={() => setAll((a) => !a)}>
       <Card>
-        <Timeline
-          entries={shown.map((e) => ({
-            id: e.id,
-            title: e.title,
-            body: [os.format.dateTime(e.occurredAt), e.body].filter(Boolean).join(' · '),
-            meta: e.actor === 'assistant' ? 'agent' : e.actor === 'automation' ? 'automation' : undefined,
-            value: typeof (e.meta as { cost?: number })?.cost === 'number' ? os.format.currency((e.meta as { cost: number }).cost) : undefined,
-            color: dot(e.actor),
-          }))}
-        />
+        <Timeline entries={shown.map(({ at: _at, ...e }) => e)} />
       </Card>
     </Section>
   );

@@ -14,6 +14,19 @@ import type { PlayerProfileData } from './types';
 
 export const SETTING_SUBMISSIONS = 'turf.submissions';
 export const SETTING_AUDIT = 'turf.audit';
+export const SETTING_SEASONS = 'turf.seasons';
+
+/** Turf web's seasons (its migration 0030), oldest first: "Monsoon 2026" from a day, to a day or still running. */
+export interface TurfSeason {
+  id: string;
+  name: string;
+  startsOn: string;
+  endsOn: string | null;
+}
+const todayIndia = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+/** Seasons that have started, and the one running today (Turf web's startedSeasons / currentSeason). */
+export const startedSeasons = (os: LifeOSContext) => os.settings.get<TurfSeason[]>(SETTING_SEASONS, []).filter((s) => s.startsOn <= todayIndia());
+export const currentSeason = (seasons: TurfSeason[]) => seasons.find((s) => s.startsOn <= todayIndia() && (!s.endsOn || s.endsOn >= todayIndia())) ?? null;
 const AUDIT_MAX = 300;
 
 export interface TurfSubmission {
@@ -40,6 +53,8 @@ export interface AuditEntry {
   playerId: string | null;
   undone: boolean;
   undoOf: string | null;
+  /** False when Turf web can't undo it (a change logged with no target, like a match edit). */
+  undoable?: boolean;
 }
 
 type Row = Record<string, unknown>;
@@ -70,12 +85,23 @@ export const SUBMISSION_FIELDS: Array<{ key: string; label: string; profile?: ke
   { key: 'supportedCountries', label: 'Countries', profile: 'countries' },
   { key: 'kitColors', label: 'Kit colours', profile: 'kitColors' },
   { key: 'photoKey', label: 'Photo' },
+  // Their own ratings, 1 to 5 (Turf web's form); the profile may hold them out of 100.
+  { key: 'pace', label: 'Pace', profile: 'pace' },
+  { key: 'stamina', label: 'Stamina', profile: 'stamina' },
+  { key: 'defending', label: 'Defending', profile: 'defending' },
+  { key: 'passing', label: 'Passing', profile: 'passing' },
+  { key: 'dribbling', label: 'Dribbling', profile: 'dribbling' },
+  { key: 'shooting', label: 'Shooting', profile: 'shooting' },
 ];
+const RATINGS = new Set(['pace', 'stamina', 'defending', 'passing', 'dribbling', 'shooting']);
 
 /** What a submission would change: field, now, submitted. */
 export function submissionChanges(s: TurfSubmission, profile?: PlayerProfileData, person?: { phone?: string; email?: string; upi?: string }) {
   const now = (key: string, field?: keyof PlayerProfileData) => {
-    if (field && profile) return profile[field] as string | undefined;
+    if (field && profile) {
+      const v = profile[field] as string | number | undefined;
+      return RATINGS.has(key) && typeof v === 'number' && v > 5 ? String(Math.round(v / 20)) : (v as string | undefined);
+    }
     if (key === 'phone') return person?.phone;
     if (key === 'email') return person?.email;
     if (key === 'paymentId') return person?.upi;
@@ -116,11 +142,19 @@ export function applyInbox(os: LifeOSContext, page: { tables: Partial<Record<str
   }
   os.settings.set(SETTING_SUBMISSIONS, subs);
 
+  const seasons = new Map(os.settings.get<TurfSeason[]>(SETTING_SEASONS, []).map((x) => [x.id, x]));
+  for (const r of page.tables.seasons ?? []) {
+    const id = String(r.id);
+    seasons.set(id, { id, name: str(r, 'name') ?? 'Season', startsOn: str(r, 'starts_on') ?? '', endsOn: str(r, 'ends_on') });
+  }
+  for (const d of page.deleted) if (d.table === 'seasons') seasons.delete(d.key);
+  os.settings.set(SETTING_SEASONS, [...seasons.values()].sort((a, b) => a.startsOn.localeCompare(b.startsOn)));
+
   const audit = os.settings.get<AuditEntry[]>(SETTING_AUDIT, []);
   const byId = new Map(audit.map((a) => [a.id, a]));
   for (const r of page.tables.change_log ?? []) {
     const id = String(r.id);
-    byId.set(id, { id, at: str(r, 'created_at') ?? '', kind: (str(r, 'kind') ?? 'match') as AuditEntry['kind'], summary: str(r, 'summary') ?? '', actor: str(r, 'actor'), device: str(r, 'device'), gameId: str(r, 'game_id'), playerId: str(r, 'player_id'), undone: !!r.undone_at, undoOf: str(r, 'undo_of') });
+    byId.set(id, { id, at: str(r, 'created_at') ?? '', kind: (str(r, 'kind') ?? 'match') as AuditEntry['kind'], summary: str(r, 'summary') ?? '', actor: str(r, 'actor'), device: str(r, 'device'), gameId: str(r, 'game_id'), playerId: str(r, 'player_id'), undone: !!r.undone_at, undoOf: str(r, 'undo_of'), undoable: !String(r.target ?? '').includes('"none"') });
   }
   for (const d of page.deleted) if (d.table === 'change_log') byId.delete(d.key);
   os.settings.set(SETTING_AUDIT, [...byId.values()].sort((a, b) => b.at.localeCompare(a.at)).slice(0, AUDIT_MAX));

@@ -860,4 +860,23 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_brain_sent_at ON brain_sent(at)`,
     ],
   },
+  {
+    version: 17,
+    name: 'message_samples',
+    // docs/MODEL.md layer 4, Message samples: one masked example per shape, per sender.
+    up: [
+      `CREATE TABLE IF NOT EXISTS message_samples (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        sender TEXT NOT NULL,
+        title TEXT,
+        text TEXT NOT NULL,
+        module TEXT,
+        seen INTEGER NOT NULL DEFAULT 1,
+        first_at INTEGER NOT NULL,
+        last_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_message_samples_sender ON message_samples(sender, last_at)`,
+    ],
+  },
 ];

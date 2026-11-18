@@ -3,6 +3,8 @@ import { cycleNudges } from '../cycles/nudges';
 import { upkeep } from '../cycles/upkeep';
 import { daily, formatMetric, isoDay, spendPace } from '../dashboard/metrics';
 import { goals, myDay } from '../dashboard/day';
+import { briefOff } from '../brain/brief';
+import { isModuleShown } from '../registry/shown';
 
 /**
  * What the phone should notify, and when (M5): reminders, upkeep nudges and
@@ -74,7 +76,8 @@ export function morningBrief(os: LifeOSContext, at: number): { title: string; bo
   const day = isoDay(at);
   const g = Object.fromEntries(goals(os, at).map((x) => [x.id, x]));
   const lines: string[] = [];
-  if (os.registry.objects.has('measurement')) {
+  const off = briefOff(os);
+  if (os.registry.objects.has('measurement') && !off.has('health') && isModuleShown(os, 'health')) {
     const slept = daily(os, 'sleep', day, day).get(day);
     if (slept != null) lines.push(`Slept ${fmtH(slept)}${g.sleep ? ` (goal ${fmtH(g.sleep.target)})` : ''}`);
     if (g.steps) lines.push(`Steps goal: ${formatMetric('steps', g.steps.target, os.format.currency)}`);
@@ -87,7 +90,7 @@ export function morningBrief(os: LifeOSContext, at: number): { title: string; bo
       .join(', ');
     lines.push(`${items.length} thing${items.length === 1 ? '' : 's'} today: ${first}${items.length > 3 ? '…' : ''}`);
   }
-  if (os.registry.objects.has('transaction')) {
+  if (os.registry.objects.has('transaction') && !off.has('finance')) {
     const p = spendPace(os, at);
     if (p.spent > 0) {
       const diff = p.usualByToday != null ? p.spent - p.usualByToday : null;

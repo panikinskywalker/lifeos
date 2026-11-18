@@ -7,6 +7,7 @@ import { childPlaces, distanceKm, homePlace, lastBeen, orgsAt, parentChain, spen
 import { useLive } from '@ui/hooks';
 import { RowItem, RowList, Section, StatTrio } from '@ui/kit';
 import { kindIcon, kindLabel, PlaceCard, PlaceMap } from './art';
+import { spentOf } from '@core/dashboard/money';
 
 /** Place and Organisation record sections (R3): the Place · card and the map on top; visits, what is inside and who is here below. */
 
@@ -116,11 +117,11 @@ export function OrgSection({ entity, ctx }: Props) {
       let monthTotal = 0;
       for (const r of os.links.forEntity(o.id, 'payee')) {
         if (r.direction !== 'in' || r.other.object !== 'transaction') continue;
-        const t = os.records.get<{ amount?: number; kind?: string; date?: string }>(r.other.id);
+        const t = os.records.get<{ amount?: number; share?: number; kind?: string; date?: string }>(r.other.id);
         if (!t || t.data.kind !== 'expense') continue;
-        total += t.data.amount ?? 0;
+        total += spentOf(t.data);
         count++;
-        if ((t.data.date ?? '') >= month) monthTotal += t.data.amount ?? 0;
+        if ((t.data.date ?? '') >= month) monthTotal += spentOf(t.data);
       }
       const at = o.data.placeId ? os.records.get<PlaceData>(o.data.placeId) : undefined;
       const mails = os.records.timeline.forEntity(o.id).filter((t) => t.kind === 'email').length;

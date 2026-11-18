@@ -6,9 +6,73 @@ import { monthlySubscriptionCost, netWorthSeries, subscriptionRunRate } from './
 import { spendQuery, type SpendKind, type SpendPeriod } from './spend';
 import type { InvestmentData } from './types';
 import { applySplit, balanceWith, balances, clearSplit, settleUp, undoSettle } from './split';
+import { answerMoney, readMoneyQuestion, type MoneyQuestion } from './answers';
+import { BLOCKS, PERIODS, runQuery, type MoneyQuery } from './ask';
+import { personToken, roundMoney, unmask } from '@core/ai/privacy';
+import { peopleNames } from './filing/moneyIn';
 
 /** Finance tools for the agent (no React Native — unit-tested). */
 export const financeAiTools: AiToolDef[] = [
+    {
+      name: 'money_answer',
+      description: 'An everyday money question worked out on the phone: where the money went, spend on a category or at a merchant, income, biggest spends, balances, net worth, subscriptions, investments, what is due before payday and what is left, anything charged twice, whether an amount is affordable.',
+      input: z.object({ question: z.string() }),
+      answers: (question) => (readMoneyQuestion(question) ? { question } : null),
+      run: async (input, os) => {
+        const q: MoneyQuestion | null = readMoneyQuestion((input as { question: string }).question);
+        if (!q) return { answer: null };
+        const { answer, card } = answerMoney(os, q);
+        return withExtras({ answer }, { card });
+      },
+    },
+    {
+      name: 'money_query',
+      description: 'Work out one money figure on the phone: what to count (spent, came_in, or bills due before payday), the period (month = this month so far, last_month, 3_months, year, all), optionally split by day, week, month, category or payee, only some categories (category values), a payee name, or categories to leave out. Returns the total, the groups and the payments behind it (payee, amount, date, category).',
+      input: z.object({
+        measure: z.enum(['spent', 'came_in', 'bills']),
+        period: z.enum(PERIODS as [SpendPeriod, ...SpendPeriod[]]).default('month'),
+        by: z.enum(['day', 'week', 'month', 'category', 'payee']).optional(),
+        only: z.array(z.string()).optional(),
+        payee: z.string().optional(),
+        leaveOut: z.array(z.string()).optional(),
+        sort: z.enum(['newest', 'largest']).optional(),
+      }),
+      // Through the privacy gate (docs/MODEL.md): amounts rounded, people as placeholders; a placeholder it filters by is put back first.
+      run: async (input, os) => {
+        const q = input as MoneyQuery;
+        const f = runQuery(os, q.payee ? { ...q, payee: unmask(os, q.payee) } : q);
+        const people = new Set(peopleNames(os).map((n) => n.toLowerCase()));
+        const name = (s: string) => (people.has(s.toLowerCase()) ? personToken(os, s) : s);
+        return {
+          label: f.label,
+          total: roundMoney(f.total),
+          sameDaysBefore: f.before != null ? roundMoney(f.before) : null,
+          groups: f.groups.slice(0, 15).map((g) => ({ label: q.by === 'payee' ? name(g.label) : g.label, value: roundMoney(g.value) })),
+          count: f.rows.length || f.bills.length,
+          payments: f.rows.slice(0, 30).map((t) => ({ payee: name(t.title || t.data.merchant || ''), amount: roundMoney(t.data.amount), date: t.data.date, category: t.data.category })),
+          due: f.bills.map((b) => ({ title: name(b.title), amount: roundMoney(b.amount), due: b.due })),
+        };
+      },
+    },
+    {
+      name: 'money_show',
+      description: 'End every Money answer with this, once: one or two plain sentences, the block to show (number, bars, line, calendar, list) with a short title, and the money query behind it (same fields as money_query). The phone works the figures out and shows the payments behind them.',
+      input: z.object({
+        sentence: z.string(),
+        block: z.enum(BLOCKS as [string, ...string[]]),
+        title: z.string(),
+        query: z.object({
+          measure: z.enum(['spent', 'came_in', 'bills']),
+          period: z.enum(PERIODS as [SpendPeriod, ...SpendPeriod[]]).default('month'),
+          by: z.enum(['day', 'week', 'month', 'category', 'payee']).optional(),
+          only: z.array(z.string()).optional(),
+          payee: z.string().optional(),
+          leaveOut: z.array(z.string()).optional(),
+          sort: z.enum(['newest', 'largest']).optional(),
+        }),
+      }),
+      run: async () => ({ shown: true }),
+    },
     {
       name: 'split_transaction',
       description: 'Split an expense with people ("that was dinner with Arjun, split it", "split the cab 3 ways, Priya paid"). parts: everyone sharing it, "me" for the user; method equal | exact (₹) | percent | shares with a value each. payer "me" or a personId. Asks the user before saving.',
@@ -115,7 +179,7 @@ export const financeAiTools: AiToolDef[] = [
       input: z.object({}),
       run: async (_i, os) => {
         const rr = subscriptionRunRate(os);
-        return { monthly: rr.monthly, yearly: rr.yearly, subscriptions: rr.rows.map((r) => ({ id: r.sub.id, name: r.sub.title, perMonth: Math.round(r.perMonth), nextBillingAt: (r.sub.data as { nextBillingAt?: string }).nextBillingAt })) };
+        return { monthly: roundMoney(rr.monthly), yearly: roundMoney(rr.yearly), subscriptions: rr.rows.map((r) => ({ id: r.sub.id, name: r.sub.title, perMonth: roundMoney(r.perMonth), nextBillingAt: (r.sub.data as { nextBillingAt?: string }).nextBillingAt })) };
       },
     },
     {
@@ -125,11 +189,11 @@ export const financeAiTools: AiToolDef[] = [
       run: async (input, os) => {
         const nw = netWorth(os);
         return {
-          total: nw.total,
-          assets: nw.assets,
-          investments: nw.investments,
-          liabilities: nw.liabilities,
-          series: netWorthSeries(os, (input as { months?: number }).months ?? 12).map((p) => ({ month: p.label, total: p.total })),
+          total: roundMoney(nw.total),
+          assets: roundMoney(nw.assets),
+          investments: roundMoney(nw.investments),
+          liabilities: roundMoney(nw.liabilities),
+          series: netWorthSeries(os, (input as { months?: number }).months ?? 12).map((p) => ({ month: p.label, total: roundMoney(p.total) })),
         };
       },
     },
@@ -140,7 +204,7 @@ export const financeAiTools: AiToolDef[] = [
       run: async (_i, os) => {
         if (!os.registry.objects.has('investment')) return { investments: [] };
         const all = os.records.query<InvestmentData>('investment', { filter: { and: [{ field: 'status', op: 'neq', value: 'sold' }] } }, { limit: 500 });
-        const rows = all.map((i) => ({ id: i.id, name: i.title, instrument: i.data.instrument, invested: i.data.invested, currentValue: i.data.currentValue ?? null, gain: i.data.currentValue != null ? Math.round(i.data.currentValue - i.data.invested) : null, sip: i.data.sip ?? null, maturesOn: i.data.maturesOn ?? null }));
+        const rows = all.map((i) => ({ id: i.id, name: i.title, instrument: i.data.instrument, invested: roundMoney(i.data.invested), currentValue: i.data.currentValue != null ? roundMoney(i.data.currentValue) : null, gain: i.data.currentValue != null ? roundMoney(i.data.currentValue - i.data.invested) : null, sip: i.data.sip != null ? roundMoney(i.data.sip) : null, maturesOn: i.data.maturesOn ?? null }));
         const by: Record<string, { invested: number; value: number }> = {};
         for (const r of rows) {
           const b = (by[r.instrument] ??= { invested: 0, value: 0 });

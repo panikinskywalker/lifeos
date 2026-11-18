@@ -12,10 +12,12 @@ import { displayFont, monoFonts } from '@ui/theme/tokens';
 import { Icon, RowItem, RowList, Screen, Section, Text } from '@ui/kit';
 import { usePull } from './useTurfSync';
 import { Crest, Display, Face } from './teams';
-import { Switcher, useCopyShare } from './switcher';
+import { useCopyShare } from './switcher';
 import { NotConnected, type Props, TINT, useBack } from './common';
 import { CopyAllRow, Disc, DueRows, HeaderRight, PillButton, SectionHead, StatTile, TurfCard, day, todayIso } from './dues';
 import { SmsAskCard, SmsPaidCard, SubmissionCard, answeredAsks } from './checkcards';
+import { FlipCard, Pulse } from './motion';
+import { BellButton } from './bell-button';
 
 /**
  * Turf · Noir 1 · Home (TF-Home): the section switcher, money at a glance,
@@ -150,9 +152,12 @@ function Poster() {
           <Crest kit={k.A} size={36} />
           <Crest kit={k.B} size={36} />
         </View>
-        <Display size={20} color={INK}>
-          {day(g.date)}
-        </Display>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Pulse color={INK} />
+          <Display size={20} color={INK}>
+            {day(g.date)}
+          </Display>
+        </View>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
         <View>
@@ -471,15 +476,16 @@ export function Wallet({ games }: { games: WalletGame[] }) {
       {placed.map(({ w, top, flipped, z }) => {
         const p = paletteOf(w.g, w.k, { raised: t.c.bg.tileRaised, pill: t.c.bg.dim, lime: t.c.accent.mustard, fg: t.c.fg.primary, soft: t.c.fg.secondary });
         return (
-          <View
+          <FlipCard
             key={w.id}
-            style={[
-              { position: 'absolute', left: 0, right: 0, top, height: flipped ? BACK_H : FRONT_H, zIndex: z, elevation: flipped ? 16 : 4 + z, shadowColor: '#000' },
-              flipped ? { shadowOpacity: 0.55, shadowRadius: 24, shadowOffset: { width: 0, height: 24 }, borderRadius: 24 } : { shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: -6 } },
-            ]}
-          >
-            {flipped ? <Back w={w} p={p} onClose={() => setOpen(null)} /> : <Front w={w} p={p} onOpen={() => setOpen(w.id)} />}
-          </View>
+            top={top}
+            flipped={flipped}
+            frontH={FRONT_H}
+            backH={BACK_H}
+            style={[{ zIndex: z, elevation: flipped ? 16 : 4 + z, shadowColor: '#000' }, flipped ? { shadowOpacity: 0.55, shadowRadius: 24, shadowOffset: { width: 0, height: 24 }, borderRadius: 24 } : { shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: -6 } }]}
+            front={<Front w={w} p={p} onOpen={() => setOpen(w.id)} />}
+            back={<Back w={w} p={p} onClose={() => setOpen(null)} />}
+          />
         );
       })}
     </View>
@@ -594,8 +600,7 @@ export function TurfHome(_props: Props) {
     );
   }
   return (
-    <Screen title="Turf" subtitle="Browse › Boards" onBack={back} right={<HeaderRight />} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
-      <Switcher active="index" />
+    <Screen title="Turf" subtitle="Browse" onBack={back} right={<HeaderRight><BellButton /></HeaderRight>} refreshControl={<RefreshControl refreshing={busy} onRefresh={() => void pull()} />}>
       {body}
     </Screen>
   );

@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '../registry/context';
 import { metricDays, topApps, usageDays } from '../sources/deviceData';
 import { upkeep, type Upkeep } from '../cycles/upkeep';
+import { MONEY_KINDS_SQL, spentSql } from './money';
 
 /**
  * Today's numbers (M4.3): every tile and full-screen chart reads a metric as
@@ -53,12 +54,13 @@ export function daily(os: LifeOSContext, id: MetricId, from: string, to: string)
   if (id === 'screen') for (const d of usageDays(os, from, to)) out.set(d.day, d.totalMs / 3_600_000);
   else if (id === 'spend') {
     if (!os.registry.objects.has('transaction')) return out;
-    const rows = os.db.all<{ day: string; total: number }>(
-      `SELECT json_extract(data,'$.date') AS day, SUM(json_extract(data,'$.amount')) AS total FROM records
-       WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.kind')='expense' AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY day`,
+    const rows = os.db.all<{ day: string; total: number; n: number }>(
+      `SELECT json_extract(data,'$.date') AS day, SUM(${spentSql()}) AS total, SUM(json_extract(data,'$.kind')='expense') AS n FROM records
+       WHERE object='transaction' AND deleted_at IS NULL AND ${MONEY_KINDS_SQL()} AND json_extract(data,'$.date') BETWEEN ? AND ? GROUP BY day`,
       [from, to],
     );
-    for (const r of rows) out.set(r.day, r.total);
+    // Your share (MODEL layer 2); a day of only refunds or paybacks is no spending, never below zero.
+    for (const r of rows) if (r.n) out.set(r.day, Math.max(0, r.total));
   } else {
     if (!os.registry.objects.has('measurement')) return out;
     for (const r of metricDays(os, id, from, to)) out.set(r.day, r.value);

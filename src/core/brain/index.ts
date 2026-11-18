@@ -4,7 +4,7 @@ export * from './store';
 export * from './runner';
 export * from './brief';
 export { cycleAct, cycleCandidates, upkeepCandidates, UPKEEP } from './upkeep';
-export { askWithPhoto, type PhotoAsk, type PhotoResult } from './photo';
+export { askWithPhoto, mediaTypeOf, type PhotoAsk, type PhotoResult } from './photo';
 export { HOUSE_RULES, systemPrompt } from './prompt';
 export { exportBrain } from './export';
 export { dayMonth, dueWords, inWords, pastDay, plural } from './words';

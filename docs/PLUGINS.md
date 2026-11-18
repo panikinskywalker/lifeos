@@ -74,6 +74,7 @@ interface ObjectDef<T = Record<string, unknown>> {
   cycleFields?: Record<string, { nextDueAt?: string; lastDoneAt?: string; nextDueMeter?: string }>;
   cycleActiveStatuses?: string[];
   meters?: Array<{ meter: string; field: string; label: string; unit: string }>;
+  linkRole?: { aspectOf: string } | { joins: [string, string]; words?: Record<string, string> }; // how Links shows it (R11): a face of the record in that Field (Player profile → Person), or the meeting of two (Appearance: person ↔ game)
 }
 ```
 
@@ -99,7 +100,7 @@ interface ModuleManifest {
   sources?: SourceDef[];               // see Sources below
   filing?: { parsers?: MessageParser[] }; // per-sender: { id, matches(msg), parse(msg) → filed records + confidence }
   filingTools?: (session: GraphSession) => AiToolDef[];
-  aiTools?: AiToolDef[];               // { name, description, input: zod, run, confirm?, describe? }; read and write
+  aiTools?: AiToolDef[];               // { name, description, input: zod, run, confirm?, describe?, answers? }; read and write. answers(question, os): the input to run it with when it can answer on the phone, no model, else null; it returns { answer }
   triggers?: TriggerDef[];             // automation contributions (no UI)
   actions?: ActionDef[];
   templates?: AutomationTemplate[];    // ready-made automations (R10; see Automations)
@@ -310,6 +311,7 @@ interface BoardManifest {
   checkCards?: Record<string, ComponentType<{ filing: Filing }>>; // To check cards for its own filing kinds (Turf's SMS questions; crm's 'payee-who')
   quickActions?: QuickAction[];        // the global "+" menu
   buttons?: ManualRun[];               // not used yet: R10 put the by-hand runs on the Automations board
+  bar?: { tabs: { screen; label; icon; also?: string[] }[]; action?: { label; icon; screen } }; // the bottom bar inside the board: its sections, the raised button its action (Turf); without it the app's bar shows
 }
 ```
 

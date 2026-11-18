@@ -28,6 +28,8 @@ export interface QuickAction {
   run?: (ctx: LifeOSContext) => void | Promise<void>;
   /** Show in the global "+" menu. */
   global?: boolean;
+  /** The board that added it (set when boards register). */
+  board?: string;
 }
 
 /** Automation trigger a module contributes (beyond the generic entity events). */
@@ -102,6 +104,8 @@ export interface AiToolDef {
   confirm?: boolean | ((input: any, os: LifeOSContext) => boolean); // eslint-disable-line @typescript-eslint/no-explicit-any
   /** One line for the confirm card: what will happen, in the user's terms ("Split ₹1,800 at Toit: you and Arjun, ₹900 each"). */
   describe?: (input: any, os: LifeOSContext) => string; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** A question this tool can answer on the phone, no model: the input to run it with, or null. It returns `{ answer }`. */
+  answers?: (question: string, os: LifeOSContext) => Record<string, unknown> | null;
 }
 
 export interface EntityDetailSection {
@@ -165,6 +169,8 @@ export interface BoardScreen {
   key: string;
   title: string;
   component: ComponentType<{ ctx: LifeOSContext; params: Record<string, string> }>;
+  /** A screen with its own box at the bottom (Ask Money) shows no bottom bar. */
+  noBar?: boolean;
 }
 
 /** Per-Object overrides of the generic screens (List, Record, Form, Metric, Links). */
@@ -197,6 +203,14 @@ export interface ManualRun {
   route?: string;
 }
 
+/** A section in a board's bar: the screen it opens, and the deeper screens that keep it lit (Players lights for Leaders). */
+export interface BoardBarTab {
+  screen: string;
+  label: string;
+  icon: string;
+  also?: string[];
+}
+
 export interface BoardManifest {
   id: string;
   name: string;
@@ -206,6 +220,8 @@ export interface BoardManifest {
   placement: 'bar' | 'browse' | 'module';
   /** The module this board is the companion of (its overrides); absent for cross-module boards (today, turf). */
   module?: string;
+  /** A cross-module board is shown when this module is (Turf with games; docs/MODEL.md, Modules shown). */
+  shownWith?: string;
   tiles?: TileDef[];
   screens?: BoardScreen[];
   /** Companion boards: the module's Overview (Browse › module, Today's area card). */
@@ -213,6 +229,13 @@ export interface BoardManifest {
   overrides?: ObjectOverride[];
   quickActions?: QuickAction[];
   buttons?: ManualRun[];
+  /**
+   * The bottom bar inside the board (docs/MODEL.md, The bar inside a board):
+   * its own sections, and its raised button doing `action` in place of Dump
+   * (Turf: Home, Games, + New match, Players, Venues). Without it the app's
+   * own bar shows.
+   */
+  bar?: { tabs: BoardBarTab[]; action?: { label: string; icon: string; screen: string } };
   /**
    * To check cards for filings of this board's own kinds (Turf: an SMS that
    * may pay a share — Yes / Not this; a friend's profile — Review / Later).

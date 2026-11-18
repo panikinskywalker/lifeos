@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '@core/registry/context';
 import { lastMonths, type ModuleOverview, type OverviewBlock } from '@core/dashboard/overview';
 import { allOrgs, allPlaces, placesBeen } from '@modules/places';
+import { spentSql } from '@core/dashboard/money';
 
 /** Places and organisations at a glance: where you have been this month, who you paid most. */
 export function placesOverview(os: LifeOSContext, now = Date.now()): ModuleOverview {
@@ -11,7 +12,7 @@ export function placesOverview(os: LifeOSContext, now = Date.now()): ModuleOverv
   const been = placesBeen(os, 30, now);
   // Top payees this month: payments linked to each.
   const rows = os.db.all<{ id: string; total: number; n: number }>(
-    `SELECT r.to_id AS id, SUM(json_extract(e.data,'$.amount')) AS total, COUNT(*) AS n FROM links r JOIN records e ON e.id = r.from_id
+    `SELECT r.to_id AS id, SUM(${spentSql('e.data')}) AS total, COUNT(*) AS n FROM links r JOIN records e ON e.id = r.from_id
      WHERE r.kind='payee' AND r.deleted_at IS NULL AND e.deleted_at IS NULL AND e.object='transaction' AND json_extract(e.data,'$.kind')='expense' AND json_extract(e.data,'$.date') BETWEEN ? AND ?
      GROUP BY r.to_id ORDER BY total DESC LIMIT 8`,
     [month!.start, month!.end],

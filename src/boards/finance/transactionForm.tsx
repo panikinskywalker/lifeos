@@ -13,8 +13,11 @@ import { DateField, Icon, IconButton, PickerSheet, Text, useToast } from '@ui/ki
 import { EntityPicker, FieldInput } from '@ui/components/fields';
 import { addCategory } from '@modules/finance/categories';
 import { CATEGORIES, type AccountData, type TransactionData } from '@modules/finance/types';
-import { Caps, Disc, Hairline, Seg, accountIcon, catColor } from './parts';
+import { Caps, Disc, Hairline, accountIcon, catColor } from './parts';
+import { blocks } from '@ui/theme/tokens';
 
+const INK = '#0B0B0D';
+const KIND_COLOR: Record<TransactionData['kind'], string> = { expense: blocks.orange, income: blocks.lime, transfer: blocks.sky, investment: blocks.lilac };
 const KINDS: Array<{ value: TransactionData['kind']; label: string }> = [{ value: 'expense', label: 'Spent' }, { value: 'income', label: 'Received' }, { value: 'transfer', label: 'Transfer' }, { value: 'investment', label: 'Investment' }];
 const QUICK_CATEGORIES = ['food', 'groceries', 'transport', 'shopping', 'utilities', 'subscriptions'];
 const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'AED', 'SGD'];
@@ -136,18 +139,30 @@ export function TransactionForm({ id, initial, onSaved, linkTo }: RecordFormProp
           </Pressable>
         </View>
 
-        <Seg value={d.kind ?? 'expense'} options={KINDS} onChange={(v) => set('kind', v)} track={t.c.bg.tile} fontSize={13} />
-
-        <Labelled label="Amount">
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 76, paddingLeft: 20, paddingRight: 12, borderRadius: 24, backgroundColor: t.c.bg.tile, borderWidth: 1.5, borderColor: amountError ? t.c.alert.coral : focus ? t.c.fg.primary : 'transparent' }}>
-            <Text color="secondary" style={{ fontSize: 34, lineHeight: 40, fontWeight: '700' }}>{symbol}</Text>
-            <TextInput accessibilityLabel="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" autoFocus={!id} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} placeholder="0" placeholderTextColor={t.c.fg.tertiary} selectionColor={t.c.accent.mustard} cursorColor={t.c.accent.mustard} style={{ flex: 1, minWidth: 0, color: t.c.fg.primary, fontSize: 34, fontFamily: fontForWeight(700), letterSpacing: -1, fontVariant: ['tabular-nums'], paddingVertical: 0 }} />
-            <Pressable accessibilityRole="button" accessibilityLabel={`Currency, ${d.currency ?? os.format.defaultCurrency()}`} hitSlop={4} onPress={() => setPicking('currency')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 12, borderRadius: 999, backgroundColor: t.c.bg.tileRaised }}>
-              <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '700' }}>{d.currency ?? os.format.defaultCurrency()}</Text>
-              <Icon name="chevron-down" size={14} color={t.c.fg.secondary} />
-            </Pressable>
+        {/* The kind colours the amount card (docs/MODEL.md, Money redesign): Spent orange, Received lime, Transfer blue, Investment lilac. */}
+        <View style={{ padding: 18, borderRadius: 32, gap: 18, backgroundColor: KIND_COLOR[d.kind ?? 'expense'], borderWidth: 2, borderColor: amountError ? t.c.alert.coral : 'transparent' }}>
+          <View accessibilityRole="tablist" style={{ flexDirection: 'row', padding: 3, borderRadius: 999, backgroundColor: 'rgba(11,11,13,0.14)' }}>
+            {KINDS.map((k) => {
+              const on = (d.kind ?? 'expense') === k.value;
+              return (
+                <Pressable key={k.value} accessibilityRole="tab" accessibilityLabel={k.label} accessibilityState={{ selected: on }} onPress={() => set('kind', k.value)} style={{ flex: 1, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? INK : 'transparent' }}>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontSize: 13, lineHeight: 18, fontWeight: '700', color: on ? '#F5F5F7' : INK }}>{k.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
-        </Labelled>
+          <View style={{ gap: 4 }}>
+            <Text style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 0.9, color: INK }}>AMOUNT</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 40, lineHeight: 48, fontWeight: '700', color: INK }}>{symbol}</Text>
+              <TextInput accessibilityLabel="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" autoFocus={!id} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} placeholder="0" placeholderTextColor="rgba(11,11,13,0.4)" selectionColor={INK} cursorColor={INK} style={{ flex: 1, minWidth: 0, color: INK, fontSize: 52, fontFamily: fontForWeight(700), letterSpacing: -2, fontVariant: ['tabular-nums'], paddingVertical: 0, opacity: focus || amount ? 1 : 0.9 }} />
+              <Pressable accessibilityRole="button" accessibilityLabel={`Currency, ${d.currency ?? os.format.defaultCurrency()}`} hitSlop={4} onPress={() => setPicking('currency')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(11,11,13,0.14)' }}>
+                <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '700', color: INK }}>{d.currency ?? os.format.defaultCurrency()}</Text>
+                <Icon name="chevron-down" size={14} color={INK} />
+              </Pressable>
+            </View>
+          </View>
+        </View>
 
         <Labelled label="Paid to / from">
           <View style={[box, { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, paddingLeft: 8, paddingRight: 10 }]}>

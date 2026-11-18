@@ -2,6 +2,8 @@ import React from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { morningBrief, notifyPrefs, setNotifyPrefs } from '@core/notify/plan';
+import { brains } from '@core/brain/runner';
+import { briefOff, setBriefShows } from '@core/brain/brief';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ChipRow, FilterChip, Screen, Section, SwitchField, Text } from '@ui/kit';
@@ -21,6 +23,13 @@ export default function NotificationSettings() {
   const router = useRouter();
   const p = useLive((o) => notifyPrefs(o), []);
   const preview = useLive((o) => morningBrief(o, Date.now()), []);
+  // One switch per module that speaks in the brief (its notices, and its line in this notification).
+  const parts = useLive((o) => {
+    const off = briefOff(o);
+    const list = brains(o).map((b) => ({ module: b.module, name: b.module === 'games' ? 'Turf' : (o.registry.boardFor(b.module)?.name ?? b.name) }));
+    if (o.registry.modules.has('health') && !list.some((x) => x.module === 'health')) list.push({ module: 'health', name: o.registry.boardFor('health')?.name ?? 'Health' });
+    return list.map((x) => ({ ...x, on: !off.has(x.module) }));
+  }, []);
   return (
     <Screen title="Notifications" onBack={() => router.back()}>
       <Section title="Morning brief">
@@ -37,6 +46,12 @@ export default function NotificationSettings() {
           <Text variant="label">{preview.title}</Text>
           <Text variant="caption" color="secondary">{preview.body}</Text>
         </View>
+      </Section>
+      <Section title="What the brief shows">
+        <Text variant="caption" color="secondary">The morning notification and the brief on Today. What you turn off here still comes to To check.</Text>
+        {parts.map((x) => (
+          <SwitchField key={x.module} label={x.name} value={x.on} onChange={(on) => setBriefShows(os, x.module, on)} />
+        ))}
       </Section>
       <Section title="What can notify you">
         <SwitchField label="Reminders" hint="Ones you set, and ones LifeOS sets for you." value={p.reminders} onChange={(reminders) => setNotifyPrefs(os, { reminders })} />

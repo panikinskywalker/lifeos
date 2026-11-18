@@ -2,6 +2,7 @@ import type { LifeOSContext } from '../registry/context';
 import type { Row } from '../db/adapter';
 import { bus } from '../events/bus';
 import type { ParserRead, QueueStatus, RawMessage } from './contract';
+import { isOtpText } from './otp';
 
 /**
  * The message queue (ingest_queue): every SMS, notification and mail the app
@@ -152,7 +153,7 @@ export function seeSender(os: LifeOSContext, m: RawMessage, hint: { name?: strin
     `INSERT INTO sms_senders(address,bank,trusted,count,first_seen,last_seen,sample) VALUES (?,?,?,1,?,?,?)
      ON CONFLICT(address) DO UPDATE SET count=count+1, last_seen=MAX(last_seen, excluded.last_seen), bank=COALESCE(bank, excluded.bank),
        trusted=CASE WHEN decided=1 THEN trusted ELSE MAX(trusted, excluded.trusted) END, sample=COALESCE(sample, excluded.sample)`,
-    [m.from, hint?.name ?? null, hint?.trusted ? 1 : 0, m.receivedAt, m.receivedAt, m.body.slice(0, 200)],
+    [m.from, hint?.name ?? null, hint?.trusted ? 1 : 0, m.receivedAt, m.receivedAt, isOtpText(m.body) ? null : m.body.slice(0, 200)],
   );
   return toSender(os.db.get<Row>(`SELECT * FROM sms_senders WHERE address=?`, [m.from])!);
 }

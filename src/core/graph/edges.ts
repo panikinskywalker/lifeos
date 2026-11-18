@@ -32,6 +32,7 @@ export const EDGE_WORDS: Record<string, EdgeWord> = {
   kept_in: { out: 'Kept in', in: 'Holds' },
   bought_in: { out: 'Bought in', in: 'Bought' },
   packed_for: { out: 'Packed for', in: 'Packed' },
+  settles: { out: 'Settles', in: 'Settled by' },
 };
 
 /** Edges that read the same both ways (stored once, either direction). */

@@ -7,6 +7,846 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.127 · 18 Nov 2026
+
+**Trips move as one, People in whole rupees** (merged from `claude/serene-edison-o0lpvy`, labelled v0.0.33 on GitHub). Switching sections on the trip bar crossfades while the header and the bar stay still; a stop, day, booking or spend slides in; Log a spend, Split a receipt, Pay back and the copilot rise from the bottom. **Split a receipt** keeps long receipts whole, takes WebP photos, and picking from your photos no longer asks for a permission. **People** shows balances in whole rupees.
+
+## v0.0.126 · 18 Nov 2026
+
+**A trip's receipt photo is read again.** Claude refused every one before reading it (the question's shape was missing a rule Claude needs). If it ever fails now, the message says why.
+
+## v0.0.125 · 18 Nov 2026
+
+**A trip's receipt is read by Haiku**, like a bill in Money's +: as good for receipts, and costs less.
+
+## v0.0.124 · 18 Nov 2026
+
+**Udhari.** The Splitwise board is now called Udhari (Browse › Boards › Udhari, and in Money's menu). Splitwise keeps its name where it means the service.
+
+## v0.0.123 · 18 Nov 2026
+
+**Splitwise is its own board.** Find it in Browse › Boards. Money's menu and a person's "Splitwise says" line still open it.
+
+## v0.0.122 · 16 Nov 2026
+
+**One bottom bar on Travel.** Travel home showed the app's bar twice; now it shows once. A trip's own screens keep their trip bar and no longer get the app's bar on top of it.
+
+## v0.0.121 · 16 Nov 2026
+
+**Trips, as designed** (R7g, the trip template, merged from
+`claude/serene-edison-o0lpvy`, labelled v0.0.32 on GitHub). Every trip now has the five sections of the
+*Trip template · Noir (Japan)* design, with the trip bar at the bottom
+(Overview, Plan, Bookings, Money, Prep) and the copilot beside it. **Travel**
+shows your next trip as a card with its countdown on a platform LED board.
+The **trip page** changes with the trip: before it, the stage stepper, the
+hero with the nights hanko, the boarding pass, what needs attention, what's
+coming up until you fly and when seats open; while away, **Today** (leave by,
+the next train, the last connection, cash and IC card, the stamp you
+collected, tomorrow); after, the **Recap** with the stamp book. **Plan** has
+the line of stops, the days and the map; each stop has its station board,
+the legs either side and its things to do. **Bookings** and every booking,
+each **day** with its travel. **Money** works like Splitwise: the budget
+with paid, booked and estimates, cost by day, log a spend, split a receipt
+photo, pay back, settle up. **Prep** has the checklist, packing and papers
+with the emergency numbers. **Search** the trip, ask the **copilot** (it
+proposes changes, saved only when you say), or share a **view-only** copy.
+Money shows in rupees or the local currency at a tap. Japan gets its own
+touches: names in Japanese, mincho station boards, seigaiha waves, stamps.
+Import a trip from the trip app's file under Travel › + › Import a trip.
+
+## v0.0.120 · 17 Nov 2026
+
+**Splitwise hears within seconds.** A linked person's share made, changed, settled or deleted (a Turf game, a split, a payment that settles it) syncs to Splitwise a few seconds later, not at the next background sync. A Turf share paid in parts is paid back on Splitwise for exactly what was sent.
+
+## v0.0.119 · 17 Nov 2026
+
+**One way to settle.** A payment recorded on Splitwise settles shares the same way a bank text does, and leaves Turf's shares to Turf too.
+
+## v0.0.118 · 17 Nov 2026
+
+**Pay, remind, settle on its own, and split a bill by item.**
+- Money from someone who owes you (or to someone you owe) settles their
+  shares on its own, oldest first, as soon as the payment is tied to them.
+- *Pay ₹450 by UPI* on a person you owe opens your UPI app with everything
+  filled in; their UPI ID is asked for once and kept on their record.
+- *Remind* writes a friendly WhatsApp message with Haiku (their name stays on
+  the phone), in a tone you pick.
+- "1200 dinner with Arjun and Priya, Arjun paid" in Money's + is split
+  equally on Save.
+- A scanned bill shows *Split by item*: who had what, portions, a line no
+  one took shared by all, tax and service in proportion, to the paisa.
+
+## v0.0.117 · 17 Nov 2026
+
+**Splitwise, kept in step.** Money › Splitwise: sign in on Splitwise's own page
+inside LifeOS, link your People to your Splitwise friends, and new shares for
+linked people (Turf, trips, splits) go to Splitwise on their own. Deleting one
+here deletes it there; settling up here records the payment there; a payment
+recorded on Splitwise settles them here. A person's Money section shows what
+Splitwise says. Needs the new app build (the sign-in page is a WebView).
+
+## v0.0.116 · 17 Nov 2026
+
+**Links, second pass, merged in (from claude/r11-activity-links).** Payments are an audit trail, not Links: they are never a Link on a card, the map, Browse › Links or the add sheet, but an Event on the timeline of each record they touch. Links read as the record would say them, one thing shows once (a player is their person, a game share is one row), the Links · Noir design (the card, a link's sheet with dates and how sure it is, the map that draws out with pinch and pan, Browse › Links showing everything), and Activity rebuilt to A1 to A4. Turf stays the games card in Browse.
+
+## v0.0.115 · 17 Nov 2026
+
+**Funds and SIPs from screenshots, for real.** Statements and fund screens are now read by Claude Sonnet 5.5, asked to think little and given room for a long list (Haiku's thinking used up the space, so lists came back cut off). It is told which figures on a fund app's holdings screen are the value and the amount invested. When nothing can be updated, the sheet says what was read and which screen to try. The CAMS / KFintech CAS PDF is suggested for all your funds at once.
+
+## v0.0.114 · 17 Nov 2026
+
+**No payments from the future.** A bank text whose date came out after the day it arrived (your ₹1,96,958 salary filed as 13 Feb, years ahead) now takes the day it arrived, and a payment dated after today never counts in a balance. HSBC is back to what your bank shows.
+
+## v0.0.113 · 17 Nov 2026
+
+**A merge keeps the real account's balance.** Merging a copy added its payments on top of the real account's figure (HSBC showed ₹3,60,382 instead of ₹1,63,424). The real account's figure is now kept as it was; the copy's payments join its history only.
+
+## v0.0.112 · 17 Nov 2026
+
+**Merge a copied account.** An account's page has *This is a copy of another account*: its payments move to the real one, which keeps its balance and learns the copy's digits, and the copy goes, with Undo.
+
+## v0.0.111 · 17 Nov 2026
+
+**Before payday in colour.** Each card on Money home is coloured by what it is (late coral, bill or card bill blue, renewal lilac, SIP green), labelled, with its category as a pill and a legend under the row.
+
+## v0.0.110 · 17 Nov 2026
+
+**What you owe looks owed.** Card and loan amounts are minus figures in red on a
+dark band ("−₹33,207"), on the wheel and on the card's page, and *On your cards*
+is a red minus total.
+
+## v0.0.109 · 17 Nov 2026
+
+**A bank balance goes only to a bank account.** Forex and debit cards are no longer offered when a bank balance asks which account.
+
+## v0.0.108 · 17 Nov 2026
+
+**A bank balance never goes to a loan.** When a balance asks which account, your loans and cards are not among the choices.
+
+## v0.0.107 · 17 Nov 2026
+
+**Which account, in order.** The account chips on an unclear balance are listed by name.
+
+## v0.0.106 · 17 Nov 2026
+
+**Subscriptions by screenshot, and every account from one screenshot.** Upload
+a screenshot of your subscriptions (an app, Google Play, App Store or a renewal
+mail) to add new ones or update a known one's price and renewal. A screenshot
+of all your balances updates each account; one that could be several accounts
+asks which, with a chip for each, instead of making a new account.
+
+## v0.0.105 · 17 Nov 2026
+
+**Upload and Add a payment start fresh.** If the app went away while a statement
+or bill was being read, reopening the sheet showed the old reading with its
+Apply or Save where a tap could land. Each opening now starts at the beginning.
+
+## v0.0.104 · 17 Nov 2026
+
+**Loan statements.** An uploaded loan statement is read as a loan, not a bank
+balance: it finds the loan by its last digits, makes it a Loan if it was filed
+as something else, and sets what you owe (with Undo). A loan's card says *Loan ·
+you owe*.
+
+## v0.0.103 · 17 Nov 2026
+
+**A bill says how it was paid.** A snapped or attached bill is read for "Paid:
+CASH" or the card's last digits, so *Paid with* starts on Cash or that card
+instead of "Someone else paid".
+
+## v0.0.102 · 17 Nov 2026
+
+**Screenshots of bills are read.** A PNG or screenshot attached as a bill (or
+snapped for the fridge) failed: the picker said PNG for what it had turned into
+a JPEG, and Claude refused the mismatch. Every photo now goes with the type its
+own bytes say, and a failed bill says why.
+
+## v0.0.101 · 17 Nov 2026
+
+**Bills, statements and the fridge are read by Haiku.** A snapped or attached
+bill, an uploaded statement and Snap the fridge now go to Claude Haiku 5.5,
+whatever model the brain uses for its other work: quicker and cheaper.
+
+## v0.0.100 · 17 Nov 2026
+
+**A forex card in several currencies.** Set balance on a forex card asks what
+it holds in each currency (dinar, yen, dollar, pound…). Spends abroad come off
+the right currency; its page lists *On the card* with each in rupees at today's
+rate, and the wheel shows them in one line over the rupee total. Rates and bank
+texts now cover EUR, KWD, BHD, OMR, SAR, QAR, SGD, THB, AUD, CAD and CHF too.
+
+## v0.0.99 · 17 Nov 2026
+
+**Forex cards look right.** A forex card says *Spending abroad* on its own, with
+no name or Ask Money needed. A forex or debit card whose figure is below zero
+(left over from when it was read as a credit card) shows *Set balance* instead of
+a minus amount.
+
+## v0.0.98 · 17 Nov 2026
+
+**Debit and forex cards.** An account can now be a Debit card or a Forex card
+(prepaid). They count with your bank money in *In your accounts*, have their
+own card colours, and a forex card gets its uses like a credit card (Ask Money
+knows it is for spending abroad). Set it with Edit › Type on the card's page.
+
+## v0.0.97 · 17 Nov 2026
+
+**No more guessed card uses.** A card named only by its bank no longer gets
+uses guessed from what goes through it (it told you to use a forex card for
+bills); those guesses are taken off. Its page asks which card it is, and once
+you name it, Ask Money fills its uses from that card's real rewards.
+
+## v0.0.96 · 17 Nov 2026
+
+**Cards come with what to use them for.** When Accounts and cards opens, Ask
+Money fills in the uses of every card that has none, once per card, as pills
+(Shopping, Forex, Fuel) on the card in front and on its page. A card still
+without uses opens Ask Money already asking about that card, instead of an
+empty Ask screen.
+
+## v0.0.95 · 17 Nov 2026
+
+**Polish on Who owes whom and a debt.** A person's card shows their latest four
+open items and "N more", which opens their page; Settle up all on a debt is
+white under its coloured card, as in the design.
+
+## v0.0.94 · 16 Nov 2026
+
+**Turf looks like Turf web, screen for screen.** Each screen is rebuilt from
+Turf web's own, piece for piece:
+- **Games:** Match centre (the season card with played, goals and per match,
+  Upcoming with the match wallet or Nothing booked, the activity grid with its
+  months and days, the month, When you play) and Match history.
+- **Match:** the vote card, "Who's in" before kick-off with Add players and the
+  RSVP link, the payment summary's buttons, the Team view (pitch and
+  formations, match stats, each side's players, Log stats · Pick teams ·
+  share) and Match history as its own sheet.
+- **Pick teams** (suggest, reshuffle, random, captains, kits, formations) and
+  **Log stats** (the score, each side, the counters).
+- **New match:** venues as a list, format chips, the day and kick-off, cost,
+  terms, kits beside their crests, and Add players with who said In, last
+  match, regulars, In this match and the A to Z list.
+- **Player profile:** the hero and Overview, Matches, Stats and Dues tabs.
+- **Squad, Dues and Venues**, and Home's Copy details and Copy short.
+
+Ratings count best on their team, as Turf web's do.
+
+## v0.0.93 · 17 Nov 2026
+
+**Who owes whom and a debt's page, redesigned.** Who owes whom has a lime *To
+you* tile and a *You owe* tile, then a card per person with what is open and a
+full-width Settle up. A debt's page puts the amount on a lime (to you) or orange
+(you owe) card with the whole balance with that person, Settle up all, and what
+else is open with each day.
+
+**Cards say what to use them for.** A new *Use it for* Field shows on the card
+in front of the wheel and as a tile on the card's page; Ask Money writes it
+when it says which card to use for what (`card_use`, with Undo).
+
+**Card balances show at the top.** Accounts and cards shows *On your cards*
+next to *In your accounts*, so setting what a card owes moves a big figure.
+
+## v0.0.92 · 16 Nov 2026
+
+**Turf's Leaders is Turf web's Leaders.** The page is rebuilt from Turf web's,
+piece for piece: the season picker ("Monsoon 2026 · now", each past season, All
+time; Turf web now sends its seasons), the thirteen tables, the position
+control, search, the table's title and how it ranks, the podium (crown, medal
+rings, steps 2 · 1 · 3), the table from 4th with ▲▼ since the last match and
+form, Not ranked yet, and Share. Best overall opens it, as on Turf web.
+
+**The bell is on every Turf screen**, as on Turf web's headers; all of them
+share one look a minute.
+
+## v0.0.91 · 16 Nov 2026
+
+**Ask Money calls your cards by name.** The agent writes a card's ref and the
+phone puts the card's own name and last digits there ("ICICI Bank card
+••8013"), so answers no longer say "cards 4 and 6"; the digits still never
+leave the phone. The line under an agent's chart now says what Claude really
+saw (rounded totals by category and shop) instead of "0 payments", and the
+sent log names Sonnet 5.5.
+
+## v0.0.90 · 16 Nov 2026
+
+**Ask Money answers card questions instead of asking first.** When a card is
+only "ICICI Bank card", it now gives its best advice straight away from the
+bank and what you buy on that card (Amazon on an ICICI card is probably the
+Amazon Pay card), says what it assumed, and asks one short question. Tell it
+which card it is and it renames the card in the app (with Undo), so it knows
+next time. When much of your spending sits in Other, it says so and offers to
+sort it, since advice is only as good as the categories.
+
+## v0.0.89 · 16 Nov 2026
+
+**Ask Money gets smarter: Claude Sonnet 5.5, the web, and your cards.**
+- It now runs on Claude Sonnet 5.5 instead of Haiku, for much better judgement.
+- **It can search the web** and read pages: today's FD and savings rates, a
+  fund's returns and costs, tax rules and deadlines, card rewards and offers.
+  Every search shows in its steps ("Searched the web: ICICI Amazon Pay card
+  cashback"); it never puts your names, account digits or exact figures in one.
+- **Which card for what:** it sees what goes through each of your cards by
+  category and shop (rounded), looks up each card's rewards, and tells you which
+  card to use for which spend and what that saves a month, with fees and caps.
+  When a card is only "ICICI Bank card", it asks you which one it is.
+
+## v0.0.88 · 16 Nov 2026
+
+**A SIP screenshot sets up your SIP.** Upload a screenshot of your fund
+dashboard or SIP list (Groww, Coin, Kuvera, a CAMS mandate) and each SIP becomes
+the monthly SIP on that fund, on its day (taken from the next instalment date
+when that is what the screen shows): it then shows under Subscriptions › SIPs,
+in Before payday and in Upkeep. A fund the app does not know yet is added with
+its SIP.
+
+## v0.0.87 · 16 Nov 2026
+
+**Uploads match the right card.** A statement or screenshot is matched by the
+card's or account's last digits first: if exactly one of yours ends in them,
+that's the one, even when the bank was misread (a "new Axis card ••6931" was
+your ICICI card). Account names that already carry their digits show them once.
+
+## v0.0.86 · 16 Nov 2026
+
+**Screenshots upload and read.** Upload a statement now tells what a file
+really is from its first bytes, so a screenshot the picker turned into a JPEG
+is no longer sent as a PNG (Claude refused those). A screenshot too big to send
+says so and asks for a crop, and when Claude can't read something the reason
+is shown.
+
+## v0.0.85 · 16 Nov 2026
+
+**The card wheel opens on your main account on Android too.** It had started
+on whichever card came first, because Android ignored where it was told to
+start.
+
+## v0.0.84 · 16 Nov 2026
+
+**Upload a statement and Money updates itself from it.** In the + sheet, the
+grid menu or on Accounts and cards, upload a PDF or a screenshot: a bank or card
+statement, a CAMS or broker summary, your bank or fund app. Claude reads it once
+(because you pressed the button), and Money lists what it would change, each
+ticked: a bank balance, what a card owes with its bill and due date, a fund's
+value, what you put in and its SIP, or a new account, card or holding it does
+not know yet. Untick anything wrong and Apply; Undo puts it all back.
+
+## v0.0.83 · 16 Nov 2026
+
+**Ask Money reads well and the keyboard no longer hides your typing.** The
+agent's answers show as real text: bold where it means bold, bullet points as
+bullets, its "What to do:" lines as headings, never raw asterisks or dashes.
+When the keyboard opens, the box you type in rises above it.
+
+## v0.0.82 · 16 Nov 2026
+
+**Ask Money's agent answers everything you type.** With a Claude key, a typed
+question always goes to the agent; before, a question that looked like one of
+the phone's fixed answers ("where did my money go") got that fixed answer
+instead. The starter buttons still answer at once on the phone. The agent also
+digs further now: it compares with last month or your usual month, finds what
+drives a number down to the shop or bill, and ends with one to three concrete
+steps in rupees.
+
+## v0.0.81 · 16 Nov 2026
+
+**The Analytics chart's period is a real dropdown.** Tap "This week" on Money
+home's orange chart to pick This week (by day), This month or Last month (by
+week), 3 months or This year (by month); the columns and the total follow.
+
+## v0.0.80 · 16 Nov 2026
+
+**Every card its own face; SIPs next to Subscriptions.**
+- **The card wheel is prettier:** each account and card has its own colour and
+  pattern (half rounds, stripes, rings, quarter rounds, dots, waves, a mountain
+  and its sun, a half sun), always the same for that account. Cards behind the
+  front one sit a little crooked like a real pile, fan in when the screen
+  opens, and give under your finger with a tap of feedback. Amounts show their
+  paise small.
+- **Subscriptions has tabs:** Subscriptions, Bills and **SIPs**. SIPs lists every
+  holding with a monthly SIP, when it next goes, and what you invest a month.
+
+## v0.0.79 · 16 Nov 2026
+
+**The card wheel opens on your main account in the middle**, with cards above
+and below it, instead of starting at the top with empty space above.
+
+## v0.0.78 · 16 Nov 2026
+
+**Accounts and cards is a wheel.** Your accounts and cards sit on a wheel like
+the iPhone's time picker: the one in front full size, the others stacked behind
+it, their names above and their amounts below, smaller and tilted away the
+further they are. Scroll to turn it; it snaps card by card with a small tick.
+Tap a card behind to bring it forward, tap the front one to open it. A card
+whose bill is late is coral.
+
+## v0.0.77 · 16 Nov 2026
+
+**Accounts and cards shows your main account in full.** Your bank account with
+the most in it is drawn as a full card at the top, and your other accounts and
+cards tuck under it as their edges (cards first), instead of a long run of
+edges with the full card hidden at the bottom. Also: Ask Money's agent (v0.0.72)
+and the new + (v0.0.73) now reach the phone; those two updates had been built
+for a different app runtime and were skipped.
+
+## v0.0.76 · 16 Nov 2026
+
+**Turf: Auto-pick and a searchable audit log.**
+- **Auto-pick** in New match and Edit match fills the squad to the number
+  expected, as Turf web does: who said In, keepers until there are two, who said
+  Maybe, last match's players, then most appearances, only people available.
+- **The audit log** has a search (names, amounts, who made the change).
+- Faces find their photo with one small lookup each, so long lists stay quick.
+
+## v0.0.75 · 16 Nov 2026
+
+**Turf gets the votes, kit wishes and partner picks.** Turf web now sends them
+(its v0.0.71), so on the phone:
+- **The vote** shows once it closes: votes for player of the match, and best on
+  each team.
+- **Suggest teams** weighs "plays well with" picks, the side someone asked for
+  and the kit they wished for, as Turf web does (they only break ties).
+- **A player's page** says who they play well with.
+- **Part payment** on a player's page, as on Dues: oldest games first, anything
+  over waits as credit.
+- **Profile changes** show the ratings a player gave themselves, on their 1 to 5
+  scale.
+
+The first sync after this update reads Turf web from the start once, to pick
+these up.
+
+## v0.0.74 · 15 Nov 2026
+
+**Turf's match screen catches up with Turf web.**
+- **The header** reads as Turf web's: "Kick-off · tomorrow" with the big
+  kick-off time before a match, "Full time" after it, the chips centred
+  (who's in before, who's paid after), captains under the crests, and player
+  of the match with goals, assists and saves.
+- **Player of the match:** while the vote is open it says until when; a tied
+  vote says to pick from the team view.
+- **Payment summary** shows the whole WhatsApp text, with Copy details and
+  Copy short.
+- **Add players** from the match: who said In or Maybe first, then who's free,
+  then everyone else, with a search; the shares split again.
+- **Suggest captains:** last match's player of the match, else the regular who
+  has led least lately, as Turf web picks them.
+- **Match history** on each match (goals, sides, captains, edits) with **Undo**;
+  the **audit log** is now money only, with Undo, like Turf web's.
+- **Kits** can be picked in New match and Edit match.
+- **Photos:** players' and venues' Turf web photos show (initials and the
+  painted turf while there are none).
+- **Search** on the payment checklist, Pick teams and Log stats once a match has
+  more than 8 players.
+
+## v0.0.73 · 15 Nov 2026
+
+**The + in Money takes a bill, or just your words.** Tap + on Money home or
+Spend: **Snap a bill** or **Attach** one (Claude reads the total, the shop, the
+date, the items and the tax), **Type it** for the full form, or write it as you
+would say it ("₹640 at Shree Sagar, paid in cash, half is Arjun's"). You see
+what was read, pick **Paid with**: Cash, any of your accounts or cards, or
+someone else paid, and Save, with Undo. Paid in cash comes off your Cash
+account (made the first time). If someone shares it, its page opens so you can
+split it. The bill's photo goes to Claude only because you pressed the button,
+and is deleted from the phone once read.
+
+## v0.0.72 · 15 Nov 2026
+
+**Ask Money is an agent: your money guru.** With a Claude key in You › Agent,
+a question in Ask Money goes to an agent on Claude Haiku 5.5 that works it out
+in steps you can see, answers in its own words with a chart and the payments
+behind it, and says what to do. It can change things for you: move every
+payment to a shop into a category (and learn it), put a live card on Money
+home ("a card that tracks Swiggy this month"), and, after asking, set a
+monthly line or a category limit. Each change shows with Undo. It never moves
+money and makes no buy or sell calls. Every figure is still worked out on the
+phone, and only rounded amounts and placeholders for people leave it. The
+agent is made once with your key; each conversation has a small spend cap.
+Without a Claude key, Ask works as before.
+
+## v0.0.71 · 15 Nov 2026
+
+**Accounts look like their cards; Subscriptions and Reports follow.**
+- **An account's page** opens with the account drawn as its card: SBI in lime,
+  a credit card in lilac (coral once its bill is late), the balance or what
+  you owe on it, and where that figure came from ("bank said, 14 Nov"). Under
+  it: the bank and last digits, In and Out this month (or the bill and how
+  much of the limit is used), then Add, Transfer, Set balance or Set owed, and
+  Edit.
+- **Subscriptions** shows them as a row of logos under what they cost.
+- **Reports** opens with what came in and what you spent, then one line on how
+  this month compares with last ("8% less than last month").
+- Money's lists leave room for the bar at the bottom.
+
+## v0.0.70 · 15 Nov 2026
+
+**Spend reads at a glance, and the form wears its kind.**
+- **One period control:** the arrows step between this month and last month;
+  the middle ("November · 1 to 15") picks any period.
+- **What to count shows its totals:** Spent, Came in, Investing and All, each
+  with its figure; the one you picked is lime.
+- **Categories are chips** with their colour and how many payments; tap to
+  filter, All to clear.
+- **The total card** says how it compares in plain words ("₹1,540 less than
+  last month by today") instead of a percentage pill.
+- **A calendar of the month:** every date box shows what you spent that day,
+  more lime for more, the biggest day solid lime, today ringed; tap a day for
+  its payments. Then the ring with every category.
+- **New transaction:** the amount card takes the kind's colour: Spent orange,
+  Received lime, Transfer blue, Investment lilac.
+
+## v0.0.69 · 15 Nov 2026
+
+**Money's new home, its own bar, and Accounts and cards.**
+- **Money has its own bottom bar:** Money home · Spend · Accounts and cards ·
+  Subscriptions, with Ask Money's sparkle as the raised button.
+- **Money home leads with where it went:** the ring with your categories and
+  Set a budget (which opens the suggested budget), the pace line, this week as
+  the orange Analytics chart, what needs you, Before payday as day cards you
+  swipe (a late bill in coral), your views, then one line each for your
+  accounts and for who owes whom, and Recent. A back button goes to Browse;
+  the grid button opens the other Money screens.
+- **Accounts and cards** is a new screen: what is in your accounts, what the
+  cards owe and your net worth, the accounts drawn as a stacked wallet (each
+  kind its own colour, a late card in coral), this month in and out, and your
+  investments.
+
+## v0.0.68 · 15 Nov 2026
+
+**Turf catches up with Turf web on money and lists.**
+- **Part payments from Dues:** open a person, type what came in and tap
+  Record. It pays their oldest games first; anything over waits as credit.
+  Undo is on the toast.
+- **Credit shows on the match:** a share paid partly from credit says so ("₹28
+  from credit"), as Turf web does.
+- **Search** on Dues, Venues and Leaders; on Leaders a player keeps their place
+  and the podium steps aside while you search.
+- **10 and 11-a-side:** formations for both, and venues take any size from 5 to
+  11 (it was 5, 6, 7 and "8+").
+
+## v0.0.67 · 15 Nov 2026
+
+**Turf has the bell.** Turf's Home has Turf web's bell, with a count of what
+waits for you: "I've paid" from players (Confirm, Not yet, or Confirm part when
+only some came in), numbers players logged themselves (Approve or Reject), join
+requests and profile changes, matches players suggested (Book it opens New match
+filled in and closes the suggestion; or Decline), and the latest answers to
+upcoming matches, including who moved up from the waiting list. It needs Turf
+web to answer; what you decide comes back with the next sync.
+
+## v0.0.66 · 15 Nov 2026
+
+**Turf: take anyone off a match.** Editing a match refused anyone who had money
+on it, even credit Turf moved there by itself. Like Turf web (its v0.0.70),
+their money now goes with them, onto their latest other match, where it pays
+what they owe or waits as credit; the edit screen says so before you save, and
+the next sync shows it. It's refused only when they have no other match to keep
+it on, and the message names them.
+
+## v0.0.65 · 15 Nov 2026
+
+**Cards owe what the bank says.** A card used to add up every spend since its
+first text, minus only the payments LifeOS matched to it, so one missed bill
+payment left it lakhs in debt (ICICI ••8013 read ₹2,00,076). Now a card
+statement text sets what you owe from its day, and each card's page has **Set
+owed** to type what the card app shows, with Undo.
+
+## v0.0.64 · 15 Nov 2026
+
+**Ask Money's box is clear of the bottom bar.** A screen with its own box at the
+bottom (Ask Money) shows no bottom bar. When more goes out than comes in, *Can I
+afford something?* says so instead of a minus sign, and the note under the
+starters says what the privacy gate sends.
+
+## v0.0.63 · 15 Nov 2026
+
+**LifeOS no longer opens itself (the real cause).** The background sync of your
+contacts asked Android for contacts permission each time it ran. On Android,
+asking opens the permission screen inside LifeOS even when permission is already
+given, and that pulled LifeOS to the front a few seconds after you left it. Now
+it only checks, and asks only while you are in the app; the notifications
+permission on start works the same way.
+
+## v0.0.62 · 15 Nov 2026
+
+**LifeOS no longer opens itself.** With the app lock on, leaving the app asked
+for your fingerprint while it was in the background, and on Android that prompt
+brings the app back to the front. Now it covers the app as you leave and only
+asks once you open it again.
+
+## v0.0.61 · 15 Nov 2026
+
+**Import and export.** Money has an *Import & export* screen: export your
+payments for any period as a CSV for a spreadsheet, or import a bank statement's
+CSV. The columns are guessed (and yours to change), a preview says what will be
+added, payments already here are skipped, and Undo takes the whole import back.
+
+## v0.0.60 · 15 Nov 2026
+
+**Ask Money catches what is easy to miss.** Bank charges (interest, late fees,
+forex markup, GST on charges, annual fees) are filed as Fees by their words, and
+a new one shows in *Did anything look wrong?*, along with any bill that crept up
+10% or more over the year. Ask "What's an APR, and what has mine cost me?" or
+"Am I spending more than I make?" and it answers on the phone.
+
+## v0.0.59 · 15 Nov 2026
+
+**A budget made for you.** With no targets set, Money home suggests one from
+your last 3 months: a limit per category, what usually comes in, and what that
+leaves to save. **Use these** sets them, with Undo.
+
+## v0.0.58 · 15 Nov 2026
+
+**AI sorts what is left in Other.** Money home shows how many payments have no
+category, with **Sort with AI**: your model gets only the shop names and a
+rounded typical amount (never people, never your texts), and each shop it is
+sure of is learned, so its next payment files itself. Undo puts them back.
+
+## v0.0.57 · 15 Nov 2026
+
+**Ask Money sends a summary, not your details.** Amounts go rounded and
+people's names go as placeholders ("Person 3"), in your question too; the phone
+puts the names back in the answer and works out every exact figure it shows.
+Shops keep their names. Who owes whom is answered on the phone only.
+
+## v0.0.56 · 15 Nov 2026
+
+**OpenRouter in one tap.** You › Agent › OpenRouter has **Connect OpenRouter**:
+sign in on OpenRouter's page and the key comes back to the phone, nothing to
+copy. If it does not come back, **Paste a code instead** gets a one-time code
+from OpenRouter to paste.
+
+## v0.0.55 · 15 Nov 2026
+
+**Balances follow the bank.** Each account page has **Set balance**: type what
+the bank shows and that is the balance from now on (with Undo). A payment made
+later on the same day as a bank's balance text now counts. Cashing out a mutual
+fund adds to your bank account instead of taking money out. A debit card spend
+lands on your account at that bank instead of making a new credit card. A text
+that only states your balance sets it, and a repeat text still does.
+
+## v0.0.54 · 15 Nov 2026
+
+**No more merged or doubled payments.** Two payments used to become one
+whenever they had the same amount within 10 minutes, so three friends each
+sending ₹161 showed as one. Now a payment is a repeat only when it is the same
+bank reference, the bank's text and its app's notification within half an hour,
+or the very same text sent twice. A text that arrives late no longer doubles a
+payment, a receipt email only confirms a payment with a matching name, and a
+repeat text still updates the account's balance.
+
+## v0.0.53 · 15 Nov 2026
+
+**Came in is money you earned.** Friends paying you back no longer count as
+income: a payment from a person, or a name the app does not know as a shop,
+says *Not income · Money back* with **Count as income**, and once you count
+someone's, theirs count from then on. Money back from a shop you paid in the
+last 90 days is a refund in that category, so it comes off spending. Salary and
+money from businesses stay income. A card bill paid through CRED ("…; CRED
+credited") is a transfer, not spending. Your earlier money in is sorted the
+same way once, leaving alone anything you changed.
+
+## v0.0.52 · 15 Nov 2026
+
+**SIP questions never go dead.** "Read my texts again" replaces payments it
+filed itself; a "A SIP?" question on one of those was left behind with buttons
+that did nothing. Now reading again closes questions on the payments it
+replaces (the new payment asks again, and Undo brings the old ones back), and
+an old question whose payment is gone closes when you tap it, saying why.
+
+## v0.0.51 · 15 Nov 2026
+
+**One Turf.** Browse had Turf twice: a tile under Boards that opened the Turf
+app, and a card under Modules that opened a plain list of its records. Now the
+card opens the Turf app and the extra tile is gone.
+
+## v0.0.50 · 15 Nov 2026
+
+**Turf's card shows the match, not a person.** With a match booked, Browse's
+Turf card shows its day ("SAT 21") with the venue. With none booked, it takes
+turns every few seconds between what friends owe and BOOK. A module card can
+now take turns between faces like this.
+
+## v0.0.49 · 15 Nov 2026
+
+**No cut names on Turf's card.** A name longer than 8 letters ("Rushikesh")
+shows what they owe in dots instead of being cut short.
+
+## v0.0.48 · 15 Nov 2026
+
+**Module cards can say a word, not just a number.** The dot letters on a
+Browse card can be a name, a place or a day. Turf's card now shows the next
+match's day ("SAT 21", with the venue under it), or with no match booked, the
+name of whoever owes most ("KARAN", with what everyone owes under it).
+
+## v0.0.47 · 15 Nov 2026
+
+**The last module card really shows its number now.** v0.0.46 said it did, but
+the change had not made it in.
+
+## v0.0.46 · 15 Nov 2026
+
+**The last module card always shows its number.** It is never covered by
+another card, so even while a card above it is open, it keeps its line and
+dot headline instead of sitting empty.
+
+## v0.0.45 · 15 Nov 2026
+
+**Browse's module cards fit on the phone.** Their colour now fills each card
+to its rounded corners (on Android it stopped short on the right and the
+bottom), and opening a card higher up makes room for the cards below it, so
+the last one no longer runs under the rows that follow.
+
+## v0.0.44 · 15 Nov 2026
+
+**A little extra is fine.** When a friend you know sends up to ₹20 more than
+they owe, Turf marks the share paid on its own and the extra counts as money
+in. Anything more is still asked, and the question now says how much more:
+"Vishwesh sent ₹472, ₹402 more than the ₹70 for Fri, 30 Oct?". Questions
+already waiting are reworded the same way.
+
+## v0.0.43 · 15 Nov 2026
+
+**Old Turf questions answer themselves.** Payments that came in before
+v0.0.40, like a friend's ₹472 for a Friday game, were still asking "paid for
+this?" in To check, because each payment was only ever looked at once. Now,
+when the app starts and after each Turf sync, open questions are looked at
+again. If the sender is known and the amount is exactly what they owe, the
+share is marked paid and the question goes. If the share was paid some other
+way, the question goes too.
+
+## v0.0.42 · 15 Nov 2026
+
+**The bottom bar stays when you open a board or module.** Inside Turf it turns
+into Turf's own: Home, Games, Players and Venues, with the big lime button as
+New match instead of Dump. Turf's switcher at the top is gone, since the bar
+does its job. Money and every other page keep the app's bar, so Today, Browse
+and the rest are one tap away.
+
+## v0.0.41 · 15 Nov 2026
+
+**Only what is finished is shown.** Money and Turf for now: other modules stay
+out of Browse, Today, Upkeep, the brief and search, while still collecting in
+the background. You › Modules has a switch for each and "Show every module";
+demo data shows everything. The SMS senders list no longer says "undefined".
+
+## v0.0.40 · 15 Nov 2026
+
+**A friend's payment marks their Turf share paid right away.** Money in from a
+squad member (their UPI id, the person Money matched, or a bank name whose
+first name is only one player's) for exactly what they owe, within 30 days of
+the game, is recorded on its own and the sender remembered; To check shows it,
+with Undo. Only part payments and names two players share are asked. Money in
+already filed is looked at again on start and after each sync.
+
+**"Who paid this?"** On a money-in payment, the Turf section lists who owes you;
+pick one and their oldest shares are marked paid, with Undo.
+
+## v0.0.39 · 15 Nov 2026
+
+**Turf moves like Turf web.** Recent games slide and flip in 3D when you open
+one (and flip back with ×); the next match's dot pulses; the Leaders podium
+rises in; a player's tick pops when you add them to a match.
+
+## v0.0.38 · 15 Nov 2026
+
+**Browse's module stack moves.** Tap a module's strip and it springs open in
+place (the cards below slide down) with what matters now and its number in dot
+numerals ("PUNE IN 10 DAYS" · 10 DAYS, Money's 81.5K); tap the open card to go
+in. A press squeezes the card a little and gives a light tick. Games is called
+Turf.
+
+## v0.0.37 · 15 Nov 2026
+
+**Payee names cleaned up.** Payees an older version named with a reference
+number ("Playo Refno 387827…", "Piyush Sunil Refno …") get their name back; a
+copy of a payee that exists is merged into it, and its payments take the clean
+name.
+
+## v0.0.36 · 15 Nov 2026
+
+**One name per payee.** "Playo" and "PLAYO" (or any bank's spelling) now show
+as the same payee's name; "As the bank wrote it" keeps the bank's spelling.
+
+**Less kept for nothing.** A delivery's one-time code goes the moment it is
+delivered. After 90 days a payment keeps its amount, date, account, category and
+who it was paid to, but its activity thread and links to the bank account go;
+anything you wrote or changed on it stays.
+
+## v0.0.35 · 15 Nov 2026
+
+**Ads from payment apps are no longer payments.** CRED's "use your CRED cash
+amount of ₹20,00,000 to make the most of this sale season" was filed as ₹20
+lakh spent, and "tap to check" became a payee called "check". Notifications
+that sell something are skipped; a call to action is never a payee; CRED's
+"Axis Bank account has been successfully credited" is the card's side of a bill
+paid from your bank, joined with that debit as one transfer.
+
+## v0.0.34 · 15 Nov 2026
+
+**Read my texts again** (You › Data sources › SMS): payments filed by older
+versions (a loan offer read as ₹20 lakh, card bills and money to yourself
+counted as spending, "Refno" in names) are filed again with today's rules.
+Payments you edited, split or linked by hand stay as they are; Undo puts the old
+ones back.
+
+**Figures are readable on the phone again.** A number with no colour of its own
+(Money home's Spent, an account's balance) was drawn in black on Android.
+
+## v0.0.33 · 15 Nov 2026
+
+**The Dump box files straight away again.** Opening Dump with nothing waiting
+left the filing run stuck as "running", so anything said after it sat on
+"Reading it…" until LifeOS was restarted. Everyday sentences ("spent 400 on
+auto") now file in a moment, and something said while a run is going is filed
+right after it.
+
+## v0.0.32 · 15 Nov 2026
+
+**Ask Money.** An ask box on top of Money home opens it.
+- Five starting questions answered on the phone, each with a live line: where
+  the money went, what is due before payday, anything wrong, can I afford it, a
+  chart of my spending.
+- Every answer is a sentence, one block (a number, bars, a line, a calendar or a
+  list) and *See the payments*, which adds up to the figure. Follow-ups (compare
+  with last month, only one category, by week, leave out rent) are worked out on
+  the phone.
+- A typed question goes to the model in You › Agent with only payee, amount,
+  date and category; the phone works out every figure. It is logged in Sent to
+  Claude, and waits for a model when none is free.
+- *Keep on Money home* keeps a view (the question, not the numbers) under Your
+  views.
+- *Anything wrong*: charged twice, a new fee and price changes, with Both are
+  real, One is wrong (with Undo), That is fine and Keep it. Double charges and
+  new fees also come to the morning brief.
+
+**You choose what the morning brief shows**: You › Notifications has a switch
+per module. Off keeps it out of the brief; its cards still come to To check.
+
+**OpenRouter's free model is now Nemotron 3 Ultra** (the old free Llama is gone).
+
+## v0.0.31 · 15 Nov 2026
+
+**Money counts what you actually spent, and keeps itself up to date.**
+- **Your share**: a split, a Turf game you fronted, a friend paying you back and a
+  refund now count only your part. Settle up finds the real payment.
+- **Read from your own texts**: card bills paid from another account are one
+  transfer; your own name moves money between your accounts, not into spending;
+  balances follow the bank's own figure; card statements give the amount due and
+  the day. One-time codes and passwords are never kept.
+- **Money home answers four things**: a day's allowance against your monthly line
+  (You › Categories › Monthly line), who owes whom, what is coming up before
+  payday, and (on the 1st to the 3rd) last month closed.
+- **On its own**: a nameless NACH debit for a SIP counts as investing (or asks
+  once); the heads-up before a card charge sets that subscription's next charge;
+  a new price goes to To check and the morning brief; three payments a month
+  apart are offered as a subscription; electricity, water and other bills come
+  from their due texts and are marked paid when the payment arrives.
+- **Built from the Noir kit**: the expense ring, donut, hour ticks, columns in
+  tracks and the instrument tile; new pages for an account, a debt,
+  Subscriptions (with Bills) and Who owes whom; Reports' net worth line now ends
+  at today's figure.
+- The parser export moved to You › Data sources › Message samples.
+
 ## v0.0.30 · 5 Nov 2026
 
 **The app now looks like its design files.** Money, Habits, Health, Deliveries,

@@ -1,6 +1,7 @@
 import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import type { TripData } from './types';
+import { spentOf } from '@core/dashboard/money';
 
 /**
  * What a trip adds up to (R7d), read through Links only: what it cost against
@@ -85,9 +86,10 @@ export interface TripSpend {
 export function tripSpend(os: LifeOSContext, trip: ObjectRecord<TripData>, now = Date.now()): TripSpend {
   const items = os.registry.objects.has('transaction') ? linkedTo<Txn>(os, trip.id, 'transaction').filter((t) => (t.data.kind ?? 'expense') === 'expense') : [];
   items.sort((a, b) => (b.data.date ?? '').localeCompare(a.data.date ?? ''));
-  const spent = Math.round(items.reduce((n, t) => n + (t.data.amount ?? 0), 0) * 100) / 100;
+  // Your share (MODEL layer 2): a dinner split with friends counts your part.
+  const spent = Math.round(items.reduce((n, t) => n + spentOf(t.data), 0) * 100) / 100;
   const cats = new Map<string, number>();
-  for (const t of items) cats.set(t.data.category ?? 'other', (cats.get(t.data.category ?? 'other') ?? 0) + (t.data.amount ?? 0));
+  for (const t of items) cats.set(t.data.category ?? 'other', (cats.get(t.data.category ?? 'other') ?? 0) + spentOf(t.data));
   const budget = trip.data.budget ?? null;
   const days = tripDays(trip.data);
   const phase = tripPhase(trip.data, now);

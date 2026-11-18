@@ -10,7 +10,7 @@ import { bus } from '@core/events/bus';
 import { groupType, personType } from '../crm/types';
 import { placeType } from '../places/types';
 import { accountType, debtType, transactionType } from '../finance/types';
-import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, type TurfSyncPage } from './index';
+import { gamesModule, applyTurfSync, fetchTurfSync, syncTurf, whoOwes, currentGame, statsFor, leaders, lineup, moneyAtAGlance, recordPayment, markPaid, isSending, turfChanges, setAttendance, setStats, setScore, followGoals, toggleCaptain, setMotm, createMatch, editMatch, matchDefaults, suggestTeams, saveTeams, setFormation, squadRatings, matchRating, kitsOf, kitName, validFormation, shuffleTeams, createPlayer, editPlayer, setAvailability, saveVenue, pendingSubmissions, submissionChanges, auditLog, turfDues, duesTexts, matchTexts, leaderTables, rankLeaders, confirmSmsAsk, settleSmsAsk, undoSmsPayment, matchVenuePayment, undoVenuePayment, TURF_BOOKING, SMS_ASK, SMS_PAID, SETTING_ME, SETTING_REV, TURF_KEY, TURF_URL, fetchTurfInbox, decideTurf, payPart, owedOn, autoPick, startedSeasons, currentSeason, type TurfSyncPage } from './index';
 import { sampleSync } from './fixtures/sampleSync';
 
 const modules: ModuleManifest[] = [
@@ -36,6 +36,7 @@ afterEach(() => {
 const first = (): TurfSyncPage => JSON.parse(JSON.stringify(sampleSync)) as TurfSyncPage;
 /** A later page: only what changed after `since`. */
 const delta = (since: number, rev: number, tables: TurfSyncPage['tables'], deleted: TurfSyncPage['deleted'] = []): TurfSyncPage => ({ since, rev, tables, deleted });
+type AppearanceLike = { personId: string; gameDate: string; share: number; paid: boolean; amountPaid?: number };
 const q = <T = Record<string, unknown>>(object: string) => os.records.query<T>(object, { includeArchived: true }, { limit: 1000 });
 const live = <T = Record<string, unknown>>(object: string) => q<T>(object).filter((r) => !r.archived);
 const person = (name: string) => q<{ phone?: string; upi?: string; email?: string }>('person').find((p) => p.title === name)!;
@@ -228,6 +229,96 @@ describe('fetchTurfSync', () => {
   });
 });
 
+describe('votes, kit wishes and partner picks from Turf web (its migration 0029)', () => {
+  beforeEach(() => applyTurfSync(os, first()));
+
+  it('land on the match and the profile, and go when Turf web removes them', () => {
+    const game = (date: string) => q<{ date: string; potmVotes?: Record<string, string> }>('game').find((g) => g.data.date === date)!;
+    const page = (tables: Record<string, unknown[]>, deleted: Array<{ table: string; key: string; rev: number }> = []) => ({ since: 40, rev: 41, tables, deleted }) as unknown as TurfSyncPage;
+    applyTurfSync(os, page({
+      potm_votes: [{ game_id: 'g_sat', voter_id: 'p_karan', nominee_id: 'p_priya' }],
+      team_votes: [{ game_id: 'g_sat', voter_id: 'p_karan', nominee_id: 'p_rutvij' }],
+      kit_picks: [{ game_id: 'g_sat', player_id: 'p_priya', shade: 'dark' }],
+      match_rsvps: [{ game_id: 'g_sat', player_id: 'p_arjun', status: 'going', team_preference: 'A' }],
+      player_partners: [{ player_id: 'p_karan', partner_id: 'p_priya' }],
+    }));
+    expect(game('2026-10-17').data).toMatchObject({ potmVotes: { p_karan: 'p_priya' }, teamVotes: { p_karan: 'p_rutvij' }, kitPicks: { p_priya: 'dark' }, sides: { p_arjun: 'A' } });
+    const karan = () => q<{ name: string; partners?: string[] }>('player').find((p) => p.data.name === 'Karan')!;
+    expect(karan().data.partners).toEqual(['p_priya']);
+    applyTurfSync(os, page({}, [{ table: 'potm_votes', key: 'g_sat:p_karan', rev: 42 }, { table: 'player_partners', key: 'p_karan:p_priya', rev: 42 }]));
+    expect(game('2026-10-17').data.potmVotes).toBeUndefined();
+    expect(karan().data.partners).toBeUndefined();
+  });
+
+  it('keeps Turf web’s seasons for Leaders: started ones, and the one running now', () => {
+    const page = (tables: Record<string, unknown[]>, deleted: Array<{ table: string; key: string; rev: number }> = []) => ({ since: 40, rev: 41, tables, deleted }) as unknown as TurfSyncPage;
+    applyTurfSync(os, page({ seasons: [
+      { id: 's1', name: 'Summer 2026', starts_on: '2026-03-01', ends_on: '2026-05-31' },
+      { id: 's2', name: 'Monsoon 2026', starts_on: '2026-06-01', ends_on: null },
+      { id: 's3', name: 'Winter 2099', starts_on: '2099-12-01', ends_on: null },
+    ] }));
+    const started = startedSeasons(os);
+    expect(started.map((x) => x.name)).toEqual(['Summer 2026', 'Monsoon 2026']);
+    expect(currentSeason(started)?.name).toBe('Monsoon 2026');
+    applyTurfSync(os, page({}, [{ table: 'seasons', key: 's1', rev: 42 }]));
+    expect(startedSeasons(os).map((x) => x.name)).toEqual(['Monsoon 2026']);
+  });
+});
+
+describe('auto-pick, as Turf web’s New match', () => {
+  beforeEach(() => applyTurfSync(os, first()));
+
+  it('fills to the number asked, a keeper among them, never someone already in or unavailable', () => {
+    const squad = q<{ name: string; position?: string; availability: string }>('player');
+    const id = (name: string) => squad.find((p) => p.data.name === name)!.id;
+    const add = autoPick(os, [id('Rutvij')], 3);
+    expect(add).toHaveLength(2);
+    expect(add).not.toContain(id('Rutvij'));
+    const keepers = squad.filter((p) => /goal|^gk$/i.test(p.data.position ?? '') && p.data.availability === 'AVL');
+    if (keepers.length) expect(add.some((x) => keepers.some((k) => k.id === x))).toBe(true);
+    expect(add.every((x) => squad.find((p) => p.id === x)!.data.availability === 'AVL')).toBe(true);
+    expect(autoPick(os, add, 2)).toEqual([]);
+  });
+});
+
+describe('the bell: Turf web answers now', () => {
+  const KEY = `tw_${'k'.repeat(30)}`;
+  const answer = (status: number, body: unknown) => vi.fn(async (_url: unknown, _init?: RequestInit) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
+  beforeEach(() => {
+    os.settings.set(TURF_URL, 'turf-web.example.dev');
+    secrets.set(TURF_KEY, KEY);
+  });
+
+  it('reads the inbox with the key, and sends each decision as Turf web’s own buttons do', async () => {
+    const inbox = answer(200, { submissions: [], paidClaims: [], claims: [], suggestions: [], replies: [], count: 0 });
+    expect((await fetchTurfInbox(os, inbox as unknown as typeof fetch)).count).toBe(0);
+    expect(String(inbox.mock.calls[0]![0])).toBe('https://turf-web.example.dev/api/inbox');
+    expect(new Headers(inbox.mock.calls[0]![1]!.headers).get('authorization')).toBe(`Bearer ${KEY}`);
+    const sent: Array<[string, unknown]> = [];
+    const ok = vi.fn(async (url: unknown, init?: RequestInit) => {
+      sent.push([String(url).replace('https://turf-web.example.dev', ''), JSON.parse(String(init?.body))]);
+      return new Response('{"ok":true}', { status: 200 });
+    });
+    const f = ok as unknown as typeof fetch;
+    await decideTurf(os, 'paid', 'c1', true, 150, f);
+    await decideTurf(os, 'paid', 'c2', false, undefined, f);
+    await decideTurf(os, 'stats', 's1', true, undefined, f);
+    await decideTurf(os, 'join', 'j1', false, undefined, f);
+    await decideTurf(os, 'suggestion', 'g1', false, undefined, f);
+    expect(sent).toEqual([
+      ['/api/paid-claims', { id: 'c1', decision: 'confirm', amount: 150 }],
+      ['/api/paid-claims', { id: 'c2', decision: 'dismiss' }],
+      ['/api/claims', { id: 's1', decision: 'approve' }],
+      ['/api/squad-invites', { submissionId: 'j1', decision: 'reject' }],
+      ['/api/suggestions', { id: 'g1', decision: 'decline' }],
+    ]);
+  });
+
+  it('says what Turf web said when it refuses', async () => {
+    await expect(decideTurf(os, 'stats', 'gone', true, undefined, answer(404, { error: 'That claim is closed.' }) as unknown as typeof fetch)).rejects.toThrow('That claim is closed.');
+  });
+});
+
 describe('payments recorded in LifeOS (R9c.2)', () => {
   const KEY = `tw_${'k'.repeat(30)}`;
   const src = () => os.registry.sources.get('turf')!;
@@ -281,6 +372,17 @@ describe('payments recorded in LifeOS (R9c.2)', () => {
     expect(debt('Karan', '2026-10-17').data.amount).toBe(250);
     expect(whoOwes(os).find((o) => o.name === 'Karan')!.amount).toBe(750);
     expect(turfChanges(os).sending).toHaveLength(1);
+  });
+
+  it('a part payment fills the oldest open share first; anything over waits on the last as credit', () => {
+    const open = q<AppearanceLike>('appearance').filter((a) => a.data.personId === person('Karan').id && owedOn(a.data as never) > 0).sort((a, b) => a.data.gameDate.localeCompare(b.data.gameDate));
+    expect(open.length).toBeGreaterThan(1);
+    const first = owedOn(open[0]!.data as never);
+    const items = payPart(os, open.map((a) => a.id), first + 100);
+    expect(items.map((i) => i.payload.body.amount)).toEqual([first, 100]);
+    expect(() => payPart(os, [open[0]!.id], 0)).toThrow(/above ₹0/);
+    const over = payPart(os, [open[1]!.id], 10_000);
+    expect(over.map((i) => i.payload.body.amount)).toEqual([10_000]);
   });
 
   it('sent before the sync; the entry Turf web confirms (same action id) replaces the sending one', async () => {
@@ -481,10 +583,11 @@ describe('matches changed in LifeOS (R9c.3)', () => {
     expect(turfChanges(os).refused.map((i) => i.error)).toEqual(['The match it belongs to wasn’t made in Turf web', 'Complete the game and select its players.']);
   });
 
-  it('an edit splits the shares again, keeps who stays as they were, adds and takes off; someone who paid needs a refund first', () => {
+  it('an edit splits the shares again, keeps who stays as they were, adds and takes off; money with nowhere to go needs a refund first', () => {
     const sat = game('2026-10-17');
     const base = { date: '2026-10-17', time: '20:00', venueId: venue('Playground Arena'), totalCost: 1800, paymentTerms: 'postpaid' as const, sideSize: 6, frontedById: profile('Rutvij') };
-    expect(() => editMatch(os, sat.id, { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Priya')] })).toThrow(/Arjun paid towards this match/);
+    // Arjun paid here and has no other match for it to go to.
+    expect(() => editMatch(os, sat.id, { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Priya')] })).toThrow(/Arjun has ₹200 on this match and no other match/);
 
     const item = editMatch(os, sat.id, { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Priya'), profile('Arjun'), profile('Neel (guest)')] });
     expect(item.payload).toMatchObject({ method: 'PUT', body: { action: 'game', id: 'g_sat', playerIds: ['p_rutvij', 'p_karan', 'p_priya', 'p_arjun', 'p_guest'] } });
@@ -493,6 +596,19 @@ describe('matches changed in LifeOS (R9c.3)', () => {
     expect(appearance('Neel (guest)', '2026-10-17').data).toMatchObject({ share: 360, paid: false, sourceKey: 'turf:game_players:g_sat:p_guest' });
     // Not set by hand, so like Turf web the score follows the goals logged after an edit (2 + 4 for A, 1 for B).
     expect(game('2026-10-17').data).toMatchObject({ scoreA: 6, scoreB: 1 });
+  });
+
+  it('someone who paid can be taken off when they have another match: Turf web moves their money there', () => {
+    const sat = game('2026-10-17');
+    const base = { date: '2026-10-17', time: '20:00', venueId: venue('Playground Arena'), totalCost: 1800, paymentTerms: 'postpaid' as const, sideSize: 6, frontedById: profile('Rutvij') };
+    // Priya fronted 14 Oct and 24 Oct is tentative, so at first her ₹450 has nowhere to go.
+    const edit = { ...base, playerIds: [profile('Rutvij'), profile('Karan'), profile('Arjun')] };
+    expect(() => editMatch(os, sat.id, edit)).toThrow(/Priya has ₹450/);
+    const later = game('2026-10-24');
+    os.records.update(later.id, { data: { ...later.data, paymentTerms: 'postpaid' } });
+    const item = editMatch(os, sat.id, edit);
+    expect(item.payload).toMatchObject({ method: 'PUT', body: { playerIds: ['p_rutvij', 'p_karan', 'p_arjun'] } });
+    expect(appearance('Priya', '2026-10-17').archived).toBe(true);
   });
 });
 
@@ -640,6 +756,9 @@ describe('players, venues, friends and the money texts (R9c.5)', () => {
     const [sub] = pendingSubmissions(os);
     expect(sub).toMatchObject({ id: 'sub_1', name: 'Karan', status: 'pending' });
     expect(submissionChanges(sub!, q<never>('player').find((p) => (p as { title: string }).title === 'Karan')!.data, person('Karan').data).map((c) => c.label)).toEqual(['Position', 'Shirt number']);
+    // Their own ratings (1 to 5) show beside the profile's, read on the same scale.
+    const rated = { ...sub!, payload: { pace: 4, shooting: 3 } };
+    expect(submissionChanges(rated, { pace: 80, shooting: 80 } as never).map((c) => [c.label, c.was, c.next])).toEqual([['Shooting', '4', '3']]);
     expect(os.filings.toCheck().filter((f) => f.kind === 'turf-submission').map((f) => f.label)).toEqual(['Karan submitted their profile']);
     expect(auditLog(os).map((a) => a.summary)).toEqual(['Karan 4G · Sat 17 Oct', 'Arjun paid ₹200 · Sat 17 Oct']);
     applyTurfSync(os, delta(41, 42, { profile_submissions: [{ id: 'sub_1', player_id: 'p_karan', invite_id: 'inv_1', payload: '{}', status: 'approved' }] }));
@@ -673,30 +792,28 @@ describe('shares paid by SMS (R9c.6)', () => {
   const asks = () => os.filings.toCheck().filter((f) => f.kind === SMS_ASK);
   const paid = () => os.filings.toCheck().filter((f) => f.kind === SMS_PAID);
 
-  it('a new sender is asked about once; Yes records the share and learns them; next time it is recorded on its own, with Undo', () => {
-    // Karan owes ₹500 (Wed 14) and ₹450 (Sat 17). A first SMS from an unknown UPI id: asked.
+  it('a squad member paying exactly what they owe is recorded on its own and learned, with Undo; a part payment is asked, and Yes records it (15 Nov)', () => {
+    // Karan owes ₹500 (Wed 14) and ₹450 (Sat 17). His bank name's first name is only his: sure.
     sms(450, '2026-10-18', 'KARAN MEHTA', 'Rs.450.00 credited to HDFC Bank A/c XX1234 on 18-10-26 from VPA karan.m@okhdfc (UPI 426912345679)');
-    expect(asks().map((f) => f.label)).toEqual(['Karan paid ₹450 for Sat, 17 Oct?']);
-    expect(asks()[0]!.flag).toMatch(/₹450 in from KARAN MEHTA · SMS/);
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹450 · Sat, 17 Oct/)]);
+    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ amountPaid: 450 });
+    expect(os.aliases.lookup('karan.m@okhdfc').map((a) => a.entityId)).toEqual([person('Karan').id]);
+    expect(turfChanges(os).sending.map((i) => i.payload.body)).toEqual([expect.objectContaining({ action: 'payment', playerId: 'p_karan', amount: 450, via: 'sms' })]);
+    undoSmsPayment(os, paid()[0]!.id);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(0);
+
+    // Part of the Wednesday share: asked; Yes records it, once; it stays until sent.
+    sms(200, '2026-10-19', 'KARAN MEHTA', 'Rs.200.00 credited to HDFC Bank A/c XX1234 on 19-10-26 from VPA karan.m@okhdfc');
+    expect(asks().map((f) => f.label)).toEqual(['Karan paid ₹200 of ₹500 for Wed, 14 Oct?']);
+    expect(asks()[0]!.flag).toMatch(/₹200 in from KARAN MEHTA · SMS/);
     const askId = asks()[0]!.id;
     confirmSmsAsk(os, askId);
     confirmSmsAsk(os, askId); // a second Yes pays nothing more
-    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ amountPaid: 450 });
-    // The answered question stays until the payment has gone, then leaves To check.
+    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(200);
     expect(asks().map((f) => f.id)).toEqual([askId]);
     settleSmsAsk(os, askId);
     expect(asks()).toHaveLength(0);
-    expect(os.aliases.lookup('karan.m@okhdfc').map((a) => a.entityId)).toEqual([person('Karan').id]);
-    expect(turfChanges(os).sending.map((i) => i.payload.body)).toEqual([expect.objectContaining({ action: 'payment', playerId: 'p_karan', amount: 450, via: 'sms' })]);
-
-    // The same sender pays the Wednesday share: known, exact, in the window — recorded without asking.
-    sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited to HDFC Bank A/c XX1234 on 19-10-26 from VPA karan.m@okhdfc');
-    expect(asks()).toHaveLength(0);
-    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹500 · Wed, 14 Oct/)]);
-    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(500);
-    undoSmsPayment(os, paid()[0]!.id);
-    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(0);
-    expect(paid()).toHaveLength(0);
   });
 
   it('a smaller amount is asked as a part payment; money from outside the squad or with nothing open is left alone', () => {
@@ -705,6 +822,77 @@ describe('shares paid by SMS (R9c.6)', () => {
     sms(450, '2026-10-18', 'SWIGGY REFUND', 'Rs.450 credited from VPA swiggy@icici');
     sms(999, '2026-12-30', 'KARAN MEHTA', 'Rs.999 credited from VPA karan.m@okhdfc');
     expect(asks()).toHaveLength(1);
+  });
+
+  it("a matched share is a payback, not income (Your share); Undo makes it money in again", () => {
+    os.records.update(person('Karan').id, { data: { upi: 'karan.m@okhdfc' } });
+    const tx = sms(500, '2026-10-19', 'KARAN MEHTA', 'Rs.500.00 credited from VPA karan.m@okhdfc');
+    expect(os.records.get<{ share?: number }>(tx.id)!.data.share).toBe(0);
+    undoSmsPayment(os, paid()[0]!.id);
+    expect(os.records.get<{ share?: number }>(tx.id)!.data.share).toBeUndefined();
+  });
+
+  it('the turf you fronted: its booking payment counts only your share; another amount or a far day is left alone; Undo', () => {
+    const spend = (amount: number, date: string) => os.records.create({ object: 'transaction', data: { amount, kind: 'expense', category: 'other', date, merchant: 'Playo' } });
+    const far = spend(1800, '2026-10-01');
+    const odd = spend(1234, '2026-10-16');
+    const booking = spend(1800, '2026-10-16');
+    const share = (id: string) => os.records.get<{ share?: number }>(id)!.data.share;
+    expect([share(far.id), share(odd.id), share(booking.id)]).toEqual([undefined, undefined, 450]);
+    const f = os.filings.toCheck().filter((x) => x.kind === TURF_BOOKING);
+    expect(f.map((x) => x.label)).toEqual([expect.stringMatching(/^Turf booked · ₹1,800 for Sat, 17 Oct · your share ₹450/)]);
+    expect(matchVenuePayment(os, spend(1800, '2026-10-17').id)).toBeNull(); // one booking per game
+    undoVenuePayment(os, f[0]!.id);
+    expect(share(booking.id)).toBeUndefined();
+  });
+
+  it('by hand: "Who paid this?" marks their oldest open shares paid, learns the sender, with Undo', async () => {
+    const { linkPaymentToPlayer, playersOwing } = await import('./smsMatch');
+    const tx = sms(950, '2026-11-02', 'MR K M', 'Rs.950.00 credited from VPA km.pay@okaxis');
+    expect(asks()).toHaveLength(0);
+    expect(playersOwing(os).map((p) => p.name)).toContain('Karan');
+    const id = linkPaymentToPlayer(os, tx.id, person('Karan').id)!;
+    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(500);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(450);
+    expect(os.aliases.lookup('km.pay@okaxis').map((a) => a.entityId)).toEqual([person('Karan').id]);
+    expect(os.records.get<{ share?: number }>(tx.id)!.data.share).toBe(0);
+    undoSmsPayment(os, id);
+    expect(appearance('Karan', '2026-10-14').data.amountPaid).toBe(0);
+  });
+
+  it('questions asked under an older rule are looked at again: a known sender paying exactly is recorded, a share paid some other way closes its question', async () => {
+    const { matchRecentPayments } = await import('./smsMatch');
+    // A payment looked at once already, and asked about then (as before 15 Nov).
+    const legacyAsk = (amount: number, date: string, merchant: string, name: string) => {
+      const tx = os.records.create({ object: 'transaction', data: { amount, kind: 'transfer', category: 'other', date, merchant, rawText: `Rs.${amount}.00 credited` } });
+      os.records.update(tx.id, { data: { kind: 'income' } });
+      os.settings.set('turf.smsSeen', [...os.settings.get<string[]>('turf.smsSeen', []), tx.id]);
+      const ap = appearance(name, '2026-10-17');
+      os.filings.add({ source: 'turf', sourceRef: tx.id, kind: SMS_ASK, entityId: tx.id, label: `${name} paid ₹${amount} for Sat, 17 Oct?`, before: { txId: tx.id, personId: person(name).id, appearanceIds: [ap.id], amount, sender: merchant } });
+      return tx;
+    };
+    legacyAsk(450, '2026-10-18', 'KARAN MEHTA', 'Karan');
+    legacyAsk(250, '2026-10-18', 'ARJUN RAO', 'Arjun');
+    markPaid(os, appearance('Arjun', '2026-10-17').id); // paid by hand meanwhile
+    const arjunPaid = appearance('Arjun', '2026-10-17').data.amountPaid;
+    expect(asks()).toHaveLength(2);
+    matchRecentPayments(os, 3650);
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹450 · Sat, 17 Oct/)]);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(450);
+    expect(appearance('Arjun', '2026-10-17').data.amountPaid).toBe(arjunPaid); // not paid twice
+  });
+
+  it('a known friend sending up to ₹20 more is paid on their own, the extra money in; more than that is asked, saying how much more (15 Nov)', () => {
+    // Karan owes ₹500 (Wed 14) and ₹450 (Sat 17).
+    const tx = sms(465, '2026-10-18', 'KARAN MEHTA', 'Rs.465.00 credited from VPA karan.m@okhdfc');
+    expect(asks()).toHaveLength(0);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹465 · Sat, 17 Oct/)]);
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(450);
+    expect(os.records.get<{ share?: number }>(tx.id)!.data.share).toBe(15);
+    sms(650, '2026-10-19', 'KARAN MEHTA', 'Rs.650.00 credited from VPA karan.m@okhdfc');
+    expect(asks().map((f) => f.label)).toEqual(['Karan sent ₹650, ₹150 more than the ₹500 for Wed, 14 Oct?']);
+    expect(appearance('Karan', '2026-10-14').data.amountPaid ?? 0).toBe(0);
   });
 
   it('one of several UPI ids on their Person is known at once (core identity)', () => {

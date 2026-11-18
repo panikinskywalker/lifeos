@@ -1,6 +1,8 @@
 import { createLifeOS } from '@core/lifeos';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
+import { Platform } from 'react-native';
+import { swConfig, syncSplitwise, SplitwiseClient } from '@modules/finance/splitwise';
 import { installedModules } from '@modules/index';
 import { installedBoards } from '@boards/index';
 import { bindSettingsPersistence, useSettings } from '@ui/hooks/useSettings';
@@ -12,6 +14,8 @@ export { syncReminderNotifications };
 import { openDatabase, openDemoDatabase } from './openDatabase';
 import { demoIsFresh, isDemo, markDemoOpened } from './demo';
 import { demoFolders, seedDemo } from './seed';
+import { startShownModules } from '@core/registry/shown';
+import { buildAgentFromSettings } from './agentProvider';
 import { deviceBridge } from './sources';
 import { brainModel, runBrainPass } from './brain';
 import { runFiling } from './filing';
@@ -60,16 +64,16 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     },
   });
   // The brain's Claude for boards (Snap the fridge, Another idea): the saved key, passes one at a time.
-  const brain = { model: () => brainModel(os), pass: (why?: string) => runBrainPass(os, 'manual', why) };
+  const brain = { model: (id?: string) => brainModel(os, id), pass: (why?: string) => runBrainPass(os, 'manual', why) };
   // The demo reads nothing from the phone, and with no secrets Turf web and Notion stay switched off.
-  os.device = demo ? { folders: demoFolders, brain } : { ...deviceBridge(os), brain };
+  os.device = demo ? { folders: demoFolders, brain } : { ...deviceBridge(os), brain, agent: () => buildAgentFromSettings(os), claudeKey: () => getProviderKey('claude').catch(() => null) };
   // The automations' Ask Claude step: the brain's key and model (R10).
   os.automation.modelProvider = () => brainModel(os);
 
   if (demo) {
     await seedDemo(os).catch((e) => console.warn('demo seed failed', e));
     markDemoOpened();
-  }
+  } else startShownModules(os); // Money and Turf only, until more are finished (You › Modules).
 
   // Settings: DB → zustand, and zustand → DB on change.
   const stored = os.settings.all();
@@ -115,6 +119,19 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   bus.on('app.foreground', () => void runFiling(os));
   // Phone data (bank SMS, payment notifications, screen time, Health Connect): on every foreground and live.
   bus.on('app.foreground', () => void syncSources(os));
+  // A linked person's share made, changed, settled or deleted: Splitwise hears within seconds (docs/MODEL.md, Splitwise and settling up).
+  let swTimer: ReturnType<typeof setTimeout> | null = null;
+  const swSoon = ({ entity }: { entity: { object: string; data: unknown } }) => {
+    if (entity.object !== 'debt' || Platform.OS === 'web') return;
+    const c = swConfig(os);
+    if (!c.me || c.signedOut || !c.people[(entity.data as { personId?: string }).personId ?? '']) return;
+    if (swTimer) clearTimeout(swTimer);
+    swTimer = setTimeout(() => void syncSplitwise(os, new SplitwiseClient()).catch(() => {}), 4000);
+  };
+  bus.on('entity.created', swSoon);
+  bus.on('entity.updated', swSoon);
+  bus.on('entity.status', swSoon);
+  bus.on('entity.deleted', swSoon);
   listenLive(os);
 
   // Run any due scheduled jobs now, then hand off to the background task.

@@ -13,37 +13,10 @@ import { fonts } from '@ui/theme/tokens';
 import { Icon, Text, Toggle, useToast } from '@ui/kit';
 import { categoryOf, type AccountData, type SubscriptionData } from '@modules/finance/types';
 import { perMonth } from '@modules/finance/reports';
-import { ActionPill, Caps, Disc, FieldRow, FieldValue, Hairline, IconDisc, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, accountName, catColor, day } from './parts';
+import { ActionPill, Caps, Disc, FieldRow, FieldValue, Hairline, IconDisc, Metric, Quick, RecordBar, RecordExtras, Rows, SectionHead, StatusPill, accountName, catColor, day } from './parts';
 
 const UNIT: Record<string, string> = { day: 'day', week: 'week', month: 'month', year: 'year' };
 const every = (n: number | null | undefined, unit: string | null | undefined) => (n && n > 1 ? `Every ${n} ${UNIT[unit ?? 'month']}s` : `Every ${UNIT[unit ?? 'month']}`);
-
-/** One of the three numbers under the header: a caps label, 22/700, a 12 line. */
-function Metric({ label, value, unit, line, color }: { label: string; value: string; unit?: string; line?: string; color?: string }) {
-  return (
-    <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      <Caps>{label}</Caps>
-      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 22, lineHeight: 26, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'], color }}>
-        {value}
-        {unit ? <Text style={{ fontSize: 13, fontWeight: '600', color }}>{` ${unit}`}</Text> : null}
-      </Text>
-      {line ? <Text numberOfLines={1} color="secondary" style={{ fontSize: 12, lineHeight: 15 }}>{line}</Text> : null}
-    </View>
-  );
-}
-
-/** A 56 round action with its word under it. */
-function Quick({ label, icon, color, onPress }: { label: string; icon: string; color?: string; onPress: () => void }) {
-  const t = useTheme();
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 8, opacity: pressed ? 0.7 : 1 })}>
-      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: t.c.bg.tile, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={icon} size={20} color={color ?? t.c.accent.gold} />
-      </View>
-      <Text numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, fontWeight: '600' }}>{label}</Text>
-    </Pressable>
-  );
-}
 
 /** The price as a step line over time: open dots where it changed, a solid one at now. */
 function PriceChart({ history, label }: { history: Array<{ amount: number; from: string }>; label: string }) {

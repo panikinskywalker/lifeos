@@ -48,6 +48,12 @@ describe('a photo sent on purpose', () => {
     expect(JSON.stringify(os.db.all('SELECT * FROM brain_learned'))).not.toContain(PHOTO);
   });
 
+  it('sends the type the file really is: a JPEG the picker called PNG goes as JPEG', async () => {
+    const m = model();
+    await askWithPhoto(os, m, { ...ask(), image: { mediaType: 'image/png', data: '/9j/4AAQSkZJRg' } }, NOW);
+    expect(m.complete).toHaveBeenCalledWith(expect.objectContaining({ image: { mediaType: 'image/jpeg', data: '/9j/4AAQSkZJRg' } }));
+  });
+
   it('no key, the brain off, or over the budget: nothing leaves and nothing is logged', async () => {
     expect(await askWithPhoto(os, null, ask(), NOW)).toEqual({ ok: false, note: 'no key' });
     setBrainSettings(os, { budget: 2000 });
@@ -77,6 +83,11 @@ describe('a photo sent on purpose', () => {
     await claude.complete({ system: 's', user: 'Text only', maxTokens: 10 });
     expect(bodies[0]!.messages[0]!.content).toEqual([{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: PHOTO } }, { type: 'text', text: 'Compare.' }]);
     expect(bodies[1]!.messages[0]!.content).toBe('Text only');
+    // A statement read asks for little thought, so a long list has room; the default stays medium.
+    await claude.complete({ system: 's', user: 'Read this.', maxTokens: 8000, effort: 'low' });
+    const effort = (b: unknown) => (b as { output_config: { effort: string } }).output_config.effort;
+    expect(effort(bodies[2])).toBe('low');
+    expect(effort(bodies[1])).toBe('medium');
   });
 });
 

@@ -51,6 +51,10 @@ export interface AssistantOptions {
   contextBudget?: number;
   /** Only these tools (the one box's question path is read-only: filing goes through dumps). */
   toolFilter?: (t: AiToolDef) => boolean;
+  /** A module's own instructions after the house ones (Ask Money's). */
+  extraSystem?: string;
+  /** Pick tools by the message (default); off sends every allowed tool (a small, fixed set). */
+  selectTools?: boolean;
 }
 
 export function toolSpec(t: AiToolDef): ToolSpec {
@@ -191,10 +195,12 @@ Guidelines:
       emit({ id: newId(), role: 'assistant', text, createdAt: Date.now() });
       return turns;
     }
-    const specs = selectTools(userText, tools, this.history).map(toolSpec);
+    const specs = (this.opts.selectTools === false ? tools : selectTools(userText, tools, this.history)).map(toolSpec);
     const maxRounds = this.opts.maxToolRounds ?? 8;
-    const context = buildContext(this.os, userText, { budget: this.opts.contextBudget });
-    const system = context ? `${this.systemPrompt()}\n\n${context}` : this.systemPrompt();
+    // A budget of 0 sends no retrieved context (Ask Money: only the payments its tools return leave).
+    const context = this.opts.contextBudget === 0 ? '' : buildContext(this.os, userText, { budget: this.opts.contextBudget });
+    const base = this.opts.extraSystem ? `${this.systemPrompt()}\n\n${this.opts.extraSystem}` : this.systemPrompt();
+    const system = context ? `${base}\n\n${context}` : base;
 
     let route = this.opts.smartProvider ? routeMessage(userText) : { tier: 'fast' as Tier, reason: 'routing off' };
     const pick = () => (route.tier === 'smart' && this.opts.smartProvider ? this.opts.smartProvider : this.opts.provider!);
@@ -305,7 +311,7 @@ export function selectTools(text: string, tools: AiToolDef[], history: ChatMessa
 }
 
 /** Tools that only read — the one box's question path (docs/GRAPH.md §5). */
-export const READ_ONLY_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'aggregate', 'list_entity_types', 'connections', 'recall', 'upkeep_status', 'balances', 'finance_summary', 'list_reminders', 'recent_activity', 'attach_file', 'find_notes', 'what_i_know']);
+export const READ_ONLY_TOOLS = new Set(['resolve_entity', 'search', 'query_entities', 'get_entity', 'aggregate', 'list_entity_types', 'connections', 'recall', 'upkeep_status', 'balances', 'finance_summary', 'list_reminders', 'recent_activity', 'attach_file', 'find_notes', 'what_i_know', 'spend', 'subscriptions_run_rate', 'net_worth', 'portfolio', 'money_answer', 'money_query', 'money_show', 'trip_spend', 'health_today']);
 
 /** The confirm card's line: the tool's own describe(), else its name and the key inputs. */
 export function confirmSummary(def: AiToolDef, input: unknown, os: LifeOSContext): string {
@@ -323,6 +329,8 @@ export function confirmSummary(def: AiToolDef, input: unknown, os: LifeOSContext
 function summarizeTool(name: string, input: unknown, output: unknown): string {
   const i = input as Record<string, unknown>;
   switch (name) {
+    case 'money_answer':
+      return 'Worked out on the phone';
     case 'search':
       return `Searched "${i.query}"`;
     case 'query_entities':

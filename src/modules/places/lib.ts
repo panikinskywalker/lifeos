@@ -4,6 +4,7 @@ import type { LocationValue } from '@core/domain/fields';
 import type { Actor } from '@core/events/bus';
 import { placeKindFor } from './kinds';
 import type { OrgData, PlaceData } from './types';
+import { spentOf } from '@core/dashboard/money';
 
 /** Places' own queries and writes (R3): matching a name to a Place, the parent chain, visits, distance, the R3 fold. */
 
@@ -107,9 +108,9 @@ export function spentAt(os: LifeOSContext, placeId: string, sinceDay?: string): 
   for (const o of orgsAt(os, placeId)) {
     for (const r of os.links.forEntity(o.id, 'payee')) {
       if (r.direction !== 'in' || r.other.object !== 'transaction') continue;
-      const t = os.records.get<{ amount?: number; kind?: string; date?: string }>(r.other.id);
+      const t = os.records.get<{ amount?: number; share?: number; kind?: string; date?: string }>(r.other.id);
       if (!t || t.data.kind !== 'expense' || (sinceDay && (t.data.date ?? '') < sinceDay)) continue;
-      total += t.data.amount ?? 0;
+      total += spentOf(t.data);
       count++;
     }
   }

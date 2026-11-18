@@ -7,12 +7,16 @@ import { financeBrain } from './brain';
 import { financeParsers } from './filing/parser';
 import { financeSources } from './sources';
 import { financeFilingTools } from './filing/tools';
-import { linkMissingPayees } from './filing/payee';
+import { linkMissingPayees, tidyPayeeNames } from './filing/payee';
+import { sortOldMoneyIn } from './filing/moneyIn';
+import { spotSubscriptions } from './filing/recurring';
 import { billType } from './bills';
 
 export * from './bills';
 import { learnCategory, payeeOf } from './filing/rules';
+import { foldSplitShares } from './split';
 import { bus } from '@core/events/bus';
+import { settleFromPayment } from './settleUpi';
 
 export const financeModule: ModuleManifest = {
   id: 'finance',
@@ -86,6 +90,34 @@ export const financeModule: ModuleManifest = {
     // R1: Budget records became monthly targets on their categories; a bank name becomes an Organisation. Both fold once.
     foldBudgetsIntoTargets(os);
     foldInstitutions(os);
+    // Your share (14 Nov): splits saved before it count your part from now on. Once.
+    foldSplitShares(os);
+    // Payee names an older parser left with a reference number: cleaned and merged, once (15 Nov).
+    if (!os.settings.get<boolean>('finance.payeeTidyV1', false)) {
+      tidyPayeeNames(os);
+      os.settings.set('finance.payeeTidyV1', true);
+    }
+    // Money in filed before Counting money (15 Nov): friends' money is money back, a shop's is a refund. Once.
+    if (!os.settings.get<boolean>('finance.moneyInV1', false)) {
+      sortOldMoneyIn(os);
+      os.settings.set('finance.moneyInV1', true);
+    }
+    // A fund redemption filed before 15 Nov took money out of the bank: it arrives there. Once.
+    if (!os.settings.get<boolean>('finance.redemptionsV1', false)) {
+      for (const r of os.records.query<{ accountId?: string; toAccountId?: string; rawText?: string }>('transaction', { filter: { and: [{ field: 'data.kind', op: 'eq', value: 'investment' }] } }, { limit: 100_000 })) {
+        if (r.data.accountId && !r.data.toAccountId && /\bredeem(?:ed|ption)?\b/i.test(r.data.rawText ?? '')) os.records.update(r.id, { data: { accountId: undefined, toAccountId: r.data.accountId } }, 'system');
+      }
+      os.settings.set('finance.redemptionsV1', true);
+    }
+    // Payments filed before subscriptions were spotted get looked at once (phase D).
+    if (!os.settings.get<boolean>('finance.spottedV1', false)) {
+      spotSubscriptions(os);
+      os.settings.set('finance.spottedV1', true);
+    }
+    // Money from someone you have a balance with (or to someone you owe) settles it, the moment the payment is tied to them.
+    bus.on('relation.added', ({ relation }) => {
+      if (relation.kind === 'person' || relation.kind === 'payee') settleFromPayment(os, relation.fromId);
+    });
     // You recategorised a payment: that payee keeps the category next time (SMS, notifications, mail).
     bus.on('entity.updated', ({ entity, previous, actor }) => {
       if (actor !== 'user' || entity.object !== 'transaction') return;

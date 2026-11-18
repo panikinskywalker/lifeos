@@ -2,6 +2,7 @@ import type { LifeOSContext } from '../registry/context';
 import type { Row } from '../db/adapter';
 import { daily, isoDay, type MetricId } from './metrics';
 import { upkeep, type Upkeep } from '../cycles/upkeep';
+import { incomeSql, spentSql } from './money';
 
 /**
  * Today at a glance (v4 home): the day in time order, what you've done so
@@ -104,14 +105,14 @@ export function doneToday(os: LifeOSContext, now = Date.now()): DoneToday {
   const today = isoDay(now);
   const has = (t: string) => os.registry.objects.has(t);
   const money = has('transaction')
-    ? os.db.all<{ kind: string; total: number; n: number }>(`SELECT json_extract(data,'$.kind') AS kind, SUM(json_extract(data,'$.amount')) AS total, COUNT(*) AS n FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date')=? GROUP BY kind`, [today])
-    : [];
+    ? os.db.get<{ spent: number | null; received: number | null; n: number }>(`SELECT SUM(${spentSql()}) AS spent, SUM(${incomeSql()}) AS received, SUM(json_extract(data,'$.kind')='expense') AS n FROM records WHERE object='transaction' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [today])
+    : null;
   const w = has('workout') ? os.db.get<{ n: number; m: number | null }>(`SELECT COUNT(*) AS n, SUM(json_extract(data,'$.durationMin')) AS m FROM records WHERE object='workout' AND deleted_at IS NULL AND json_extract(data,'$.date')=?`, [today]) : null;
   const count = (sql: string, p: unknown[]) => os.db.get<{ n: number }>(sql, p as never[])?.n ?? 0;
   return {
-    spent: money.find((m) => m.kind === 'expense')?.total ?? 0,
-    payments: money.find((m) => m.kind === 'expense')?.n ?? 0,
-    received: money.find((m) => m.kind === 'income')?.total ?? 0,
+    spent: Math.max(0, money?.spent ?? 0),
+    payments: money?.n ?? 0,
+    received: money?.received ?? 0,
     steps: has('measurement') ? (daily(os, 'steps', today, today).get(today) ?? null) : null,
     workouts: w?.n ?? 0,
     workoutMin: w?.m ?? 0,
@@ -177,7 +178,8 @@ export function goals(os: LifeOSContext, now = Date.now()): Goal[] {
     { id: 'steps', label: 'Steps', better: 'up', ...pick('steps', steps != null ? steps * 1.05 : null, (n) => Math.max(1000, Math.round(n / 500) * 500)) },
     { id: 'sleep', label: 'Sleep', better: 'up', ...pick('sleep', sleep != null ? sleep + 0.25 : null, (n) => Math.round(n * 4) / 4) },
     { id: 'screen', label: 'Screen time', better: 'down', ...pick('screen', screen != null ? screen * 0.95 : null, (n) => Math.max(0.5, Math.round(n * 2) / 2)) },
-    { id: 'spend', label: 'Spend this month', better: 'down', ...pick('spend', spend, (n) => Math.round(n / 1000) * 1000) },
+    // The usual month as it is, so Today's ring and the Money tile say the same figure.
+    { id: 'spend', label: 'Spend this month', better: 'down', ...pick('spend', spend, (n) => Math.round(n)) },
   ];
 }
 

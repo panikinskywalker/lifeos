@@ -1,6 +1,7 @@
 import type { LifeOSContext } from '../registry/context';
 import { brains, lastPassToday, type PassName } from './runner';
 import { startOfDay } from './store';
+import { isModuleShown } from '../registry/shown';
 
 /**
  * The Morning brief on Today (docs/MODEL.md layer 8): today's nudges in a few
@@ -37,17 +38,30 @@ export function urgentWhen(line: string): string {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** Modules you left out of the morning brief (You › Notifications). Their cards still come to To check. */
+export const BRIEF_OFF = 'brief.off';
+export const briefOff = (os: LifeOSContext): Set<string> => new Set(os.settings.get<string[]>(BRIEF_OFF, []));
+export function setBriefShows(os: LifeOSContext, module: string, on: boolean): void {
+  const off = briefOff(os);
+  if (on) off.delete(module);
+  else off.add(module);
+  os.settings.set(BRIEF_OFF, [...off]);
+}
+
 export function brief(os: LifeOSContext, now = Date.now(), max = 6): Brief {
   const lines: BriefLine[] = [];
+  const off = briefOff(os);
   for (const n of os.brain.nudges.since(startOfDay(now))) {
     if (n.state === 'no' || n.state === 'undone') continue;
     const rec = n.recordId ? os.records.get(n.recordId) : undefined;
     // A routine is Upkeep's, whichever module keeps it.
+    if (off.has(rec?.object === 'routine' ? 'upkeep' : n.module) || !isModuleShown(os, n.module)) continue;
     lines.push({ id: n.id, text: n.line, module: rec?.object === 'routine' ? 'upkeep' : n.module, urgent: n.urgent, when: n.urgent ? urgentWhen(n.line) : null, route: n.route ?? (rec ? `/entity/${rec.object}/${rec.id}` : '/check'), answered: n.state !== 'open' });
   }
   lines.sort((a, b) => Number(b.urgent) - Number(a.urgent) || Number(a.answered) - Number(b.answered));
   const out = lines.slice(0, max);
   for (const b of brains(os)) {
+    if (off.has(b.module) || !isModuleShown(os, b.module)) continue;
     let asks: ReturnType<NonNullable<typeof b.def.asks>> = [];
     try {
       asks = b.def.asks?.(os, now) ?? [];
