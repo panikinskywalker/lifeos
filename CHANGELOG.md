@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.127 · 18 Nov 2026
+
+**Trips move as one, People in whole rupees** (merged from `claude/serene-edison-o0lpvy`, labelled v0.0.33 on GitHub). Switching sections on the trip bar crossfades while the header and the bar stay still; a stop, day, booking or spend slides in; Log a spend, Split a receipt, Pay back and the copilot rise from the bottom. **Split a receipt** keeps long receipts whole, takes WebP photos, and picking from your photos no longer asks for a permission. **People** shows balances in whole rupees.
+
 ## v0.0.126 · 18 Nov 2026
 
 **A trip's receipt photo is read again.** Claude refused every one before reading it (the question's shape was missing a rule Claude needs). If it ever fails now, the message says why.

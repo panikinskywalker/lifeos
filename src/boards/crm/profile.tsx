@@ -658,7 +658,8 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
   const neverSpoken = !p.data.lastContactAt && !vendor;
   const open = (object: string, rid: string) => router.push(`/entity/${object}/${rid}`);
   const edit = () => controls?.edit();
-  const fmt = (n: number) => ctx.format.currency(n);
+  // Balances can carry paise from a split or a yen spend; People shows whole rupees.
+  const fmt = (n: number) => ctx.format.currency(Math.round(n));
   // Short amounts for the donut's centre, as the kit writes them (₹3.2k, ₹1.3L).
   const short = (n: number) => {
     const sym = ctx.format.currency(0).replace(/[\d.,\s]/g, '') || '₹';

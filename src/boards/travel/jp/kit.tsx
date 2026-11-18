@@ -44,14 +44,28 @@ export function Wave({ color = '#F5F5F7', opacity = 0.12 }: { color?: string; op
   );
 }
 
+/**
+ * When the trip bar switches section, the new screen crossfades in; its
+ * entrance motion is skipped so the header and the bar stay still and only
+ * the content changes. `markTabSwitch` is called by the bar just before.
+ */
+let tabSwitchAt = 0;
+export function markTabSwitch() {
+  tabSwitchAt = Date.now();
+}
+const ENTRANCES = new Set(['jr', 'jstamp', 'jbar', 'jflip', 'jroll', 'jrise']);
+
 type AnimKind = 'jr' | 'jstamp' | 'jbar' | 'jshine' | 'jflip' | 'jblink' | 'jroll' | 'jrise' | 'jbreathe' | 'jnudge' | 'jspin' | 'jpulse' | 'jpulse2' | 'jwave' | 'jflow';
 const native = Platform.OS !== 'web';
 const ease = Easing.bezier(0.2, 0.8, 0.2, 1);
 
 /** A View that moves the way the artboard's class says (`jr` rises in, `jstamp` presses in, `jbar` grows from the left, ...). */
 export function Anim({ k, delay = 0, style, children, ...rest }: { k: AnimKind | string; delay?: number; style?: StyleProp<ViewStyle>; children?: React.ReactNode } & React.ComponentProps<typeof View>) {
-  const v = useRef(new Animated.Value(0)).current;
+  // On a section switch the entrance shows at once (the screen itself crossfades).
+  const still = useRef(ENTRANCES.has(k) && Date.now() - tabSwitchAt < 1200).current;
+  const v = useRef(new Animated.Value(still ? 1 : 0)).current;
   useEffect(() => {
+    if (still) return;
     const loop = ['jblink', 'jbreathe', 'jnudge', 'jspin', 'jpulse', 'jpulse2'].includes(k);
     const dur = k === 'jstamp' ? 500 : k === 'jbar' || k === 'jrise' ? 900 : k === 'jflip' ? 450 : k === 'jroll' ? 600 : k === 'jblink' ? 1100 : k === 'jspin' ? 1600 : k === 'jbreathe' ? 3000 : 2200;
     const start = k === 'jstamp' ? 700 : k === 'jbar' ? 250 : k === 'jrise' ? 200 : 0;
@@ -66,7 +80,7 @@ export function Anim({ k, delay = 0, style, children, ...rest }: { k: AnimKind |
     }
     a.start();
     return () => a.stop();
-  }, [k, delay, v]);
+  }, [k, delay, v, still]);
   const flat = StyleSheet.flatten(style) ?? {};
   const base = (flat.transform as unknown[] | undefined) ?? [];
   let extra: Record<string, unknown> = {};

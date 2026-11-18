@@ -99,8 +99,8 @@ export function LastSpokeChip({ days, overdueBy }: { days: number | null; overdu
 
 /** Balance: in is lime ("owes you ₹1,620"), out is white ("you owe ₹400"), else "settled". */
 export function BalanceChip({ amount, format }: { amount: number; format: (n: number) => string }) {
-  if (amount > 0) return <Chip28 label={`owes you ${format(amount)}`} tone="lime" />;
-  if (amount < 0) return <Chip28 label={`you owe ${format(-amount)}`} tone="white" />;
+  if (amount > 0) return <Chip28 label={`owes you ${format(Math.round(amount))}`} tone="lime" />;
+  if (amount < 0) return <Chip28 label={`you owe ${format(Math.round(-amount))}`} tone="white" />;
   return <Chip28 label="settled" />;
 }
 

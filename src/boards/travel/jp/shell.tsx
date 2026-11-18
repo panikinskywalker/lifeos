@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ObjectRecord } from '@core/domain/types';
 import type { TripData } from '@modules/travel';
-import { Anim, JP_SANS, JP_SERIF, MONO } from './kit';
+import { Anim, JP_SANS, JP_SERIF, markTabSwitch, MONO } from './kit';
 
 /**
  * Every trip screen's frame, as the *Trip template · Noir (Japan)* artboards
@@ -235,9 +235,11 @@ export function TripBar({ tripId, active }: { tripId: string; active: TripTab })
   const insets = useSafeAreaInsets();
   const go = (k: Exclude<TripTab, null>) => {
     if (k === active) return;
-    const r = k === 'overview' ? tripRoutes.overview(tripId) : k === 'plan' ? tripRoutes.plan(tripId) : k === 'bookings' ? tripRoutes.bookings(tripId) : k === 'money' ? tripRoutes.money(tripId) : tripRoutes.prep(tripId);
-    if (active) router.replace(r);
-    else router.push(r);
+    // A section switch: same screen frame, crossfaded (`via: 'tab'`, see src/platform/motion.ts).
+    const r = k === 'overview' ? { pathname: '/entity/[type]/[id]', params: { type: 'trip', id: tripId, via: 'tab' } } : { pathname: '/module/[id]/[page]', params: { id: 'travel', page: k, trip: tripId, via: 'tab' } };
+    markTabSwitch();
+    if (active) router.replace(r as never);
+    else router.push(r as never);
   };
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: Math.max(20, insets.bottom + 8), paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
