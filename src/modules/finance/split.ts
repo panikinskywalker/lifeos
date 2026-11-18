@@ -201,6 +201,38 @@ export function settlingPayment(os: LifeOSContext, personId: string, balance: nu
   return hits[0]?.id ?? null;
 }
 
+/** Settle someone's open shares in one direction, oldest first, up to an amount. Turf's shares are Turf's to settle (its ledger sets their status). */
+export function settleOldest(os: LifeOSContext, personId: string, direction: DebtData['direction'], amount: number): string[] {
+  const open = os.records
+    .query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: personId }, { field: 'status', op: 'eq', value: 'open' }] } }, { limit: 500 })
+    .filter((d) => d.data.direction === direction && !os.links.forEntity(d.id).some((l) => l.other.object === 'appearance'))
+    .sort((a, b) => a.data.date.localeCompare(b.data.date) || a.createdAt - b.createdAt);
+  const settled: string[] = [];
+  let left = amount + 0.5;
+  for (const d of open) {
+    if (d.data.amount > left) break;
+    left -= d.data.amount;
+    os.records.setStatus(d.id, 'settled', 'system');
+    settled.push(d.id);
+  }
+  return settled;
+}
+
+/**
+ * Money that moved between you and someone, against what is open between you:
+ * their shares oldest first (Turf's are Turf's), then what Bills say is owed,
+ * as a payback Bill for the rest, up to the amount.
+ */
+export function applyPayment(os: LifeOSContext, personId: string, direction: DebtData['direction'], amount: number, date: string): { settled: string[]; billId: string | null } {
+  const settled = settleOldest(os, personId, direction, amount);
+  const covered = settled.reduce((n, id) => n + (os.records.get<DebtData>(id)?.data.amount ?? 0), 0);
+  const owed = billBalanceWith(os, personId) * (direction === 'they_owe' ? 1 : -1);
+  const pay = paise(Math.min(amount - covered, owed)) / 100;
+  if (pay < 0.5) return { settled, billId: null };
+  const [from, to] = direction === 'they_owe' ? [personId, 'me'] : ['me', personId];
+  return { settled, billId: makePayment(os, from, to, pay, { date }).id };
+}
+
 export function undoSettle(os: LifeOSContext, s: { paymentId: string | null; settled: string[]; payback?: string | null; billId?: string | null }): void {
   os.db.transaction(() => {
     for (const id of s.settled) os.records.setStatus(id, 'open');

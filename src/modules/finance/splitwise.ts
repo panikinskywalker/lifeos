@@ -2,17 +2,17 @@ import type { LifeOSContext } from '@core/registry/context';
 import type { ObjectRecord } from '@core/domain/types';
 import { owedOf } from '@core/money/split';
 import { billInr, billsOf, type BillData } from './bills';
-import type { DebtData } from './split';
-import { settleOldest } from './settleUpi';
+import { applyPayment, type DebtData } from './split';
 
 /**
  * Splitwise, kept in step (docs/MODEL.md, Splitwise and settling up). You sign
  * in on Splitwise's own page inside LifeOS; the session lives in the phone's
  * cookie store, which `fetch` shares, so calls go to Splitwise's API as the
  * website makes them (a CSRF token read from the page for writes). Only
- * linked people sync: a new Debt for one becomes a Splitwise expense, a Debt
- * deleted here is deleted there, a settle-up here is a payment there, and a
- * payment recorded there settles their Debts here.
+ * linked people sync: a new Debt or Bill with them becomes a Splitwise expense
+ * (in the mapped Splitwise group, else between you), one deleted here is
+ * deleted there, a settle-up or a payment from them here is a payment there,
+ * and a payment recorded there settles what is open here.
  */
 
 export const SPLITWISE = 'https://secure.splitwise.com/';
@@ -77,6 +77,8 @@ export interface SwConfig {
   billGroupsSeen?: string[];
   /** When a mapped group's Splitwise expenses were last read. */
   billsReadAt?: number;
+  /** Payments noted here for what is owed only on Splitwise (+ they paid you), sent at the next sync. */
+  toSend?: Array<{ debtId: string; personId: string; amount: number }>;
   lastSync?: number;
 }
 
@@ -93,7 +95,7 @@ export function setSwConfig(os: LifeOSContext, patch: Partial<SwConfig>): SwConf
 /** Sign out: what LifeOS knows of Splitwise goes; the links to people stay, for next time. */
 export function forgetSplitwise(os: LifeOSContext): void {
   const c = swConfig(os);
-  os.settings.set(KEY, { ...EMPTY, people: c.people, groups: c.groups, auto: c.auto, pushed: c.pushed, sent: c.sent, ours: c.ours, bills: c.bills, billGroupsSeen: c.billGroupsSeen });
+  os.settings.set(KEY, { ...EMPTY, people: c.people, groups: c.groups, auto: c.auto, pushed: c.pushed, sent: c.sent, ours: c.ours, bills: c.bills, billGroupsSeen: c.billGroupsSeen, toSend: c.toSend });
 }
 
 export class SplitwiseError extends Error {
@@ -294,6 +296,20 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
   result.billsMatched = 0;
   result.billsIn = 0;
   result.billsHeld = 0;
+  const send = async (b: ObjectRecord<BillData>, swGroup: number) => {
+    const users = billUsers(b, me.id, c.people);
+    if (!users) {
+      result.billsHeld!++;
+      return;
+    }
+    const prev = bills[b.id];
+    if (prev) await sw.deleteExpense(prev.id).catch(() => {});
+    const id = await sw.createExpense({ cost: money(r2(b.data.amount)), description: b.title.slice(0, 100), currency_code: (b.data.currency || 'INR').toUpperCase(), date: new Date(`${b.data.date}T12:00:00`).toISOString(), group_id: swGroup, payment: b.data.kind === 'payment', ...users });
+    bills[b.id] = { id, sig: billSig(b) };
+    tracked.add(id);
+    ours.add(id);
+    result.billsSent!++;
+  };
   for (const [groupId, swGroup] of Object.entries(c.groups)) {
     if (!swGroup) continue;
     const local = billsOf(os, { groupId });
@@ -316,17 +332,7 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
           continue;
         }
       }
-      const users = billUsers(b, me.id, c.people);
-      if (!users) {
-        result.billsHeld!++;
-        continue;
-      }
-      if (prev) await sw.deleteExpense(prev.id).catch(() => {});
-      const id = await sw.createExpense({ cost: money(r2(b.data.amount)), description: b.title.slice(0, 100), currency_code: (b.data.currency || 'INR').toUpperCase(), date: new Date(`${b.data.date}T12:00:00`).toISOString(), group_id: swGroup, payment: b.data.kind === 'payment', ...users });
-      bills[b.id] = { id, sig };
-      tracked.add(id);
-      ours.add(id);
-      result.billsSent!++;
+      await send(b, swGroup);
     }
     // In: expenses added (or deleted) on Splitwise.
     const trip = os.registry.objects.has('trip') ? os.records.query<{ localCurrency?: string; fxRate?: number }>('trip', { filter: { and: [{ field: 'data.groupId', op: 'eq', value: groupId }] } }, { limit: 1 })[0] : undefined;
@@ -349,6 +355,14 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
     }
     seen.add(groupId);
   }
+  // Any other Bill (a trip or a group not mapped, a payback) with only linked people, made after the last of them was linked: an expense between you.
+  if (c.auto) {
+    for (const b of billsOf(os)) {
+      if ((b.data.groupId && c.groups[b.data.groupId]) || bills[b.id]?.sig === billSig(b)) continue;
+      const others = [...new Set([...Object.keys(b.data.split.payers), ...Object.keys(owedOf(b.data.amount, b.data.split))])].filter((p) => p !== 'me');
+      if (others.length && others.every((p) => c.people[p] && b.createdAt >= c.people[p]!.at)) await send(b, 0);
+    }
+  }
   // A Bill deleted here goes there too.
   for (const [billId, v] of Object.entries(bills)) {
     const b = os.records.get(billId);
@@ -365,7 +379,7 @@ export interface SyncResult {
   removed: number;
   paidThere: number;
   settledHere: number;
-  /** A trip's or a group's Bills: sent, matched with what Splitwise had, brought in, and held back (someone in them not linked). */
+  /** Bills (a mapped group's, or between you): sent, matched with what Splitwise had, brought in, and held back (someone in them not linked). */
   billsSent?: number;
   billsMatched?: number;
   billsIn?: number;
@@ -435,11 +449,20 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       ours.add(id);
       result.paidThere++;
     }
+    // Payments noted here for what was owed only on Splitwise (undone ones are dropped).
+    const queued = c.toSend ?? [];
+    for (const q of queued) {
+      const link = c.people[q.personId];
+      if (!link || !os.records.get(q.debtId)) continue;
+      const id = await sw.createExpense({ payment: true, creation_method: 'payment', description: 'Payment', cost: money(Math.abs(q.amount)), currency_code: 'INR', date: new Date(now).toISOString(), group_id: 0, ...shareParams(link.sw, me.id, Math.abs(q.amount), q.amount > 0) });
+      ours.add(id);
+      result.paidThere++;
+    }
 
     // 3b. A trip's or a group's Bills, in a group mapped to a Splitwise group.
-    const billState = Object.keys(c.groups).length ? await syncBills(os, sw, c, me, ours, result, now) : null;
+    const billState = await syncBills(os, sw, c, me, ours, result, now);
 
-    // 4. Payments recorded on Splitwise settle their Debts here (a mapped group's payments are its Bills, above).
+    // 4. Payments recorded on Splitwise settle what is open here, Debts then Bills (a mapped group's payments are its Bills, above).
     const mapped = new Set(Object.values(c.groups));
     const since = c.lastSync ? c.lastSync - 60_000 : now - 7 * 86_400_000;
     for (const e of await sw.expenses(since)) {
@@ -452,12 +475,16 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       const iPaidThem = payer.user_id === me.id ? personFor(os, payee.user_id) : null;
       const personId = theyPaidMe ?? iPaidThem;
       if (!personId) continue;
-      const done = settleOldest(os, personId, theyPaidMe ? 'they_owe' : 'i_owe', Number(e.cost));
-      for (const id of done) sent.add(id);
-      result.settledHere += done.length;
+      const done = applyPayment(os, personId, theyPaidMe ? 'they_owe' : 'i_owe', Number(e.cost), (e.date ?? '').slice(0, 10) || new Date(now).toISOString().slice(0, 10));
+      for (const id of done.settled) sent.add(id);
+      // A payback Bill made for it is this payment, so it is never sent back.
+      const bill = done.billId ? os.records.get<BillData>(done.billId) : null;
+      if (bill) billState.bills[bill.id] = { id: e.id, sig: billSig(bill) };
+      result.settledHere += done.settled.length + (bill ? 1 : 0);
     }
 
-    setSwConfig(os, { pushed, amounts, sent: [...sent], ours: [...ours].slice(-2000), lastSync: now, ...(billState ?? {}) });
+    const sentQueue = new Set(queued.map((q) => q.debtId));
+    setSwConfig(os, { pushed, amounts, sent: [...sent], ours: [...ours].slice(-2000), lastSync: now, ...billState, toSend: (swConfig(os).toSend ?? []).filter((q) => !sentQueue.has(q.debtId)) });
     return result;
   } catch (e) {
     if (e instanceof SplitwiseError && e.signedOut) setSwConfig(os, { signedOut: true });

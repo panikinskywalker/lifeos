@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.132 · 18 Nov 2026
+
+**Splitwise keeps up on its own.**
+- Money from a friend (their UPI payment, read from the bank text or notification) settles what they owe: their shares first, then trip and group expenses, as a payback. If they're linked in Udhari, the payment goes to Splitwise within seconds.
+- If they owe you only on Splitwise (something added there, or before you linked them), the payment is still noted in LifeOS and recorded on Splitwise.
+- A trip expense with friends who are all linked goes to Splitwise even when the trip isn't mapped to a Splitwise group: as an expense between you, with who paid and each share. Edits and deletes follow. A mapped trip still goes to its Splitwise group.
+- A payment a friend records on Splitwise now also clears trip and group expenses in LifeOS, not only shares.
+
 ## v0.0.131 · 18 Nov 2026 (needs the new app build)
 
 **Long photos are read.** A photo or screenshot with a side over 8,000 pixels (a long receipt, a 50 MP photo, a long scrolling screenshot) was refused by Claude with an API 400. It is now shrunk on the phone first, in Money's +, a trip's receipt, Upload a statement and Snap the fridge.

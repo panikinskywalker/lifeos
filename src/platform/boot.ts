@@ -119,12 +119,14 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   bus.on('app.foreground', () => void runFiling(os));
   // Phone data (bank SMS, payment notifications, screen time, Health Connect): on every foreground and live.
   bus.on('app.foreground', () => void syncSources(os));
-  // A linked person's share made, changed, settled or deleted: Splitwise hears within seconds (docs/MODEL.md, Splitwise and settling up).
+  // A share or a Bill with a linked person made, changed, settled or deleted: Splitwise hears within seconds (docs/MODEL.md, Splitwise and settling up).
   let swTimer: ReturnType<typeof setTimeout> | null = null;
   const swSoon = ({ entity }: { entity: { object: string; data: unknown } }) => {
-    if (entity.object !== 'debt' || Platform.OS === 'web') return;
+    if ((entity.object !== 'debt' && entity.object !== 'bill') || Platform.OS === 'web') return;
     const c = swConfig(os);
-    if (!c.me || c.signedOut || !c.people[(entity.data as { personId?: string }).personId ?? '']) return;
+    const d = entity.data as { personId?: string; split?: { payers?: Record<string, number>; shares?: Record<string, number> } };
+    const who = d.personId ? [d.personId] : [...Object.keys(d.split?.payers ?? {}), ...Object.keys(d.split?.shares ?? {})];
+    if (!c.me || c.signedOut || !who.some((p) => c.people[p])) return;
     if (swTimer) clearTimeout(swTimer);
     swTimer = setTimeout(() => void syncSplitwise(os, new SplitwiseClient()).catch(() => {}), 4000);
   };

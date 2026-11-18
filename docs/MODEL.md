@@ -2099,6 +2099,20 @@ within 0.50, date within three days) instead of doubling it; expenses added on S
 Bills (with the trip's rate for a foreign currency), and one deleted there is deleted here. A Bill
 with someone not linked waits until they are. Splitwise payments in a mapped group are its Bills, so
 they do not also settle Debts. (`syncBills` in `src/modules/finance/splitwise.ts`.)
+**Everything with a linked person syncs on its own (18 Nov, Rutvij: "a payment comes in, if the person is on my Splitwise it logs the payment both on the app and Splitwise, all automatic"; "if I log an expense on the trip it should send it on Splitwise if the person is on Splitwise"):**
+- *Money in or out with a person* (bank text, payment notification, once it is tied to them) settles
+  what is open with them, up to what moved: their Debts oldest first (Turf's stay Turf's), then what
+  Bills say, as a payback Bill. Settled Debts that were on Splitwise and the payback Bill go there as a
+  payment. When LifeOS has nothing open but they are linked and Splitwise says they owe (added there,
+  or before you linked them), the payment is noted here (a settled payment Debt, the money a payback)
+  and sent to Splitwise as a payment (`toSend`).
+- *Any Bill with only linked people*, in no mapped group (a trip whose group is not mapped, a payback),
+  made after the last of them was linked, goes to Splitwise as an expense between you, with who paid
+  and each share; changes and deletes follow, as in a mapped group. A mapped group still goes to its
+  Splitwise group.
+- *A payment recorded on Splitwise* settles Debts, then Bills (a payback Bill, never sent back).
+- A Debt or a Bill with a linked person, made, changed, settled or deleted, starts a sync within
+  seconds; the toggle *New shares go to Splitwise* covers Debts and Bills not in a mapped group.
 **Its own board, Udhari (18 Nov, Rutvij; v0.0.123, named Udhari in v0.0.124):**
 Splitwise lives in a Browse board called **Udhari** (`src/boards/udhari`, id
 `udhari`), not a Money screen: Browse › Boards › Udhari, shown while Money is.

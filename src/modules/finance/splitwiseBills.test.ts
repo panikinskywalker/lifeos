@@ -5,7 +5,7 @@ import { Registry } from '@core/registry/registry';
 import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { crmModule } from '../crm';
-import { financeModule, makeBill, makePayment, type BillData } from '.';
+import { billBalanceWith, financeModule, makeBill, makePayment, type BillData } from '.';
 import { linkPerson, setSwConfig, swConfig, syncSplitwise, type SplitwiseClient, type SwExpense } from './splitwise';
 
 /**
@@ -114,5 +114,38 @@ describe('a trip’s Bills, kept in step with a Splitwise group', () => {
     expect(await run()).toMatchObject({ billsSent: 0, billsHeld: 1 });
     linkPerson(os, zoe, { id: 4, name: 'Zoe' });
     expect(await run()).toMatchObject({ billsSent: 1, billsHeld: 0 });
+  });
+});
+
+describe('Bills in no mapped group, and payments, on their own', () => {
+  it('a trip Bill whose group is not mapped goes to Splitwise between you, once everyone in it is linked', async () => {
+    const trip = os.records.create({ object: 'group', title: 'Japan trip', data: { name: 'Japan trip', kind: 'trip', memberIds: [ana] } }, 'user').id;
+    const zoe = os.records.create({ object: 'person', title: 'Zoe', data: {} }, 'user').id;
+    makeBill(os, 'Ramen', { amount: 2000, currency: 'JPY', date: '2026-11-14', split: { payers: { me: 2000 }, method: 'equal', shares: { me: 1, [ana]: 1 } }, groupId: trip });
+    makeBill(os, 'Taxi', { amount: 900, date: '2026-11-14', split: { payers: { me: 900 }, method: 'equal', shares: { me: 1, [zoe]: 1 } }, groupId: trip });
+    makeBill(os, 'Just mine', { amount: 100, date: '2026-11-14', split: { payers: { me: 100 }, method: 'equal', shares: { me: 1 } } });
+    expect(await run()).toMatchObject({ billsSent: 1 });
+    expect(sw.made).toHaveLength(1);
+    expect(sw.made[0]).toMatchObject({ description: 'Ramen', group_id: 0, currency_code: 'JPY', users__0__paid_share: '2000.00', users__1__user_id: String(ANA), users__1__owed_share: '1000.00' });
+    expect((await run()).billsSent).toBe(0);
+  });
+
+  it('a payment noted for what is owed only on Splitwise is sent there as a payment, once', async () => {
+    setSwConfig(os, { toSend: [{ debtId: os.records.create({ object: 'debt', status: 'settled', data: { personId: ana, direction: 'i_owe', amount: 300, reason: 'Paid, on Splitwise', date: '2026-11-18', kind: 'payment' } }, 'system').id, personId: ana, amount: 300 }] });
+    expect((await run()).paidThere).toBe(1);
+    expect(sw.made.at(-1)).toMatchObject({ payment: true, cost: '300.00', users__0__user_id: String(ANA), users__0__paid_share: '300.00', users__1__user_id: String(ME), users__1__owed_share: '300.00' });
+    expect(swConfig(os).toSend).toEqual([]);
+    expect((await run()).paidThere).toBe(0);
+  });
+
+  it('a payment Ana records on Splitwise pays back what Bills say she owes, and is not sent back', async () => {
+    makeBill(os, 'Brunch', { amount: 1000, date: '2026-11-10', split: { payers: { me: 1000 }, method: 'equal', shares: { me: 1, [ana]: 1 } } });
+    await run();
+    const sent = sw.made.length;
+    sw.list.push({ id: 900, group_id: null, payment: true, cost: '500.00', currency_code: 'INR', description: 'Payment', date: '2026-11-17T10:00:00Z', users: [{ user_id: ANA, paid_share: '500.00', owed_share: '0.00' }, { user_id: ME, paid_share: '0.00', owed_share: '500.00' }] });
+    expect((await run()).settledHere).toBe(1);
+    expect(billBalanceWith(os, ana)).toBe(0);
+    await run();
+    expect(sw.made.length).toBe(sent);
   });
 });
