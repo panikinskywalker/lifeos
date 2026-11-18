@@ -1609,7 +1609,7 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
   payment sheets start fresh each time they open, so a reading left from before
   never waits behind its Apply or Save.
 - **Photos and PDFs are read by Haiku** (17 Nov, Rutvij): a snapped or attached
-  bill and Snap the fridge go to Claude Haiku 5.5 (`PHOTO_MODEL`), whatever model
+  bill, a trip's receipt (18 Nov) and Snap the fridge go to Claude Haiku 5.5 (`PHOTO_MODEL`), whatever model
   the brain's other passes use; same key, budget and Sent to Claude log. An
   uploaded statement or fund screen is a dense table and goes to Claude Sonnet 5.5
   (`STATEMENT_MODEL`), asked to think little (effort low) with room for a long
