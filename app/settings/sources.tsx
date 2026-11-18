@@ -30,6 +30,7 @@ export default function SourcesScreen() {
   const gmail = useLive((o) => mailAccounts(o), []);
   const turf = useLive((o) => sourceState(o, 'turf'), []);
   const notion = useLive((o) => sourceState(o, 'notion'), []);
+  const splitwise = useLive((o) => sourceState(o, 'splitwise'), []);
   const proposed = useLive((o) => o.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ingest_queue WHERE status='proposed'`)?.n ?? 0, []);
 
   const refresh = useCallback(async () => {
@@ -193,6 +194,23 @@ export default function SourcesScreen() {
           </Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button title={notion.lastSync ? 'Settings' : 'Connect'} size="sm" variant={notion.lastSync ? 'secondary' : 'primary'} icon={notion.lastSync ? 'settings' : 'link'} onPress={() => router.push('/settings/notion' as never)} />
+          </View>
+        </View>
+        <View style={{ backgroundColor: t.c.bg.container, borderRadius: 24, padding: 14, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Icon name="transfer" size={18} color={splitwise.lastSync ? t.c.ok.sageText : t.c.fg.secondary} />
+            <Text variant="rowTitle" style={{ flex: 1 }}>
+              Splitwise
+            </Text>
+            <Text variant="labelMicro" color={splitwise.error ? t.c.alert.coralText : splitwise.lastSync ? t.c.ok.sageText : t.c.fg.secondary} style={{ textTransform: 'uppercase' }}>
+              {splitwise.error ? 'Needs attention' : splitwise.lastSync ? 'On' : 'Off'}
+            </Text>
+          </View>
+          <Text variant="caption" color="secondary">
+            Your Splitwise groups kept in step with LifeOS’s groups both ways, so both apps show the same balances. A trip’s group brings its expenses into the trip’s Money.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Button title={splitwise.lastSync ? 'Settings' : 'Connect'} size="sm" variant={splitwise.lastSync ? 'secondary' : 'primary'} icon={splitwise.lastSync ? 'settings' : 'link'} onPress={() => router.push('/settings/splitwise' as never)} />
           </View>
         </View>
       </View>

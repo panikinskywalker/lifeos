@@ -6,11 +6,13 @@ import { financeAiTools } from './aiTools';
 import { financeBrain } from './brain';
 import { financeParsers } from './filing/parser';
 import { financeSources } from './sources';
+import { listenForSplitwise, splitwiseSource } from './splitwise';
 import { financeFilingTools } from './filing/tools';
 import { linkMissingPayees } from './filing/payee';
 import { billType } from './bills';
 
 export * from './bills';
+export * from './splitwise';
 import { learnCategory, payeeOf } from './filing/rules';
 import { bus } from '@core/events/bus';
 
@@ -76,13 +78,15 @@ export const financeModule: ModuleManifest = {
   ],
   aiTools: financeAiTools,
   filing: { parsers: financeParsers },
-  sources: financeSources,
+  sources: [...financeSources, splitwiseSource],
   filingTools: financeFilingTools,
   brain: financeBrain,
   onStart: async (os) => {
     // Your own categories join the built-in list in every category picker.
     for (const def of [transactionType, subscriptionType]) trackCategoryField(def.fields.find((f) => f.key === 'category'));
     applyCategories(os);
+    // Bills added, changed or deleted in a Group linked to Splitwise go there (MODEL.md *Splitwise*).
+    listenForSplitwise(os);
     // R1: Budget records became monthly targets on their categories; a bank name becomes an Organisation. Both fold once.
     foldBudgetsIntoTargets(os);
     foldInstitutions(os);
