@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ObjectDef, ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
+import { splitBill } from './billSplit';
 import { balancesOf, owedOf, type Balances, type LedgerEntry, type Party, type SplitSpec } from '@core/money/split';
 
 /**
@@ -170,7 +171,7 @@ export function receiptQuestion(people: string[]): { module: string; moduleName:
     why: 'you pressed Split a receipt photo',
     what: 'a photo of a receipt',
     system:
-      'You read receipts for LifeOS, a personal app. Return every line item with its price as printed (the line total, a number), its quantity (1 when not printed), the name as printed, and an English name when it is not English (else ""); the shop name ("" when unreadable); the currency as an ISO code (JPY for yen); the total as printed. Leave out tax lines already included in the prices, and subtotal, change and payment lines. Plain British English, no em dashes.',
+      'You read receipts for LifeOS, a personal app. Return every line item with its price as printed (the line total, a number), its quantity (1 when not printed), the name as printed, and an English name when it is not English (else ""); the shop name ("" when unreadable); the currency as an ISO code (JPY for yen); the total: the final amount to pay as printed (合計 on a Japanese receipt), with tax and any service charge. Leave out tax, service, subtotal, discount, change and payment lines from the items. Receipts may be in Japanese or any language. Plain British English, no em dashes.',
     prompt: 'Read this receipt into its items.',
     record: { people },
     schema: RECEIPT_SCHEMA,
@@ -209,15 +210,9 @@ export function parseReceipt(answer: unknown): ReceiptRead | null {
 }
 
 /** Each party's exact share from who had each line (a line nobody tapped is shared by all). */
-export function receiptShares(items: ReceiptItem[], who: string[][], everyone: string[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  items.forEach((it, i) => {
-    const ps = who[i]?.length ? who[i]! : everyone;
-    const base = Math.floor((it.price / ps.length) * 100) / 100;
-    ps.forEach((p, k) => {
-      const part = k === ps.length - 1 ? it.price - base * (ps.length - 1) : base;
-      out[p] = Math.round(((out[p] ?? 0) + part) * 100) / 100;
-    });
-  });
-  return out;
+export function receiptShares(items: ReceiptItem[], who: string[][], everyone: string[], total = items.reduce((s, i) => s + i.price, 0)): Record<string, number> {
+  // Tax, service and discounts (the printed total less the items) go in proportion to what each had, as Money's bill split does.
+  const lines = items.map((it) => ({ name: it.name, qty: it.qty, total: it.price }));
+  const portions = items.map((_, i) => (who[i]?.length ? Object.fromEntries(who[i]!.map((p) => [p, 1])) : undefined));
+  return Object.fromEntries(splitBill(lines, portions, everyone, total).map((s) => [s.party, s.amount]));
 }

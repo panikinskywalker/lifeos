@@ -283,6 +283,10 @@ export function TravelHome(_: { ctx: LifeOSContext; params: Record<string, strin
     <View style={{ flex: 1, backgroundColor: C.ink }}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: barInset + 8, gap: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, paddingBottom: 4 }}>
+          {/* Every page has a back button (docs/MODEL.md, The bar inside a board); Travel home's goes back to Browse. */}
+          <RoundButton label="Back" bg={C.raised} onPress={() => (router.canGoBack() ? router.back() : router.replace('/browse' as never))}>
+            <Icon d={['m12 19-7-7 7-7', 'M19 12H5']} />
+          </RoundButton>
           <View style={{ flexGrow: 1, flexShrink: 1, gap: 1, minWidth: 0 }}>
             <Text numberOfLines={1} style={{ color: C.mid, fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'], fontFamily: SANS }}>{caption}</Text>
             <Text accessibilityRole="header" style={{ color: C.white, fontSize: 28, lineHeight: 32, letterSpacing: -0.6, fontFamily: BOLD }}>Travel</Text>

@@ -75,8 +75,11 @@ export function ReceiptScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
     }
   };
   const tap = (i: number, p: string) => setWho((w) => w.map((x, k) => (k !== i ? x : x.includes(p) ? x.filter((y) => y !== p) : [...x, p])));
-  const shares = read ? receiptShares(read.items, who, parties) : {};
-  const total = read ? read.items.reduce((s, i) => s + i.price, 0) : 0;
+  // The bill is the printed total, with tax and service; what is over the items is shared in proportion to what each had.
+  const itemsTotal = read ? read.items.reduce((s, i) => s + i.price, 0) : 0;
+  const total = read ? read.total : 0;
+  const extra = Math.round((total - itemsTotal) * 100) / 100;
+  const shares = read ? receiptShares(read.items, who, parties, total) : {};
   const save = () => {
     if (!read) return;
     const rate = rateFor(trip, read.currency);
@@ -162,6 +165,15 @@ export function ReceiptScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
                 </View>
               </Anim>
             ))}
+            {Math.abs(extra) >= 1 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, borderTopWidth: 1, borderTopColor: C.line }}>
+                <View style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>
+                  <Text numberOfLines={1} style={{ color: C.white, fontSize: 14, fontFamily: F.s }}>{extra > 0 ? 'Tax and service' : 'Discount'}</Text>
+                  <Text numberOfLines={1} style={{ color: C.mid, fontSize: 12, fontFamily: F.r }}>shared in proportion to what each had</Text>
+                </View>
+                <Text style={{ color: C.white, fontSize: 14, fontVariant: ['tabular-nums'], fontFamily: F.s }}>{`${extra > 0 ? '' : '−'}${money(Math.abs(extra), read.currency)}`}</Text>
+              </View>
+            ) : null}
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {parties.map((p) => (

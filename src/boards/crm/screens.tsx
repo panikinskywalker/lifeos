@@ -111,6 +111,8 @@ export function PeopleHome({ ctx }: { ctx: LifeOSContext; params: Record<string,
   const n = data.people.length;
   const header = {
     title: 'People',
+    // Every page has a back button (docs/MODEL.md, The bar inside a board); People home's goes back to Browse.
+    onBack: () => (router.canGoBack() ? router.back() : router.replace('/browse' as never)),
     subtitle: `${n} ${n === 1 ? 'person' : 'people'}${data.calls.length ? ` · ${data.calls.length} to call` : ''}`,
     right: (
       <>

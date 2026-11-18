@@ -37,3 +37,15 @@ describe('splitting a bill by item', () => {
     ]);
   });
 });
+
+describe('a trip receipt with tax and service', () => {
+  it('shares what is over the items in proportion to what each had, adding up to the printed total', async () => {
+    const { receiptShares } = await import('./bills');
+    const items = [{ name: 'ラーメン', price: 1000, qty: 1 }, { name: 'ビール', price: 600, qty: 1 }];
+    // 10% tax on top: ¥1,760. You had the ramen; the beer was everyone's.
+    const s = receiptShares(items, [['me'], []], ['me', 'p1'], 1760);
+    expect(s).toEqual({ me: 1430, p1: 330 });
+    // With nothing over the items, it is the items as they are.
+    expect(receiptShares(items, [['me'], []], ['me', 'p1'])).toEqual({ me: 1300, p1: 300 });
+  });
+});

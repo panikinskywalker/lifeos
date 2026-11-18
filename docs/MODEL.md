@@ -1921,7 +1921,7 @@ leaves the board. A screen with its own box at the bottom (Ask Money) shows no
 bar. In **Money** (15 Nov, Rutvij): Money home · Spend · Accounts and cards ·
 Subscriptions, and the raised button is Ask Money's sparkle, which opens Ask
 Money.
-Every page has a back button, Money home's going back to Browse. Every other
+Every page has a back button, Money home's going back to Browse (so do People home and Travel home, 18 Nov). Every other
 board and module page keeps the app's own bar, and its buttons lead back out
 to Today, Upkeep, Dump, Browse and You. A board declares its sections as `bar` (`docs/PLUGINS.md` contract:
 `BoardManifest.bar`).

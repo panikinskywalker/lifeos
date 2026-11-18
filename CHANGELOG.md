@@ -7,6 +7,12 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.128 · 18 Nov 2026
+
+**Back buttons, and a receipt's tax.**
+- People home and Travel home have a back button again, to Browse.
+- A trip's receipt is the printed total, with tax and service charge: what is over the items shows as its own line and is shared in proportion to what each had, as Money's bill split does. Japanese receipts are read the same way (合計 is the total).
+
 ## v0.0.127 · 18 Nov 2026
 
 **Trips move as one, People in whole rupees** (merged from `claude/serene-edison-o0lpvy`, labelled v0.0.33 on GitHub). Switching sections on the trip bar crossfades while the header and the bar stay still; a stop, day, booking or spend slides in; Log a spend, Split a receipt, Pay back and the copilot rise from the bottom. **Split a receipt** keeps long receipts whole, takes WebP photos, and picking from your photos no longer asks for a permission. **People** shows balances in whole rupees.
