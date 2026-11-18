@@ -7,6 +7,18 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.33 · 18 Nov 2026
+
+**Receipts read, trips move as one** (merged from `claude/serene-edison-o0lpvy`).
+**Split a receipt** works: a photo of a receipt comes back as its lines to
+tap who had what (it was refused every time before), long receipts are no
+longer cut off, a failed read says why, and picking from your photos no
+longer asks for a permission. **Moving around a trip** feels like one app:
+switching sections on the trip bar crossfades while the header and the bar
+stay still, a stop, day, booking or spend slides in, and Log a spend, Split a
+receipt, Pay back and the copilot rise from the bottom. **People** shows
+balances in whole rupees.
+
 ## v0.0.32 · 16 Nov 2026
 
 **Trips, as designed** (R7g, the trip template, merged from
