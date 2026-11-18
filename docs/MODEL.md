@@ -722,35 +722,6 @@ since balances are derived from Bills. Loans, and Turf's shares, stay Debts.
 add them to the Debts; the fold and switching finance's split to make Bills
 are a follow-up.
 
-### Splitwise: a Group's Bills, kept in step (agreed and built 18 Nov)
-
-A Source of finance (`splitwise`, a `readings` source that also writes, the Notion
-pattern). You keep a group in the Splitwise app (the Japan trip, the flat); LifeOS
-keeps the same Group's Bills, so both apps show the same balances.
-- **Connecting**: your Splitwise API key (register an app on secure.splitwise.com/apps;
-  any name) in You › Data sources › Splitwise, kept in the phone's secure store. Then
-  each Splitwise group you want is linked to a LifeOS Group (or makes one); a Group of
-  kind trip brings its Bills into that trip's Money.
-- **People**: each Splitwise friend in a linked group is a Person, matched once by a
-  hidden `splitwiseId` on the Person, else by email, the whole name, or a first name only
-  one Person has; else made. You are `me`.
-- **Coming in** (each sync, per linked group, from Splitwise's `updated_after`): every
-  expense becomes or updates a Bill (title, amount, currency, date, category kept when
-  known; who paid how much and each share, split exact; a payment is a payback Bill);
-  a deleted one deletes its Bill. Bill gains hidden `splitwiseId` and `splitwiseAt`.
-  A foreign-currency expense takes the trip's rate for its ₹ value.
-- **Going out** (the outbox, before each sync): a Bill added, changed or deleted here in
-  a linked Group is sent to Splitwise. Someone who is not a Splitwise friend in that
-  group cannot be in it: refused, with the reason.
-- **The first link** matches what both already have: a Bill here and an expense there
-  with the same amount, currency, kind and a date within three days are the same; the
-  rest of Splitwise's come in; the rest of LifeOS's wait for *Send N to Splitwise*.
-- **Both changed** before a sync: Splitwise's version wins.
-- The settings page shows each linked group's balances as Splitwise says them beside
-  LifeOS's, so a difference is seen at once.
-- Code: `src/modules/finance/splitwise.ts` (client, sync, outbox, listeners; tests against a
-  made-up Splitwise in `splitwise.test.ts`), `app/settings/splitwise.tsx`.
-
 **Money on a trip, derived** (as the Japan app's ledger, one source of truth
 for Overview, Money and Recap):
 - **Paid**: the Bills on the trip, and bookings' paid part not yet in a Bill.

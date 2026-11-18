@@ -47,8 +47,6 @@ export interface FileValue {
 }
 
 export interface PersonData {
-  /** Hidden: this person's Splitwise user id (finance's Splitwise source, MODEL.md *Splitwise*). */
-  splitwiseId?: number;
   relationship?: string;
   phone?: string;
   email?: string;
@@ -88,7 +86,6 @@ export const personType: ObjectDef<PersonData> = {
   labelPlural: 'People',
   icon: 'person',
   schema: z.object({
-    splitwiseId: z.coerce.number().optional(),
     relationship: z.string().optional(),
     phone: z.string().optional(),
     email: z.string().optional(),
@@ -154,9 +151,6 @@ export interface GroupData {
   defaultSplit?: 'equal' | 'shares';
   /** Settle the group's Bills in the fewest payments (MODEL.md, *Bill*). */
   simplifyDebts?: boolean;
-  /** Hidden: the Splitwise group kept in step with this one (MODEL.md *Splitwise*), and when it was linked. */
-  splitwiseId?: number;
-  splitwiseLinkedAt?: number;
   placeId?: string;
   photo?: FileValue;
   notes?: string;
@@ -165,7 +159,7 @@ export interface GroupData {
 /** Group (R2): flatmates, a trip crew, family, the Football group. Members also live in group_members (shares, joined / left). */
 export const groupType: ObjectDef<GroupData> = {
   id: 'group', module: 'crm', label: 'Group', labelPlural: 'Groups', icon: 'people',
-  schema: z.object({ name: z.string().min(1), kind: z.string().optional(), memberIds: z.array(z.string()).default([]), defaultSplit: z.enum(['equal', 'shares']).optional(), simplifyDebts: z.boolean().optional(), splitwiseId: z.coerce.number().optional(), splitwiseLinkedAt: z.coerce.number().optional(), placeId: z.string().optional(), photo: file.optional(), notes: z.string().optional() }),
+  schema: z.object({ name: z.string().min(1), kind: z.string().optional(), memberIds: z.array(z.string()).default([]), defaultSplit: z.enum(['equal', 'shares']).optional(), simplifyDebts: z.boolean().optional(), placeId: z.string().optional(), photo: file.optional(), notes: z.string().optional() }),
   fields: [
     { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Flat 4B, Goa trip, Family' },
     { key: 'kind', label: 'Kind', type: 'select', summary: true, options: GROUP_KINDS },

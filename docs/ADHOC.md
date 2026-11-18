@@ -5,6 +5,30 @@ through the list together and pick what to push at once (one build where a
 build is needed). Newest discussion first within each group. Keep this file
 current: add as we talk, move items out when they ship.
 
+## To fix on Wednesday 18 Nov
+
+- **Split a receipt reads nothing.** Every receipt photo is refused by the Claude API: the receipt
+  question's answer format (`receiptQuestion` in `src/modules/finance/bills.ts`) leaves its objects
+  open, and structured answers need `additionalProperties: false` with every field required (as
+  Snap the fridge's has). A fix is parked in a git stash on `claude/serene-edison-o0lpvy` ("receipt
+  scanner fix"): the closed format, a longer answer (4,000 tokens) for long receipts, and the reason
+  shown when a read fails. Still to do: test it, check that "From photos" is not stopped by a
+  photo-library permission Android does not need, publish.
+- **Settle up does not match the trip app after importing.** Importing the trip should leave who owes
+  whom in LifeOS equal to the trip app's own Settle up; it does not. To check: how the importer maps
+  each expense's payers and shares (paid for someone else, settlements' direction, the rupee value of
+  yen spends), pair by pair against simplified debts, and finance's older splits (Debts) counted on
+  top. First ask which "actual app" is meant: the trip app's balances, or Splitwise itself (LifeOS has
+  no Splitwise connector; it is under *Offered* below).
+- **Moving between trip pages feels like separate apps.** Pages swap in with no motion: the trip
+  bar replaces one route with the next (`router.replace` in `TripBar`, `src/boards/travel/jp/shell.tsx`),
+  so the header and bar redraw and the content jumps. Make it one app: the header and trip bar stay put
+  while the section underneath moves (a short crossfade or slide in the direction of the tab),
+  pushes into a stop, day, booking or spend slide in and back out, sheets (Log a spend, Pay back,
+  Split a receipt) rise from the bottom, and the artboards' entrance motion runs once per visit, not on
+  every swap. Check the navigator's per-screen animation options (expo-router stack) before adding
+  anything; no new native packages.
+
 ## Agreed in principle
 
 ### Nightly leftovers loop (via Gmail) — 28 Sep
@@ -21,7 +45,7 @@ A friendly "LifeOS import" file (records + links, not raw backup rows) that goes
 ## Offered, waiting on a decision
 
 - **Notion connector** (28 Sep): internal-integration token pasted once; you share pages / databases with it. Could bring pages in as searchable notes linked to people / projects, a task database as tasks, a journal onto the Time view. *24 Oct: the People CRM part is pushed as R2b (MODEL layer 4, *Notion*); notes, tasks and the journal stay open.*
-- **Other token connectors:** GitHub (commits → an Activity tracker "days coded"), Todoist / Linear (tasks). *Splitwise was picked 18 Nov (MODEL layer 2, *Splitwise*).* Strava / Spotify need a sign-in flow like Google.
+- **Other token connectors:** GitHub (commits → an Activity tracker "days coded"), Todoist / Linear (tasks), Splitwise (shared expenses). Strava / Spotify need a sign-in flow like Google.
 - **Missing-keys warning** (27 Sep): "Your AI keys are missing — add them in You › Agent" instead of dumps quietly waiting.
 - **Automatic encrypted backups** to a folder you pick (e.g. Drive).
 - **"Replace everything" restore** (restore today only adds / updates).

@@ -33,9 +33,6 @@ export interface BillData {
   receipt?: { uri: string; name?: string; mime?: string };
   notes?: string;
   sourceKey?: string;
-  /** Hidden: the Splitwise expense this Bill is kept in step with, and its updated_at when last in step. */
-  splitwiseId?: number;
-  splitwiseAt?: string;
 }
 
 export const BILL_CATEGORIES = [
@@ -71,8 +68,6 @@ export const billType: ObjectDef<BillData> = {
     receipt: z.object({ uri: z.string(), name: z.string().optional(), mime: z.string().optional() }).optional(),
     notes: z.string().optional(),
     sourceKey: z.string().optional(),
-    splitwiseId: z.coerce.number().optional(),
-    splitwiseAt: z.string().optional(),
   }),
   fields: [
     { key: 'kind', label: 'Kind', type: 'select', required: true, default: 'spend', options: [{ value: 'spend', label: 'A spend' }, { value: 'payment', label: 'A payback' }] },
