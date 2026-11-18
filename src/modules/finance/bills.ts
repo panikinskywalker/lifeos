@@ -163,26 +163,49 @@ export interface ReceiptRead {
 }
 
 /** What Claude is asked about a receipt you photographed on purpose: its lines, each with a price. */
-export function receiptQuestion(people: string[]): { module: string; moduleName: string; why: string; what: string; system: string; prompt: string; record: Record<string, string[]>; schema: Record<string, unknown> } {
+export function receiptQuestion(people: string[]): { module: string; moduleName: string; why: string; what: string; system: string; prompt: string; record: Record<string, string[]>; schema: Record<string, unknown>; maxTokens: number } {
   return {
     module: 'finance',
     moduleName: 'Money',
     why: 'you pressed Split a receipt photo',
     what: 'a photo of a receipt',
-    system: 'You read receipts. Return every line item with its price as printed (the line total), its quantity, the name as printed and an English name when it is not English; the currency; the total. Leave out tax lines that are already in the prices.',
+    system:
+      'You read receipts for LifeOS, a personal app. Return every line item with its price as printed (the line total, a number), its quantity (1 when not printed), the name as printed, and an English name when it is not English (else ""); the shop name ("" when unreadable); the currency as an ISO code (JPY for yen); the total as printed. Leave out tax lines already included in the prices, and subtotal, change and payment lines. Plain British English, no em dashes.',
     prompt: 'Read this receipt into its items.',
     record: { people },
-    schema: { type: 'object', properties: { shop: { type: 'string' }, currency: { type: 'string', description: 'ISO code, e.g. JPY' }, total: { type: 'number' }, items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, en: { type: 'string' }, price: { type: 'number' }, qty: { type: 'number' } }, required: ['name', 'price'] } } }, required: ['items', 'total'] },
+    schema: RECEIPT_SCHEMA,
+    maxTokens: 4000,
   };
 }
+
+/** The receipt's answer, as Claude's structured output takes it: every object closed, every field required. */
+export const RECEIPT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['shop', 'currency', 'total', 'items'],
+  properties: {
+    shop: { type: 'string' },
+    currency: { type: 'string' },
+    total: { type: 'number' },
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'en', 'price', 'qty'],
+        properties: { name: { type: 'string' }, en: { type: 'string' }, price: { type: 'number' }, qty: { type: 'number' } },
+      },
+    },
+  },
+} as const;
 
 /** Claude's answer as a receipt, or null when it is not one. */
 export function parseReceipt(answer: unknown): ReceiptRead | null {
   const a = answer as Partial<ReceiptRead> | null;
   if (!a || !Array.isArray(a.items)) return null;
-  const items = a.items.filter((i) => i && typeof i.name === 'string' && Number(i.price) > 0).map((i) => ({ name: i.name, en: typeof i.en === 'string' && i.en !== i.name ? i.en : undefined, price: Number(i.price), qty: Number(i.qty) > 0 ? Number(i.qty) : 1 }));
+  const items = a.items.filter((i) => i && typeof i.name === 'string' && Number(i.price) > 0).map((i) => ({ name: i.name, en: typeof i.en === 'string' && i.en.trim() && i.en !== i.name ? i.en : undefined, price: Number(i.price), qty: Number(i.qty) > 0 ? Number(i.qty) : 1 }));
   if (!items.length) return null;
-  return { shop: typeof a.shop === 'string' ? a.shop : undefined, currency: typeof a.currency === 'string' ? a.currency.toUpperCase() : 'JPY', total: Number(a.total) > 0 ? Number(a.total) : items.reduce((s, i) => s + i.price, 0), items };
+  return { shop: typeof a.shop === 'string' && a.shop.trim() ? a.shop : undefined, currency: typeof a.currency === 'string' ? a.currency.toUpperCase() : 'JPY', total: Number(a.total) > 0 ? Number(a.total) : items.reduce((s, i) => s + i.price, 0), items };
 }
 
 /** Each party's exact share from who had each line (a line nobody tapped is shared by all). */

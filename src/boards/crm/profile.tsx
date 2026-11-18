@@ -654,7 +654,8 @@ export function PersonPage({ entity, ctx, controls, say }: { entity: ObjectRecor
   const neverSpoken = !p.data.lastContactAt && !vendor;
   const open = (object: string, rid: string) => router.push(`/entity/${object}/${rid}`);
   const edit = () => controls?.edit();
-  const fmt = (n: number) => ctx.format.currency(n);
+  // Balances can carry paise from a split or a yen spend; People shows whole rupees.
+  const fmt = (n: number) => ctx.format.currency(Math.round(n));
 
   const logContact = () => {
     const prev = p.data.lastContactAt;

@@ -62,7 +62,7 @@ export function GroupPage({ entity, ctx, controls, say }: { entity: ObjectRecord
   const g = entity as ObjectRecord<GroupData>;
   const id = entity.id;
   const byShares = g.data.defaultSplit === 'shares';
-  const fmt = (n: number) => ctx.format.currency(n);
+  const fmt = (n: number) => ctx.format.currency(Math.round(n));
 
   const view = useLive(
     (os) => {
