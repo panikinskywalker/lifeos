@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.126 · 18 Nov 2026
+
+**A trip's receipt photo is read again.** Claude refused every one before reading it (the question's shape was missing a rule Claude needs). If it ever fails now, the message says why.
+
 ## v0.0.125 · 18 Nov 2026
 
 **A trip's receipt is read by Haiku**, like a bill in Money's +: as good for receipts, and costs less.

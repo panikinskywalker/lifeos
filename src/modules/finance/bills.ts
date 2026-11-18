@@ -172,7 +172,8 @@ export function receiptQuestion(people: string[]): { module: string; moduleName:
     system: 'You read receipts. Return every line item with its price as printed (the line total), its quantity, the name as printed and an English name when it is not English; the currency; the total. Leave out tax lines that are already in the prices.',
     prompt: 'Read this receipt into its items.',
     record: { people },
-    schema: { type: 'object', properties: { shop: { type: 'string' }, currency: { type: 'string', description: 'ISO code, e.g. JPY' }, total: { type: 'number' }, items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, en: { type: 'string' }, price: { type: 'number' }, qty: { type: 'number' } }, required: ['name', 'price'] } } }, required: ['items', 'total'] },
+    // Claude's structured answers need additionalProperties: false on every object, or the request is refused unread.
+    schema: { type: 'object', additionalProperties: false, properties: { shop: { type: 'string' }, currency: { type: 'string', description: 'ISO code, e.g. JPY' }, total: { type: 'number' }, items: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { name: { type: 'string' }, en: { type: 'string' }, price: { type: 'number' }, qty: { type: 'number' } }, required: ['name', 'price'] } } }, required: ['items', 'total'] },
   };
 }
 

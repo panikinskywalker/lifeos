@@ -60,7 +60,7 @@ export function ReceiptScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
       // Haiku reads receipts, as Money's + does (docs/MODEL.md, Photos and PDFs are read by Haiku).
       const model = (await ctx.device?.brain?.model(PHOTO_MODEL)) ?? null;
       const res = await askWithPhoto(ctx, model, { ...receiptQuestion(parties.map(n)), image: { mediaType: a.mimeType === 'image/png' ? 'image/png' : 'image/jpeg', data: a.base64 } });
-      if (!res.ok) return setError(res.note === 'no key' || res.note === 'off' ? 'Reading a receipt needs the brain on, with a key (You › Agent).' : res.note === 'over budget' ? 'Over today’s brain budget; try tomorrow or raise it in You › Agent.' : 'Couldn’t read that receipt.');
+      if (!res.ok) return setError(res.note === 'no key' || res.note === 'off' ? 'Reading a receipt needs the brain on, with a key (You › Agent).' : res.note === 'over budget' ? 'Over today’s brain budget; try tomorrow or raise it in You › Agent.' : `Couldn’t read that receipt.${res.note === 'error' && res.error ? ` (${res.error.slice(0, 160)})` : ''}`);
       const rr = parseReceipt(res.answer);
       if (!rr) return setError('That doesn’t look like a receipt.');
       setRead(rr);
