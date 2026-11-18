@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import type { LifeOSContext } from '@core/registry/context';
 import { askWithPhoto } from '@core/brain';
+import { photoForClaude } from '@ui/photo';
 import { PHOTO_MODEL } from '@core/ai/brainModel';
 import type { Party } from '@core/money/split';
 import { useToast } from '@ui/kit';
@@ -55,8 +56,12 @@ export function ReceiptScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
         if (!perm.granted) return setError('LifeOS needs the camera for this. Allow it in Android’s settings.');
       }
       const r = camera ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, exif: false }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, exif: false });
-      const a = r.canceled ? null : r.assets[0];
-      if (!a?.base64) return;
+      const picked = r.canceled ? null : r.assets[0];
+      if (!picked?.base64) return;
+      // A side over Claude's 8,000 px limit is shrunk first (src/ui/photo.ts).
+      const shrunk = await photoForClaude(picked);
+      if (!shrunk) return setError('Couldn’t make that photo small enough to send. Try another.');
+      const a = { ...picked, base64: shrunk.base64, mimeType: shrunk.mimeType };
       if (a.base64.length > MAX_BASE64) return setError('That photo is too big to send. Try again a little further back.');
       setPhoto({ uri: a.uri, mime: a.mimeType ?? undefined });
       setBusy(true);

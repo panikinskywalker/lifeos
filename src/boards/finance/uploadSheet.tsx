@@ -9,6 +9,7 @@ import type { BrainImage } from '@core/brain/model';
 import { useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Icon, Sheet, Text, useToast } from '@ui/kit';
+import { photoForClaude } from '@ui/photo';
 import { proposeChanges, readStatement, statementAsk, type Proposal } from '@modules/finance/statementRead';
 
 type Phase = { at: 'pick' } | { at: 'reading' } | { at: 'review'; proposals: Proposal[]; on: Record<string, boolean>; pick: Record<string, string> } | { at: 'failed'; why: string };
@@ -82,7 +83,11 @@ export function UploadSheet({ visible, onClose }: { visible: boolean; onClose: (
     if (!perm.granted) return setPhase({ at: 'failed', why: 'LifeOS needs your photos for this. Allow it in Android’s settings.' });
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true, exif: false });
     const a = r.canceled ? null : r.assets[0];
-    if (a) await read({ uri: a.uri, mimeType: a.mimeType, base64: a.base64 });
+    if (!a) return;
+    // A long screenshot can be over Claude's 8,000 px limit: shrunk first (src/ui/photo.ts).
+    const shrunk = await photoForClaude(a).catch(() => null);
+    if (!shrunk) return setPhase({ at: 'failed', why: 'Couldn’t make that screenshot small enough to send. Try another.' });
+    await read({ uri: a.uri, mimeType: shrunk.mimeType, base64: shrunk.base64 });
   };
   const apply = () => {
     if (phase.at !== 'review') return;

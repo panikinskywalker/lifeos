@@ -7,6 +7,7 @@ import { File } from 'expo-file-system';
 import type { LifeOSContext } from '@core/registry/context';
 import { askWithPhoto } from '@core/brain';
 import { PHOTO_MODEL } from '@core/ai/brainModel';
+import { photoForClaude } from '@ui/photo';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { Icon, IconButton, Screen, Sheet, Text, useToast } from '@ui/kit';
 import { fonts } from '@ui/theme/tokens';
@@ -63,8 +64,12 @@ export function FridgeSnap({ ctx }: { ctx: LifeOSContext; params: Record<string,
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return setPhase({ at: 'failed', why: 'LifeOS needs the camera for this. Allow it in Android’s settings.' });
     const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.4, base64: true, exif: false });
-    const a = r.canceled ? null : r.assets[0];
-    if (!a?.base64) return;
+    const picked = r.canceled ? null : r.assets[0];
+    if (!picked?.base64) return;
+    // A side over Claude's 8,000 px limit is shrunk first (src/ui/photo.ts).
+    const shrunk = await photoForClaude(picked).catch(() => null);
+    if (!shrunk) return setPhase({ at: 'failed', uri: picked.uri, why: 'Couldn’t make that photo small enough to send. Try again.' });
+    const a = { ...picked, base64: shrunk.base64, mimeType: shrunk.mimeType };
     if (uriRef.current) dropFile(uriRef.current);
     uriRef.current = a.uri;
     if (a.base64.length > MAX_BASE64) return setPhase({ at: 'failed', uri: a.uri, why: 'That photo is too big to send. Try again from a little further back.' });

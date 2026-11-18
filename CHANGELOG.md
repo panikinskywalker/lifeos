@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.131 · 18 Nov 2026 (needs the new app build)
+
+**Long photos are read.** A photo or screenshot with a side over 8,000 pixels (a long receipt, a 50 MP photo, a long scrolling screenshot) was refused by Claude with an API 400. It is now shrunk on the phone first, in Money's +, a trip's receipt, Upload a statement and Snap the fridge.
+
 ## v0.0.130 · 18 Nov 2026
 
 Merged from `claude/serene-edison-o0lpvy`, labelled v0.0.128 and v0.0.129 on GitHub.

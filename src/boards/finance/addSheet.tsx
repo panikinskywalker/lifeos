@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
 import { askWithPhoto } from '@core/brain';
 import { PHOTO_MODEL } from '@core/ai/brainModel';
+import { photoForClaude } from '@ui/photo';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
@@ -74,8 +75,12 @@ export function AddSheet({ visible, onClose, onUpload }: { visible: boolean; onC
     const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return setPhase({ at: 'failed', why: camera ? 'LifeOS needs the camera for this. Allow it in Android’s settings.' : 'LifeOS needs your photos for this. Allow it in Android’s settings.' });
     const r = camera ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, exif: false }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, exif: false });
-    const a = r.canceled ? null : r.assets[0];
-    if (!a?.base64) return;
+    const picked = r.canceled ? null : r.assets[0];
+    if (!picked?.base64) return;
+    // A side over Claude's 8,000 px limit is shrunk first (src/ui/photo.ts).
+    const shrunk = await photoForClaude(picked).catch(() => null);
+    if (!shrunk) return setPhase({ at: 'failed', why: 'Couldn’t make that photo small enough to send. Try another.' });
+    const a = { ...picked, base64: shrunk.base64, mimeType: shrunk.mimeType };
     if (a.base64.length > MAX_BASE64) {
       if (camera) dropFile(a.uri);
       return setPhase({ at: 'failed', why: 'That photo is too big to send. Try a closer one.' });
