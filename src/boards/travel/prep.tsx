@@ -15,7 +15,7 @@ import {
 } from '@modules/travel';
 import { companions, plural } from './parts';
 import { Anim, bgImage, JP_SANS, MONO } from './jp/kit';
-import { C, DotMatrix, Faces, FACE, money, TripHeader, TripScreen, isJapan, tripRoutes } from './jp/shell';
+import { C, DotMatrix, Faces, FACE, money, TripHeader, TripScreen, isJapan, tripRoutes, goTrip } from './jp/shell';
 import { Ico, saveOfflineCopy, shareText, type IcoName } from './jp/search';
 import { hear } from './jp/listen';
 
@@ -791,7 +791,7 @@ function Docs({ ctx, trip, items }: { ctx: LifeOSContext; trip: ObjectRecord<Tri
   const openTile = (s: ShelfTile) => {
     if (s.open.task) router.push(`/entity/task/${s.open.task}` as never);
     else if (s.open.document) router.push(`/entity/document/${s.open.document}` as never);
-    else router.push(tripRoutes.bookings(trip.id));
+    else goTrip(router, tripRoutes.bookings(trip.id));
   };
   const download = async (p: Paper) => {
     if (p.file && ctx.device?.folders?.open) {
@@ -1026,7 +1026,7 @@ export function MoneyPrepCard({ tripId }: { tripId: string }) {
   const tile = { flex: 1, padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile, gap: 4 } as const;
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Money" onPress={() => router.push(tripRoutes.money(tripId))} style={({ pressed }) => ({ ...tile, opacity: pressed ? 0.8 : 1 })}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Money" onPress={() => goTrip(router, tripRoutes.money(tripId))} style={({ pressed }) => ({ ...tile, opacity: pressed ? 0.8 : 1 })}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="wallet" size={16} color={C.lime} />
           <KitText variant="labelCaps" color="secondary">MONEY</KitText>
@@ -1035,7 +1035,7 @@ export function MoneyPrepCard({ tripId }: { tripId: string }) {
         <KitText variant="caption" color="secondary" numberOfLines={1}>{d.net < -0.5 ? 'you owe · Settle up' : d.net > 0.5 ? 'you’re owed · Settle up' : 'all settled up'}</KitText>
         <KitText style={{ fontSize: 12, fontWeight: '600', color: d.trip.data.budget && d.mine > d.trip.data.budget ? C.coral : t.c.fg.secondary }} numberOfLines={1}>{d.trip.data.budget ? `${inr(Math.abs(d.trip.data.budget - d.mine))} ${d.mine > d.trip.data.budget ? 'over' : 'left'} of budget` : `${inr(d.mine)} projected`}</KitText>
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Prep" onPress={() => router.push(prepRoute(tripId) as never)} style={({ pressed }) => ({ ...tile, opacity: pressed ? 0.8 : 1 })}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Prep" onPress={() => goTrip(router, prepRoute(tripId) as never)} style={({ pressed }) => ({ ...tile, opacity: pressed ? 0.8 : 1 })}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="check" size={16} color={C.lime} />
           <KitText variant="labelCaps" color="secondary">PREP</KitText>

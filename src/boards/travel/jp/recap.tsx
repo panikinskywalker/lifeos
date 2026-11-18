@@ -10,7 +10,7 @@ import {
 import { useLive } from '@ui/hooks';
 import { useToast } from '@ui/kit';
 import { Anim, bgImage, JP_SERIF, MONO } from './kit';
-import { C, Faces, isJapan, scriptName, TripHeader, TripScreen, tripRoutes, useShow } from './shell';
+import { C, Faces, isJapan, scriptName, TripHeader, TripScreen, tripRoutes, useShow, goTrip } from './shell';
 import { CardHead, dLabel, hexOf, Ico, Label, P, Pill, StampDisc, useClock } from './today';
 
 /**
@@ -172,7 +172,7 @@ function SpentEach({ d }: { d: D }) {
   const over = cap && spent > cap;
   return (
     <Anim k="jr" delay={290}>
-      <Pressable accessibilityRole="button" onPress={() => router.push(tripRoutes.money(d.t.id))} style={{ gap: 10, padding: 16, backgroundColor: C.tile, borderRadius: 28, overflow: 'hidden' }}>
+      <Pressable accessibilityRole="button" onPress={() => goTrip(router, tripRoutes.money(d.t.id))} style={{ gap: 10, padding: 16, backgroundColor: C.tile, borderRadius: 28, overflow: 'hidden' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Label>SPENT EACH</Label>
           <View style={{ flexGrow: 1 }} />
@@ -353,7 +353,7 @@ function SettledCard({ d }: { d: D }) {
   const sub = s.settled ? `${s.paybacks} payback${s.paybacks === 1 ? '' : 's'} recorded${s.lastPayback ? ` · ${dLabel(s.lastPayback, false)}` : ''}` : `${s.debts.length} payback${s.debts.length === 1 ? '' : 's'} to go · ${show(s.debts.reduce((a, x) => a + x.amount, 0))}`;
   return (
     <Anim k="jr" delay={530}>
-      <Pressable accessibilityRole="button" onPress={() => router.push(tripRoutes.money(d.t.id, 'settle'))} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: C.tile, borderRadius: 24 }}>
+      <Pressable accessibilityRole="button" onPress={() => goTrip(router, tripRoutes.money(d.t.id, 'settle'))} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: C.tile, borderRadius: 24 }}>
         <Faces names={d.parties} size={34} ring={C.tile} />
         <View style={{ flexGrow: 1, flexShrink: 1 }}>
           <CardHead title={s.settled ? 'All settled up' : 'Not settled yet'} sub={sub} />

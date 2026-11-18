@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.130 · 18 Nov 2026
+
+Merged from `claude/serene-edison-o0lpvy`, labelled v0.0.128 and v0.0.129 on GitHub.
+
+**A trip's expenses go to Splitwise.** In Udhari › Groups, a trip's group (Japan trip) can now go to a Splitwise group. Once it does, every expense and payback on the trip goes there with who paid and each person's share, in its own currency; an edit or a delete here follows there; expenses added on Splitwise come into the trip's Money; and what both already have is matched the first time, never doubled. An expense with someone you haven't linked in Udhari waits until you link them.
+
+**A trip's tabs are real tabs.** Overview, Plan, Bookings, Money and Prep now live in one screen under one trip bar: a tap shows the section at once, with nothing sliding in, and each section keeps where you were. A link from one section to another (All notes, Settle up, the map) switches the tab the same way; from a stop, a day or a booking, the trip bar takes you back to the trip on that section.
+
 ## v0.0.128 · 18 Nov 2026
 
 **Back buttons, and a receipt's tax.**

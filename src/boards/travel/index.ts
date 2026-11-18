@@ -6,15 +6,12 @@ import { PackScreen } from './pack';
 import { TripPage, TripsHere } from './trip';
 import { TripForm } from './form';
 import { travelTiles } from './tile';
-import { PlanScreen } from './plan';
 import { StopPage } from './stop';
 import { ImportTripScreen } from './importTrip';
-import { BookingsScreen } from './bookings';
 import { BookingScreen } from './booking';
 import { DayScreen } from './day';
-import { MoneyScreen } from './money';
 import { BillScreen } from './bill';
-import { PrepScreen } from './prep';
+import { sectionRoute } from './jp/host';
 import { StayScreen } from './jp/stay';
 import { SpendScreen } from './jp/spend';
 import { ReceiptScreen } from './jp/receipt';
@@ -44,14 +41,14 @@ export const travelBoard: BoardManifest = {
     { key: 'index', title: 'Travel', component: TravelHome },
     { key: 'upcoming', title: 'Upcoming', component: UpcomingScreen, noBar: true },
     { key: 'pack', title: 'Packing', component: PackScreen, noBar: true },
-    { key: 'plan', title: 'Plan', component: PlanScreen, noBar: true },
+    { key: 'plan', title: 'Plan', component: sectionRoute('plan'), noBar: true },
     { key: 'import', title: 'Import a trip', component: ImportTripScreen, noBar: true },
-    { key: 'bookings', title: 'Bookings', component: BookingsScreen, noBar: true },
+    { key: 'bookings', title: 'Bookings', component: sectionRoute('bookings'), noBar: true },
     { key: 'booking', title: 'Booking', component: BookingScreen, noBar: true },
     { key: 'day', title: 'A day', component: DayScreen, noBar: true },
-    { key: 'money', title: 'Money', component: MoneyScreen, noBar: true },
+    { key: 'money', title: 'Money', component: sectionRoute('money'), noBar: true },
     { key: 'bill', title: 'Expense', component: BillScreen, noBar: true },
-    { key: 'prep', title: 'Prep', component: PrepScreen, noBar: true },
+    { key: 'prep', title: 'Prep', component: sectionRoute('prep'), noBar: true },
     { key: 'stay', title: 'Stay', component: StayScreen, noBar: true },
     { key: 'spend', title: 'Log a spend', component: SpendScreen, noBar: true },
     { key: 'receipt', title: 'Split a receipt', component: ReceiptScreen, noBar: true },

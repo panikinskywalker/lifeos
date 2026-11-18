@@ -9,7 +9,7 @@ import { useToast } from '@ui/kit';
 import { makePayment, type BillData } from '@modules/finance';
 import { billInrOf, rateFor, tripBalances, tripBills, tripParties, type TripData } from '@modules/travel';
 import { Anim, bgImage, MONO } from './kit';
-import { C, money, TripScreen, tripRoutes, useShow } from './shell';
+import { C, money, TripScreen, tripRoutes, useShow, goTrip } from './shell';
 import { dayMonth, F, Face, faceColor, Ic, Label, LimePill, Tag, today, useNames, useTrip } from '../money';
 
 /**
@@ -32,7 +32,7 @@ export function PaybackScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
       </View>
     );
   }
-  return <Payback ctx={ctx} trip={trip} params={params} back={() => (router.canGoBack() ? router.back() : router.replace(tripRoutes.money(trip.id, 'settle')))} />;
+  return <Payback ctx={ctx} trip={trip} params={params} back={() => (router.canGoBack() ? router.back() : goTrip(router, tripRoutes.money(trip.id, 'settle')))} />;
 }
 
 function Payback({ ctx, trip, params, back }: { ctx: LifeOSContext; trip: ObjectRecord<TripData>; params: Record<string, string>; back: () => void }) {

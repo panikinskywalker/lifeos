@@ -11,7 +11,7 @@ import { useToast } from '@ui/kit';
 import { BILL_CATEGORIES, makeBill, type BillData } from '@modules/finance';
 import { rateFor, tripParties, type TripData } from '@modules/travel';
 import { Anim } from './kit';
-import { C, money, symOf, TripHeader, tripRoutes } from './shell';
+import { C, money, symOf, TripHeader, tripRoutes, goTrip } from './shell';
 import { CAT_ICON, F, Face, faceColor, Ic, Label, Seg, today, useNames, useTrip } from '../money';
 
 /**
@@ -85,7 +85,7 @@ export function SpendScreen({ ctx, params }: { ctx: LifeOSContext; params: Recor
     return b?.object === 'bill' ? b : null;
   }, [params.bill]);
   const trip = useTrip(params.trip ?? edit?.data.tripId);
-  const close = () => (router.canGoBack() ? router.back() : trip ? router.replace(tripRoutes.money(trip.id, 'settle')) : router.replace(tripRoutes.travel));
+  const close = () => (router.canGoBack() ? router.back() : trip ? goTrip(router, tripRoutes.money(trip.id, 'settle')) : router.replace(tripRoutes.travel));
   if (!trip) {
     return (
       <View style={{ flex: 1, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' }}>
