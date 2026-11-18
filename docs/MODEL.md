@@ -2090,9 +2090,11 @@ drawn first on the Money design canvas (*Splitwise* row):
    to Splitwise for linked people.
 7. **Remind**: on someone who owes you, a short friendly message with the amount
    (Haiku), ready to send on WhatsApp.
-**Its own board (18 Nov, Rutvij; v0.0.123):** Splitwise is a Browse board
-(`src/boards/splitwise`, id `splitwise`), not a Money screen: Browse › Boards ›
-Splitwise, shown while Money is. Money's grid menu and a person's "Splitwise
+**Its own board, Udhari (18 Nov, Rutvij; v0.0.123, named Udhari in v0.0.124):**
+Splitwise lives in a Browse board called **Udhari** (`src/boards/udhari`, id
+`udhari`), not a Money screen: Browse › Boards › Udhari, shown while Money is.
+Splitwise keeps its own name where the words mean the service (Sign in with
+Splitwise, Splitwise says). Money's grid menu and a person's "Splitwise
 says" line open it. It defines no Objects; the client and the sync stay in
 finance. Its screen is the one described below; sections of its own wait for
 their artboards.

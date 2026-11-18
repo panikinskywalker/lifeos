@@ -16,7 +16,7 @@ import { turfBoard } from './turf';
 import { todayBoard } from './today';
 import { timeBoard } from './time';
 import { activityBoard } from './activity';
-import { splitwiseBoard } from './splitwise';
+import { udhariBoard } from './udhari';
 
 /**
  * The boards (docs/MODEL.md §3): what you see on screen. Companion boards
@@ -42,5 +42,5 @@ export const installedBoards: BoardManifest[] = [
   todayBoard,
   timeBoard,
   activityBoard,
-  splitwiseBoard,
+  udhariBoard,
 ];

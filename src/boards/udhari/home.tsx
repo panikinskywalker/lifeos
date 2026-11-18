@@ -79,7 +79,7 @@ export function SplitwiseScreen(_: { ctx: LifeOSContext; params: Record<string, 
   return (
     <View style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 22 }}>
-        <ScreenHeader title="Splitwise" subtitle="Board" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse' as never))} right={connected ? <IconButton icon="repeat" filled accessibilityLabel="Sync now" onPress={() => void sync()} /> : undefined} />
+        <ScreenHeader title="Udhari" subtitle="With Splitwise" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse' as never))} right={connected ? <IconButton icon="repeat" filled accessibilityLabel="Sync now" onPress={() => void sync()} /> : undefined} />
 
         {!connected ? (
           <View style={{ padding: 22, borderRadius: 32, backgroundColor: blocks.mint, gap: 16, overflow: 'hidden' }}>
