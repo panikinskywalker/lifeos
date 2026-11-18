@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.123 · 18 Nov 2026
+
+**Splitwise is its own board.** Find it in Browse › Boards. Money's menu and a person's "Splitwise says" line still open it.
+
 ## v0.0.122 · 16 Nov 2026
 
 **One bottom bar on Travel.** Travel home showed the app's bar twice; now it shows once. A trip's own screens keep their trip bar and no longer get the app's bar on top of it.

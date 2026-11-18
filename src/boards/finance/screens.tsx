@@ -208,7 +208,7 @@ function MoneyScreens({ visible, onClose, onUpload }: { visible: boolean; onClos
     ['Accounts and cards', 'card', '/module/finance/wallet'],
     ['Subscriptions', 'repeat', '/module/finance/subscriptions'],
     ['Who owes whom', 'people', '/module/finance/debts'],
-    ['Splitwise', 'link', '/module/finance/splitwise'],
+    ['Splitwise', 'link', '/board/splitwise'],
     ['Reports', 'chart', '/module/finance/reports'],
     ['Import & export', 'file', '/module/finance/files'],
     ['Ask Money', 'sparkle', '/module/finance/ask'],

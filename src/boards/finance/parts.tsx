@@ -12,7 +12,8 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import type { Theme } from '@ui/theme/tokens';
 import { blocks } from '@ui/theme/tokens';
-import { Icon, IconButton, Text } from '@ui/kit';
+import { Disc, Icon, IconButton, SectionHead, Text } from '@ui/kit';
+export { Disc, discColor, SectionHead } from '@ui/kit';
 import { TagChips } from '@ui/components/fields';
 import { categoryOf, type AccountData, type TransactionData } from '@modules/finance/types';
 import type { SplitRecord } from '@modules/finance/split';
@@ -52,26 +53,6 @@ export function shortMoney(os: LifeOSContext, n: number): string {
 
 export const catColor = (value: string | undefined, t: Theme) => CATEGORY_COLORS[value ?? 'other'] ?? t.paletteColor(categoryOf(value)?.color) ?? t.c.fg.tertiary;
 
-const DISC_COLORS = [blocks.yellow, blocks.mint, blocks.lilac, blocks.sky, blocks.pink, '#FF9F5A', '#FF8A6A', '#6FD3C8'];
-
-/** A merchant's or person's colour: fixed per name or id. */
-export function discColor(key: string): string {
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return DISC_COLORS[h % DISC_COLORS.length]!;
-}
-
-/** A disc with the first letter (40 in a row, 56 on a record, 32 or 28 in a chip). */
-export function Disc({ name, colorKey, size = 40 }: { name: string; colorKey?: string; size?: number }) {
-  const letter = name.trim().match(/\p{L}|\p{N}/u)?.[0]?.toUpperCase() ?? '?';
-  const fontSize = size >= 56 ? 22 : size >= 40 ? 15 : size >= 32 ? 12 : 11;
-  return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: discColor(colorKey ?? name), alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <Text style={{ fontSize, lineHeight: fontSize + 4, fontWeight: '700', color: '#0B0B0D' }}>{letter}</Text>
-    </View>
-  );
-}
-
 /** A raised 40 disc with an icon. */
 export function IconDisc({ icon, color, size = 40 }: { icon: string; color?: string; size?: number }) {
   const t = useTheme();
@@ -92,26 +73,6 @@ export function Caps({ children, color, style }: { children: React.ReactNode; co
     <Text variant="labelCaps" color={color ?? 'secondary'} numberOfLines={1} style={style as never}>
       {children}
     </Text>
-  );
-}
-
-/** Section head: 17/600 title, a 13/400 line under it, an optional link on the right. */
-export function SectionHead({ title, sub, action, chevron, lime, onAction }: { title: string; sub?: string | null; action?: string; chevron?: boolean; lime?: boolean; onAction?: () => void }) {
-  const t = useTheme();
-  const tone = lime ? t.c.accent.gold : t.c.fg.secondary;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 6, paddingHorizontal: 4 }}>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="heading" accessibilityRole="header">{title}</Text>
-        {sub ? <Text variant="caption" color="secondary" numberOfLines={1}>{sub}</Text> : null}
-      </View>
-      {action ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={action} hitSlop={14} onPress={onAction} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '600', color: tone }}>{action}</Text>
-          {chevron ? <Icon name="chevron-right" size={14} color={tone} /> : null}
-        </Pressable>
-      ) : null}
-    </View>
   );
 }
 

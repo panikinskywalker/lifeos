@@ -2090,8 +2090,14 @@ drawn first on the Money design canvas (*Splitwise* row):
    to Splitwise for linked people.
 7. **Remind**: on someone who owes you, a short friendly message with the amount
    (Haiku), ready to send on WhatsApp.
-**Built 17 Nov (v0.0.117, steps 1 to 4)** on the *Splitwise* artboards: Money ›
-Splitwise (the grid menu; a person's Money section links there). Signed out, the
+**Its own board (18 Nov, Rutvij; v0.0.123):** Splitwise is a Browse board
+(`src/boards/splitwise`, id `splitwise`), not a Money screen: Browse › Boards ›
+Splitwise, shown while Money is. Money's grid menu and a person's "Splitwise
+says" line open it. It defines no Objects; the client and the sync stay in
+finance. Its screen is the one described below; sections of its own wait for
+their artboards.
+**Built 17 Nov (v0.0.117, steps 1 to 4)** on the *Splitwise* artboards: then Money ›
+Splitwise (the grid menu; a person's Money section links there), now its own board. Signed out, the
 mint card and *Sign in with Splitwise* (Splitwise's page in a WebView, needing the
 build with `react-native-webview`); signed in, the live instrument (owed to you
 and you owe, from linked people's Splitwise balances), arc ticks for people

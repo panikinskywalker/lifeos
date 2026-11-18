@@ -257,7 +257,7 @@ export function PersonBalanceSection({ entity, ctx }: { entity: ObjectRecord<any
         </View>
         <PayOrRemind personId={entity.id} name={entity.title} balance={bal} open={open} />
         {sw ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`Splitwise says ${ctx.format.currency(Math.abs(sw.says))}. Opens Splitwise`} onPress={() => router.push('/module/finance/splitwise' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: Math.abs(sw.says - bal) < 1 ? 'rgba(159,224,181,0.12)' : 'rgba(255,138,122,0.12)' }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Splitwise says ${ctx.format.currency(Math.abs(sw.says))}. Opens Splitwise`} onPress={() => router.push('/board/splitwise' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: Math.abs(sw.says - bal) < 1 ? 'rgba(159,224,181,0.12)' : 'rgba(255,138,122,0.12)' }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Math.abs(sw.says - bal) < 1 ? '#9FE0B5' : t.c.alert.coralText }} />
             <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '600', color: Math.abs(sw.says - bal) < 1 ? '#9FE0B5' : t.c.alert.coralText }}>{Math.abs(sw.says - bal) < 1 ? `Splitwise says ${ctx.format.currency(Math.abs(sw.says))} too · in step` : `Splitwise says ${sw.says >= 0 ? '' : 'you owe '}${ctx.format.currency(Math.abs(sw.says))} · ${ctx.format.currency(Math.abs(sw.says - bal))} apart`}</Text>
           </Pressable>

@@ -6,10 +6,9 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
-import { ArcTicks, Icon, IconButton, InstrumentCard, PickerSheet, ScreenHeader, StackedBar, Text, Toggle, useBottomBarInset, useToast } from '@ui/kit';
+import { ArcTicks, Disc, Icon, IconButton, InstrumentCard, PickerSheet, ScreenHeader, SectionHead, StackedBar, Text, Toggle, useBottomBarInset, useToast } from '@ui/kit';
 import { forgetSplitwise, linkPerson, setSwConfig, suggestPerson, swConfig, syncSplitwise, SplitwiseClient, SplitwiseError, SPLITWISE, unlinkPerson } from '@modules/finance/splitwise';
 import type { DebtData } from '@modules/finance/split';
-import { Disc, SectionHead } from './parts';
 
 const INK = '#0B0B0D';
 
@@ -80,7 +79,7 @@ export function SplitwiseScreen(_: { ctx: LifeOSContext; params: Record<string, 
   return (
     <View style={{ flex: 1, backgroundColor: t.c.bg.ground }}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: t.layout.gutter, paddingBottom: bottom, gap: 22 }}>
-        <ScreenHeader title="Splitwise" subtitle="Money" onBack={() => (router.canGoBack() ? router.back() : router.replace('/module/finance' as never))} right={connected ? <IconButton icon="repeat" filled accessibilityLabel="Sync now" onPress={() => void sync()} /> : undefined} />
+        <ScreenHeader title="Splitwise" subtitle="Board" onBack={() => (router.canGoBack() ? router.back() : router.replace('/browse' as never))} right={connected ? <IconButton icon="repeat" filled accessibilityLabel="Sync now" onPress={() => void sync()} /> : undefined} />
 
         {!connected ? (
           <View style={{ padding: 22, borderRadius: 32, backgroundColor: blocks.mint, gap: 16, overflow: 'hidden' }}>

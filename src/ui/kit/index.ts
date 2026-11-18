@@ -17,6 +17,7 @@ export { Segmented } from './Segmented';
 export { FormField, TextField, NumberField, MoneyField, DateField, SelectField, RelationField, TagsField, SwitchField, Toggle, Stepper, DayChips, PickerSheet, ChipsField, OptionPills, splitList, type Option, type PickerItem } from './fields';
 export { RecordHeader, type HeaderStat } from './RecordHeader';
 export { Section, ListGroup, Card } from './SectionCard';
+export { Disc, discColor, SectionHead } from './Disc';
 export { Icon, icons, type IconName } from '../icons';
 export { BottomBar, OnBar, useBottomBarInset, type BottomBarItem } from './BottomBar';
 export { Screen, ScreenHeader } from './Screen';
