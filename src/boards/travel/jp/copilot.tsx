@@ -1,13 +1,13 @@
 // own-glyphs: this screen draws the trip template's inline icons (JP-Parts), not the kit's icon set.
 import React, { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { useToast } from '@ui/kit';
 import { makeBill } from '@modules/finance';
-import { applyChanges, askCopilot, changeLine, rateFor, type Change, type CopilotAnswer, type TripData } from '@modules/travel';
+import { applyChanges, askCopilot, changeLine, clearCopilotChat, copilotChat, rateFor, saveCopilotChat, type Change, type CopilotAnswer, type SavedTurn, type TripData } from '@modules/travel';
 import { Anim, MONO } from './kit';
 import { C, tripRoutes } from './shell';
 import { Ico, type IcoName } from './search';
@@ -18,21 +18,36 @@ import { canHear, hear } from './listen';
  * its records, through the app's brain with your key (budget and Sent to
  * Claude as every call). When it proposes changes (a thing to do, a to-do, a
  * note, an expense, a tick, a check-in time) they wait in Proposed changes
- * until Save to the trip, which has an Undo. Booking.com and Gmail are not
- * connected to LifeOS: they show as the design's labelled slots only.
+ * until Save to the trip, which has an Undo. When a question needs current
+ * facts it looks them up on the web first (Claude's web search and page
+ * reading) and lists the pages under the answer. The chat is kept on this
+ * phone per trip, so it is there next time; New chat clears it. Booking.com and
+ * Gmail are not connected to LifeOS: they show as the design's labelled slots only.
  */
 
 interface Turn {
   q: string;
+  at: number;
   state: 'thinking' | 'done' | 'error';
   answer?: CopilotAnswer;
   keys?: Map<string, string>;
   error?: string;
+  sources?: Array<{ url: string; title: string }>;
   saved?: 'saved' | 'discarded';
 }
 
+const toSaved = (t: Turn): SavedTurn => ({ q: t.q, at: t.at, answer: t.answer, error: t.error, sources: t.sources, keys: t.keys ? [...t.keys] : undefined, saved: t.saved === 'saved' ? 'saved' : t.saved === 'discarded' ? 'dismissed' : undefined });
+const fromSaved = (t: SavedTurn): Turn => ({ q: t.q, at: t.at, state: t.answer ? 'done' : 'error', answer: t.answer, error: t.error, sources: t.sources, keys: t.keys ? new Map(t.keys) : undefined, saved: t.saved === 'saved' ? 'saved' : t.saved === 'dismissed' ? 'discarded' : undefined });
+const host = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
 const F = { semi: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold', med: 'PlusJakartaSans_500Medium', reg: 'PlusJakartaSans_400Regular' };
-const SUGGEST = ['What now?', 'Split a receipt photo', 'Who owes whom?', 'Cheaper transport', 'What’s most urgent?'];
+const SUGGEST = ['What now?', 'What’s on while we’re there?', 'Anything closed on our dates?', 'Split a receipt photo', 'Who owes whom?', 'Cheaper transport', 'What’s most urgent?'];
 
 function Disc({ size = 28 }: { size?: number }) {
   return (
@@ -74,7 +89,7 @@ function Thinking() {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Anim k="jspin" style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: C.lime, borderTopColor: 'transparent' }} />
-      <Text style={{ color: C.mid, fontSize: 15, lineHeight: 22, fontFamily: F.reg }}>Reading the trip…</Text>
+      <Text style={{ color: C.mid, fontSize: 15, lineHeight: 22, fontFamily: F.reg }}>Reading the trip, and the web if it needs to…</Text>
     </View>
   );
 }
@@ -88,7 +103,13 @@ export function CopilotScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
     const x = os.records.get<TripData>(params.trip ?? '');
     return x?.object === 'trip' ? x : null;
   }, [params.trip]);
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setTurns] = useState<Turn[]>(() => (params.trip ? copilotChat(ctx, params.trip).map(fromSaved) : []));
+  // The chat is kept on the phone per trip (finished turns only).
+  useEffect(() => {
+    if (!trip) return;
+    const done = turns.filter((t) => t.state !== 'thinking');
+    saveCopilotChat(ctx, trip.id, done.map(toSaved));
+  }, [turns, trip, ctx]);
   const [text, setText] = useState('');
   const asked = useRef<string | null>(null);
   const busy = turns.some((t) => t.state === 'thinking');
@@ -99,10 +120,10 @@ export function CopilotScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
     if (/split a receipt/i.test(q)) return router.push(tripRoutes.receipt(trip.id));
     setText('');
     const history = turns.filter((t) => t.answer).map((t) => ({ q: t.q, a: t.answer!.reply }));
-    setTurns((ts) => [...ts, { q, state: 'thinking' }]);
+    setTurns((ts) => [...ts, { q, at: Date.now(), state: 'thinking' }]);
     const model = (await ctx.device?.brain?.model().catch(() => null)) ?? null;
     const res = await askCopilot(ctx, model, trip, q, history);
-    setTurns((ts) => ts.map((t, i) => (i !== ts.length - 1 ? t : res.ok ? { ...t, state: 'done', answer: res.answer, keys: res.keys } : { ...t, state: 'error', error: res.note === 'no key' || res.note === 'off' ? 'The copilot needs the brain on, with a Claude key: You › Agent.' : res.note === 'over budget' ? 'Over today’s brain budget. Try tomorrow, or raise it in You › Agent.' : `Couldn’t get an answer${res.error ? `: ${res.error.slice(0, 120)}` : ''}.` })));
+    setTurns((ts) => ts.map((t, i) => (i !== ts.length - 1 ? t : res.ok ? { ...t, state: 'done', answer: res.answer, keys: res.keys, sources: res.sources } : { ...t, state: 'error', error: res.note === 'no key' || res.note === 'off' ? 'The copilot needs the brain on, with a Claude key: You › Agent.' : res.note === 'over budget' ? 'Over today’s brain budget. Try tomorrow, or raise it in You › Agent.' : `Couldn’t get an answer${res.error ? `: ${res.error.slice(0, 120)}` : ''}.` })));
   };
 
   useEffect(() => {
@@ -156,14 +177,20 @@ export function CopilotScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
           <Disc size={36} />
           <View style={{ flexGrow: 1, flexShrink: 1, gap: 1, minWidth: 0 }}>
             <Text numberOfLines={1} style={{ color: C.white, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, fontFamily: F.semi }}>Trip copilot</Text>
-            <Text numberOfLines={1} style={{ color: C.mid, fontSize: 13, lineHeight: 17, fontFamily: F.med }}>{place} · reads the trip and its bookings</Text>
+            <Text numberOfLines={1} style={{ color: C.mid, fontSize: 13, lineHeight: 17, fontFamily: F.med }}>{place} · reads the trip, looks things up on the web</Text>
           </View>
+          {turns.length && !busy ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="New chat" onPress={() => { clearCopilotChat(ctx, trip.id); setTurns([]); }} style={{ height: 40, paddingHorizontal: 14, borderRadius: 20, backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: C.white, fontSize: 13, fontFamily: F.semi }}>New chat</Text>
+            </Pressable>
+          ) : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={close} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' }}>
             <Ico name="x" size={16} />
           </Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 6, paddingHorizontal: 20 }}>
           <ToolPill icon="check" label="Trip data" on />
+          <ToolPill icon="globe" label="Web" on onPress={() => toast.show({ message: 'When a question needs current facts (what’s on, hours, closures, trains), the copilot searches the web and lists the pages it used', icon: 'info' })} />
           <ToolPill icon="globe" label="Booking.com" note="not connected" onPress={() => toast.show({ message: 'Booking.com isn’t connected to LifeOS yet', icon: 'info' })} />
           <ToolPill icon="mail" label="Gmail" note="not connected" onPress={() => toast.show({ message: 'Gmail isn’t connected to LifeOS yet', icon: 'info' })} />
           <ToolPill icon="receipt" label="Receipts" onPress={() => router.push(tripRoutes.receipt(trip.id))} />
@@ -176,7 +203,7 @@ export function CopilotScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
               <Disc />
               <Text style={{ color: C.mid, fontSize: 13, fontFamily: F.bold }}>Trip copilot</Text>
             </View>
-            <Text style={{ color: C.white, fontSize: 15, lineHeight: 22, fontFamily: F.reg }}>Ask anything about {place}: what is next, what is still to book, who owes whom. If something should change, I put it in Proposed changes and nothing is saved until you say so.</Text>
+            <Text style={{ color: C.white, fontSize: 15, lineHeight: 22, fontFamily: F.reg }}>Ask anything about {place}: what is next, what is still to book, who owes whom, what is on while you are there. I look things up on the web when the trip alone can’t answer. If something should change, I put it in Proposed changes and nothing is saved until you say so.</Text>
           </Anim>
         ) : null}
 
@@ -193,6 +220,19 @@ export function CopilotScreen({ ctx, params }: { ctx: LifeOSContext; params: Rec
               {t.state === 'thinking' ? <Thinking /> : null}
               {t.state === 'error' ? <Text style={{ color: '#FF8A7A', fontSize: 15, lineHeight: 22, fontFamily: F.reg }}>{t.error}</Text> : null}
               {t.answer ? <Text style={{ color: C.white, fontSize: 15, lineHeight: 22, fontFamily: F.reg }}>{t.answer.reply}</Text> : null}
+              {t.answer && t.sources?.length ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={{ color: C.low, fontSize: 10, letterSpacing: 1.2, fontFamily: MONO }}>{`FROM THE WEB · ${t.sources.length} ${t.sources.length === 1 ? 'PAGE' : 'PAGES'}`}</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {t.sources.slice(0, 6).map((src) => (
+                      <Pressable key={src.url} accessibilityRole="link" accessibilityLabel={`Open ${src.title}`} onPress={() => void Linking.openURL(src.url).catch(() => {})} style={{ maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 11, borderRadius: 999, backgroundColor: C.raised }}>
+                        <Ico name="globe" size={12} color={C.mid} />
+                        <Text numberOfLines={1} style={{ flexShrink: 1, color: C.white, fontSize: 12, fontFamily: F.semi }}>{host(src.url)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
               {t.answer?.needs.includes('booking') ? <Slot icon="globe" title="Booking.com" line="Finds and prices from Booking.com show here once it is connected to LifeOS. Until then I answer from the trip." /> : null}
               {t.answer?.needs.includes('gmail') ? <Slot icon="mail" title="Gmail" line="Mail finds (check-in times, confirmations) show here once your mail is connected to LifeOS." /> : null}
               {t.answer && t.keys && t.answer.changes.length && t.saved !== 'discarded' ? <Proposed ctx={ctx} changes={t.answer.changes} keys={t.keys} saved={t.saved === 'saved'} onSave={() => save(i)} onDiscard={() => discard(i)} /> : null}
