@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.134 · 19 Nov 2026
+
+**Everything on Haiku.** Every request LifeOS makes to Claude now goes to Claude Haiku 5.5: Ask Money (still with web search), uploaded statements and fund screens, the brain's passes (including its first day, which used to be Opus), the trip copilot's look-ups, and Talk's smarter tier. A model picked before today in You › Agent moves to Haiku once; you can still choose another there, or turn on Opus for a day.
+
 ## v0.0.133 · 19 Nov 2026
 
 **The trip copilot looks things up** (merged from `claude/serene-edison-o0lpvy`, labelled v0.0.131 on GitHub). Ask what's on while you're there, whether anything is closed on your dates, the last train or opening hours, and the copilot searches the web and reads a few pages before it answers, then lists the pages it used under the answer (tap one to open it). When the trip alone can answer, it doesn't search. It still suggests changes that are saved only when you tap Save. The chat is kept for each trip, so it's there when you come back; **New chat** starts again. Web searches cost a little on top of the usual Claude use ($10 per 1,000 searches), inside the same daily budget.

@@ -14,7 +14,7 @@ describe('Claude web research', () => {
       const r = replies.shift()!;
       return { ok: true, status: 200, json: async () => r, text: async () => JSON.stringify(r) };
     }) as unknown as typeof fetch;
-    const brain = createClaudeBrain({ apiKey: 'test', fetchImpl });
+    const brain = createClaudeBrain({ apiKey: 'test', model: 'claude-opus-5-5', fetchImpl });
     const r = await brain.research!({ system: 'research', user: 'Is it open?', maxTokens: 1000 });
     expect((bodies[0]!.tools as Array<{ type: string }>).map((t) => t.type)).toEqual(['web_search_20260209', 'web_fetch_20260209']);
     expect(bodies[0]!.output_config).toEqual({ effort: 'medium' });

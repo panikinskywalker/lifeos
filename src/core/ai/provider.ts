@@ -47,7 +47,7 @@ export interface ClaudeProviderOptions {
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): LLMProvider {
-  const model = opts.model ?? 'claude-sonnet-5';
+  const model = opts.model ?? 'claude-haiku-5-5';
   const baseUrl = (opts.baseUrl ?? 'https://api.anthropic.com').replace(/\/$/, '');
   return {
     id: 'claude',

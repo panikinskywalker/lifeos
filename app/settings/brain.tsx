@@ -214,9 +214,6 @@ export default function BrainSettingsRoute() {
             </Text>
           </View>
         ) : null}
-        <Text variant="labelMicro" color="secondary" style={{ fontFamily: t.type.caption.fontFamily }}>
-          {`The first day the brain runs starts on ${label(STRONG_MODEL)}.`}
-        </Text>
       </Card>
 
       <CapsLabel label={over ? 'Over budget' : 'Daily budget'} />

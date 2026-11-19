@@ -11,7 +11,7 @@ export interface AppSettings {
   appearance: 'system' | 'light' | 'dark';
   locale: LocaleSettings;
   homeDashboardId: string | null;
-  /** Smart tier (Sonnet): plans, multi-request messages, tool errors. */
+  /** Smart tier: plans, multi-request messages, tool errors (Haiku 5.5 since 19 Nov). */
   aiModel: string;
   /** Fast tier (Haiku): everyday messages and fact mining. */
   aiFastModel: string;
@@ -38,8 +38,8 @@ export const useSettings = create<AppSettings>((set) => ({
   appearance: 'dark',
   locale: DEFAULT_LOCALE,
   homeDashboardId: null,
-  aiModel: 'claude-sonnet-5',
-  aiFastModel: 'claude-haiku-4-5',
+  aiModel: 'claude-haiku-5-5',
+  aiFastModel: 'claude-haiku-5-5',
   aiRouting: true,
   aiChain: [{ kind: 'groq' }, { kind: 'gemini' }, { kind: 'claude' }],
   aiMonthlyCaps: {},

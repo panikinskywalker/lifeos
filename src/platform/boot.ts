@@ -15,6 +15,7 @@ import { openDatabase, openDemoDatabase } from './openDatabase';
 import { demoIsFresh, isDemo, markDemoOpened } from './demo';
 import { demoFolders, seedDemo } from './seed';
 import { startShownModules } from '@core/registry/shown';
+import { setBrainSettings } from '@core/brain';
 import { buildAgentFromSettings } from './agentProvider';
 import { deviceBridge } from './sources';
 import { brainModel, runBrainPass } from './brain';
@@ -81,8 +82,8 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     appearance: (stored.appearance as never) ?? 'dark',
     locale: { ...useSettings.getState().locale, ...((stored.locale as object) ?? {}) },
     homeDashboardId: (stored.homeDashboardId as string) ?? null,
-    aiModel: (stored.aiModel as string) ?? 'claude-sonnet-5',
-    aiFastModel: (stored.aiFastModel as string) ?? 'claude-haiku-4-5',
+    aiModel: (stored.aiModel as string) ?? 'claude-haiku-5-5',
+    aiFastModel: (stored.aiFastModel as string) ?? 'claude-haiku-5-5',
     aiRouting: stored.aiRouting !== false,
     aiChain: (stored.aiChain as never) ?? useSettings.getState().aiChain,
     aiMonthlyCaps: (stored.aiMonthlyCaps as never) ?? {},
@@ -91,6 +92,13 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
     onboarded: !!stored.onboarded,
   });
   bindSettingsPersistence((k, v) => os.settings.set(k, v));
+  // Everything on Haiku (19 Nov, Rutvij): a model picked before then moves to Haiku once.
+  if (!stored.allHaiku) {
+    setBrainSettings(os, { model: 'claude-haiku-5-5', forToday: undefined });
+    useSettings.getState().set('aiModel', 'claude-haiku-5-5');
+    useSettings.getState().set('aiFastModel', 'claude-haiku-5-5');
+    os.settings.set('allHaiku', true);
+  }
 
   // The demo stops here: no notifications, no phone data, no background work.
   if (demo) {

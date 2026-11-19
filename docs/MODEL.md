@@ -1523,8 +1523,8 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
     Remove · Undo). Kept views are these components.
   - The privacy gate stays. With no AI connected, it offers Connect
     OpenRouter, and the quick answers keep working on the phone.
-  - **How it runs** (15 Nov, Rutvij; 16 Nov: **Claude Sonnet 5.5 with web
-    search**, since Haiku was too weak for judgement; it searches and reads pages
+  - **How it runs** (15 Nov, Rutvij; 16 Nov: Claude Sonnet 5.5 with web
+    search; 19 Nov: **Claude Haiku 5.5 with web search**, everything on Haiku; it searches and reads pages
     for rates, fund facts, tax rules and card rewards, each search shown in its
     steps, never with names, digits or exact figures; its environment is open to
     the web and every other sandbox tool is off. Cards: `cards_and_spend` gives
@@ -1611,8 +1611,8 @@ Sources. Read-only, always (until 15 Nov: see *Ask Money is an agent* below).
 - **Photos and PDFs are read by Haiku** (17 Nov, Rutvij): a snapped or attached
   bill, a trip's receipt (18 Nov) and Snap the fridge go to Claude Haiku 5.5 (`PHOTO_MODEL`), whatever model
   the brain's other passes use; same key, budget and Sent to Claude log. An
-  uploaded statement or fund screen is a dense table and goes to Claude Sonnet 5.5
-  (`STATEMENT_MODEL`), asked to think little (effort low) with room for a long
+  uploaded statement or fund screen is a dense table and goes to Claude Haiku 5.5 too
+  (`STATEMENT_MODEL`; Sonnet 5.5 from 17 to 19 Nov), asked to think little (effort low) with room for a long
   list (8,000 tokens), since Haiku's thinking used up the old 2,500 and missed
   funds and SIPs. When nothing can be updated, the sheet says what was read
   ("Claude read 6 funds, but none had a rupee figure") and which screen to try;
@@ -2163,8 +2163,7 @@ web, and his Debt settles; Splitwise then gets a payment for the amount that was
 sent there (a part payment shows on Splitwise only once the share is paid in full).
 Still to come: one Splitwise expense per bill with every share (today each
 share goes as its own), and the bill photo on it.
-Bills, statements and fund screens are read by Haiku (bills already; statements
-back from Sonnet once it has room). Left out: Splitware's UPI directory (it sends
+Bills, statements and fund screens are read by Haiku (statements since 19 Nov). Left out: Splitware's UPI directory (it sends
 your email and UPI ID to a third party) and a copy of Splitwise's group screens
 (parked in ADHOC). Only the linked people's Debts go to Splitwise: their
 Splitwise id, amount, description and date.

@@ -331,7 +331,7 @@ describe('Claude over fetch (mocked)', () => {
       void init;
       return new Response(JSON.stringify({ content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: '{"nudges":[],"fills":[],"remember":[],"skills":[]}' }], stop_reason: 'end_turn', usage: { input_tokens: 40, output_tokens: 9, cache_read_input_tokens: 1200, cache_creation_input_tokens: 0 } }), { status: 200 });
     });
-    const m = createClaudeBrain({ apiKey: 'sk-test', fetchImpl: fetchImpl as unknown as typeof fetch });
+    const m = createClaudeBrain({ apiKey: 'sk-test', model: 'claude-opus-5-5', fetchImpl: fetchImpl as unknown as typeof fetch });
     const r = await m.complete({ system: systemPrompt([]), user: '{}', maxTokens: 100, schema: { type: 'object' } });
     expect(r.usage).toEqual({ input: 40, output: 9, cacheRead: 1200, cacheWrite: 0 });
     expect(parseAnswer(r.text)).toEqual({ nudges: [], fills: [], remember: [], skills: [] });
@@ -367,10 +367,10 @@ describe('quiet hours', () => {
 });
 
 describe('which model', () => {
-  it('Opus on the first day the brain runs, Haiku from the next; Opus can be turned on for one more day', async () => {
+  it('Haiku from the first day; Opus can be turned on for one day', async () => {
     const { brainModelId, setModelForToday } = await import('.');
-    expect(brainModelId(os, NOW)).toBe('claude-opus-5-5');
-    expect(brainModelId(os, NOW + 3600_000)).toBe('claude-opus-5-5');
+    expect(brainModelId(os, NOW)).toBe('claude-haiku-5-5');
+    expect(brainModelId(os, NOW + 3600_000)).toBe('claude-haiku-5-5');
     expect(brainModelId(os, NOW + DAY)).toBe('claude-haiku-5-5');
     setModelForToday(os, 'claude-opus-5-5', NOW + 5 * DAY);
     expect(brainModelId(os, NOW + 5 * DAY)).toBe('claude-opus-5-5');

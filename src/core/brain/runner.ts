@@ -46,11 +46,9 @@ export const STRONG_MODEL = 'claude-opus-5-5';
 
 /**
  * The model for a pass now: the one-day model on its day, else the standing
- * one. The very first time the brain runs it starts with a day on Opus (agreed
- * 31 Oct: Opus for the first day, then Haiku).
+ * one. Everything runs on Haiku (19 Nov, Rutvij); Opus only on a day you turn it on.
  */
 export function brainModelId(os: LifeOSContext, now = Date.now()): string {
-  if (os.settings.get<unknown>('brain', null) === null) setBrainSettings(os, { forToday: { model: STRONG_MODEL, day: iso(now) } });
   const s = brainSettings(os);
   return s.forToday?.day === iso(now) ? s.forToday.model : s.model;
 }

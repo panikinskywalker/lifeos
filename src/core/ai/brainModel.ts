@@ -18,11 +18,11 @@ export const BRAIN_MODELS = [
   { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
   { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
 ] as const;
-export const DEFAULT_BRAIN_MODEL = 'claude-opus-5-5';
+export const DEFAULT_BRAIN_MODEL = 'claude-haiku-5-5';
 /** Reading a photo or PDF you sent (a bill, the fridge) goes to Haiku, whatever the brain's model (17 Nov, Rutvij). */
 export const PHOTO_MODEL = 'claude-haiku-5-5';
-/** A statement or fund screen is a dense table: Sonnet reads it (17 Nov: Haiku missed funds and SIPs). */
-export const STATEMENT_MODEL = 'claude-sonnet-5-5';
+/** A statement or fund screen: Haiku too (19 Nov, Rutvij: everything on Haiku), with room for a long list. */
+export const STATEMENT_MODEL = 'claude-haiku-5-5';
 
 export interface ClaudeBrainOptions {
   apiKey: string;
@@ -106,9 +106,10 @@ export function createClaudeBrain(opts: ClaudeBrainOptions): BrainModel {
           max_tokens: maxTokens,
           system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
           messages,
+          // Haiku takes the basic web tools; the 2026-02-09 ones (dynamic filtering) are for Opus and Sonnet.
           tools: [
-            { type: 'web_search_20260209', name: 'web_search', max_uses: maxSearches },
-            { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3, max_content_tokens: 6000 },
+            { type: fallbacks ? 'web_search_20260209' : 'web_search_20250305', name: 'web_search', max_uses: maxSearches },
+            { type: fallbacks ? 'web_fetch_20260209' : 'web_fetch_20250910', name: 'web_fetch', max_uses: 3, max_content_tokens: 6000 },
           ],
           output_config: { effort: opts.effort ?? 'medium' },
         };

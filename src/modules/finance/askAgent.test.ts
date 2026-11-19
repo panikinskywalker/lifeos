@@ -51,10 +51,10 @@ const hooks = () => {
 };
 
 describe('Ask Money as an agent', () => {
-  it('is a Sonnet 5.5 agent with web search; every money tool is answered on the phone', () => {
+  it('is a Haiku 5.5 agent with web search; every money tool is answered on the phone', () => {
     const def = agentDefinition();
     expect(def.model.id).toBe(ASK_AGENT_MODEL);
-    expect(ASK_AGENT_MODEL).toBe('claude-sonnet-5-5');
+    expect(ASK_AGENT_MODEL).toBe('claude-haiku-5-5');
     const toolset = def.tools.find((t) => t.type === 'agent_toolset_20260401') as { default_config: { enabled: boolean }; configs: Array<{ name: string; enabled: boolean }> };
     expect(toolset.default_config.enabled).toBe(false);
     expect(toolset.configs.filter((c) => c.enabled).map((c) => c.name).sort()).toEqual(['web_fetch', 'web_search']);

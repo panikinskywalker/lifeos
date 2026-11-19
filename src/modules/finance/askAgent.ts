@@ -16,14 +16,14 @@ import type { SpendPeriod } from './spend';
 
 /**
  * Ask Money as an agent (docs/MODEL.md, Ask Money is an agent): a Claude
- * Managed Agent on Claude Sonnet 5.5, with web search, whose every money tool the phone answers, so
+ * Managed Agent on Claude Haiku 5.5 (19 Nov, Rutvij: everything on Haiku), with web search, whose every money tool the phone answers, so
  * figures come from the phone's sums and only rounded amounts and
  * placeholders for people leave it. It answers, says what to do, makes
  * changes with Undo (asking first for the bigger ones) and builds views on
  * Money home. It never moves money.
  */
 
-export const ASK_AGENT_MODEL = 'claude-sonnet-5-5';
+export const ASK_AGENT_MODEL = 'claude-haiku-5-5';
 const SAVED_KEY = 'finance.askAgent';
 /** A conversation's spend cap at list price, in US cents. */
 const SESSION_BUDGET_CENTS = '50';
