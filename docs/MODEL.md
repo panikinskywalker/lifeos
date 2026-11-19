@@ -2504,7 +2504,17 @@ screens checked on the phone → overrides only where the default is wrong)
     driver, cash with a quick add, the stamp collected) and the afternoon (the rest of today, bring and pack,
     tomorrow); Recap (spent by stop, steps, settled up, back home, Keep for the next trip). The trip bar on
     every trip screen, the ₹ / local currency switch, the *japan* look (the app's posters, photos and maps).
-  - [x] **7. Search and the copilot.** *Built 16 Nov in the design pass (below); Booking.com and Gmail finds stay labelled slots until they are connected.* The trip's search (records, actions, views); a helper in every section; the
+  - [x] **7. Search and the copilot.** *Built 16 Nov in the design pass (below); Booking.com and Gmail finds stay labelled slots until they are connected.*
+    *The copilot looks things up (19 Nov, Rutvij: "upgrade the copilot"):* each question first goes to a research
+    step where Claude decides whether it needs current facts from the web (what's on, closures, opening hours,
+    timetables, prices, rules); if so it searches and reads a few pages (Anthropic's web search and fetch, run on
+    Anthropic's side, a paused search continued) and writes short notes, and the answer is then made from the
+    trip plus those notes, with the pages listed under it (web answers carry citations, which a JSON answer
+    cannot, so it is two calls; when the trip is enough, Claude says so and no search is made). Both calls are
+    in Sent to Claude and inside the brain's budget; web search costs $10 per 1,000 searches on top. The chat is
+    kept on the phone per trip (the last 40 turns; New chat clears it), and the last six questions go with each
+    new one. `BrainModel.research` in `src/core/brain/model.ts`, `src/core/ai/brainModel.ts`; `askCopilot` in
+    `src/modules/travel/copilot.ts`. The trip's search (records, actions, views); a helper in every section; the
     trip copilot over the trip's records, your mail (finance's mail source) and a receipt photo, proposing
     changes (add a thing, a day line, a Task, a note, a Bill from a receipt, a payback; change a booking or a
     journey; move a thing; set a thing's status; tick a Task), saved only on Save, with Undo; by voice through
