@@ -1,6 +1,6 @@
-# agent-client
+# money-agent
 
-A small TypeScript command-line app that sends one message to the LifeOS Managed Agent and prints the reply as it streams in.
+A small TypeScript command-line app that sends one message to the agent behind the Money section of LifeOS (it logs expenses and splits, picks a card, and checks whether you can afford something) and prints the reply as it streams in.
 
 ## Run
 
@@ -23,3 +23,7 @@ If you don't pass a message, it sends a built-in groceries/dinner example. You c
 There is no one around to approve tool calls, so if a tool call pauses for approval the app answers `deny`. If the agent asks for a custom tool, the app replies with an error result instead of hanging. API errors (bad key, wrong IDs, rate limits, network) print a short message and exit with code 1.
 
 Each run starts a new session. Sessions are not deleted afterwards and stay visible in the Console.
+
+## Using it from the LifeOS app
+
+Don't call this code from inside the Expo/web app. An API key bundled into the app ends up in every user's browser. Run the same session logic on a small backend (a serverless function or an API route) that holds `ANTHROPIC_API_KEY`. That backend relays the `agent.message` text to the Money screen over SSE or a WebSocket. `src/index.ts` is written so its `main` loop can be moved into that handler with few changes.

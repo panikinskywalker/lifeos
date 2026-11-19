@@ -1,5 +1,5 @@
 {
-  "name": "lifeos-agent-client",
+  "name": "lifeos-money-agent",
   "private": true,
   "type": "module",
   "scripts": {
