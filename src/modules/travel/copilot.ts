@@ -1,4 +1,4 @@
-import { brainSettings, type BrainModel } from '@core/brain';
+import { brainSettings, type BrainModel, type BrainSource } from '@core/brain';
 import { recordUsage } from '@core/ai/routing';
 import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
@@ -34,7 +34,22 @@ How to answer:
   set_check_in (ref = the stay key, value = the check-in time like 15:00-23:00).
   Fill unused fields with "" or 0. Never invent prices, times or bookings as facts; an idea is an idea.
 - needs: the outside sources the question needs that you cannot reach here: "booking" (Booking.com, to find or book things and stays) or "gmail" (their mail). Usually empty.
-- LifeOS never books, pays or sends on its own; never word the reply as if it had.`;
+- LifeOS never books, pays or sends on its own; never word the reply as if it had.
+- When the message has "From the web just now", use those notes for anything current (dates, hours, closures, prices, rules) and say it comes from the web; the app lists the pages under your reply. Where the notes and the records disagree, say so.`;
+
+/**
+ * The research step before an answer: Claude decides whether the question needs
+ * the web (what's on, closures, opening hours, timetables, prices, rules) and,
+ * if so, searches and reads a few pages and writes short notes. When the trip
+ * and general knowledge are enough it says NO_RESEARCH, and no search is made.
+ */
+export const RESEARCH_SYSTEM = `You do the web research for the trip copilot in LifeOS, a personal app. You get one question and the trip (where, when, the stops with their dates).
+- First decide: does a good answer need current facts from the web (events and festivals on these dates, closures and holidays, opening hours, timetables and last trains, prices, entry rules, the weather usual for the dates)? If the trip and general travel knowledge are enough, reply with exactly NO_RESEARCH and nothing else.
+- Otherwise search (two or three searches are usually enough), read the most useful pages, and reply with 3 to 8 short notes, each one fact the copilot can use, tied to the stops and dates of this trip. Say when something is not confirmed or may have changed. Never invent dates, hours or prices.
+- Plain British English, no em dashes, no preamble.`;
+
+/** True when the research step found nothing worth searching for. */
+export const noResearch = (text: string) => !text.trim() || /^\s*NO_RESEARCH\b/.test(text);
 
 export const COPILOT_SCHEMA = {
   type: 'object',
@@ -187,30 +202,82 @@ export function parseCopilot(v: unknown): CopilotAnswer | null {
   return { reply: o.reply.trim(), changes, needs: [...new Set(needs)] };
 }
 
-export type CopilotResult = { ok: true; answer: CopilotAnswer; keys: Map<string, string> } | { ok: false; note: 'off' | 'no key' | 'over budget' | 'error'; error?: string };
+export type CopilotResult = { ok: true; answer: CopilotAnswer; keys: Map<string, string>; sources: BrainSource[]; searches: number } | { ok: false; note: 'off' | 'no key' | 'over budget' | 'error'; error?: string };
 
-/** One question, one call: budget first, the Sent to Claude log after. */
-export async function askCopilot(os: LifeOSContext, model: BrainModel | null, trip: ObjectRecord<TripData>, question: string, history: Array<{ q: string; a: string }> = [], now = Date.now()): Promise<CopilotResult> {
+/**
+ * One question: research on the web when it needs it (Claude decides), then the
+ * answer with its proposed changes. Budget first, the Sent to Claude log after
+ * each call. A failed search never stops the answer.
+ */
+export async function askCopilot(os: LifeOSContext, model: BrainModel | null, trip: ObjectRecord<TripData>, question: string, history: Array<{ q: string; a: string }> = [], now = Date.now(), opts: { web?: boolean } = {}): Promise<CopilotResult> {
   const settings = brainSettings(os);
   if (!settings.on) return { ok: false, note: 'off' };
   if (!model) return { ok: false, note: 'no key' };
   const ctx = tripContext(os, trip, now);
   const maxTokens = 1500;
-  const user = `${history.length ? `Earlier in this chat:\n${history.slice(-3).map((h) => `Q: ${h.q}\nA: ${h.a}`).join('\n')}\n\n` : ''}Question: ${question.trim()}\n\nThe trip:\n${JSON.stringify(ctx.record)}`;
+  const earlier = history.length ? `Earlier in this chat:\n${history.slice(-6).map((h) => `Q: ${h.q}\nA: ${h.a}`).join('\n')}\n\n` : '';
+  const tripJson = JSON.stringify(ctx.record);
+  const base = { at: now, why: 'you asked the trip copilot', model: model.model, records: ctx.count };
+  const sentLines = [`Travel · question: ${question.trim().slice(0, 200)}`, `Travel · ${trip.data.destination}: ${ctx.count} records (stops, stays, journeys, things, checklist, notes, expenses), no references`];
+
+  // 1. The web, when the question needs it.
+  let web: { notes: string; sources: BrainSource[]; searches: number } | null = null;
+  if (model.research && opts.web !== false) {
+    const rUser = `${earlier}Question: ${question.trim()}\n\nThe trip:\n${tripJson}`;
+    const rTokens = 2000;
+    const estimate = Math.ceil((RESEARCH_SYSTEM.length + rUser.length) / 4) + rTokens + 8000;
+    if (os.brain.sent.tokensToday(now) + estimate <= settings.budget) {
+      try {
+        const r = await model.research({ system: RESEARCH_SYSTEM, user: rUser, maxTokens: rTokens });
+        os.brain.sent.add({ ...base, pass: 'copilot-web', lines: [...sentLines, `Travel · web: ${r.searches} search${r.searches === 1 ? '' : 'es'}, ${r.sources.length} pages`], ...r.usage, outcome: 'ok', error: null });
+        recordUsage(os, { provider: 'claude', model: model.model, purpose: 'brain', input: r.usage.input + r.usage.cacheRead + r.usage.cacheWrite, output: r.usage.output, at: now });
+        if (!noResearch(r.text)) web = { notes: r.text.trim(), sources: r.sources, searches: r.searches };
+      } catch (e) {
+        const usage = (e as { usage?: { input: number; output: number; cacheRead: number; cacheWrite: number } }).usage ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+        os.brain.sent.add({ ...base, pass: 'copilot-web', lines: sentLines, ...usage, outcome: 'error', error: (e as Error).message.slice(0, 300) });
+      }
+    }
+  }
+
+  // 2. The answer, with what the web said.
+  const user = `${earlier}Question: ${question.trim()}\n\nThe trip:\n${tripJson}${web ? `\n\nFrom the web just now (${web.sources.length} ${web.sources.length === 1 ? 'page' : 'pages'}):\n${web.notes}` : ''}`;
   const estimate = Math.ceil((COPILOT_SYSTEM.length + user.length) / 4) + maxTokens;
   if (os.brain.sent.tokensToday(now) + estimate > settings.budget) return { ok: false, note: 'over budget' };
-  const base = { at: now, pass: 'copilot', why: 'you asked the trip copilot', model: model.model, lines: [`Travel · question: ${question.trim().slice(0, 200)}`, `Travel · ${trip.data.destination}: ${ctx.count} records (stops, stays, journeys, things, checklist, notes, expenses), no references`], records: ctx.count };
   try {
     const r = await model.complete({ system: COPILOT_SYSTEM, user, maxTokens, schema: COPILOT_SCHEMA as unknown as Record<string, unknown> });
     const answer = parseCopilot(parseJson(r.text));
-    os.brain.sent.add({ ...base, ...r.usage, outcome: answer ? 'ok' : 'error', error: answer ? null : 'The answer was not the expected JSON' });
+    os.brain.sent.add({ ...base, pass: 'copilot', lines: sentLines, ...r.usage, outcome: answer ? 'ok' : 'error', error: answer ? null : 'The answer was not the expected JSON' });
     recordUsage(os, { provider: 'claude', model: model.model, purpose: 'brain', input: r.usage.input + r.usage.cacheRead + r.usage.cacheWrite, output: r.usage.output, at: now });
-    return answer ? { ok: true, answer, keys: ctx.keys } : { ok: false, note: 'error', error: 'The answer was not the expected JSON' };
+    return answer ? { ok: true, answer, keys: ctx.keys, sources: web?.sources ?? [], searches: web?.searches ?? 0 } : { ok: false, note: 'error', error: 'The answer was not the expected JSON' };
   } catch (e) {
     const usage = (e as { usage?: { input: number; output: number; cacheRead: number; cacheWrite: number } }).usage ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-    os.brain.sent.add({ ...base, ...usage, outcome: 'error', error: (e as Error).message.slice(0, 300) });
+    os.brain.sent.add({ ...base, pass: 'copilot', lines: sentLines, ...usage, outcome: 'error', error: (e as Error).message.slice(0, 300) });
     return { ok: false, note: 'error', error: (e as Error).message };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* The chat, kept on the phone per trip                                */
+/* ------------------------------------------------------------------ */
+
+export interface SavedTurn {
+  q: string;
+  at: number;
+  answer?: CopilotAnswer;
+  error?: string;
+  sources?: BrainSource[];
+  /** The short keys the answer used, so its proposed changes can still be saved later. */
+  keys?: Array<[string, string]>;
+  saved?: 'saved' | 'dismissed';
+}
+const chatKey = (tripId: string) => `travel.copilot.chat.${tripId}`;
+/** The trip's copilot chat as kept on this phone (the last 40 turns). */
+export const copilotChat = (os: LifeOSContext, tripId: string) => os.settings.get<SavedTurn[]>(chatKey(tripId), []);
+export function saveCopilotChat(os: LifeOSContext, tripId: string, turns: SavedTurn[]) {
+  os.settings.set(chatKey(tripId), turns.slice(-40));
+}
+export function clearCopilotChat(os: LifeOSContext, tripId: string) {
+  os.settings.set(chatKey(tripId), []);
 }
 
 function parseJson(text: string): unknown {

@@ -33,9 +33,20 @@ export interface ClaudeBrainOptions {
 }
 
 interface ApiResponse {
-  content: Array<{ type: string; text?: string }>;
+  content: Array<{ type: string; text?: string; citations?: Array<{ type?: string; url?: string; title?: string }>; content?: unknown }>;
   stop_reason: string;
-  usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+  usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } };
+}
+
+/** The pages a web answer used: its citations first, then the search results it saw. */
+function sourcesOf(content: ApiResponse['content']): Array<{ url: string; title: string }> {
+  const seen = new Map<string, string>();
+  for (const b of content) for (const c of b.citations ?? []) if (c.url && !seen.has(c.url)) seen.set(c.url, c.title || c.url);
+  for (const b of content) {
+    if (b.type !== 'web_search_tool_result' || !Array.isArray(b.content)) continue;
+    for (const r of b.content as Array<{ type?: string; url?: string; title?: string }>) if (r.type === 'web_search_result' && r.url && !seen.has(r.url) && seen.size < 8) seen.set(r.url, r.title || r.url);
+  }
+  return [...seen].map(([url, title]) => ({ url, title }));
 }
 
 export function createClaudeBrain(opts: ClaudeBrainOptions): BrainModel {
@@ -80,6 +91,63 @@ export function createClaudeBrain(opts: ClaudeBrainOptions): BrainModel {
       if (json.stop_reason === 'max_tokens') throw Object.assign(new ProviderError('claude: the answer was cut off', 'claude', 200), { usage });
       const text = json.content.filter((b) => b.type === 'text').map((b) => b.text ?? '').join('');
       return { text, usage };
+    },
+    // Web research (the trip copilot): Anthropic's web search and fetch run on Anthropic's side within the request;
+    // a long search may pause (`pause_turn`), and the paused turn is sent back unchanged to continue it.
+    async research({ system, user, maxTokens, maxSearches = 4 }) {
+      const messages: Array<{ role: 'user' | 'assistant'; content: unknown }> = [{ role: 'user', content: user }];
+      const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+      let searches = 0;
+      let json: ApiResponse | null = null;
+      const content: ApiResponse['content'] = [];
+      for (let round = 0; round < 5; round++) {
+        const body: Record<string, unknown> = {
+          model,
+          max_tokens: maxTokens,
+          system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+          messages,
+          tools: [
+            { type: 'web_search_20260209', name: 'web_search', max_uses: maxSearches },
+            { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3, max_content_tokens: 6000 },
+          ],
+          output_config: { effort: opts.effort ?? 'medium' },
+        };
+        if (fallbacks) body.fallbacks = 'default';
+        let res: Response;
+        try {
+          res = await doFetch(`${baseUrl}/v1/messages`, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-api-key': opts.apiKey,
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true',
+              ...(fallbacks ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}),
+            },
+            body: JSON.stringify(body),
+          });
+        } catch (e) {
+          throw Object.assign(new ProviderError(`claude: network error (${(e as Error).message})`, 'claude', 0), { usage });
+        }
+        if (!res.ok) throw Object.assign(new ProviderError(`Claude API ${res.status}: ${(await res.text()).slice(0, 300)}`, 'claude', res.status === 529 ? 429 : res.status), { usage });
+        json = (await res.json()) as ApiResponse;
+        const u = json.usage ?? {};
+        usage.input += u.input_tokens ?? 0;
+        usage.output += u.output_tokens ?? 0;
+        usage.cacheRead += u.cache_read_input_tokens ?? 0;
+        usage.cacheWrite += u.cache_creation_input_tokens ?? 0;
+        searches += u.server_tool_use?.web_search_requests ?? 0;
+        content.push(...json.content);
+        if (json.stop_reason !== 'pause_turn') break;
+        messages.push({ role: 'assistant', content: json.content });
+      }
+      if (json?.stop_reason === 'refusal') throw Object.assign(new ProviderError('claude: declined this pass', 'claude', 200), { usage });
+      // The answer is the text after the last tool call (earlier text is Claude narrating its searches).
+      const last = json?.content ?? [];
+      const lastTool = last.map((b) => b.type).lastIndexOf('web_search_tool_result');
+      const tail = last.slice(Math.max(lastTool, last.map((b) => b.type).lastIndexOf('web_fetch_tool_result')) + 1);
+      const text = (tail.some((b) => b.type === 'text') ? tail : last).filter((b) => b.type === 'text').map((b) => b.text ?? '').join('').trim();
+      return { text, sources: sourcesOf(content), searches, usage };
     },
   };
 }
