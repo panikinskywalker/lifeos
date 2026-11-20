@@ -30,6 +30,7 @@ Preview build (no Mac / Metro / Wi-Fi dance), updates arrive by themselves on ne
 - **Automatic encrypted backups** to a folder you pick (e.g. Drive).
 - **"Replace everything" restore** (restore today only adds / updates).
 - **Cloud sync** (backlog) — also enables a web / iPhone client.
+- **Obsidian as the reference for the Second Brain** (20 Nov): your Obsidian notetaker is the clearest picture of what you mean by a second brain; read it before R7f (MODEL.md §6, Note and Fact as the Second Brain, Memory replaced) is settled. Needs the vault shared from your computer (or exported).
 - **Activity goals:** "at least 4 days a week" / "at most 2", weeks met / missed, streak of weeks.
 
 ## Still to check on the phone
