@@ -30,7 +30,7 @@ Preview build (no Mac / Metro / Wi-Fi dance), updates arrive by themselves on ne
 - **Automatic encrypted backups** to a folder you pick (e.g. Drive).
 - **"Replace everything" restore** (restore today only adds / updates).
 - **Cloud sync** (backlog) — also enables a web / iPhone client.
-- **Obsidian as the reference for the Second Brain** (20 Nov): your Obsidian notetaker is the clearest picture of what you mean by a second brain; read it before R7f (MODEL.md §6, Note and Fact as the Second Brain, Memory replaced) is settled. Needs the vault shared from your computer (or exported).
+- **Obsidian (the app) as the reference for the Second Brain** (20 Nov, corrected 22 Nov): the Obsidian app's way of working is the clearest picture of what you mean by a second brain; design R7f (MODEL.md §6, Note and Fact as the Second Brain, Memory replaced) against it. Not your vault: the app. What LifeOS already has of it: `[[links]]` in any text Field become mention Links (`src/core/links.ts`), a record lists the Notes that link to it (backlinks), and the Links screen is its graph view. What Obsidian has that LifeOS doesn't yet: unlinked mentions (a record's name in a note that isn't linked yet), daily notes, templates, embeds (one note inside another), properties on a note queried as a table (Bases), aliases on notes, a local graph per note, and notes as plain Markdown files you own.
 - **Activity goals:** "at least 4 days a week" / "at most 2", weeks met / missed, streak of weeks.
 
 ## Still to check on the phone
