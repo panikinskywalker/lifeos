@@ -3,8 +3,8 @@ import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
-import { useLive } from '@ui/hooks';
-import { EmptyState, Screen } from '@ui/kit';
+import { useLive, useOS } from '@ui/hooks';
+import { EmptyState, Screen, useToast } from '@ui/kit';
 import { connectionMargin, dayPlans, dayView, flightTrips, happeningOn, longLeg, moneyOf, nightsOf, stayNights, stepsOf, thingStatus, type FlightTrip, type OutingData, type StopData, type ThingStatus, type TravelEvent, type TripData } from '@modules/travel';
 import { shortDay, shortIso, timeOf } from './parts';
 import { stopColor as stopHex } from './jp/bookparts';
@@ -492,8 +492,16 @@ export function JourneyBody({ e, trip, from, to, checkOut, checkIn, amt, showSta
   const steps = stepsOf(e);
   const margin = connectionMargin(e);
   const seatsIn = e.data.seatsOpenAt ? Math.ceil((e.data.seatsOpenAt - Date.now()) / 86_400_000) : null;
+  const os = useOS();
+  const toast = useToast();
   const booked = e.data.plan === 'booked';
   const book = e.data.book ?? [];
+  // Bought the ticket: say so here, and Bookings, Plan and the reminders stop asking.
+  const setBooked = (on: boolean) => {
+    const was = e.data.plan;
+    os.records.update<TravelEvent>(e.id, { data: { ...e.data, plan: on ? 'booked' : was === 'booked' ? 'decided' : was } }, 'user');
+    toast.show({ message: on ? 'Marked booked' : 'Not booked yet', icon: 'check', undo: () => { os.records.update<TravelEvent>(e.id, { data: { ...e.data, plan: was } }, 'user'); } });
+  };
   const directions = `https://www.google.com/maps/dir/?api=1&travelmode=transit&origin=${encodeURIComponent(from?.title ?? e.title.split(' → ')[0] ?? '')}&destination=${encodeURIComponent(to?.title ?? e.title.split(' → ')[1] ?? '')}`;
   const timeBox = (t: string, label: string) => (
     <View style={{ alignItems: 'center', flexGrow: 1, flexShrink: 1, flexBasis: 0, gap: 2, minWidth: 0, paddingVertical: 12, paddingHorizontal: 8, borderWidth: 1.5, borderColor: 'rgba(245,245,247,0.18)', borderRadius: 20 }}>
@@ -504,7 +512,7 @@ export function JourneyBody({ e, trip, from, to, checkOut, checkIn, amt, showSta
   const rows = [
     checkOut ? <Line key="out" icon={P.home} title={`Check out · ${nameOf(checkOut)}`} sub={checkOut.data.checkOut ?? (e.data.startAt && !e.data.allDay ? `by ${timeOf(e.data.startAt)}` : 'time not known')} minHeight={50} onPress={() => router.push(tripRoutes.booking(checkOut.id))} /> : null,
     checkIn ? <Line key="in" icon={P.bed} color={checkIn.data.stopId && to ? stopHex(to) : '#C99A6E'} title={`Check in · ${nameOf(checkIn)}`} sub={checkIn.data.checkIn ?? 'check-in time missing'} minHeight={50} onPress={() => router.push(tripRoutes.booking(checkIn.id))} /> : null,
-    e.data.bookNote || book.length ? <Line key="book" icon={P.ticket} color={C.lime} title={booked ? 'Booked' : `Book ahead${book[0] ? ` · ${book[0].label.replace(/^(reserve|book)\s+(the\s+)?/i, '')}` : ''}`} sub={e.data.bookNote ?? null} minHeight={50} right={booked ? <Chip label="booked" tone="lime" /> : seatsIn != null && seatsIn > 0 ? <Chip label={`in ${seatsIn} d`} tone="lime" /> : seatsIn != null ? <Chip label="open now" tone="yellow" /> : null} onPress={book[0] ? () => openUrl(book[0]!.url) : undefined} /> : null,
+    e.data.bookNote || book.length ? <Line key="book" icon={P.ticket} color={C.lime} title={booked ? 'Booked' : `Book ahead${book[0] ? ` · ${book[0].label.replace(/^(reserve|book)\s+(the\s+)?/i, '')}` : ''}`} sub={e.data.bookNote ?? null} minHeight={50} right={booked ? <Chip label="Booked ✓" tone="lime" h={30} onPress={() => setBooked(false)} a11y="Booked. Tap if it is not booked yet" /> : seatsIn != null && seatsIn > 0 ? <Chip label={`in ${seatsIn} d`} tone="lime" /> : <Chip label="Mark booked" tone="yellow" h={30} onPress={() => setBooked(true)} a11y="Mark this journey booked" />} onPress={book[0] ? () => openUrl(book[0]!.url) : undefined} /> : null,
     e.data.lastConnection ? <Line key="last" icon={P.bus} color="#FF5C47" title="Last connection" sub={e.data.lastConnection.replace(/^last connection[:\s]*/i, '')} minHeight={50} right={margin != null && margin <= 240 ? <Chip label="tight" tone="coral" /> : margin != null ? <Chip label={`${Math.floor(margin / 60)} h spare`} /> : null} /> : null,
   ].filter(Boolean);
 

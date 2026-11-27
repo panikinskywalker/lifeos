@@ -188,12 +188,15 @@ export type Stage = (typeof STAGES)[number];
 /** Plan · Book · Prep · Travel · Home: done ones ticked, the current one pulsing. */
 export function Stepper({ stage }: { stage: Stage }) {
   const at = STAGES.indexOf(stage);
+  // Each step opens the section where that work is done (they look like buttons, so they are).
+  const host = useContext(TripHostContext);
+  const goes: Record<Stage, { tab: Section; params?: Record<string, string> }> = { plan: { tab: 'plan' }, book: { tab: 'bookings' }, prep: { tab: 'prep' }, travel: { tab: 'plan', params: { view: 'days' } }, home: { tab: 'money', params: { tab: 'settle' } } };
   return (
     <Anim k="jr" delay={110} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
       {STAGES.map((s, i) => (
         <React.Fragment key={s}>
           {i ? <View style={{ flexGrow: 1, height: 2, marginTop: 10, borderRadius: 1, backgroundColor: i <= at ? C.lime : 'rgba(245,245,247,0.16)' }} /> : null}
-          <View style={{ alignItems: 'center', gap: 5, width: 40, flexShrink: 0 }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${s[0]!.toUpperCase()}${s.slice(1)}${i < at ? ', done' : i === at ? ', now' : ''}`} disabled={!host} onPress={() => host?.show(goes[s].tab, goes[s].params)} hitSlop={8} style={({ pressed }) => ({ alignItems: 'center', gap: 5, width: 40, flexShrink: 0, opacity: pressed ? 0.6 : 1 })}>
             {i < at ? (
               <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: C.lime, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon d={['M20 6 9 17l-5-5']} size={12} color={C.ink} />
@@ -209,7 +212,7 @@ export function Stepper({ stage }: { stage: Stage }) {
               <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: 'rgba(245,245,247,0.28)' }} />
             )}
             <Text style={{ color: i <= at ? C.white : C.low, fontSize: 9, letterSpacing: 1, fontFamily: MONO }}>{s.toUpperCase()}</Text>
-          </View>
+          </Pressable>
         </React.Fragment>
       ))}
     </Anim>
@@ -221,12 +224,12 @@ export function Stepper({ stage }: { stage: Stage }) {
 /* ------------------------------------------------------------------ */
 
 export type TripTab = 'overview' | 'plan' | 'bookings' | 'money' | 'prep' | null;
-const TABS: Array<{ key: Exclude<TripTab, null>; label: string; icon: React.ReactNode | ((c: string) => React.ReactNode) }> = [
-  { key: 'overview', label: 'Overview', icon: (c: string) => <Icon size={21} color={c} d={['m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z']}><Circle cx={12} cy={12} r={10} /></Icon> },
-  { key: 'plan', label: 'Plan', icon: (c: string) => <Icon size={21} color={c} d={['M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z', 'M15 5.764v15', 'M9 3.236v15']} /> },
-  { key: 'bookings', label: 'Bookings', icon: (c: string) => <Icon size={21} color={c} d={['M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z', 'M13 5v2', 'M13 17v2', 'M13 11v2']} /> },
-  { key: 'money', label: 'Money', icon: (c: string) => <Icon size={21} color={c} d={['M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1', 'M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4']} /> },
-  { key: 'prep', label: 'Prep', icon: (c: string) => <Icon size={21} color={c} d={['m3 17 2 2 4-4', 'm3 7 2 2 4-4', 'M13 6h8', 'M13 12h8', 'M13 18h8']} /> },
+const TABS: Array<{ key: Exclude<TripTab, null>; label: string; short: string; icon: React.ReactNode | ((c: string) => React.ReactNode) }> = [
+  { key: 'overview', short: 'Trip', label: 'Overview', icon: (c: string) => <Icon size={21} color={c} d={['m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z']}><Circle cx={12} cy={12} r={10} /></Icon> },
+  { key: 'plan', short: 'Plan', label: 'Plan', icon: (c: string) => <Icon size={21} color={c} d={['M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z', 'M15 5.764v15', 'M9 3.236v15']} /> },
+  { key: 'bookings', short: 'Bookings', label: 'Bookings', icon: (c: string) => <Icon size={21} color={c} d={['M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z', 'M13 5v2', 'M13 17v2', 'M13 11v2']} /> },
+  { key: 'money', short: 'Money', label: 'Money', icon: (c: string) => <Icon size={21} color={c} d={['M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1', 'M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4']} /> },
+  { key: 'prep', short: 'Prep', label: 'Prep', icon: (c: string) => <Icon size={21} color={c} d={['m3 17 2 2 4-4', 'm3 7 2 2 4-4', 'M13 6h8', 'M13 12h8', 'M13 18h8']} /> },
 ];
 
 /** The trip bar, floating at the bottom: five sections and the copilot. */
@@ -246,8 +249,10 @@ export function TripBar({ tripId, active }: { tripId: string; active: TripTab })
         {TABS.map((t) => {
           const on = t.key === active;
           return (
-            <Pressable key={t.key} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => go(t.key)} style={({ pressed }) => ({ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? C.lime : 'transparent', transform: [{ scale: pressed ? 0.94 : 1 }] })}>
+            <Pressable key={t.key} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => go(t.key)} style={({ pressed }) => ({ width: 50, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', gap: 2, backgroundColor: on ? C.lime : 'transparent', transform: [{ scale: pressed ? 0.94 : 1 }] })}>
               {typeof t.icon === 'function' ? t.icon(on ? C.ink : C.mid) : t.icon}
+              {/* The word under each icon: the sections are found by name, not guessed from a glyph. */}
+              <Text numberOfLines={1} style={{ color: on ? C.ink : C.mid, fontSize: 9.5, lineHeight: 12, letterSpacing: -0.1, fontFamily: 'PlusJakartaSans_700Bold' }}>{t.short}</Text>
             </Pressable>
           );
         })}
