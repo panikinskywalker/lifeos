@@ -10,6 +10,8 @@ import { mePersonId } from './lib';
 /**
  * Turf shares paid by SMS (docs/MODEL.md layer 2, *Money*; R9c.6). When finance
  * files a money-in Transaction, games looks for the share it pays:
+ * - looked at when filed, and again the moment it is tied to someone (you
+ *   confirm who sent it): a sender unknown at first is known then;
  * - the **sender** is the UPI id in the text, else the name the bank wrote;
  *   a sender is *known* when it is a learned alias (core `aliases`), one of a
  *   player's UPI ids (core `whoIs`), or the Person finance already matched;
@@ -75,8 +77,8 @@ function footballPeople(os: LifeOSContext): Set<string> {
 /** Who sent it, and whether we know for sure. */
 function whoSent(os: LifeOSContext, tx: Tx, txId?: string): { personId: string | null; known: boolean } {
   const members = footballPeople(os);
-  // The person finance linked the payment to (its payee).
-  const linked = txId ? os.links.forEntity(txId, 'person').find((l) => members.has(l.other.id)) : undefined;
+  // The person finance linked the payment to, or you confirmed as its payee.
+  const linked = txId ? os.links.forEntity(txId).find((l) => (l.relation.kind === 'person' || l.relation.kind === 'payee') && members.has(l.other.id)) : undefined;
   if (linked) return { personId: linked.other.id, known: true };
   const { vpa, name } = senderOf(tx);
   const people = os.records.query('person', {}, { limit: 100_000 });

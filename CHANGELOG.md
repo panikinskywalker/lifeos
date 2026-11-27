@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.144 · 27 Nov 2026
+
+**Confirming who paid settles their Turf shares.** A payment message whose sender LifeOS didn't know was looked at by Turf only once, when it came in. Now it's looked at again the moment you confirm who sent it, and their Turf shares are marked paid (with Undo in To check). Payments you already confirmed in the last 60 days are matched on the next start. Money's own settling leaves Turf players' payments to Turf, so nothing is settled twice.
+
 ## v0.0.143 · 27 Nov 2026
 
 **Yen counts, and old payments come in.** Splitwise keeps a trip's yen apart from rupees, so it called Parth square while he still owed hostel shares in yen. Udhari now counts other currencies in rupees at your trip's rate, and shows any it can't convert. Payments made in a trip's Splitwise group before you linked it (Parth's ₹4,000 on 17 Nov) now come into the trip, unless they already settled shares here back then.

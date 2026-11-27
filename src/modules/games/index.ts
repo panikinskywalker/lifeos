@@ -68,6 +68,15 @@ export const gamesModule: ModuleManifest = {
     } catch (e) {
       console.warn('[turf] booking match failed', e);
     }
+    // Tied to someone after it was filed (you confirmed who sent it): looked at again.
+    bus.on('relation.added', ({ relation }) => {
+      if (relation.kind !== 'person' && relation.kind !== 'payee') return;
+      try {
+        matchTransaction(os, relation.fromId);
+      } catch (e) {
+        console.warn('[turf] SMS share match failed', e);
+      }
+    });
     bus.on('entity.created', ({ entity }) => {
       if (entity.object !== 'transaction') return;
       try {

@@ -2111,6 +2111,10 @@ they do not also settle Debts. (`syncBills` in `src/modules/finance/splitwise.ts
   and each share; changes and deletes follow, as in a mapped group. A mapped group still goes to its
   Splitwise group.
 - *A payment recorded on Splitwise* settles Debts, then Bills (a payback Bill, never sent back).
+- *Turf first (27 Nov, Rutvij: "messages coming in should settle Turf after confirming the person"):*
+  a payment is looked at by Turf when filed and again the moment it is tied to someone (a person or
+  payee link: you confirmed who sent it); money from someone with Turf shares open is Turf's to match,
+  and Money's own settling leaves it alone, so one payment never settles twice.
 - A payment only settles what was open on its day, never shares or Bills dated after it (27 Nov: an
   August payment tied to Parth later had paid off his November trip). A payment for what only
   Splitwise knows is sent there only when it was filed in the last 7 days.

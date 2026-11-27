@@ -24,6 +24,9 @@ export function settleFromPayment(os: LifeOSContext, txId: string): AutoSettled 
   if (os.links.forEntity(txId, 'settles').length) return null;
   const payee = payeeOf(os, txId);
   if (!payee || payee.type !== 'person') return null;
+  // Turf's: money that pays a Turf share, or from someone with Turf shares open, is Turf's to match (one payment never settles twice).
+  if (os.links.forEntity(txId, 'pays').length) return null;
+  if (os.records.query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: payee.id }, { field: 'status', op: 'eq', value: 'open' }] } }, { limit: 500 }).some((d) => os.links.forEntity(d.id).some((l) => l.other.object === 'appearance'))) return null;
   const inMoney = tx.data.kind === 'income';
   const sign = inMoney ? 1 : -1;
   const amount = tx.data.amount;
