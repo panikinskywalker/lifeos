@@ -2144,6 +2144,10 @@ someone in People, a new person, or a Splitwise friend). Each group card has its
 *Splitwise group* to link one); mapping it reads the group from the start: Bills sent between you
 before move into the group (the loose copy deleted, the group's own matched or added), and the
 group's expenses come in. A Bill between two others is never sent outside a group.
+One Splitwise sync runs at a time (a second call waits for the running one): two at once had each
+sent the same Bill. Once, the copies made that way were deleted on Splitwise (same name, amount and
+day as a sent Bill, not the tracked copy). A linked person LifeOS has as square but Splitwise does not
+shows Splitwise's figure (*On Splitwise, not in LifeOS*).
 **Built 17 Nov (v0.0.117, steps 1 to 4)** on the *Splitwise* artboards: then Money ›
 Splitwise (the grid menu; a person's Money section links there), now its own board. Signed out, the
 mint card and *Sign in with Splitwise* (Splitwise's page in a WebView, needing the

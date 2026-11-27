@@ -263,13 +263,15 @@ function Tag({ label, color }: { label: string; color?: string }) {
 }
 
 /** The figure a row stands for: LifeOS's, or Splitwise's for a friend only Splitwise knows. */
-const valueOf = (r: PersonRow) => (r.swOnly ? (r.swAmount ?? 0) : r.amount);
+const valueOf = (r: PersonRow) => (onlySw(r) ? (r.swAmount ?? 0) : r.amount);
+/** Splitwise has a balance with them and LifeOS has none: Splitwise's figure stands. */
+const onlySw = (r: PersonRow) => r.swOnly || (!r.amount && !!r.swAmount);
 
 function People({ rows }: { rows: PersonRow[] }) {
   const os = useOS();
   const t = useTheme();
   const [open, setOpen] = useState<PersonRow | null>(null);
-  const apart = (r: PersonRow) => !r.swOnly && r.swAmount !== null && Math.abs(r.swAmount - r.amount) >= 1;
+  const apart = (r: PersonRow) => !onlySw(r) && r.swAmount !== null && Math.abs(r.swAmount - r.amount) >= 1;
   const said = (n: number) => (n > 0 ? `${os.format.currency(Math.round(n))} to you` : n < 0 ? `you owe ${os.format.currency(Math.round(-n))}` : 'square');
   return (
     <View style={{ paddingHorizontal: 16, paddingVertical: 4, borderRadius: 28, backgroundColor: t.c.bg.tile }}>
@@ -283,7 +285,7 @@ function People({ rows }: { rows: PersonRow[] }) {
             <Text numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, fontWeight: '600' }}>{r.name}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
               {r.tags.slice(0, 2).map((x) => <Tag key={x} label={x} />)}
-              {r.swOnly ? <Tag label="Only on Splitwise" color={blocks.sky} /> : r.linked && !apart(r) ? <Tag label="Splitwise" color={blocks.mint} /> : null}
+              {onlySw(r) ? <Tag label={r.swOnly ? 'Only on Splitwise' : 'On Splitwise, not in LifeOS'} color={blocks.sky} /> : r.linked && !apart(r) ? <Tag label="Splitwise" color={blocks.mint} /> : null}
               {apart(r) ? <Tag label={`Splitwise: ${said(r.swAmount!)}`} color={t.c.alert.coralText} /> : null}
               {r.oldestDays ? <Tag label={`${r.oldestDays} days`} color={t.c.alert.coralText} /> : null}
             </View>

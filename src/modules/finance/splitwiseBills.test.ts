@@ -29,6 +29,7 @@ class FakeSw {
   async groups() { return [{ id: GROUP, name: 'Lisbon' }]; }
   async expenses() { return this.list.filter((e) => e.payment); }
   async groupExpenses(g: number) { return this.list.filter((e) => e.group_id === g); }
+  async looseExpenses() { return this.list.filter((e) => !e.group_id && !e.deleted_at); }
   async createExpense(p: Record<string, string | number | boolean | undefined>) {
     if (this.refuse.has(String(p.description))) throw new Error('Splitwise: Cost must be a positive number');
     this.made.push(p);
@@ -194,5 +195,21 @@ describe('mapping a group after its Bills went between you', () => {
     expect(await run()).toMatchObject({ billsMatched: 1, billsSent: 0 });
     expect(sw.list.find((e) => e.id === loose)!.deleted_at).toBeTruthy();
     expect(swConfig(os).bills![b.id]!.id).toBe(61);
+  });
+});
+
+describe('copies LifeOS made twice', () => {
+  it('two syncs at once send a Bill once; a copy made twice before is deleted, once', async () => {
+    setSwConfig(os, { groups: {} });
+    makeBill(os, 'Parth’s flight', { amount: 52129, date: '2026-11-08', split: { payers: { me: 52129 }, method: 'exact', shares: { [ana]: 52129 } } });
+    await Promise.all([run(), run()]);
+    expect(sw.made.filter((p) => p.description === 'Parth’s flight')).toHaveLength(1);
+    // A copy from before the lock: same name, amount and day, not the one LifeOS tracks.
+    setSwConfig(os, { dupesCleaned: false });
+    sw.list.push({ ...sw.list[0]!, id: 999 });
+    await run();
+    expect(sw.list.find((e) => e.id === 999)!.deleted_at).toBeTruthy();
+    expect(sw.list.filter((e) => !e.deleted_at && e.description === 'Parth’s flight')).toHaveLength(1);
+    expect(swConfig(os).dupesCleaned).toBe(true);
   });
 });

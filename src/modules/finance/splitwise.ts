@@ -79,6 +79,8 @@ export interface SwConfig {
   billGroupsSeen?: string[];
   /** When a mapped group's Splitwise expenses were last read. */
   billsReadAt?: number;
+  /** Once (27 Nov): copies LifeOS made twice, when two syncs ran at once, were deleted on Splitwise. */
+  dupesCleaned?: boolean;
   /** Payments noted here for what is owed only on Splitwise (+ they paid you), sent at the next sync. */
   toSend?: Array<{ debtId: string; personId: string; amount: number }>;
   lastSync?: number;
@@ -170,6 +172,10 @@ export class SplitwiseClient {
   }
   expenses(updatedAfter?: number) {
     return this.api<{ expenses: SwExpense[] }>('get_expenses', { limit: 200, updated_after: updatedAfter ? new Date(updatedAfter).toISOString() : undefined }).then((r) => r.expenses ?? []);
+  }
+  /** Expenses outside any group, dated after a day (for clearing copies LifeOS made twice). */
+  looseExpenses(datedAfter: string) {
+    return this.api<{ expenses: SwExpense[] }>('get_expenses', { dated_after: datedAfter, limit: 0 }).then((r) => (r.expenses ?? []).filter((e) => !e.group_id && !e.deleted_at));
   }
   /** Everything with one friend, newest first (Udhari shows it on their row). */
   friendExpenses(friendId: number) {
@@ -338,6 +344,24 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
     ours.add(id);
     result.billsSent!++;
   };
+  // Once: two syncs at once (before they waited for each other) each sent the same Bill; the untracked copy goes.
+  let dupesCleaned = c.dupesCleaned;
+  if (!dupesCleaned) {
+    const sentLoose = Object.entries(bills).map(([id, v]) => [os.records.get<BillData>(id), v] as const).filter((x): x is [ObjectRecord<BillData>, { id: number; sig: string }] => !!x[0] && !(x[0].data.groupId && c.groups[x[0].data.groupId]));
+    if (sentLoose.length) {
+      const oldest = sentLoose.map(([b]) => b.data.date).sort()[0]!;
+      const loose = await sw.looseExpenses(new Date(Date.parse(`${oldest}T00:00:00Z`) - 4 * 86_400_000).toISOString());
+      for (const [b, v] of sentLoose) {
+        for (const e of loose) {
+          if (e.id === v.id || tracked.has(e.id) || e.description !== b.title.slice(0, 100) || !sameExpense(b, e)) continue;
+          await sw.deleteExpense(e.id).catch(() => {});
+          e.deleted_at = new Date(now).toISOString();
+          result.removed++;
+        }
+      }
+    }
+    dupesCleaned = true;
+  }
   for (const [groupId, swGroup] of Object.entries(c.groups)) {
     if (!swGroup) continue;
     const local = billsOf(os, { groupId });
@@ -420,7 +444,7 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
     delete bills[billId];
     result.removed++;
   }
-  return { bills, billGroupsSeen: [...seen], billsReadAt: now };
+  return { bills, billGroupsSeen: [...seen], billsReadAt: now, dupesCleaned };
 }
 
 export interface SyncResult {
@@ -443,7 +467,17 @@ export interface SyncResult {
  * deleted ones removed, settle-ups here sent as payments, and payments
  * recorded there settled here.
  */
-export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now = Date.now()): Promise<SyncResult> {
+let running: Promise<SyncResult> | null = null;
+
+/** One sync at a time: a second call while one runs waits for it (two at once each sent the same expense, 27 Nov). */
+export function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now = Date.now()): Promise<SyncResult> {
+  running ??= syncOnce(os, sw, now).finally(() => {
+    running = null;
+  });
+  return running;
+}
+
+async function syncOnce(os: LifeOSContext, sw: SplitwiseClient, now: number): Promise<SyncResult> {
   const result: SyncResult = { pushed: 0, removed: 0, paidThere: 0, settledHere: 0 };
   let c = swConfig(os);
   try {
