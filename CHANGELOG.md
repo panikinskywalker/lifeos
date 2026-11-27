@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.135 · 27 Nov 2026
+
+**One refused expense no longer stops the Splitwise sync** (merged from `claude/serene-edison-o0lpvy`). If Splitwise turns down a trip expense, a share or a payment, the rest still sync. Money › Splitwise lists what wasn't sent, with what Splitwise said, and **Try again**. A refused one also goes again on its own once you change it here. Being signed out still stops the sync, as before.
+
 ## v0.0.134 · 19 Nov 2026
 
 **Everything on Haiku.** Every request LifeOS makes to Claude now goes to Claude Haiku 5.5: Ask Money (still with web search), uploaded statements and fund screens, the brain's passes (including its first day, which used to be Opus), the trip copilot's look-ups, and Talk's smarter tier. A model picked before today in You › Agent moves to Haiku once; you can still choose another there, or turn on Opus for a day.
