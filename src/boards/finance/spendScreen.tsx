@@ -11,7 +11,7 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { ChipRow, FilterChip, Icon, IconButton, OnBar, PickerSheet, RingBadges, ScreenHeader, Sheet, Text, useBottomBarInset } from '@ui/kit';
 import { blocks } from '@ui/theme/tokens';
-import { AddSheet } from './addSheet';
+import { AddSheet } from '../../screens/AddSheet';
 import { Caps, Rows, SmallPill, SplitBar, TxRow, catColor, day, kindWord, shortMoney, splitOf } from './parts';
 
 const PERIODS: Array<[SpendPeriod, string]> = [['month', 'This month'], ['last_month', 'Last month'], ['3_months', '3 months'], ['year', 'This year'], ['all', 'All time']];

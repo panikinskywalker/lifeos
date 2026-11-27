@@ -2119,8 +2119,18 @@ Splitwise lives in a Browse board called **Udhari** (`src/boards/udhari`, id
 Splitwise keeps its own name where the words mean the service (Sign in with
 Splitwise, Splitwise says). Money's grid menu and a person's "Splitwise
 says" line open it. It defines no Objects; the client and the sync stay in
-finance. Its screen is the one described below; sections of its own wait for
-their artboards.
+finance.
+**Udhari's home, balances first (27 Nov, Rutvij: "it should show the people owed and owe, a better
+interface than Splitwise first, then all our additions"; artboard NR-Udhari-Home):** from LifeOS's
+own Debts and Bills, so it works signed out: *Overall* (your net, the owed and owe bar, how many owe
+you and you owe, Add an expense and Settle up); filters All · Owe you · You owe · Groups · Settled;
+*Owe you* and *You owe*, biggest first, each person with what for, a Splitwise tag when linked, how
+long their oldest share has been open (14 days or more) and Remind or Pay by UPI; *Groups*, each
+one's net for you; *Activity* (paybacks, a game's shares as one line, Bills); then *Splitwise, kept
+in step, underneath* (people linked and to check, group mapping, the toggle, last sync with Sync now,
+sign out). Its own bar: People · Groups · + Add an expense · Activity · Splitwise; the Splitwise tab is
+the linking screen described below. Remind / Pay by UPI and Money's + sheet live in `src/screens`,
+shared by Money and Udhari.
 **Built 17 Nov (v0.0.117, steps 1 to 4)** on the *Splitwise* artboards: then Money ›
 Splitwise (the grid menu; a person's Money section links there), now its own board. Signed out, the
 mint card and *Sign in with Splitwise* (Splitwise's page in a WebView, needing the

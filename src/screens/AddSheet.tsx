@@ -14,7 +14,7 @@ import { billAsk, readBill, readSaid, saveQuick, type QuickPayment } from '@modu
 import { categoryOf, type AccountData } from '@modules/finance/types';
 import { suggestPerson } from '@modules/finance/splitwise';
 import { applySplit } from '@modules/finance/split';
-import { catColor } from './parts';
+import { catColor } from './moneyColors';
 
 type Phase = { at: 'pick' } | { at: 'reading' } | { at: 'review'; p: QuickPayment; account: string | 'cash' | null } | { at: 'failed'; why: string };
 

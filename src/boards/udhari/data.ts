@@ -1,0 +1,142 @@
+import type { LifeOSContext } from '@core/registry/context';
+import type { ObjectRecord } from '@core/domain/types';
+import { owedOf } from '@core/money/split';
+import { balances, type DebtData } from '@modules/finance/split';
+import { billsOf, type BillData } from '@modules/finance/bills';
+import { swConfig } from '@modules/finance/splitwise';
+
+/**
+ * What Udhari's home shows (NR-Udhari-Home): everyone's net with you, from
+ * LifeOS's own shares (Debts) and Bills, so it works signed out of Splitwise
+ * too; each group's net for you; and what moved lately.
+ */
+
+export interface PersonRow {
+  personId: string;
+  name: string;
+  /** + they owe you, − you owe them. */
+  amount: number;
+  /** What it is for: the shares' and Bills' names, newest first. */
+  tags: string[];
+  /** Days since their oldest open share, when it is a while (14 days or more). */
+  oldestDays: number | null;
+  linked: boolean;
+  open: Array<ObjectRecord<DebtData>>;
+}
+
+const DAY = 86_400_000;
+const daysSince = (date: string, now: number) => Math.floor((now - Date.parse(`${date}T00:00:00`)) / DAY);
+/** "Turf at Wings" → "Turf": the place goes, the thing stays. */
+const tagOf = (s: string) => s.replace(/ at .*$/, '').replace(/^(.+) paid (.+)$/, '').trim();
+const parties = (b: ObjectRecord<BillData>) => new Set([...Object.keys(b.data.split.payers), ...Object.keys(owedOf(b.data.amount, b.data.split))]);
+
+function openDebts(os: LifeOSContext): Array<ObjectRecord<DebtData>> {
+  return os.records.query<DebtData>('debt', { filter: { and: [{ field: 'status', op: 'neq', value: 'settled' }] }, sort: [{ field: 'data.date', dir: 'asc' }] }, { limit: 10000 });
+}
+
+export function udhariPeople(os: LifeOSContext, now = Date.now()): { owe: PersonRow[]; owed: PersonRow[]; settled: PersonRow[] } {
+  const c = swConfig(os);
+  const debts = openDebts(os);
+  const bills = billsOf(os);
+  const row = (personId: string, amount: number): PersonRow => {
+    const open = debts.filter((d) => d.data.personId === personId);
+    const mine = bills.filter((b) => b.data.kind === 'spend' && parties(b).has(personId));
+    const tags = [...new Set([...open.slice().reverse().map((d) => d.data.reason ?? ''), ...mine.map((b) => b.title)].map(tagOf).filter(Boolean))].slice(0, 3);
+    const oldest = open[0] ? daysSince(open[0].data.date, now) : null;
+    return { personId, name: os.records.get(personId)?.title ?? 'Someone', amount, tags, oldestDays: oldest !== null && oldest >= 14 ? oldest : null, linked: !!c.people[personId], open };
+  };
+  const all = balances(os).map((b) => row(b.personId, b.amount));
+  // Settled lately: shares settled in the last 60 days with someone now square.
+  const since = now - 60 * DAY;
+  const square = new Set(all.map((r) => r.personId));
+  const settledIds = [...new Set(os.records.query<DebtData>('debt', { filter: { and: [{ field: 'status', op: 'eq', value: 'settled' }] } }, { limit: 5000 }).filter((d) => d.updatedAt >= since && !square.has(d.data.personId)).map((d) => d.data.personId))];
+  return {
+    owe: all.filter((r) => r.amount > 0),
+    owed: all.filter((r) => r.amount < 0),
+    settled: settledIds.filter((id) => os.records.get(id)).map((id) => row(id, 0)),
+  };
+}
+
+export interface GroupRow {
+  id: string;
+  title: string;
+  memberIds: string[];
+  sub: string;
+  /** + owed to you in it, − you owe in it. */
+  net: number;
+}
+
+/** Groups with shares or Bills, each with your net in it, the biggest first. */
+export function udhariGroups(os: LifeOSContext): GroupRow[] {
+  const ids = new Set([...openDebts(os).map((d) => d.data.groupId), ...billsOf(os).map((b) => b.data.groupId)].filter((g): g is string => !!g));
+  return [...ids]
+    .map((id) => {
+      const g = os.records.get<{ kind?: string }>(id);
+      if (!g) return null;
+      const memberIds = os.groups.members(id).map((m) => m.memberId);
+      const net = Math.round(balances(os, id).reduce((n, b) => n + b.amount, 0) * 100) / 100;
+      const kind = g.data.kind ? g.data.kind[0]!.toUpperCase() + g.data.kind.slice(1) : null;
+      return { id, title: g.title, memberIds, sub: [`${memberIds.length + 1} of you`, kind].filter(Boolean).join(' · '), net };
+    })
+    .filter((g): g is GroupRow => !!g)
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+}
+
+export interface ActivityRow {
+  key: string;
+  date: string;
+  /** For the same day, the newest first. */
+  at: number;
+  title: string;
+  sub: string;
+  /** + to you, − from you; null when nothing is owed by it (a payback). */
+  amount: number;
+  payment: boolean;
+  route: string;
+}
+
+/**
+ * What moved lately, newest first: paybacks and settle-ups, shares (a game's
+ * many shares as one line) and Bills, each with what it means for you.
+ */
+export function udhariActivity(os: LifeOSContext, limit = 8): ActivityRow[] {
+  const name = (id: string) => (id === 'me' ? 'You' : (os.records.get(id)?.title ?? 'Someone').split(' ')[0]!);
+  const money = (n: number) => os.format.currency(Math.round(Math.abs(n)));
+  const rows: ActivityRow[] = [];
+  const debts = os.records.query<DebtData>('debt', { sort: [{ field: 'data.date', dir: 'desc' }] }, { limit: 300 });
+  const games = new Map<string, Array<ObjectRecord<DebtData>>>();
+  for (const d of debts) {
+    if (d.data.kind === 'payment') {
+      // A settle-up: "they owed you" is saved as the money coming your way.
+      const toYou = d.data.direction === 'i_owe';
+      rows.push({ key: d.id, date: d.data.date, at: d.createdAt, title: toYou ? `${name(d.data.personId)} paid you` : `You paid ${name(d.data.personId)}`, sub: d.data.reason === 'Paid, on Splitwise' ? 'from the bank text · recorded on Splitwise' : d.data.transactionId ? 'from the bank text · settled' : 'settled up', amount: toYou ? d.data.amount : -d.data.amount, payment: true, route: `/entity/debt/${d.id}` });
+      continue;
+    }
+    const k = `${d.data.transactionId ?? d.data.reason}|${d.data.date}|${d.data.direction}`;
+    games.set(k, [...(games.get(k) ?? []), d]);
+  }
+  for (const list of games.values()) {
+    const d = list[0]!;
+    const total = list.reduce((n, x) => n + x.data.amount, 0);
+    const theyOwe = d.data.direction === 'they_owe';
+    const open = list.filter((x) => x.status !== 'settled').length;
+    const sub = list.length > 1 ? `${list.length} shares · ${open} open` : `${theyOwe ? `${name(d.data.personId)} owes you` : `you owe ${name(d.data.personId)}`}${d.status === 'settled' ? ' · settled' : ''}`;
+    rows.push({ key: d.id, date: d.data.date, at: d.createdAt, title: d.data.reason || 'A share', sub, amount: theyOwe ? total : -total, payment: false, route: list.length > 1 && d.data.transactionId ? `/entity/transaction/${d.data.transactionId}` : `/entity/debt/${d.id}` });
+  }
+  for (const b of billsOf(os).slice(0, 200)) {
+    const owed = owedOf(b.data.amount, b.data.split);
+    const paid = b.data.split.payers;
+    const rate = b.data.amount ? (b.data.inr ?? b.data.amount) / b.data.amount : 1;
+    if (b.data.kind === 'payment') {
+      const from = Object.keys(paid)[0] ?? 'me';
+      const to = Object.keys(owed)[0] ?? 'me';
+      if (from !== 'me' && to !== 'me') continue;
+      rows.push({ key: b.id, date: b.data.date, at: b.createdAt, title: `${name(from)} paid ${to === 'me' ? 'you' : name(to)}`, sub: b.title, amount: (from === 'me' ? -1 : 1) * b.data.amount * rate, payment: true, route: `/entity/bill/${b.id}` });
+      continue;
+    }
+    if (!(('me' in paid) || ('me' in owed))) continue;
+    const net = ((paid.me ?? 0) - (owed.me ?? 0)) * rate;
+    rows.push({ key: b.id, date: b.data.date, at: b.createdAt, title: b.title, sub: paid.me ? `you paid ${money(paid.me * rate)}${Math.abs(net) >= 1 ? ` · ${money(net)} to you` : ''}` : `${name(Object.keys(paid)[0] ?? 'me')} paid · your share ${money((owed.me ?? 0) * rate)}`, amount: net, payment: false, route: `/entity/bill/${b.id}` });
+  }
+  return rows.sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at).slice(0, limit);
+}
