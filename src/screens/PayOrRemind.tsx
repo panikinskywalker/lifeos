@@ -67,7 +67,7 @@ export function PayOrRemind({ personId, name, balance, open, compact }: { person
       {compact ? (
         balance !== 0 ? (
           <Pressable accessibilityRole="button" accessibilityLabel={balance < 0 ? `Pay ${first} ${amount} by UPI` : `Remind ${first}`} onPress={() => (balance < 0 ? pay() : void write(tone))} style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', backgroundColor: balance < 0 ? t.c.alert.coralText : t.c.bg.tileRaised, opacity: pressed ? 0.8 : 1 })}>
-            <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '700', color: balance < 0 ? '#0B0B0D' : t.c.fg.primary }}>{balance < 0 ? `Pay ${amount}` : 'Remind'}</Text>
+            <Text style={{ fontSize: 13, lineHeight: 17, fontWeight: '700', color: balance < 0 ? '#0B0B0D' : t.c.fg.primary }}>{balance < 0 ? `Pay ${os.format.currency(Math.round(Math.abs(balance)))}` : 'Remind'}</Text>
           </Pressable>
         ) : null
       ) : (

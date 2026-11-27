@@ -26,8 +26,8 @@ export interface PersonRow {
 
 const DAY = 86_400_000;
 const daysSince = (date: string, now: number) => Math.floor((now - Date.parse(`${date}T00:00:00`)) / DAY);
-/** "Turf at Wings" → "Turf": the place goes, the thing stays. */
-const tagOf = (s: string) => s.replace(/ at .*$/, '').replace(/^(.+) paid (.+)$/, '').trim();
+/** "Turf at Wings", "Turf · Joggers 7", "Visa fee (Parth)" → "Turf", "Turf", "Visa fee": the place and the person go, the thing stays. */
+const tagOf = (s: string) => s.replace(/( at | · ).*$/, '').replace(/\s*\(.*\)$/, '').replace(/^(.+) paid (.+)$/, '').trim();
 const parties = (b: ObjectRecord<BillData>) => new Set([...Object.keys(b.data.split.payers), ...Object.keys(owedOf(b.data.amount, b.data.split))]);
 
 function openDebts(os: LifeOSContext): Array<ObjectRecord<DebtData>> {
@@ -41,7 +41,13 @@ export function udhariPeople(os: LifeOSContext, now = Date.now()): { owe: Person
   const row = (personId: string, amount: number): PersonRow => {
     const open = debts.filter((d) => d.data.personId === personId);
     const mine = bills.filter((b) => b.data.kind === 'spend' && parties(b).has(personId));
-    const tags = [...new Set([...open.slice().reverse().map((d) => d.data.reason ?? ''), ...mine.map((b) => b.title)].map(tagOf).filter(Boolean))].slice(0, 3);
+    // What it is for, the most money first.
+    const by = new Map<string, number>();
+    for (const [what, n] of [...open.map((d) => [d.data.reason ?? '', d.data.amount] as const), ...mine.map((b) => [b.title, b.data.inr ?? b.data.amount] as const)]) {
+      const tag = tagOf(what);
+      if (tag) by.set(tag, (by.get(tag) ?? 0) + n);
+    }
+    const tags = [...by.entries()].sort((a, b) => b[1] - a[1]).map(([tag]) => tag).slice(0, 3);
     const oldest = open[0] ? daysSince(open[0].data.date, now) : null;
     return { personId, name: os.records.get(personId)?.title ?? 'Someone', amount, tags, oldestDays: oldest !== null && oldest >= 14 ? oldest : null, linked: !!c.people[personId], open };
   };

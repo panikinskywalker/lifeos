@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.137 · 27 Nov 2026
+
+**Udhari, tidied on the phone.** Each person's tags show what most of the money is for first (the Japan trip before a ₹200 game) and drop the venue ("Turf", not "Turf · Joggers 7"); Pay shows whole rupees; the owed and owe bar no longer prints raw numbers under it.
+
 ## v0.0.136 · 27 Nov 2026
 
 **Udhari opens on who owes whom.** The new home, as designed: what you're owed overall, who owes you and whom you owe (biggest first, with what it's for, a Splitwise tag when they're linked, and how long the oldest share has been open), Remind or Pay by UPI right on each row, your net in each group, recent activity, and Splitwise underneath (people linked, groups, the toggle, last sync, sign out). It works from LifeOS's own shares even when you're signed out of Splitwise. Udhari has its own bar now: People, Groups, + Add an expense, Activity, Splitwise.

@@ -25,12 +25,12 @@ const debt = (personId: string, amount: number, date: string, direction: DebtDat
   os.records.create<DebtData>({ object: 'debt', status: 'open', data: { personId, direction, amount, reason, date, kind: 'split' } });
 
 describe('Udhari', () => {
-  it('lists who owes you and whom you owe, with what for and how long the oldest share has been open', () => {
+  it('lists who owes you and whom you owe, with what for (the most money first) and how long the oldest share has been open', () => {
     debt(kalpak, 200, '2026-10-01');
     makeBill(os, 'Ramen', { amount: 1000, date: '2026-11-20', split: { payers: { me: 1000 }, method: 'equal', shares: { me: 1, [kalpak]: 1 } }, groupId: group });
     debt(yash, 450, '2026-11-14', 'i_owe');
     const p = udhariPeople(os, Date.parse('2026-11-27T12:00:00'));
-    expect(p.owe).toMatchObject([{ personId: kalpak, amount: 700, tags: ['Turf', 'Ramen'], oldestDays: 57 }]);
+    expect(p.owe).toMatchObject([{ personId: kalpak, amount: 700, tags: ['Ramen', 'Turf'], oldestDays: 57 }]);
     expect(p.owed).toMatchObject([{ personId: yash, amount: -450, oldestDays: null }]);
     expect(udhariGroups(os)).toMatchObject([{ id: group, title: 'Japan trip', net: 500 }]);
   });

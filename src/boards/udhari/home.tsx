@@ -84,7 +84,7 @@ export function UdhariHome(_: { ctx: LifeOSContext; params: Record<string, strin
             <Text color="secondary" style={{ fontSize: 15, lineHeight: 20 }}>{net > 0 ? 'You’re owed' : net < 0 ? 'You owe' : 'All square'}</Text>
             <Text style={{ fontSize: 44, lineHeight: 50, fontWeight: '700', letterSpacing: -1.5, color: net > 0 ? blocks.lime : net < 0 ? t.c.alert.coralText : t.c.fg.primary }}>{money(net)}</Text>
           </View>
-          {owedToYou + youOwe > 0 ? <StackedBar parts={[{ value: owedToYou, color: blocks.lime, label: 'owed to you' }, { value: youOwe, color: t.c.alert.coralText, label: 'you owe' }]} /> : null}
+          {owedToYou + youOwe > 0 ? <StackedBar parts={[{ value: owedToYou, color: blocks.lime, label: 'owed to you' }, { value: youOwe, color: t.c.alert.coralText, label: 'you owe' }]} legend={false} /> : null}
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Stat label={`${people.owe.length} ${people.owe.length === 1 ? 'person owes' : 'people owe'} you`} value={money(owedToYou)} color={blocks.lime} onPress={() => setFilter('owe')} />
             <Stat label={`You owe ${people.owed.length}`} value={money(youOwe)} color={t.c.alert.coralText} onPress={() => setFilter('owed')} />
