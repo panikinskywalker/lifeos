@@ -28,7 +28,11 @@ export interface SwFriend {
 export interface SwGroup {
   id: number;
   name: string;
+  /** Splitwise's members with their balance in the group (get_groups); only yours is kept. */
+  members?: Array<{ id: number; balance?: Array<{ currency_code: string; amount: string }> }>;
 }
+/** A balance in each currency Splitwise has one in (plus: owed to you). */
+export type SwBalance = Array<{ currency: string; amount: number }>;
 interface SwShare {
   user_id: number;
   paid_share: string;
@@ -59,8 +63,8 @@ export interface SwConfig {
   /** New shares for linked people go to Splitwise on their own. */
   auto: boolean;
   /** Your Splitwise friends and groups, as of the last sync, for the link list. */
-  friends: Array<{ id: number; name: string; email?: string }>;
-  swGroups: SwGroup[];
+  friends: Array<{ id: number; name: string; email?: string; balance?: SwBalance }>;
+  swGroups: Array<{ id: number; name: string; balance?: SwBalance }>;
   /** Person → what Splitwise says they owe you in rupees (minus: you owe them). */
   balances: Record<string, number>;
   /** Debt → the Splitwise expense made for it. */
@@ -115,7 +119,8 @@ const enc = (o: Record<string, string | number | boolean | undefined>) =>
 /** Splitwise's API with the signed-in session, as its website calls it. */
 export class SplitwiseClient {
   private csrf: string | null = null;
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  // Called unbound, a browser's fetch throws "Illegal invocation": wrap it.
+  constructor(private readonly fetchImpl: typeof fetch = (input, init) => fetch(input, init)) {}
 
   /** The page's CSRF token, which Splitwise wants on every write made with a session. */
   private async token(): Promise<string> {
@@ -213,6 +218,9 @@ export function personFor(os: LifeOSContext, swId: number): string | null {
 }
 
 const money = (n: number) => n.toFixed(2);
+/** Splitwise's balance list, in every currency, rounded; zero ones dropped. */
+export const balanceOf = (b?: SwFriend['balance']): SwBalance =>
+  (b ?? []).map((x) => ({ currency: x.currency_code.toUpperCase(), amount: Math.round(Number(x.amount) * 100) / 100 })).filter((x) => Math.abs(x.amount) >= 0.01);
 const inr = (b?: SwFriend['balance']) => (b ?? []).filter((x) => x.currency_code === 'INR').reduce((n, x) => n + Number(x.amount), 0);
 const signed = (d: DebtData) => (d.direction === 'they_owe' ? d.amount : -d.amount);
 
@@ -438,7 +446,7 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       const f = friends.find((x) => x.id === link.sw);
       if (f) balances[personId] = Math.round(inr(f.balance) * 100) / 100;
     }
-    c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined })), swGroups: groups });
+    c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined, balance: balanceOf(f.balance) })), swGroups: groups.map((g) => ({ id: g.id, name: g.name, balance: balanceOf(g.members?.find((m) => m.id === user.id)?.balance) })) });
     const pushed = { ...c.pushed };
     const amounts = { ...(c.amounts ?? {}) };
     const sent = new Set(c.sent);
