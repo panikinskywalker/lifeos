@@ -73,6 +73,8 @@ export interface SwConfig {
   ours: number[];
   /** Bill → the Splitwise expense it is kept in step with, and what it looked like when sent (a trip's or a group's Bills, in a group mapped to a Splitwise group). */
   bills?: Record<string, { id: number; sig: string }>;
+  /** What Splitwise refused (a Bill or share by its id, a payment, a group): kept with its reason, not tried again until it changes or you tap Try again. */
+  failed?: Record<string, { what: string; error: string; sig: string; at: number }>;
   /** Mapped groups whose Splitwise expenses were already matched once (so the first sync never doubles what both have). */
   billGroupsSeen?: string[];
   /** When a mapped group's Splitwise expenses were last read. */
@@ -95,7 +97,7 @@ export function setSwConfig(os: LifeOSContext, patch: Partial<SwConfig>): SwConf
 /** Sign out: what LifeOS knows of Splitwise goes; the links to people stay, for next time. */
 export function forgetSplitwise(os: LifeOSContext): void {
   const c = swConfig(os);
-  os.settings.set(KEY, { ...EMPTY, people: c.people, groups: c.groups, auto: c.auto, pushed: c.pushed, sent: c.sent, ours: c.ours, bills: c.bills, billGroupsSeen: c.billGroupsSeen, toSend: c.toSend });
+  os.settings.set(KEY, { ...EMPTY, people: c.people, groups: c.groups, auto: c.auto, pushed: c.pushed, sent: c.sent, ours: c.ours, bills: c.bills, billGroupsSeen: c.billGroupsSeen, toSend: c.toSend, failed: c.failed });
 }
 
 export class SplitwiseError extends Error {
@@ -288,7 +290,17 @@ export function billFromExpense(e: SwExpense, meId: number, people: SwConfig['pe
  * both already have is matched, never doubled; expenses added on Splitwise
  * come in as Bills. A Bill with someone not linked waits until they are.
  */
-async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me: { id: number }, ours: Set<number>, result: SyncResult, now: number) {
+/** Splitwise refused this one (not a sign-out): note it and carry on with the rest. A sign-out still stops the sync. */
+function refused(e: unknown, failed: NonNullable<SwConfig['failed']>, key: string, what: string, sig: string, now: number): void {
+  if (e instanceof SplitwiseError && e.signedOut) throw e;
+  failed[key] = { what: what.slice(0, 100), error: (e as Error).message.replace(/^Splitwise: /, '').slice(0, 200), sig, at: now };
+}
+/** Try again everything Splitwise refused (Udhari's Try again). */
+export function retryRefused(os: LifeOSContext): void {
+  setSwConfig(os, { failed: {} });
+}
+
+async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me: { id: number }, ours: Set<number>, result: SyncResult, now: number, failed: NonNullable<SwConfig['failed']>) {
   const bills = { ...(c.bills ?? {}) };
   const seen = new Set(c.billGroupsSeen ?? []);
   const tracked = new Set(Object.values(bills).map((v) => v.id));
@@ -302,10 +314,22 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
       result.billsHeld!++;
       return;
     }
+    const sig = billSig(b);
+    // Refused before and not changed since: wait for a change or Try again.
+    if (failed[b.id]?.sig === sig) return;
     const prev = bills[b.id];
+    let id: number;
+    try {
+      id = await sw.createExpense({ cost: money(r2(b.data.amount)), description: b.title.slice(0, 100), currency_code: (b.data.currency || 'INR').toUpperCase(), date: new Date(`${b.data.date}T12:00:00`).toISOString(), group_id: swGroup, payment: b.data.kind === 'payment', ...users });
+    } catch (e) {
+      refused(e, failed, b.id, b.title, sig, now);
+      result.billsFailed = (result.billsFailed ?? 0) + 1;
+      return;
+    }
+    // The new one is made first, so a refusal never leaves Splitwise without either.
     if (prev) await sw.deleteExpense(prev.id).catch(() => {});
-    const id = await sw.createExpense({ cost: money(r2(b.data.amount)), description: b.title.slice(0, 100), currency_code: (b.data.currency || 'INR').toUpperCase(), date: new Date(`${b.data.date}T12:00:00`).toISOString(), group_id: swGroup, payment: b.data.kind === 'payment', ...users });
-    bills[b.id] = { id, sig: billSig(b) };
+    delete failed[b.id];
+    bills[b.id] = { id, sig };
     tracked.add(id);
     ours.add(id);
     result.billsSent!++;
@@ -314,7 +338,15 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
     if (!swGroup) continue;
     const local = billsOf(os, { groupId });
     const first = !seen.has(groupId);
-    const theirs = await sw.groupExpenses(swGroup, first ? undefined : c.billsReadAt ? c.billsReadAt - 60_000 : undefined);
+    let theirs: SwExpense[];
+    try {
+      theirs = await sw.groupExpenses(swGroup, first ? undefined : c.billsReadAt ? c.billsReadAt - 60_000 : undefined);
+      delete failed[`group:${groupId}`];
+    } catch (e) {
+      // A group Splitwise will not read (deleted there, or you left it): the other groups still sync.
+      refused(e, failed, `group:${groupId}`, os.records.get(groupId)?.title ?? 'A group', '', now);
+      continue;
+    }
     const used = new Set<number>();
     // Out: new and changed Bills.
     for (const b of local) {
@@ -384,6 +416,9 @@ export interface SyncResult {
   billsMatched?: number;
   billsIn?: number;
   billsHeld?: number;
+  /** Refused by Splitwise this time (the reasons are in the config's `failed`). */
+  billsFailed?: number;
+  sharesFailed?: number;
 }
 
 /**
@@ -408,6 +443,7 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
     const amounts = { ...(c.amounts ?? {}) };
     const sent = new Set(c.sent);
     const ours = new Set(c.ours);
+    const failed = { ...(c.failed ?? {}) };
 
     // 1. New shares for linked people, made after you linked them.
     if (c.auto) {
@@ -415,7 +451,17 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       for (const d of open) {
         const link = c.people[d.data.personId];
         if (!link || pushed[d.id] || d.data.kind === 'payment' || d.createdAt < link.at || (d.data.currency && d.data.currency !== 'INR')) continue;
-        const id = await sw.createExpense({ cost: money(d.data.amount), description: (d.data.reason || 'Shared expense').slice(0, 100), currency_code: 'INR', date: new Date(`${d.data.date}T12:00:00`).toISOString(), group_id: (d.data.groupId && c.groups[d.data.groupId]) || 0, ...shareParams(me.id, link.sw, d.data.amount, d.data.direction === 'they_owe') });
+        const sig = `${d.data.amount}|${d.data.reason ?? ''}|${d.data.date}|${d.data.direction}`;
+        if (failed[d.id]?.sig === sig) continue;
+        let id: number;
+        try {
+          id = await sw.createExpense({ cost: money(d.data.amount), description: (d.data.reason || 'Shared expense').slice(0, 100), currency_code: 'INR', date: new Date(`${d.data.date}T12:00:00`).toISOString(), group_id: (d.data.groupId && c.groups[d.data.groupId]) || 0, ...shareParams(me.id, link.sw, d.data.amount, d.data.direction === 'they_owe') });
+        } catch (e) {
+          refused(e, failed, d.id, d.data.reason || 'A share', sig, now);
+          result.sharesFailed = (result.sharesFailed ?? 0) + 1;
+          continue;
+        }
+        delete failed[d.id];
         pushed[d.id] = id;
         amounts[d.id] = d.data.amount;
         ours.add(id);
@@ -434,33 +480,51 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
 
     // 3. Settled here: one payment there per person, for what was on Splitwise.
     const byPerson = new Map<string, number>();
+    const debtsOf = new Map<string, string[]>();
     for (const debtId of Object.keys(pushed)) {
       if (sent.has(debtId)) continue;
       const d = os.records.get<DebtData>(debtId);
       if (!d || d.status !== 'settled' || !c.people[d.data.personId]) continue;
       const sentAmount = amounts[debtId] ?? d.data.amount;
       byPerson.set(d.data.personId, (byPerson.get(d.data.personId) ?? 0) + (d.data.direction === 'they_owe' ? sentAmount : -sentAmount));
+      debtsOf.set(d.data.personId, [...(debtsOf.get(d.data.personId) ?? []), debtId]);
       sent.add(debtId);
     }
     for (const [personId, amount] of byPerson) {
       if (Math.abs(amount) < 0.01) continue;
       // They owed you and paid: they paid the payment to you.
-      const id = await sw.createExpense({ payment: true, creation_method: 'payment', description: 'Payment', cost: money(Math.abs(amount)), currency_code: 'INR', date: new Date(now).toISOString(), group_id: 0, ...shareParams(c.people[personId]!.sw, me.id, Math.abs(amount), amount > 0) });
-      ours.add(id);
-      result.paidThere++;
+      try {
+        const id = await sw.createExpense({ payment: true, creation_method: 'payment', description: 'Payment', cost: money(Math.abs(amount)), currency_code: 'INR', date: new Date(now).toISOString(), group_id: 0, ...shareParams(c.people[personId]!.sw, me.id, Math.abs(amount), amount > 0) });
+        ours.add(id);
+        delete failed[`pay:${personId}`];
+        result.paidThere++;
+      } catch (e) {
+        // Not sent: those settled shares go again next time.
+        for (const id of debtsOf.get(personId) ?? []) sent.delete(id);
+        refused(e, failed, `pay:${personId}`, `Payment with ${c.people[personId]!.name}`, String(amount), now);
+      }
     }
     // Payments noted here for what was owed only on Splitwise (undone ones are dropped).
     const queued = c.toSend ?? [];
+    const keepQueued = new Set<string>();
     for (const q of queued) {
       const link = c.people[q.personId];
       if (!link || !os.records.get(q.debtId)) continue;
-      const id = await sw.createExpense({ payment: true, creation_method: 'payment', description: 'Payment', cost: money(Math.abs(q.amount)), currency_code: 'INR', date: new Date(now).toISOString(), group_id: 0, ...shareParams(link.sw, me.id, Math.abs(q.amount), q.amount > 0) });
-      ours.add(id);
-      result.paidThere++;
+      const key = `queue:${q.debtId}`;
+      if (failed[key]?.sig === String(q.amount)) { keepQueued.add(q.debtId); continue; }
+      try {
+        const id = await sw.createExpense({ payment: true, creation_method: 'payment', description: 'Payment', cost: money(Math.abs(q.amount)), currency_code: 'INR', date: new Date(now).toISOString(), group_id: 0, ...shareParams(link.sw, me.id, Math.abs(q.amount), q.amount > 0) });
+        ours.add(id);
+        delete failed[key];
+        result.paidThere++;
+      } catch (e) {
+        keepQueued.add(q.debtId);
+        refused(e, failed, key, `Payment with ${link.name}`, String(q.amount), now);
+      }
     }
 
     // 3b. A trip's or a group's Bills, in a group mapped to a Splitwise group.
-    const billState = await syncBills(os, sw, c, me, ours, result, now);
+    const billState = await syncBills(os, sw, c, me, ours, result, now, failed);
 
     // 4. Payments recorded on Splitwise settle what is open here, Debts then Bills (a mapped group's payments are its Bills, above).
     const mapped = new Set(Object.values(c.groups));
@@ -483,8 +547,10 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       result.settledHere += done.settled.length + (bill ? 1 : 0);
     }
 
-    const sentQueue = new Set(queued.map((q) => q.debtId));
-    setSwConfig(os, { pushed, amounts, sent: [...sent], ours: [...ours].slice(-2000), lastSync: now, ...billState, toSend: (swConfig(os).toSend ?? []).filter((q) => !sentQueue.has(q.debtId)) });
+    // A refused Bill or share that has since been deleted here is no longer waiting.
+    for (const key of Object.keys(failed)) if (!key.includes(':') && !os.records.get(key)) delete failed[key];
+    const sentQueue = new Set(queued.map((q) => q.debtId).filter((id) => !keepQueued.has(id)));
+    setSwConfig(os, { pushed, amounts, sent: [...sent], ours: [...ours].slice(-2000), lastSync: now, ...billState, failed, toSend: (swConfig(os).toSend ?? []).filter((q) => !sentQueue.has(q.debtId)) });
     return result;
   } catch (e) {
     if (e instanceof SplitwiseError && e.signedOut) setSwConfig(os, { signedOut: true });

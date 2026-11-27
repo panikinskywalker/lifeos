@@ -22,12 +22,15 @@ class FakeSw {
   list: Array<SwExpense & { group_id: number | null }> = [];
   next = 500;
   made: Array<Record<string, string | number | boolean | undefined>> = [];
+  /** Descriptions Splitwise will refuse, as the real one does a bad expense. */
+  refuse = new Set<string>();
   async me() { return { id: ME, first_name: 'Sam' }; }
   async friends() { return [{ id: ANA, first_name: 'Ana', balance: [] }, { id: BEN, first_name: 'Ben', balance: [] }]; }
   async groups() { return [{ id: GROUP, name: 'Lisbon' }]; }
   async expenses() { return this.list.filter((e) => e.payment); }
   async groupExpenses(g: number) { return this.list.filter((e) => e.group_id === g); }
   async createExpense(p: Record<string, string | number | boolean | undefined>) {
+    if (this.refuse.has(String(p.description))) throw new Error('Splitwise: Cost must be a positive number');
     this.made.push(p);
     const users: SwExpense['users'] = [];
     for (let i = 0; p[`users__${i}__user_id`] != null; i++) users.push({ user_id: Number(p[`users__${i}__user_id`]), paid_share: String(p[`users__${i}__paid_share`]), owed_share: String(p[`users__${i}__owed_share`]) });
@@ -147,5 +150,34 @@ describe('Bills in no mapped group, and payments, on their own', () => {
     expect(billBalanceWith(os, ana)).toBe(0);
     await run();
     expect(sw.made.length).toBe(sent);
+  });
+});
+
+describe('when Splitwise refuses one', () => {
+  it('the rest still sync; the refused one is kept with its reason and waits for a change or Try again', async () => {
+    makeBill(os, 'Odd one', { amount: 500, date: '2026-11-10', split: { payers: { me: 500 }, method: 'equal', shares: { me: 1, [ana]: 1 } }, groupId: group });
+    makeBill(os, 'Lunch', { amount: 600, date: '2026-11-11', split: { payers: { me: 600 }, method: 'equal', shares: { me: 1, [ana]: 1 } }, groupId: group });
+    sw.refuse.add('Odd one');
+    const r = await run();
+    expect(r).toMatchObject({ billsSent: 1, billsFailed: 1 });
+    expect(sw.made.map((p) => p.description)).toEqual(['Lunch']);
+    const failed = Object.values(swConfig(os).failed ?? {});
+    expect(failed).toEqual([expect.objectContaining({ what: 'Odd one', error: 'Cost must be a positive number' })]);
+    // Not changed: not tried again.
+    expect(await run()).toMatchObject({ billsSent: 0 });
+    expect(sw.made).toHaveLength(1);
+    // Try again, once Splitwise takes it: sent, and no longer waiting.
+    sw.refuse.clear();
+    setSwConfig(os, { failed: {} });
+    expect(await run()).toMatchObject({ billsSent: 1 });
+    expect(swConfig(os).failed).toEqual({});
+  });
+
+  it('a sign-out still stops the sync', async () => {
+    const { SplitwiseError } = await import('./splitwise');
+    makeBill(os, 'Lunch', { amount: 600, date: '2026-11-11', split: { payers: { me: 600 }, method: 'equal', shares: { me: 1, [ana]: 1 } }, groupId: group });
+    sw.createExpense = async () => { throw new SplitwiseError('signed out', true); };
+    await expect(run()).rejects.toThrow();
+    expect(swConfig(os).signedOut).toBe(true);
   });
 });

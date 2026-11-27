@@ -7,7 +7,7 @@ import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
 import { ArcTicks, Disc, Icon, IconButton, InstrumentCard, PickerSheet, ScreenHeader, SectionHead, StackedBar, Text, Toggle, useBottomBarInset, useToast } from '@ui/kit';
-import { forgetSplitwise, linkPerson, setSwConfig, suggestPerson, swConfig, syncSplitwise, SplitwiseClient, SplitwiseError, SPLITWISE, unlinkPerson } from '@modules/finance/splitwise';
+import { forgetSplitwise, linkPerson, retryRefused, setSwConfig, suggestPerson, swConfig, syncSplitwise, SplitwiseClient, SplitwiseError, SPLITWISE, unlinkPerson } from '@modules/finance/splitwise';
 import type { DebtData } from '@modules/finance/split';
 
 const INK = '#0B0B0D';
@@ -16,7 +16,8 @@ const INK = '#0B0B0D';
 export async function runSplitwiseSync(os: LifeOSContext): Promise<string> {
   try {
     const r = await syncSplitwise(os, new SplitwiseClient());
-    const bits = [r.pushed && `${r.pushed} sent`, r.removed && `${r.removed} removed`, r.paidThere && `${r.paidThere} payment${r.paidThere === 1 ? '' : 's'} recorded`, r.settledHere && `${r.settledHere} settled here`].filter(Boolean);
+    const notSent = (r.billsFailed ?? 0) + (r.sharesFailed ?? 0);
+    const bits = [r.pushed && `${r.pushed} sent`, r.billsSent && `${r.billsSent} trip expense${r.billsSent === 1 ? '' : 's'} sent`, notSent && `${notSent} not sent, see why in Splitwise`, r.removed && `${r.removed} removed`, r.paidThere && `${r.paidThere} payment${r.paidThere === 1 ? '' : 's'} recorded`, r.settledHere && `${r.settledHere} settled here`].filter(Boolean);
     return bits.length ? `Splitwise: ${bits.join(' · ')}` : 'Splitwise is in step';
   } catch (e) {
     return e instanceof SplitwiseError && e.signedOut ? 'Splitwise signed you out. Sign in again.' : `Splitwise: ${(e as Error).message.slice(0, 80)}`;
@@ -104,6 +105,25 @@ export function SplitwiseScreen(_: { ctx: LifeOSContext; params: Record<string, 
             <InstrumentCard title="SPLITWISE · LIVE" value={money(owedToYou)} caption="to you" status={busy ? 'syncing' : 'live'} footer={{ label: c.lastSync ? `you owe ${money(youOwe)} · synced ${new Date(c.lastSync).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : `you owe ${money(youOwe)}`, value: c.me!.name, good: true }} />
             {owedToYou + youOwe > 0 ? <StackedBar parts={[{ value: owedToYou, color: blocks.lime, label: 'owed to you' }, { value: youOwe, color: t.c.alert.coralText, label: 'you owe' }]} /> : null}
             {c.friends.length ? <ArcTicks share={Object.keys(c.people).length / c.friends.length} value={`${Object.keys(c.people).length} of ${c.friends.length}`} label="People linked" period="only linked people sync" color={blocks.lime} /> : null}
+
+            {Object.keys(c.failed ?? {}).length ? (
+              <View style={{ gap: 10 }}>
+                <SectionHead title="Not sent to Splitwise" sub={`${Object.keys(c.failed!).length} waiting`} />
+                <View style={{ paddingHorizontal: 16, paddingVertical: 4, borderRadius: 28, backgroundColor: t.c.bg.tile }}>
+                  {Object.entries(c.failed!).map(([key, f], i) => (
+                    <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 62, paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderColor: t.c.line }}>
+                      <Icon name="alert" size={18} color={t.c.alert.coralText} />
+                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                        <Text numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, fontWeight: '600' }}>{f.what}</Text>
+                        <Text numberOfLines={2} color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{`Splitwise said: ${f.error}`}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, paddingHorizontal: 4 }}>Everything else synced. These wait until you change them here or try again.</Text>
+                <View style={{ alignSelf: 'flex-start' }}><Chip label={busy ? 'Trying…' : 'Try again'} lime onPress={() => { if (busy) return; retryRefused(os); void sync(); }} /></View>
+              </View>
+            ) : null}
 
             <View style={{ gap: 10 }}>
               <SectionHead title="Link your people" sub={`${Object.keys(c.people).length} linked`} />
