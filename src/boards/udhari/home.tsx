@@ -11,7 +11,7 @@ import { Button, Disc, EmptyState, FilterChip, Icon, IconButton, PickerSheet, Sc
 import { linkPerson, setSwConfig, SplitwiseClient, suggestPerson, swConfig, unlinkPerson, type SwExpense } from '@modules/finance/splitwise';
 import { AddSheet } from '../../screens/AddSheet';
 import { PayOrRemind } from '../../screens/PayOrRemind';
-import { personRecords, udhariActivity, udhariGroups, udhariPeople, type ActivityRow, type GroupRow, type PersonRow } from './data';
+import { personRecords, swTotals, udhariActivity, udhariGroups, udhariPeople, type ActivityRow, type GroupRow, type PersonRow } from './data';
 import { runSplitwiseSync, signOutSplitwise } from './splitwise';
 
 const INK = '#0B0B0D';
@@ -54,8 +54,8 @@ export function UdhariHome(_: { ctx: LifeOSContext; params: Record<string, strin
   // Everyone you know of: LifeOS's own figure, and Splitwise's for friends no one is linked to yet.
   const owedToYou = people.owe.reduce((n, r) => n + valueOf(r), 0);
   const youOwe = -people.owed.reduce((n, r) => n + valueOf(r), 0);
-  const swTo = c.friends.reduce((n, f) => n + Math.max(0, f.balance ?? 0), 0);
-  const swOwe = -c.friends.reduce((n, f) => n + Math.min(0, f.balance ?? 0), 0);
+  const sw = useLive((o) => swTotals(o), []);
+  const { to: swTo, owe: swOwe } = sw;
   const net = owedToYou - youOwe;
   const synced = c.lastSync ? new Date(c.lastSync).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null;
 
@@ -99,6 +99,7 @@ export function UdhariHome(_: { ctx: LifeOSContext; params: Record<string, strin
                 <Stat label="To you" value={money(swTo)} color={blocks.lime} onPress={() => setFilter('owe')} />
                 <Stat label="You owe" value={money(swOwe)} color={t.c.alert.coralText} onPress={() => setFilter('owed')} />
               </View>
+              {Object.keys(sw.unrated).length ? <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{`and ${Object.entries(sw.unrated).map(([cur, v]) => `${cur} ${Math.round(Math.abs(v)).toLocaleString()} ${v > 0 ? 'to you' : 'you owe'}`).join(' · ')} (no trip rate to count it in rupees)`}</Text> : null}
               {Math.abs(swTo - owedToYou) >= 1 || Math.abs(swOwe - youOwe) >= 1 ? <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>Apart from LifeOS: tap someone to see both sides, link people and groups to bring them in step.</Text> : null}
             </View>
           ) : null}
@@ -354,6 +355,7 @@ function PersonSheet({ row, onClose }: { row: PersonRow | null; onClose: () => v
             <View key={label as string} style={{ flex: 1, padding: 14, borderRadius: 20, backgroundColor: t.c.bg.tileRaised, gap: 4 }}>
               <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{label as string}</Text>
               <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '700' }}>{n === null ? (label === 'In LifeOS' ? 'not in People' : signedIn ? 'not linked' : 'signed out') : said(n as number)}</Text>
+              {label === 'On Splitwise' && n !== null && Object.keys(row.swOther).length ? <Text color="secondary" style={{ fontSize: 11, lineHeight: 14 }}>{`Splitwise keeps ${Object.entries(row.swOther).map(([cur, v]) => `${cur} ${Math.round(v).toLocaleString()}`).join(', ')} apart; counted at your trip's rate`}</Text> : null}
             </View>
           ))}
         </View>

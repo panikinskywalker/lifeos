@@ -7,6 +7,7 @@ import { bus } from '@core/events/bus';
 import { crmModule } from '../crm';
 import { billBalanceWith, financeModule, makeBill, makePayment, type BillData } from '.';
 import { billSig, linkPerson, setSwConfig, swConfig, syncSplitwise, type SplitwiseClient, type SwExpense } from './splitwise';
+import type { DebtData } from './split';
 
 /**
  * A trip's Bills in a group mapped to a Splitwise group (MODEL.md, *Splitwise
@@ -257,5 +258,26 @@ describe('pairing by the people in it, not only the date', () => {
     expect(os.records.get(came.id)).toBeUndefined();
     expect(swConfig(os).bills![b.id]!.id).toBe(81);
     expect(swConfig(os).pairedV1).toContain(group);
+  });
+});
+
+describe('payments read before a group was linked', () => {
+  const pay = (id: number) => ({ id, group_id: GROUP, payment: true, cost: '4000.00', currency_code: 'INR', description: 'Payment', date: '2026-11-17T12:00:00Z', created_at: '2026-11-17T12:00:00Z', users: [{ user_id: ANA, paid_share: '4000.00', owed_share: '0.00' }, { user_id: ME, paid_share: '0.00', owed_share: '4000.00' }] });
+
+  it('come in once the group is linked, when they settled nothing here back then', async () => {
+    sw.list.push(pay(91));
+    setSwConfig(os, { billGroupsSeen: [group], pairedV1: [group], billsReadAt: Date.now(), ours: [91] });
+    expect((await run()).billsIn).toBe(1);
+    expect(os.records.query<BillData>('bill', {}, { limit: 10 }).find((b) => b.data.kind === 'payment')!.data.split.payers).toEqual({ [ana]: 4000 });
+    expect((await run()).billsIn).toBe(0);
+  });
+
+  it('stay out when one of their shares was settled in the days after', async () => {
+    sw.list.push(pay(92));
+    const d = os.records.create<DebtData>({ object: 'debt', status: 'open', data: { personId: ana, direction: 'they_owe', amount: 4000, reason: 'Dinner', date: '2026-11-10', kind: 'split' } });
+    os.records.setStatus(d.id, 'settled');
+    sw.list[sw.list.length - 1]!.created_at = new Date(Date.now() - 86_400_000).toISOString();
+    setSwConfig(os, { billGroupsSeen: [group], pairedV1: [group], billsReadAt: Date.now(), ours: [92] });
+    expect((await run()).billsIn).toBe(0);
   });
 });

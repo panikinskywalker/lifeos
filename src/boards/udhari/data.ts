@@ -29,6 +29,37 @@ export interface PersonRow {
   friendId: number | null;
   /** Only on Splitwise: no one in People is linked to them yet. */
   swOnly: boolean;
+  /** Splitwise's balance in other currencies, as Splitwise keeps them (JPY 10,653); counted in swAmount at a trip's rate when one is known. */
+  swOther: Record<string, number>;
+}
+
+/** ₹ for one of a currency, from your trips (the Japan trip's yen rate). */
+function tripRates(os: LifeOSContext): Record<string, number> {
+  if (!os.registry.objects.has('trip')) return {};
+  const out: Record<string, number> = {};
+  for (const t of os.records.query<{ localCurrency?: string; fxRate?: number }>('trip', {}, { limit: 500 })) if (t.data.localCurrency && t.data.fxRate) out[t.data.localCurrency] = t.data.fxRate;
+  return out;
+}
+
+/** A friend's Splitwise balance in rupees: rupees, and other currencies at a trip's rate. */
+function swRupees(f: { balance?: number; other?: Record<string, number> }, rates: Record<string, number>): number {
+  return Math.round(((f.balance ?? 0) + Object.entries(f.other ?? {}).reduce((n, [cur, v]) => n + (rates[cur] ? v * rates[cur]! : 0), 0)) * 100) / 100;
+}
+
+/** What Splitwise says over all your friends, in rupees, and what is left in currencies with no rate. */
+export function swTotals(os: LifeOSContext): { to: number; owe: number; unrated: Record<string, number> } {
+  const c = swConfig(os);
+  const rates = tripRates(os);
+  const unrated: Record<string, number> = {};
+  let to = 0;
+  let owe = 0;
+  for (const f of c.friends) {
+    const n = swRupees(f, rates);
+    if (n > 0) to += n;
+    else owe -= n;
+    for (const [cur, v] of Object.entries(f.other ?? {})) if (!rates[cur]) unrated[cur] = (unrated[cur] ?? 0) + v;
+  }
+  return { to, owe, unrated };
 }
 
 const DAY = 86_400_000;
@@ -58,18 +89,19 @@ export function udhariPeople(os: LifeOSContext, now = Date.now()): { owe: Person
     const oldest = open[0] ? daysSince(open[0].data.date, now) : null;
     const link = c.people[personId];
     const friend = link ? c.friends.find((f) => f.id === link.sw) : undefined;
-    return { personId, name: os.records.get(personId)?.title ?? 'Someone', amount, tags, oldestDays: oldest !== null && oldest >= 14 ? oldest : null, linked: !!link, open, swAmount: signedIn && friend ? (friend.balance ?? 0) : null, friendId: link?.sw ?? null, swOnly: false };
+    return { personId, name: os.records.get(personId)?.title ?? 'Someone', amount, tags, oldestDays: oldest !== null && oldest >= 14 ? oldest : null, linked: !!link, open, swAmount: signedIn && friend ? swRupees(friend, rates) : null, friendId: link?.sw ?? null, swOnly: false, swOther: friend?.other ?? {} };
   };
   const signedIn = !!c.me && !c.signedOut;
+  const rates = tripRates(os);
   const all = balances(os).map((b) => row(b.personId, b.amount));
   if (signedIn) {
     // Everyone Splitwise has a balance with: linked people LifeOS has as square, and friends no one is linked to yet.
     const shown = new Set(all.map((r) => r.personId));
     for (const f of c.friends) {
-      if (Math.abs(f.balance ?? 0) < 1) continue;
+      if (Math.abs(swRupees(f, rates)) < 1 && !Object.keys(f.other ?? {}).length) continue;
       const pid = Object.entries(c.people).find(([, v]) => v.sw === f.id)?.[0];
       if (pid && shown.has(pid)) continue;
-      all.push(pid ? row(pid, 0) : { personId: `sw:${f.id}`, name: f.name, amount: 0, tags: [], oldestDays: null, linked: false, open: [], swAmount: f.balance!, friendId: f.id, swOnly: true });
+      all.push(pid ? row(pid, 0) : { personId: `sw:${f.id}`, name: f.name, amount: 0, tags: [], oldestDays: null, linked: false, open: [], swAmount: swRupees(f, rates), friendId: f.id, swOnly: true, swOther: f.other ?? {} });
     }
   }
   const sideOf = (r: PersonRow) => r.amount || r.swAmount || 0;

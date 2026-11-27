@@ -44,3 +44,12 @@ describe('Udhari', () => {
     expect(a[1]!.sub).toBe('2 shares · 2 open');
   });
 });
+
+describe('Splitwise’s other currencies', () => {
+  it('are kept apart when no trip gives a rate for them', async () => {
+    const { setSwConfig } = await import('@modules/finance/splitwise');
+    const { swTotals } = await import('./data');
+    setSwConfig(os, { me: { id: 1, name: 'Me' }, friends: [{ id: 2, name: 'Parth', balance: 0, other: { JPY: 5326 } }, { id: 3, name: 'Kunal', balance: 30594 }] });
+    expect(swTotals(os)).toEqual({ to: 30594, owe: 0, unrated: { JPY: 5326 } });
+  });
+});

@@ -2155,6 +2155,10 @@ both sides). Once, a group linked before that is mended: a Bill here and its twi
 paired, the copy LifeOS sent there (its own name) deleted and the one that came in removed. Bills
 that come in from Splitwise carry `sourceKey: splitwise:<id>`. After a sync that changed anything the
 balances are read again.
+Splitwise keeps each currency apart (a trip's yen): Udhari counts them in rupees at a trip's rate
+(`localCurrency`, `fxRate`), and shows what has no rate as it is. A payment in a group read before the
+group was linked (when it only settled old-style shares) comes in as a Bill once the group is linked,
+unless one of that person's shares was settled in the eight days after it was made.
 One Splitwise sync runs at a time (a second call waits for the running one): two at once had each
 sent the same Bill. Once, the copies made that way were deleted on Splitwise (same name, amount and
 day as a sent Bill, not the tracked copy). A linked person LifeOS has as square but Splitwise does not

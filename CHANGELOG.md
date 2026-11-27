@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.143 · 27 Nov 2026
+
+**Yen counts, and old payments come in.** Splitwise keeps a trip's yen apart from rupees, so it called Parth square while he still owed hostel shares in yen. Udhari now counts other currencies in rupees at your trip's rate, and shows any it can't convert. Payments made in a trip's Splitwise group before you linked it (Parth's ₹4,000 on 17 Nov) now come into the trip, unless they already settled shares here back then.
+
 ## v0.0.142 · 27 Nov 2026
 
 **The Japan trip and its Splitwise group, paired properly.** Linking paired expenses only within three days of each other, so Parth's flight (8 Nov here, 23 Aug on Splitwise) was added to both sides. Pairing now looks at who paid and who owes, and the name, too; the Japan group is mended once (the extra copies go on both sides). What Splitwise says is read again after a sync that changed anything.
