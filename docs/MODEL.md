@@ -2144,6 +2144,11 @@ someone in People, a new person, or a Splitwise friend). Each group card has its
 *Splitwise group* to link one); mapping it reads the group from the start: Bills sent between you
 before move into the group (the loose copy deleted, the group's own matched or added), and the
 group's expenses come in. A Bill between two others is never sent outside a group.
+**Linking a group both sides already have (27 Nov, Rutvij: "both, in sync: add what is missing from
+here and there"):** the first sync pairs what both have (same kind, currency, amount within 0.50, date
+within three days), and one expense there that is two to four Bills here from the same days adding up
+to it (Splitwise's *Visa ₹12,000*, LifeOS's three visa fees) is the same money, paired as parts that
+stay as they are on both sides; what is missing there goes there, what is missing here comes in.
 One Splitwise sync runs at a time (a second call waits for the running one): two at once had each
 sent the same Bill. Once, the copies made that way were deleted on Splitwise (same name, amount and
 day as a sent Bill, not the tracked copy). A linked person LifeOS has as square but Splitwise does not

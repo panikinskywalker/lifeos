@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.141 · 27 Nov 2026
+
+**Linking a trip to its Splitwise group keeps both in sync.** The first sync pairs what both already have, including one expense there that's several here (Splitwise's *Visa ₹12,000* and LifeOS's three ₹4,000 visa fees), then adds what's missing on each side: LifeOS's extras go into the group, the group's extras come into the trip.
+
 ## v0.0.140 · 27 Nov 2026
 
 **No more doubles on Splitwise.** When two syncs ran at the same time (opening Udhari while one was running in the background), each sent the same expense, so some trip expenses were on Splitwise twice (Parth's flight, the visa fees). Now only one sync runs at a time, and the copies made twice are deleted on Splitwise once. People LifeOS has as square but Splitwise doesn't now show Splitwise's amount instead of *Settled*.

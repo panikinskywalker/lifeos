@@ -213,3 +213,20 @@ describe('copies LifeOS made twice', () => {
     expect(swConfig(os).dupesCleaned).toBe(true);
   });
 });
+
+describe('linking a group both sides already have', () => {
+  it('pairs what both have (several here can be one there), and adds what is missing on each side', async () => {
+    for (const who of [ana, ben, 'me']) makeBill(os, `Visa fee (${who})`, { amount: 4000, date: '2026-11-16', split: { payers: { me: 4000 }, method: 'exact', shares: { [who]: 4000 } }, groupId: group });
+    makeBill(os, 'Flight', { amount: 5000, date: '2026-11-08', split: { payers: { me: 5000 }, method: 'exact', shares: { [ana]: 5000 } }, groupId: group });
+    makeBill(os, 'Hostel', { amount: 900, date: '2026-11-09', split: { payers: { me: 900 }, method: 'equal', shares: { me: 1, [ana]: 1, [ben]: 1 } }, groupId: group });
+    const u = (id: number, paid: string, owed: string) => ({ user_id: id, paid_share: paid, owed_share: owed });
+    sw.list.push({ id: 71, group_id: GROUP, payment: false, cost: '12000.00', currency_code: 'INR', description: 'Visa', date: '2026-11-17T12:00:00Z', users: [u(ME, '12000.00', '4000.00'), u(ANA, '0.00', '4000.00'), u(BEN, '0.00', '4000.00')] });
+    sw.list.push({ id: 72, group_id: GROUP, payment: false, cost: '5000.00', currency_code: 'INR', description: 'Flight (Ana)', date: '2026-11-08T12:00:00Z', users: [u(ME, '5000.00', '0.00'), u(ANA, '0.00', '5000.00')] });
+    sw.list.push({ id: 73, group_id: GROUP, payment: false, cost: '600.00', currency_code: 'INR', description: 'Taxi', date: '2026-11-10T12:00:00Z', users: [u(BEN, '600.00', '200.00'), u(ME, '0.00', '200.00'), u(ANA, '0.00', '200.00')] });
+    expect(await run()).toMatchObject({ billsMatched: 4, billsSent: 1, billsIn: 1 });
+    expect(sw.made.map((p) => p.description)).toEqual(['Hostel']);
+    expect(os.records.query<BillData>('bill', {}, { limit: 20 }).some((b) => b.title === 'Taxi')).toBe(true);
+    expect(await run()).toMatchObject({ billsMatched: 0, billsSent: 0, billsIn: 0 });
+    expect(sw.list.filter((e) => e.deleted_at)).toHaveLength(0);
+  });
+});
