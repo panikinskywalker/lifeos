@@ -2134,6 +2134,16 @@ in step, underneath* (people linked and to check, group mapping, the toggle, las
 sign out). Its own bar: People · Groups · + Add an expense · Activity · Splitwise; the Splitwise tab is
 the linking screen described below. Remind / Pay by UPI and Money's + sheet live in `src/screens`,
 shared by Money and Udhari.
+**Everything Splitwise has, in Udhari (27 Nov, Rutvij: "I should see everything on Udhari and then
+link those people"; "for the trip I already have a group on Splitwise, I should be able to link
+groups"):** each sync keeps every Splitwise friend's balance. *Overall* shows Splitwise's totals under
+LifeOS's. The lists hold everyone: a friend no one is linked to shows Splitwise's figure, *Only on
+Splitwise* and **Link**; a linked person whose Splitwise figure differs shows it in coral. Tapping a
+person opens both sides: LifeOS's records and Splitwise's (read live, `friend_id`), and linking (to
+someone in People, a new person, or a Splitwise friend). Each group card has its Splitwise group (or
+*Splitwise group* to link one); mapping it reads the group from the start: Bills sent between you
+before move into the group (the loose copy deleted, the group's own matched or added), and the
+group's expenses come in. A Bill between two others is never sent outside a group.
 **Built 17 Nov (v0.0.117, steps 1 to 4)** on the *Splitwise* artboards: then Money ›
 Splitwise (the grid menu; a person's Money section links there), now its own board. Signed out, the
 mint card and *Sign in with Splitwise* (Splitwise's page in a WebView, needing the

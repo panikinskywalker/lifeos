@@ -181,3 +181,18 @@ describe('when Splitwise refuses one', () => {
     expect(swConfig(os).signedOut).toBe(true);
   });
 });
+
+describe('mapping a group after its Bills went between you', () => {
+  it('moves them into the Splitwise group: the loose copy goes, the group’s own copy is matched', async () => {
+    setSwConfig(os, { groups: {} });
+    const b = makeBill(os, 'Flight', { amount: 5000, date: '2026-11-08', split: { payers: { me: 5000 }, method: 'exact', shares: { [ana]: 5000 } }, groupId: group });
+    await run();
+    const loose = swConfig(os).bills![b.id]!.id;
+    expect(sw.list.find((e) => e.id === loose)!.group_id).toBeNull();
+    sw.list.push({ id: 61, group_id: GROUP, payment: false, cost: '5000.00', currency_code: 'INR', description: 'Flight (Ana)', date: '2026-11-08T12:00:00Z', users: [{ user_id: ME, paid_share: '5000.00', owed_share: '0.00' }, { user_id: ANA, paid_share: '0.00', owed_share: '5000.00' }] });
+    setSwConfig(os, { groups: { [group]: GROUP } });
+    expect(await run()).toMatchObject({ billsMatched: 1, billsSent: 0 });
+    expect(sw.list.find((e) => e.id === loose)!.deleted_at).toBeTruthy();
+    expect(swConfig(os).bills![b.id]!.id).toBe(61);
+  });
+});

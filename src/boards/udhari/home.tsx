@@ -7,11 +7,11 @@ import type { LifeOSContext } from '@core/registry/context';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import { blocks } from '@ui/theme/tokens';
-import { Disc, EmptyState, FilterChip, Icon, IconButton, ScreenHeader, SectionHead, StackedBar, Text, Toggle, useBottomBarInset, useToast } from '@ui/kit';
-import { setSwConfig, suggestPerson, swConfig } from '@modules/finance/splitwise';
+import { Button, Disc, EmptyState, FilterChip, Icon, IconButton, PickerSheet, ScreenHeader, SectionHead, Sheet, StackedBar, Text, Toggle, useBottomBarInset, useToast } from '@ui/kit';
+import { linkPerson, setSwConfig, SplitwiseClient, suggestPerson, swConfig, unlinkPerson, type SwExpense } from '@modules/finance/splitwise';
 import { AddSheet } from '../../screens/AddSheet';
 import { PayOrRemind } from '../../screens/PayOrRemind';
-import { udhariActivity, udhariGroups, udhariPeople, type ActivityRow, type GroupRow, type PersonRow } from './data';
+import { personRecords, udhariActivity, udhariGroups, udhariPeople, type ActivityRow, type GroupRow, type PersonRow } from './data';
 import { runSplitwiseSync, signOutSplitwise } from './splitwise';
 
 const INK = '#0B0B0D';
@@ -51,8 +51,11 @@ export function UdhariHome(_: { ctx: LifeOSContext; params: Record<string, strin
   const [busy, setBusy] = useState(false);
   const connected = !!c.me && !c.signedOut;
   const money = (n: number) => os.format.currency(Math.round(Math.abs(n)));
-  const owedToYou = people.owe.reduce((n, r) => n + r.amount, 0);
-  const youOwe = -people.owed.reduce((n, r) => n + r.amount, 0);
+  // Everyone you know of: LifeOS's own figure, and Splitwise's for friends no one is linked to yet.
+  const owedToYou = people.owe.reduce((n, r) => n + valueOf(r), 0);
+  const youOwe = -people.owed.reduce((n, r) => n + valueOf(r), 0);
+  const swTo = c.friends.reduce((n, f) => n + Math.max(0, f.balance ?? 0), 0);
+  const swOwe = -c.friends.reduce((n, f) => n + Math.min(0, f.balance ?? 0), 0);
   const net = owedToYou - youOwe;
   const synced = c.lastSync ? new Date(c.lastSync).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null;
 
@@ -89,6 +92,16 @@ export function UdhariHome(_: { ctx: LifeOSContext; params: Record<string, strin
             <Stat label={`${people.owe.length} ${people.owe.length === 1 ? 'person owes' : 'people owe'} you`} value={money(owedToYou)} color={blocks.lime} onPress={() => setFilter('owe')} />
             <Stat label={`You owe ${people.owed.length}`} value={money(youOwe)} color={t.c.alert.coralText} onPress={() => setFilter('owed')} />
           </View>
+          {connected && swTo + swOwe > 0 ? (
+            <View style={{ gap: 6 }}>
+              <Text color="secondary" style={{ fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: 1.2 }}>SPLITWISE SAYS</Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Stat label="To you" value={money(swTo)} color={blocks.lime} onPress={() => setFilter('owe')} />
+                <Stat label="You owe" value={money(swOwe)} color={t.c.alert.coralText} onPress={() => setFilter('owed')} />
+              </View>
+              {Math.abs(swTo - owedToYou) >= 1 || Math.abs(swOwe - youOwe) >= 1 ? <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>Apart from LifeOS: tap someone to see both sides, link people and groups to bring them in step.</Text> : null}
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Pill label="Add an expense" icon="plus" lime onPress={() => setAdding(true)} />
             <Pill label="Settle up" icon="check" onPress={() => router.push('/module/finance/debts' as never)} />
@@ -249,14 +262,19 @@ function Tag({ label, color }: { label: string; color?: string }) {
   );
 }
 
+/** The figure a row stands for: LifeOS's, or Splitwise's for a friend only Splitwise knows. */
+const valueOf = (r: PersonRow) => (r.swOnly ? (r.swAmount ?? 0) : r.amount);
+
 function People({ rows }: { rows: PersonRow[] }) {
   const os = useOS();
   const t = useTheme();
-  const router = useRouter();
+  const [open, setOpen] = useState<PersonRow | null>(null);
+  const apart = (r: PersonRow) => !r.swOnly && r.swAmount !== null && Math.abs(r.swAmount - r.amount) >= 1;
+  const said = (n: number) => (n > 0 ? `${os.format.currency(Math.round(n))} to you` : n < 0 ? `you owe ${os.format.currency(Math.round(-n))}` : 'square');
   return (
     <View style={{ paddingHorizontal: 16, paddingVertical: 4, borderRadius: 28, backgroundColor: t.c.bg.tile }}>
       {rows.map((r, i) => (
-        <Pressable key={r.personId} accessibilityRole="button" accessibilityLabel={`${r.name}, ${r.amount > 0 ? 'owes you' : r.amount < 0 ? 'you owe' : 'settled'} ${os.format.currency(Math.abs(r.amount))}`} onPress={() => router.push(`/entity/person/${r.personId}` as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderColor: t.c.line }}>
+        <Pressable key={r.personId} accessibilityRole="button" accessibilityLabel={`${r.name}, ${said(valueOf(r))}${r.swOnly ? ', only on Splitwise' : ''}`} onPress={() => setOpen(r)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderColor: t.c.line }}>
           <View>
             <Disc name={r.name} colorKey={r.personId} size={40} />
             {r.linked ? <View style={{ position: 'absolute', right: -2, bottom: -2, width: 13, height: 13, borderRadius: 7, backgroundColor: blocks.mint, borderWidth: 2, borderColor: t.c.bg.tile }} /> : null}
@@ -265,23 +283,153 @@ function People({ rows }: { rows: PersonRow[] }) {
             <Text numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, fontWeight: '600' }}>{r.name}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
               {r.tags.slice(0, 2).map((x) => <Tag key={x} label={x} />)}
-              {r.linked ? <Tag label="Splitwise" color={blocks.mint} /> : null}
+              {r.swOnly ? <Tag label="Only on Splitwise" color={blocks.sky} /> : r.linked && !apart(r) ? <Tag label="Splitwise" color={blocks.mint} /> : null}
+              {apart(r) ? <Tag label={`Splitwise: ${said(r.swAmount!)}`} color={t.c.alert.coralText} /> : null}
               {r.oldestDays ? <Tag label={`${r.oldestDays} days`} color={t.c.alert.coralText} /> : null}
             </View>
           </View>
           <View style={{ alignItems: 'flex-end', gap: 6 }}>
-            <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '700', color: r.amount > 0 ? blocks.lime : r.amount < 0 ? t.c.alert.coralText : t.c.fg.secondary }}>{r.amount ? os.format.currency(Math.round(Math.abs(r.amount))) : 'Settled'}</Text>
-            {r.amount ? <PayOrRemind personId={r.personId} name={r.name} balance={r.amount} open={r.open} compact /> : null}
+            <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '700', color: valueOf(r) > 0 ? blocks.lime : valueOf(r) < 0 ? t.c.alert.coralText : t.c.fg.secondary }}>{valueOf(r) ? os.format.currency(Math.round(Math.abs(valueOf(r)))) : 'Settled'}</Text>
+            {r.swOnly ? <Pill label="Link" small lime onPress={() => setOpen(r)} /> : r.amount ? <PayOrRemind personId={r.personId} name={r.name} balance={r.amount} open={r.open} compact /> : null}
           </View>
         </Pressable>
       ))}
+      <PersonSheet row={open} onClose={() => setOpen(null)} />
     </View>
+  );
+}
+
+/**
+ * One person, both sides: what LifeOS has and what Splitwise has (read live),
+ * and linking them, so a friend only Splitwise knows joins People.
+ */
+function PersonSheet({ row, onClose }: { row: PersonRow | null; onClose: () => void }) {
+  const os = useOS();
+  const t = useTheme();
+  const router = useRouter();
+  const toast = useToast();
+  const c = useLive((o) => swConfig(o), []);
+  const people = useLive((o) => o.records.query('person', {}, { limit: 3000 }).map((p) => ({ id: p.id, title: p.title })), []);
+  const personId = row && !row.swOnly ? row.personId : null;
+  const local = useLive((o) => (personId ? personRecords(o, personId) : []), [personId]);
+  const [theirs, setTheirs] = useState<{ list: SwExpense[]; error?: string } | null>(null);
+  const [picking, setPicking] = useState<'person' | 'friend' | null>(null);
+  const signedIn = !!c.me && !c.signedOut;
+  const friendId = row?.friendId ?? (personId ? c.people[personId]?.sw ?? null : null);
+  useEffect(() => {
+    setTheirs(null);
+    if (!row || !friendId || !signedIn) return;
+    let live = true;
+    new SplitwiseClient().friendExpenses(friendId).then((list) => live && setTheirs({ list })).catch((e) => live && setTheirs({ list: [], error: (e as Error).message }));
+    return () => {
+      live = false;
+    };
+  }, [row, friendId, signedIn]);
+  if (!row) return null;
+  const money = (n: number, cur = 'INR') => (cur === 'INR' ? os.format.currency(Math.round(Math.abs(n))) : `${cur} ${Math.round(Math.abs(n)).toLocaleString()}`);
+  const said = (n: number | null) => (n === null ? '—' : n > 0 ? `${money(n)} to you` : n < 0 ? `you owe ${money(n)}` : 'square');
+  const linkedIds = new Set(Object.keys(c.people));
+  const free = people.filter((p) => !linkedIds.has(p.id));
+  const freeFriends = c.friends.filter((f) => !Object.values(c.people).some((v) => v.sw === f.id));
+  const guessPerson = row.swOnly ? suggestPerson(free, row.name) : null;
+  const guessFriend = personId && !c.people[personId] ? suggestPerson(freeFriends.map((f) => ({ id: String(f.id), title: f.name })), row.name) : null;
+  const friendName = (id: number) => c.friends.find((f) => f.id === id)?.name ?? 'them';
+  const link = (pid: string, fid: number) => {
+    linkPerson(os, pid, { id: fid, name: friendName(fid) });
+    toast.show({ message: `${friendName(fid)} linked`, icon: 'check', undo: () => unlinkPerson(os, pid) });
+    onClose();
+  };
+  const mine = (e: SwExpense) => {
+    const u = e.users.find((x) => x.user_id === c.me?.id);
+    return u ? Number(u.paid_share) - Number(u.owed_share) : 0;
+  };
+
+  return (
+    <Sheet visible onClose={onClose} title={row.name} footer={personId ? <Button title="Open their page" variant="secondary" onPress={() => { onClose(); router.push(`/entity/person/${personId}` as never); }} /> : undefined}>
+      <View style={{ gap: 18 }}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {[['In LifeOS', row.swOnly ? null : row.amount], ['On Splitwise', signedIn && friendId ? (row.swAmount ?? c.friends.find((f) => f.id === friendId)?.balance ?? 0) : null]].map(([label, n]) => (
+            <View key={label as string} style={{ flex: 1, padding: 14, borderRadius: 20, backgroundColor: t.c.bg.tileRaised, gap: 4 }}>
+              <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{label as string}</Text>
+              <Text style={{ fontSize: 17, lineHeight: 22, fontWeight: '700' }}>{n === null ? (label === 'In LifeOS' ? 'not in People' : signedIn ? 'not linked' : 'signed out') : said(n as number)}</Text>
+            </View>
+          ))}
+        </View>
+
+        {row.swOnly ? (
+          <View style={{ gap: 8 }}>
+            <Text color="secondary" style={{ fontSize: 13, lineHeight: 18 }}>Link them to someone in People: what you share from now goes to Splitwise, and their payments settle here.</Text>
+            {guessPerson ? <Button title={`Link to ${people.find((p) => p.id === guessPerson)?.title}`} icon="link" onPress={() => link(guessPerson, row.friendId!)} /> : null}
+            <Button title={guessPerson ? 'Someone else in People' : 'Pick in People, or add them'} variant="secondary" onPress={() => setPicking('person')} />
+          </View>
+        ) : personId && c.people[personId] ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text color="secondary" style={{ flex: 1, fontSize: 13, lineHeight: 18 }}>{`Linked to ${c.people[personId]!.name} on Splitwise`}</Text>
+            <Pill label="Unlink" small onPress={() => { const was = c.people[personId]!; unlinkPerson(os, personId); toast.show({ message: `${row.name} unlinked`, icon: 'check', undo: () => linkPerson(os, personId, { id: was.sw, name: was.name }, was.at) }); }} />
+          </View>
+        ) : personId && signedIn ? (
+          <View style={{ gap: 8 }}>
+            {guessFriend ? <Button title={`Link to ${friendName(Number(guessFriend))} on Splitwise`} icon="link" onPress={() => link(personId, Number(guessFriend))} /> : null}
+            <Button title="Pick a Splitwise friend" variant="secondary" onPress={() => setPicking('friend')} />
+          </View>
+        ) : null}
+
+        {friendId && signedIn ? (
+          <View style={{ gap: 8 }}>
+            <SectionHead title="On Splitwise" sub={theirs ? `${theirs.list.length} latest` : 'reading…'} />
+            {theirs?.error ? <Text style={{ fontSize: 13, color: t.c.alert.coralText }}>{`Splitwise: ${theirs.error.slice(0, 120)}`}</Text> : null}
+            {theirs?.list.map((e) => (
+              <View key={e.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text numberOfLines={1} style={{ fontSize: 14, lineHeight: 19, fontWeight: '600' }}>{e.payment ? 'Payment' : e.description}</Text>
+                  <Text numberOfLines={1} color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{[format(new Date(e.date), 'd MMM yyyy'), e.group_id ? c.swGroups.find((g) => g.id === e.group_id)?.name ?? 'a group' : 'between you', `${money(Number(e.cost), e.currency_code)} in all`].join(' · ')}</Text>
+                </View>
+                {Math.abs(mine(e)) >= 0.5 ? <Text style={{ fontSize: 14, fontWeight: '700', color: mine(e) > 0 ? blocks.lime : t.c.alert.coralText }}>{`${mine(e) > 0 ? '+' : '−'}${money(mine(e), e.currency_code)}`}</Text> : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {personId ? (
+          <View style={{ gap: 8 }}>
+            <SectionHead title="In LifeOS" sub={`${local.length} latest`} />
+            {local.length ? local.map((r) => (
+              <Pressable key={r.key} accessibilityRole="button" accessibilityLabel={r.title} onPress={() => { onClose(); router.push(r.route as never); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text numberOfLines={1} style={{ fontSize: 14, lineHeight: 19, fontWeight: '600' }}>{r.title}</Text>
+                  <Text numberOfLines={1} color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{`${format(new Date(`${r.date}T00:00:00`), 'd MMM yyyy')} · ${r.sub}`}</Text>
+                </View>
+                {Math.abs(r.amount) >= 0.5 ? <Text style={{ fontSize: 14, fontWeight: '700', color: r.amount > 0 ? blocks.lime : t.c.alert.coralText }}>{`${r.amount > 0 ? '+' : '−'}${money(r.amount)}`}</Text> : null}
+              </Pressable>
+            )) : <Text color="secondary" style={{ fontSize: 13 }}>Nothing shared with them in LifeOS.</Text>}
+          </View>
+        ) : null}
+      </View>
+      <PickerSheet visible={picking === 'person'} onClose={() => setPicking(null)} title={`Who is ${row.name}?`} items={free} onSelect={(id) => { setPicking(null); link(id, row.friendId!); }} onCreate={(name) => { const p = os.records.create({ object: 'person', title: name, data: {} }, 'user'); setPicking(null); link(p.id, row.friendId!); }} />
+      <PickerSheet visible={picking === 'friend'} onClose={() => setPicking(null)} title={`${row.name} on Splitwise`} items={freeFriends.map((f) => ({ id: String(f.id), title: f.name }))} onSelect={(id) => { setPicking(null); if (personId) link(personId, Number(id)); }} />
+    </Sheet>
   );
 }
 
 function Groups({ rows }: { rows: GroupRow[] }) {
   const os = useOS();
   const router = useRouter();
+  const toast = useToast();
+  const c = useLive((o) => swConfig(o), []);
+  const [mapping, setMapping] = useState<GroupRow | null>(null);
+  const connected = !!c.me && !c.signedOut;
+  const mapTo = (g: GroupRow, id: string) => {
+    const groups = { ...c.groups };
+    if (id === '0') delete groups[g.id];
+    else groups[g.id] = Number(id);
+    // A new mapping is read again from the start: what both have is matched, the rest goes across.
+    setSwConfig(os, { groups, billGroupsSeen: (c.billGroupsSeen ?? []).filter((x) => x !== g.id) });
+    setMapping(null);
+    if (id !== '0') {
+      toast.show({ message: `${g.title} syncs with ${c.swGroups.find((x) => String(x.id) === id)?.name ?? 'Splitwise'}…`, icon: 'repeat' });
+      void runSplitwiseSync(os).then((msg) => toast.show({ message: msg, icon: msg.includes('signed') ? 'alert' : 'check' }));
+    }
+  };
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
       {rows.map((g, i) => (
@@ -301,8 +449,15 @@ function Groups({ rows }: { rows: GroupRow[] }) {
             <Text style={{ fontSize: 22, lineHeight: 27, fontWeight: '700', color: INK }}>{os.format.currency(Math.round(Math.abs(g.net)))}</Text>
             <Text style={{ fontSize: 12, lineHeight: 16, fontWeight: '600', color: 'rgba(11,11,13,0.68)' }}>{g.net > 0 ? 'to you' : g.net < 0 ? 'you owe' : 'all square'}</Text>
           </View>
+          {connected ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={c.groups[g.id] ? `Syncs with ${c.swGroups.find((x) => x.id === c.groups[g.id])?.name} on Splitwise. Change` : 'Link to a Splitwise group'} onPress={() => setMapping(g)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 10, height: 30, borderRadius: 999, backgroundColor: 'rgba(11,11,13,0.12)', opacity: pressed ? 0.8 : 1 })}>
+              <Icon name={c.groups[g.id] ? 'check' : 'link'} size={13} color={INK} />
+              <Text numberOfLines={1} style={{ fontSize: 12, lineHeight: 16, fontWeight: '700', color: INK, maxWidth: 120 }}>{c.groups[g.id] ? c.swGroups.find((x) => x.id === c.groups[g.id])?.name ?? 'Splitwise' : 'Splitwise group'}</Text>
+            </Pressable>
+          ) : null}
         </Pressable>
       ))}
+      <PickerSheet visible={!!mapping} onClose={() => setMapping(null)} title={mapping ? `${mapping.title} on Splitwise` : undefined} items={[{ id: '0', title: 'No group (between you)' }, ...c.swGroups.map((x) => ({ id: String(x.id), title: x.name }))]} selected={mapping && c.groups[mapping.id] ? [String(c.groups[mapping.id])] : ['0']} onSelect={(id) => mapping && mapTo(mapping, id)} />
     </View>
   );
 }

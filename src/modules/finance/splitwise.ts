@@ -59,7 +59,7 @@ export interface SwConfig {
   /** New shares for linked people go to Splitwise on their own. */
   auto: boolean;
   /** Your Splitwise friends and groups, as of the last sync, for the link list. */
-  friends: Array<{ id: number; name: string; email?: string }>;
+  friends: Array<{ id: number; name: string; email?: string; /** What Splitwise says they owe you in rupees (minus: you owe them), linked or not. */ balance?: number }>;
   swGroups: SwGroup[];
   /** Person → what Splitwise says they owe you in rupees (minus: you owe them). */
   balances: Record<string, number>;
@@ -170,6 +170,10 @@ export class SplitwiseClient {
   }
   expenses(updatedAfter?: number) {
     return this.api<{ expenses: SwExpense[] }>('get_expenses', { limit: 200, updated_after: updatedAfter ? new Date(updatedAfter).toISOString() : undefined }).then((r) => r.expenses ?? []);
+  }
+  /** Everything with one friend, newest first (Udhari shows it on their row). */
+  friendExpenses(friendId: number) {
+    return this.api<{ expenses: SwExpense[] }>('get_expenses', { friend_id: friendId, limit: 60 }).then((r) => (r.expenses ?? []).filter((e) => !e.deleted_at));
   }
   groupExpenses(groupId: number, updatedAfter?: number) {
     return this.api<{ expenses: SwExpense[] }>('get_expenses', { group_id: groupId, limit: 0, updated_after: updatedAfter ? new Date(updatedAfter).toISOString() : undefined }).then((r) => r.expenses ?? []);
@@ -351,7 +355,14 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
     // Out: new and changed Bills.
     for (const b of local) {
       const sig = billSig(b);
-      const prev = bills[b.id];
+      let prev: { id: number; sig: string } | undefined = bills[b.id];
+      // The first sync after the group is mapped: a Bill sent between you before (outside the group) moves into it, never doubled.
+      if (prev && first && !theirs.some((e) => e.id === prev!.id)) {
+        await sw.deleteExpense(prev.id).catch(() => {});
+        tracked.delete(prev.id);
+        delete bills[b.id];
+        prev = undefined;
+      }
       if (prev && prev.sig === sig) continue;
       if (!prev && first) {
         const twin = theirs.find((e) => !e.deleted_at && !used.has(e.id) && !tracked.has(e.id) && sameExpense(b, e));
@@ -387,11 +398,17 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
     }
     seen.add(groupId);
   }
-  // Any other Bill (a trip or a group not mapped, a payback) with only linked people, made after the last of them was linked: an expense between you.
+  // Any other Bill you are in (a trip or a group not mapped, a payback) with only linked people, made after the last of them was linked: an expense between you.
+  // One between two others is not yours to send outside a group (Splitwise refuses it): it waits for its group to be mapped.
   if (c.auto) {
     for (const b of billsOf(os)) {
       if ((b.data.groupId && c.groups[b.data.groupId]) || bills[b.id]?.sig === billSig(b)) continue;
-      const others = [...new Set([...Object.keys(b.data.split.payers), ...Object.keys(owedOf(b.data.amount, b.data.split))])].filter((p) => p !== 'me');
+      const who = new Set([...Object.keys(b.data.split.payers), ...Object.keys(owedOf(b.data.amount, b.data.split))]);
+      const others = [...who].filter((p) => p !== 'me');
+      if (!who.has('me')) {
+        delete failed[b.id];
+        continue;
+      }
       if (others.length && others.every((p) => c.people[p] && b.createdAt >= c.people[p]!.at)) await send(b, 0);
     }
   }
@@ -438,7 +455,7 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       const f = friends.find((x) => x.id === link.sw);
       if (f) balances[personId] = Math.round(inr(f.balance) * 100) / 100;
     }
-    c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined })), swGroups: groups });
+    c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined, balance: Math.round(inr(f.balance) * 100) / 100 })), swGroups: groups });
     const pushed = { ...c.pushed };
     const amounts = { ...(c.amounts ?? {}) };
     const sent = new Set(c.sent);
