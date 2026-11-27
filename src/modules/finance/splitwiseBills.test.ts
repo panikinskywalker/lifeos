@@ -6,7 +6,7 @@ import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { crmModule } from '../crm';
 import { billBalanceWith, financeModule, makeBill, makePayment, type BillData } from '.';
-import { linkPerson, setSwConfig, swConfig, syncSplitwise, type SplitwiseClient, type SwExpense } from './splitwise';
+import { billSig, linkPerson, setSwConfig, swConfig, syncSplitwise, type SplitwiseClient, type SwExpense } from './splitwise';
 
 /**
  * A trip's Bills in a group mapped to a Splitwise group (MODEL.md, *Splitwise
@@ -228,5 +228,34 @@ describe('linking a group both sides already have', () => {
     expect(os.records.query<BillData>('bill', {}, { limit: 20 }).some((b) => b.title === 'Taxi')).toBe(true);
     expect(await run()).toMatchObject({ billsMatched: 0, billsSent: 0, billsIn: 0 });
     expect(sw.list.filter((e) => e.deleted_at)).toHaveLength(0);
+  });
+});
+
+describe('pairing by the people in it, not only the date', () => {
+  const u = (id: number, paid: string, owed: string) => ({ user_id: id, paid_share: paid, owed_share: owed });
+  const flight = () => os.records.create<BillData>({ object: 'bill', title: 'Ana’s flight', data: { kind: 'spend', amount: 52129, currency: 'INR', date: '2026-11-08', split: { payers: { me: 52129 }, method: 'exact', shares: { [ana]: 52129 } }, groupId: group, sourceKey: 'trip:expense:1' } }, 'user');
+  const theirs = () => sw.list.push({ id: 81, group_id: GROUP, payment: false, cost: '52129.00', currency_code: 'INR', description: 'Ana Flight ticket Vietnam Airlines', date: '2026-08-23T12:00:00Z', users: [u(ME, '52129.00', '0.00'), u(ANA, '0.00', '52129.00')] });
+
+  it('the first link pairs a Bill with its twin weeks apart (same price, same people, a word in common), and not with someone else’s of the same price', async () => {
+    const b = flight();
+    sw.list.push({ id: 80, group_id: GROUP, payment: false, cost: '52129.00', currency_code: 'INR', description: 'Ben’s flight', date: '2026-11-08T12:00:00Z', users: [u(ME, '52129.00', '0.00'), u(BEN, '0.00', '52129.00')] });
+    theirs();
+    expect(await run()).toMatchObject({ billsMatched: 1, billsSent: 0 });
+    expect(swConfig(os).bills![b.id]!.id).toBe(81);
+  });
+
+  it('once, mends a link made before: the copy LifeOS sent there and the copy that came in here go, the two are paired', async () => {
+    const b = flight();
+    theirs();
+    // As v0.0.141 left it: LifeOS's Bill sent into the group, Splitwise's brought in.
+    sw.list.push({ id: 82, group_id: GROUP, payment: false, cost: '52129.00', currency_code: 'INR', description: 'Ana’s flight', date: '2026-11-08T12:00:00Z', users: [u(ME, '52129.00', '0.00'), u(ANA, '0.00', '52129.00')] });
+    const came = os.records.create<BillData>({ object: 'bill', title: 'Ana Flight ticket Vietnam Airlines', data: { kind: 'spend', amount: 52129, currency: 'INR', date: '2026-08-23', split: { payers: { me: 52129 }, method: 'exact', shares: { [ana]: 52129 } }, groupId: group } }, 'system');
+    setSwConfig(os, { billGroupsSeen: [group], billsReadAt: Date.now(), bills: { [b.id]: { id: 82, sig: billSig(b) }, [came.id]: { id: 81, sig: billSig(came) } } });
+    await run();
+    expect(sw.list.find((e) => e.id === 82)!.deleted_at).toBeTruthy();
+    expect(sw.list.find((e) => e.id === 81)!.deleted_at).toBeFalsy();
+    expect(os.records.get(came.id)).toBeUndefined();
+    expect(swConfig(os).bills![b.id]!.id).toBe(81);
+    expect(swConfig(os).pairedV1).toContain(group);
   });
 });

@@ -81,6 +81,8 @@ export interface SwConfig {
   billsReadAt?: number;
   /** Once (27 Nov): copies LifeOS made twice, when two syncs ran at once, were deleted on Splitwise. */
   dupesCleaned?: boolean;
+  /** Mapped groups whose Bills and Splitwise twins were paired again once (27 Nov), or paired that way from their first sync. */
+  pairedV1?: string[];
   /** Payments noted here for what is owed only on Splitwise (+ they paid you), sent at the next sync. */
   toSend?: Array<{ debtId: string; personId: string; amount: number }>;
   lastSync?: number;
@@ -274,6 +276,33 @@ export function sameExpense(b: ObjectRecord<BillData>, e: SwExpense): boolean {
   return Math.abs(Date.parse(`${b.data.date}T12:00:00Z`) - Date.parse(`${(e.date ?? '').slice(0, 10)}T12:00:00Z`)) <= 3 * 86_400_000;
 }
 
+const words = (s: string) => new Set(s.toLowerCase().normalize('NFKD').replace(/[^a-z ]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 4));
+/** How many words two names share ("Parth's flight", "Parth Flight ticket Vietnam Airlines": 2). */
+export const sharedWords = (a: string, b: string) => { const x = words(a); return [...words(b)].filter((w) => x.has(w)).length; };
+const keys = (o: Record<string, number>) => Object.keys(o).filter((k) => (o[k] ?? 0) > 0).sort().join(',');
+/** Who paid and who owes, as two lists, to tell two expenses of the same price apart. */
+const partiesKey = (d: Pick<BillData, 'amount' | 'split'>) => `${keys(d.split.payers)}|${keys(owedOf(d.amount, d.split))}`;
+
+/**
+ * The first link of a group: the expense there that is this Bill, or null.
+ * The same kind, currency, amount (within 0.50) and people (who paid, who
+ * owes), and a date within three days or a word in common; the best fit first.
+ */
+export function twinOf(b: ObjectRecord<BillData>, candidates: SwExpense[], meId: number, people: SwConfig['people'], groupId: string): SwExpense | null {
+  const mine = partiesKey(b.data);
+  const near = (e: SwExpense) => Math.abs(Date.parse(`${b.data.date}T12:00:00Z`) - Date.parse(`${(e.date ?? '').slice(0, 10)}T12:00:00Z`)) <= 3 * 86_400_000;
+  const fits = candidates
+    .filter((e) => (b.data.kind === 'payment') === !!e.payment && (b.data.currency || 'INR').toUpperCase() === (e.currency_code || 'INR').toUpperCase() && Math.abs(b.data.amount - Number(e.cost)) <= 0.5)
+    .filter((e) => {
+      const d = billFromExpense(e, meId, people, groupId);
+      return d ? partiesKey(d) === mine : false;
+    })
+    .map((e) => ({ e, score: sharedWords(b.title, e.description ?? '') * 2 + (near(e) ? 1 : 0) }))
+    .filter((x) => x.score > 0)
+    .sort((a, z) => z.score - a.score);
+  return fits[0]?.e ?? null;
+}
+
 /** Two to four Bills (same kind and currency, within three days of it) that add up to one Splitwise expense, or null. */
 export function partsOf(e: SwExpense, bills: Array<ObjectRecord<BillData>>): Array<ObjectRecord<BillData>> | null {
   const cost = Number(e.cost);
@@ -330,6 +359,7 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
   const bills = { ...(c.bills ?? {}) };
   const seen = new Set(c.billGroupsSeen ?? []);
   const tracked = new Set(Object.values(bills).map((v) => v.id));
+  const paired = new Set(c.pairedV1 ?? []);
   result.billsSent = 0;
   result.billsMatched = 0;
   result.billsIn = 0;
@@ -406,7 +436,7 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
       }
       if (prev && (prev.sig === sig || prev.part)) continue;
       if (!prev && first) {
-        const twin = theirs.find((e) => !e.deleted_at && !used.has(e.id) && !tracked.has(e.id) && sameExpense(b, e));
+        const twin = twinOf(b, theirs.filter((e) => !e.deleted_at && !used.has(e.id) && !tracked.has(e.id)), me.id, c.people, groupId);
         if (twin) {
           used.add(twin.id);
           bills[b.id] = { id: twin.id, sig };
@@ -448,10 +478,34 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
       if (mine || ours.has(e.id) || used.has(e.id)) continue;
       const data = billFromExpense(e, me.id, c.people, groupId, trip ? { id: trip.id, localCurrency: trip.data.localCurrency, fxRate: trip.data.fxRate } : null);
       if (!data) continue;
-      const b = os.records.create<BillData>({ object: 'bill', title: e.description || 'A Splitwise expense', data: data as BillData }, 'system');
+      const b = os.records.create<BillData>({ object: 'bill', title: e.description || 'A Splitwise expense', data: { ...data, sourceKey: `splitwise:${e.id}` } as BillData }, 'system');
       bills[b.id] = { id: e.id, sig: billSig(b) };
       ours.add(e.id);
       result.billsIn!++;
+    }
+    // Once (27 Nov): the first link paired only within three days, so a Bill here and its twin there (Parth's flight, 8 Nov and 23 Aug) were each added to the other side. Pair them now.
+    if (first) paired.add(groupId);
+    else if (!paired.has(groupId)) {
+      const all = await sw.groupExpenses(swGroup).catch(() => theirs);
+      const here = billsOf(os, { groupId });
+      // Bills that came in from Splitwise (marked since 27 Nov; before, the ones without a trip's key).
+      const cameIn = here.filter((x) => bills[x.id] && (!x.data.sourceKey || x.data.sourceKey.startsWith('splitwise:')));
+      for (const a of here) {
+        if (!bills[a.id] || !a.data.sourceKey || a.data.sourceKey.startsWith('splitwise:') || bills[a.id]!.part) continue;
+        const sentId = bills[a.id]!.id;
+        const sent = all.find((e) => e.id === sentId);
+        // Only a copy LifeOS made (its own name) is deleted; a friend's entry is never touched.
+        if (!sent || sent.description !== a.title.slice(0, 100)) continue;
+        const twinBill = cameIn.filter((x) => bills[x.id] && bills[x.id]!.id !== sentId).map((x) => ({ x, e: all.find((e) => e.id === bills[x.id]!.id) })).find(({ x, e }) => e && !e.deleted_at && x.id !== a.id && twinOf(a, [e], me.id, c.people, groupId))?.x;
+        if (!twinBill) continue;
+        await sw.deleteExpense(sentId).catch(() => {});
+        bills[a.id] = { id: bills[twinBill.id]!.id, sig: billSig(a) };
+        delete bills[twinBill.id];
+        os.records.delete(twinBill.id, 'system');
+        cameIn.splice(cameIn.indexOf(twinBill), 1);
+        result.removed++;
+      }
+      paired.add(groupId);
     }
     seen.add(groupId);
   }
@@ -482,7 +536,7 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
     delete bills[billId];
     result.removed++;
   }
-  return { bills, billGroupsSeen: [...seen], billsReadAt: now, dupesCleaned };
+  return { bills, billGroupsSeen: [...seen], billsReadAt: now, dupesCleaned, pairedV1: [...paired] };
 }
 
 export interface SyncResult {
@@ -638,6 +692,18 @@ async function syncOnce(os: LifeOSContext, sw: SplitwiseClient, now: number): Pr
 
     // A refused Bill or share that has since been deleted here is no longer waiting.
     for (const key of Object.keys(failed)) if (!key.includes(':') && !os.records.get(key)) delete failed[key];
+    // What moved changes what Splitwise says: read the balances again.
+    if (result.pushed || result.removed || result.paidThere || result.billsSent || result.billsIn) {
+      const after = await sw.friends().catch(() => null);
+      if (after) {
+        const balances: Record<string, number> = {};
+        for (const [personId, link] of Object.entries(c.people)) {
+          const f = after.find((x) => x.id === link.sw);
+          if (f) balances[personId] = Math.round(inr(f.balance) * 100) / 100;
+        }
+        setSwConfig(os, { balances, friends: after.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined, balance: Math.round(inr(f.balance) * 100) / 100 })) });
+      }
+    }
     const sentQueue = new Set(queued.map((q) => q.debtId).filter((id) => !keepQueued.has(id)));
     setSwConfig(os, { pushed, amounts, sent: [...sent], ours: [...ours].slice(-2000), lastSync: now, ...billState, failed, toSend: (swConfig(os).toSend ?? []).filter((q) => !sentQueue.has(q.debtId)) });
     return result;

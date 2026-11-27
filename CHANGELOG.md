@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.142 · 27 Nov 2026
+
+**The Japan trip and its Splitwise group, paired properly.** Linking paired expenses only within three days of each other, so Parth's flight (8 Nov here, 23 Aug on Splitwise) was added to both sides. Pairing now looks at who paid and who owes, and the name, too; the Japan group is mended once (the extra copies go on both sides). What Splitwise says is read again after a sync that changed anything.
+
 ## v0.0.141 · 27 Nov 2026
 
 **Linking a trip to its Splitwise group keeps both in sync.** The first sync pairs what both already have, including one expense there that's several here (Splitwise's *Visa ₹12,000* and LifeOS's three ₹4,000 visa fees), then adds what's missing on each side: LifeOS's extras go into the group, the group's extras come into the trip.

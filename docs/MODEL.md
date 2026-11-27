@@ -2149,6 +2149,12 @@ here and there"):** the first sync pairs what both have (same kind, currency, am
 within three days), and one expense there that is two to four Bills here from the same days adding up
 to it (Splitwise's *Visa ₹12,000*, LifeOS's three visa fees) is the same money, paired as parts that
 stay as they are on both sides; what is missing there goes there, what is missing here comes in.
+Pairing asks for the same people too (who paid, who owes) and a date within three days *or* a word in
+common, the best fit first (v0.0.142: Parth's flight, 8 Nov here and 23 Aug there, had been added to
+both sides). Once, a group linked before that is mended: a Bill here and its twin that came in are
+paired, the copy LifeOS sent there (its own name) deleted and the one that came in removed. Bills
+that come in from Splitwise carry `sourceKey: splitwise:<id>`. After a sync that changed anything the
+balances are read again.
 One Splitwise sync runs at a time (a second call waits for the running one): two at once had each
 sent the same Bill. Once, the copies made that way were deleted on Splitwise (same name, amount and
 day as a sent Bill, not the tracked copy). A linked person LifeOS has as square but Splitwise does not
