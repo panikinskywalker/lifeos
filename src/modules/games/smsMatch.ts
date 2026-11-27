@@ -337,3 +337,30 @@ export function linkPaymentToPlayer(os: LifeOSContext, txId: string, personId: s
   });
   return id;
 }
+
+/**
+ * Wrong person, on a match or a question: the payment is taken back from who
+ * it was matched to (a match or an answered question is undone; an open
+ * question goes), what was learned about the sender for them is forgotten, and
+ * it pays the open shares of who really paid, oldest first, filed in To check
+ * with Undo. The payment is tied to them. Returns the new filing, or null when
+ * they have nothing open (the payment is still tied to them).
+ */
+export function reassignSmsPayment(os: LifeOSContext, filingId: string, personId: string): string | null {
+  const f = os.filings.get(filingId);
+  const txId = f?.sourceRef;
+  const tx = txId ? os.records.get<Tx>(txId) : undefined;
+  if (!f || !txId || !tx) return null;
+  const before = f.before as { appearanceIds?: string[]; personId?: string } | null;
+  const wrong = before?.personId ?? (before?.appearanceIds?.[0] ? os.records.get<AppearanceData>(before.appearanceIds[0])?.data.personId : undefined);
+  if (f.kind === SMS_PAID || smsConfirmed(os, filingId)) undoSmsPayment(os, filingId);
+  else dismissSmsAsk(os, filingId);
+  if (wrong && wrong !== personId) {
+    const sender = senderOf(tx.data).key;
+    if (sender) for (const a of os.aliases.lookup(sender)) if (a.entityId === wrong) os.aliases.forget(a.id);
+    for (const l of os.links.forEntity(txId)) if ((l.relation.kind === 'person' || l.relation.kind === 'payee') && l.other.id === wrong) os.links.unlink(txId, wrong, l.relation.kind, 'user');
+  }
+  const id = linkPaymentToPlayer(os, txId, personId);
+  if (!os.links.forEntity(txId).some((l) => l.other.id === personId && (l.relation.kind === 'person' || l.relation.kind === 'payee'))) os.links.link(txId, personId, 'person', {}, 'user');
+  return id;
+}

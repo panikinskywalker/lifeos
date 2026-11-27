@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.145 · 27 Nov 2026
+
+**Wrong person, on Turf payments.** When Turf matches a payment message to a player (or asks about one), To check now has **Wrong person**: pick who really paid, and the payment comes off the wrong player, pays the right one's shares instead (with Undo), and LifeOS forgets the wrong match so it doesn't happen again.
+
 ## v0.0.144 · 27 Nov 2026
 
 **Confirming who paid settles their Turf shares.** A payment message whose sender LifeOS didn't know was looked at by Turf only once, when it came in. Now it's looked at again the moment you confirm who sent it, and their Turf shares are marked paid (with Undo in To check). Payments you already confirmed in the last 60 days are matched on the next start. Money's own settling leaves Turf players' payments to Turf, so nothing is settled twice.

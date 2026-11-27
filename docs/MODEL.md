@@ -2115,6 +2115,10 @@ they do not also settle Debts. (`syncBills` in `src/modules/finance/splitwise.ts
   a payment is looked at by Turf when filed and again the moment it is tied to someone (a person or
   payee link: you confirmed who sent it); money from someone with Turf shares open is Turf's to match,
   and Money's own settling leaves it alone, so one payment never settles twice.
+- *Wrong person (27 Nov):* a Turf payment matched on its own (Looks right · Wrong person · Undo) or
+  asked about (Yes · Not this · Wrong person) can go to who really paid: it comes off the wrong player
+  (undone), the sender is forgotten for them and the payment untied from them, and it pays the right
+  player's open shares oldest first, tied to them, filed in To check with Undo.
 - A payment only settles what was open on its day, never shares or Bills dated after it (27 Nov: an
   August payment tied to Parth later had paid off his November trip). A payment for what only
   Splitwise knows is sent there only when it was filed in the last 7 days.
