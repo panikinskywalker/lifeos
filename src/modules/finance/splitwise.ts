@@ -122,7 +122,8 @@ const enc = (o: Record<string, string | number | boolean | undefined>) =>
 /** Splitwise's API with the signed-in session, as its website calls it. */
 export class SplitwiseClient {
   private csrf: string | null = null;
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  // Called unbound, a browser's fetch throws "Illegal invocation": wrap it.
+  constructor(private readonly fetchImpl: typeof fetch = (input, init) => fetch(input, init)) {}
 
   /** The page's CSRF token, which Splitwise wants on every write made with a session. */
   private async token(): Promise<string> {

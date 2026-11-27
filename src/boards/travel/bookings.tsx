@@ -5,11 +5,11 @@ import type { ObjectRecord } from '@core/domain/types';
 import type { LifeOSContext } from '@core/registry/context';
 import { useLive } from '@ui/hooks';
 import { EmptyState, Screen, useToast } from '@ui/kit';
-import { flightTrips, missingCheckIn, moneyOf, overlappingStays, statusOf, stayMoney, stopsOf, tripFlights, tripOthers, tripStays, tripTickets, type FlightTrip, type StopData, type TravelEvent, type TripData } from '@modules/travel';
+import { dayMonth, flightTrips, isoOf, legChip, legTimes, missingCheckIn, serviceName, tripJourneys, moneyOf, overlappingStays, statusOf, stayMoney, stopsOf, tripFlights, tripOthers, tripStays, tripTickets, type FlightTrip, type StopData, type TravelEvent, type TripData } from '@modules/travel';
 import { firstName, shortDay, shortIso, timeOf } from './parts';
 import { C, FACE, isJapan, TripHeader, TripScreen, tripRoutes } from './jp/shell';
 import { Anim, MONO } from './jp/kit';
-import { AskRow, Btn, CardHead, Chip, Ico, LedBoard, Line, P, PayChip, RoundIcon, StopMark, T, Tile, useAmt } from './jp/bookparts';
+import { AskRow, Btn, CardHead, Chip, Ico, LedBoard, Line, Lines, modeIcon, P, PayChip, RoundIcon, StopMark, T, Tile, useAmt } from './jp/bookparts';
 
 /**
  * Bookings (the trip template; JP-Bookings): the next flight on the platform
@@ -41,7 +41,9 @@ export function BookingsScreen({ ctx, params }: { ctx: LifeOSContext; params: Re
       const tickets = tripTickets(os, trip.id)
         .filter((e) => statusOf(e) !== 'cancelled')
         .map((e) => ({ e, who: (e.data.personIds ?? []).map((id) => name(id)).filter((x): x is string => !!x)[0] ?? 'You', payer: name(e.data.paidBy) }));
-      return { trip, stops: new Map(all.map((s) => [s.id, s])), airports: all.filter((s) => s.data.kind === 'airport'), stays: tripStays(os, trip.id), tickets, flights: tripFlights(os, trip.id), others: tripOthers(os, trip.id) };
+      return { trip, stops: new Map(all.map((s) => [s.id, s])), airports: all.filter((s) => s.data.kind === 'airport'), stays: tripStays(os, trip.id), tickets, flights: tripFlights(os, trip.id), others: tripOthers(os, trip.id),
+        // Trains and buses between the stops (flights are above), by day.
+        journeys: tripJourneys(os, trip.id).filter((e) => statusOf(e) !== 'cancelled' && e.data.startAt && !/plane|flight|fly/i.test(e.data.mode ?? '')).sort((a, b) => a.data.startAt! - b.data.startAt!) };
     },
     [params.trip],
   );
@@ -67,6 +69,40 @@ export function BookingsScreen({ ctx, params }: { ctx: LifeOSContext; params: Re
   const next = ways.find((w) => w.departAt >= now - 3_600_000) ?? null;
   const going = ways[0] ?? null;
   const home = ways.length > 1 ? ways[ways.length - 1]! : null;
+  // Trains and buses between the stops: first on the page while one can be booked now (they sell out), else after the flights.
+  const trainRows = d.journeys.map((e) => ({ e, chip: legChip(e, now) }));
+  const bookNow = trainRows.some((r) => r.chip.kind === 'open');
+  const trains = d.journeys.length ? (() => {
+    const rows = trainRows;
+    const count = (k: string) => rows.filter((r) => r.chip.kind === k).length;
+    const sub = [count('open') ? `${count('open')} to book now` : null, count('seats') ? `${count('seats')} open later` : null, count('booked') ? `${count('booked')} booked` : null].filter(Boolean).join(' · ') || 'nothing to book';
+    const where = (id?: string) => (id ? d.stops.get(id)?.title : undefined);
+    return (
+      <Tile>
+        <CardHead title="Trains and buses" sub={sub} />
+        <Lines>
+          {rows.map(({ e, chip }) => {
+            const from = where(e.data.fromStopId), to = where(e.data.toStopId);
+            const service = serviceName(e.data.bookNote, e.data.mode);
+            const today = chip.label === `seats open ${dayMonth(isoOf(now))}`;
+            const tone = chip.kind === 'open' ? 'coral' : chip.kind === 'seats' ? 'yellow' : chip.kind === 'booked' ? 'lime' : 'raised';
+            const label = chip.kind === 'open' ? 'Book now' : chip.kind === 'seats' ? (today ? 'opens today' : chip.label.replace('seats open', 'opens')) : chip.kind === 'booked' ? 'Booked' : 'No booking';
+            return (
+              <Line
+                key={e.id}
+                icon={modeIcon(e.data.mode)}
+                color={chip.kind === 'open' ? '#FF8A7A' : chip.kind === 'booked' ? C.lime : C.mid}
+                title={from && to ? `${from} → ${to}` : e.title}
+                sub={[shortDay(e.data.startAt!), service || null, legTimes(e) || null].filter(Boolean).join(' · ')}
+                right={<Chip label={label} tone={tone} />}
+                onPress={() => router.push(tripRoutes.day(trip.id, isoOf(e.data.startAt!), 'travel'))}
+              />
+            );
+          })}
+        </Lines>
+      </Tile>
+    );
+  })() : null;
   const asks = [missing.length ? 'Find missing check-in times' : null, 'What’s still to pay?', 'Cancellation deadlines'].filter((x): x is string => !!x);
 
   // What is left to pay at the stays, in ₹ when every currency converts (else the main one as it is).
@@ -91,6 +127,8 @@ export function BookingsScreen({ ctx, params }: { ctx: LifeOSContext; params: Re
       <Anim k="jr" delay={110} style={{ minWidth: 0 }}>
         <AskRow tripId={trip.id} asks={asks} />
       </Anim>
+
+      {trains && bookNow ? trains : null}
 
       {next ? <NextFlight w={next} delay={170} onPress={() => router.push(`/entity/event/${next.legs[0]!.e.id}` as never)} /> : null}
 
@@ -147,6 +185,8 @@ export function BookingsScreen({ ctx, params }: { ctx: LifeOSContext; params: Re
           {home ? <AirportCard label="DEPART" w={home} end="from" airports={d.airports} onOpen={(id) => router.push(id.startsWith('stop:') ? tripRoutes.stop(id.slice(5)) : (`/entity/event/${id}` as never))} /> : null}
         </Anim>
       ) : null}
+
+      {trains && !bookNow ? trains : null}
 
       <Tile>
         <CardHead title="Stays" sub={listed.length ? [`${confirmed} confirmed`, listed.length - confirmed ? `${listed.length - confirmed} not yet` : null, missing.length ? `${missing.length} without a check-in time` : null].filter(Boolean).join(' · ') : 'none yet'} />

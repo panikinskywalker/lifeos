@@ -7,6 +7,16 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.146 · 27 Nov 2026
+
+Merged from GitHub's `m1-design-system` (labelled v0.0.136 there, from `claude/serene-edison-o0lpvy`).
+
+**The trip's sections are easier to find.** The bar at the bottom of a trip has a name under each icon: Trip, Plan, Bookings, Money, Prep. Plan, Book, Prep, Travel and Home at the top of the trip each open their section.
+
+**Trains and buses to book are in Bookings.** Each leg says Book now, when seats open, Booked, or that it needs no booking, and the list comes first while something can be booked. Tap a leg for that day's travel and the booking link, then **Mark booked** once you have the ticket, so Bookings, Plan and the reminders stop asking.
+
+Udhari stays as built here in v0.0.136 to v0.0.145 (already balances first, with Splitwise's figures in every currency and linking from each person); that branch's own Udhari front page and Set up page are not taken. Its fix for Splitwise calls on the web ("Illegal invocation") is.
+
 ## v0.0.145 · 27 Nov 2026
 
 **Wrong person, on Turf payments.** When Turf matches a payment message to a player (or asks about one), To check now has **Wrong person**: pick who really paid, and the payment comes off the wrong player, pays the right one's shares instead (with Undo), and LifeOS forgets the wrong match so it doesn't happen again.
