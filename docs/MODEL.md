@@ -2111,6 +2111,9 @@ they do not also settle Debts. (`syncBills` in `src/modules/finance/splitwise.ts
   and each share; changes and deletes follow, as in a mapped group. A mapped group still goes to its
   Splitwise group.
 - *A payment recorded on Splitwise* settles Debts, then Bills (a payback Bill, never sent back).
+- A payment only settles what was open on its day, never shares or Bills dated after it (27 Nov: an
+  August payment tied to Parth later had paid off his November trip). A payment for what only
+  Splitwise knows is sent there only when it was filed in the last 7 days.
 - A Debt or a Bill with a linked person, made, changed, settled or deleted, starts a sync within
   seconds; the toggle *New shares go to Splitwise* covers Debts and Bills not in a mapped group.
 **Its own board, Udhari (18 Nov, Rutvij; v0.0.123, named Udhari in v0.0.124):**

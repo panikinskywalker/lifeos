@@ -38,7 +38,8 @@ export function settleFromPayment(os: LifeOSContext, txId: string): AutoSettled 
     // Owed only on Splitwise (added there, or before you linked them): the payment is noted here and sent there.
     const c = swConfig(os);
     const owed = (c.balances[payee.id] ?? 0) * sign;
-    if (c.people[payee.id] && owed > 0) {
+    // Only a payment that just arrived: an old one tied to them later is not for today's Splitwise balance.
+    if (c.people[payee.id] && owed > 0 && Date.now() - tx.createdAt < 7 * 86_400_000) {
       const paid = Math.round(Math.min(amount, owed) * 100) / 100;
       anchor = os.records.create<DebtData>({ object: 'debt', status: 'settled', data: { personId: payee.id, direction: inMoney ? 'i_owe' : 'they_owe', amount: paid, reason: 'Paid, on Splitwise', date: tx.data.date, kind: 'payment', transactionId: txId } }, 'system').id;
       setSwConfig(os, { toSend: [...(c.toSend ?? []), { debtId: anchor, personId: payee.id, amount: paid * sign }], balances: { ...c.balances, [payee.id]: Math.round((c.balances[payee.id]! - paid * sign) * 100) / 100 } });

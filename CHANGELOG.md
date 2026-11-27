@@ -7,6 +7,10 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.138 · 27 Nov 2026
+
+**An old payment no longer settles new shares.** A payment only settles what was owed on the day it was made. An August payment from Parth, matched to him later, had paid off his November Japan-trip expenses and gone to Splitwise. An old payment also no longer sends anything to Splitwise for what's owed only there.
+
 ## v0.0.137 · 27 Nov 2026
 
 **Udhari, tidied on the phone.** Each person's tags show what most of the money is for first (the Japan trip before a ₹200 game) and drop the venue ("Turf", not "Turf · Joggers 7"); Pay shows whole rupees; the owed and owe bar no longer prints raw numbers under it.
