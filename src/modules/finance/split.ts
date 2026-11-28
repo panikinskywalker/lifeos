@@ -202,10 +202,10 @@ export function settlingPayment(os: LifeOSContext, personId: string, balance: nu
 }
 
 /** Settle someone's open shares in one direction, oldest first, up to an amount. Turf's shares are Turf's to settle (its ledger sets their status). */
-export function settleOldest(os: LifeOSContext, personId: string, direction: DebtData['direction'], amount: number): string[] {
+export function settleOldest(os: LifeOSContext, personId: string, direction: DebtData['direction'], amount: number, upTo?: string): string[] {
   const open = os.records
     .query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: personId }, { field: 'status', op: 'eq', value: 'open' }] } }, { limit: 500 })
-    .filter((d) => d.data.direction === direction && !os.links.forEntity(d.id).some((l) => l.other.object === 'appearance'))
+    .filter((d) => d.data.direction === direction && (!upTo || d.data.date <= upTo) && !os.links.forEntity(d.id).some((l) => l.other.object === 'appearance'))
     .sort((a, b) => a.data.date.localeCompare(b.data.date) || a.createdAt - b.createdAt);
   const settled: string[] = [];
   let left = amount + 0.5;
@@ -219,14 +219,17 @@ export function settleOldest(os: LifeOSContext, personId: string, direction: Deb
 }
 
 /**
- * Money that moved between you and someone, against what is open between you:
- * their shares oldest first (Turf's are Turf's), then what Bills say is owed,
- * as a payback Bill for the rest, up to the amount.
+ * Money that moved between you and someone, against what is open between you
+ * on that day (a payment never pays for what came after it): their shares
+ * oldest first (Turf's are Turf's), then what Bills say is owed, as a payback
+ * Bill for the rest, up to the amount.
  */
 export function applyPayment(os: LifeOSContext, personId: string, direction: DebtData['direction'], amount: number, date: string): { settled: string[]; billId: string | null } {
-  const settled = settleOldest(os, personId, direction, amount);
+  const settled = settleOldest(os, personId, direction, amount, date);
   const covered = settled.reduce((n, id) => n + (os.records.get<DebtData>(id)?.data.amount ?? 0), 0);
-  const owed = billBalanceWith(os, personId) * (direction === 'they_owe' ? 1 : -1);
+  const sign = direction === 'they_owe' ? 1 : -1;
+  const then = billBalances(billsOf(os).filter((b) => b.data.date <= date)).debts.reduce((a, d) => a + (d.from === personId && d.to === 'me' ? d.amount : d.to === personId && d.from === 'me' ? -d.amount : 0), 0);
+  const owed = Math.min(then * sign, billBalanceWith(os, personId) * sign);
   const pay = paise(Math.min(amount - covered, owed)) / 100;
   if (pay < 0.5) return { settled, billId: null };
   const [from, to] = direction === 'they_owe' ? [personId, 'me'] : ['me', personId];

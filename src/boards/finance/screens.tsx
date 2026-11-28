@@ -21,7 +21,7 @@ import { ToCheckBell } from '../../screens/ToCheckBell';
 import { PayeeGuess } from './payeeGuess';
 import { YourViews } from './ask';
 import { walletTotals } from './wallet';
-import { AddSheet } from './addSheet';
+import { AddSheet } from '../../screens/AddSheet';
 import { UploadSheet } from './uploadSheet';
 import { Caps, Disc, KIND_WORD, SectionHead, Hairline, IconDisc, Rows, Spark, TxRow, accountIcon, catColor, shortMoney, day, kindWord, relDay, splitOf } from './parts';
 

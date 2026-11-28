@@ -2111,6 +2111,17 @@ they do not also settle Debts. (`syncBills` in `src/modules/finance/splitwise.ts
   and each share; changes and deletes follow, as in a mapped group. A mapped group still goes to its
   Splitwise group.
 - *A payment recorded on Splitwise* settles Debts, then Bills (a payback Bill, never sent back).
+- *Turf first (27 Nov, Rutvij: "messages coming in should settle Turf after confirming the person"):*
+  a payment is looked at by Turf when filed and again the moment it is tied to someone (a person or
+  payee link: you confirmed who sent it); money from someone with Turf shares open is Turf's to match,
+  and Money's own settling leaves it alone, so one payment never settles twice.
+- *Wrong person (27 Nov):* a Turf payment matched on its own (Looks right · Wrong person · Undo) or
+  asked about (Yes · Not this · Wrong person) can go to who really paid: it comes off the wrong player
+  (undone), the sender is forgotten for them and the payment untied from them, and it pays the right
+  player's open shares oldest first, tied to them, filed in To check with Undo.
+- A payment only settles what was open on its day, never shares or Bills dated after it (27 Nov: an
+  August payment tied to Parth later had paid off his November trip). A payment for what only
+  Splitwise knows is sent there only when it was filed in the last 7 days.
 - A Debt or a Bill with a linked person, made, changed, settled or deleted, starts a sync within
   seconds; the toggle *New shares go to Splitwise* covers Debts and Bills not in a mapped group.
 
@@ -2123,7 +2134,7 @@ it); and everyone in the trip's group is added to it, a friend by id, anyone els
 People (Splitwise invites them and they are linked). Someone with neither waits, and Udhari lists
 them under *Not on Splitwise yet*. The group is then mapped, so its Bills follow as above. Someone
 added to the trip later is added there at the next sync, and a change to a group or trip starts one.
-Choosing *Just between you* for a group in Udhari › Set up keeps it off Splitwise (`noGroup`).
+Choosing no group (between you) for a group in Udhari keeps it off Splitwise (`noGroup`).
 (`syncTripGroups` in `src/modules/finance/splitwise.ts`.)
 **Its own board, Udhari (18 Nov, Rutvij; v0.0.123, named Udhari in v0.0.124):**
 Splitwise lives in a Browse board called **Udhari** (`src/boards/udhari`, id
@@ -2131,8 +2142,57 @@ Splitwise lives in a Browse board called **Udhari** (`src/boards/udhari`, id
 Splitwise keeps its own name where the words mean the service (Sign in with
 Splitwise, Splitwise says). Money's grid menu and a person's "Splitwise
 says" line open it. It defines no Objects; the client and the sync stay in
-finance. Its screen is the one described below; sections of its own wait for
-their artboards.
+finance.
+**Udhari's home, balances first (27 Nov, Rutvij: "it should show the people owed and owe, a better
+interface than Splitwise first, then all our additions"; artboard NR-Udhari-Home):** from LifeOS's
+own Debts and Bills, so it works signed out: *Overall* (your net, the owed and owe bar, how many owe
+you and you owe, Add an expense and Settle up); filters All · Owe you · You owe · Groups · Settled;
+*Owe you* and *You owe*, biggest first, each person with what for, a Splitwise tag when linked, how
+long their oldest share has been open (14 days or more) and Remind or Pay by UPI; *Groups*, each
+one's net for you; *Activity* (paybacks, a game's shares as one line, Bills); then *Splitwise, kept
+in step, underneath* (people linked and to check, group mapping, the toggle, last sync with Sync now,
+sign out). Its own bar: People · Groups · + Add an expense · Activity · Splitwise; the Splitwise tab is
+the linking screen described below. Remind / Pay by UPI and Money's + sheet live in `src/screens`,
+shared by Money and Udhari.
+**Everything Splitwise has, in Udhari (27 Nov, Rutvij: "I should see everything on Udhari and then
+link those people"; "for the trip I already have a group on Splitwise, I should be able to link
+groups"):** each sync keeps every Splitwise friend's balance. *Overall* shows Splitwise's totals under
+LifeOS's. The lists hold everyone: a friend no one is linked to shows Splitwise's figure, *Only on
+Splitwise* and **Link**; a linked person whose Splitwise figure differs shows it in coral. Tapping a
+person opens both sides: LifeOS's records and Splitwise's (read live, `friend_id`), and linking (to
+someone in People, a new person, or a Splitwise friend). Each group card has its Splitwise group (or
+*Splitwise group* to link one); mapping it reads the group from the start: Bills sent between you
+before move into the group (the loose copy deleted, the group's own matched or added), and the
+group's expenses come in. A Bill between two others is never sent outside a group.
+**Linking a group both sides already have (27 Nov, Rutvij: "both, in sync: add what is missing from
+here and there"):** the first sync pairs what both have (same kind, currency, amount within 0.50, date
+within three days), and one expense there that is two to four Bills here from the same days adding up
+to it (Splitwise's *Visa ₹12,000*, LifeOS's three visa fees) is the same money, paired as parts that
+stay as they are on both sides; what is missing there goes there, what is missing here comes in.
+Pairing asks for the same people too (who paid, who owes) and a date within three days *or* a word in
+common, the best fit first (v0.0.142: Parth's flight, 8 Nov here and 23 Aug there, had been added to
+both sides). Once, a group linked before that is mended: a Bill here and its twin that came in are
+paired, the copy LifeOS sent there (its own name) deleted and the one that came in removed. Bills
+that come in from Splitwise carry `sourceKey: splitwise:<id>`. After a sync that changed anything the
+balances are read again.
+**Both sides in step from linking on (28 Nov, Rutvij: "I just need both of them to be in sync; if
+they are not on Splitwise it just shows on LifeOS"; "we will work from now on"):** what was between
+you before someone was linked stays where it was. From linking on, an expense or payment added on
+Splitwise outside a linked group (between friends, or in a group not linked), with only you and
+people linked before it was made, comes in as a Bill (`sourceKey: splitwise:<id>`); a change there
+changes it here, a delete there deletes it here; it is never sent back. Someone not on Splitwise
+stays only in LifeOS. **Currencies:** a Bill keeps its own currency both ways (sent with its currency
+code, brought in as Splitwise has it); its rupees come from a trip's rate for that currency, and one
+with no rate (GBP) is shown in its currency, not counted in rupees. Rupee payments on Splitwise still
+settle shares here (above); a payment in another currency comes in as a payback Bill in it.
+Splitwise keeps each currency apart (a trip's yen): Udhari counts them in rupees at a trip's rate
+(`localCurrency`, `fxRate`), and shows what has no rate as it is. A payment in a group read before the
+group was linked (when it only settled old-style shares) comes in as a Bill once the group is linked,
+unless one of that person's shares was settled in the eight days after it was made.
+One Splitwise sync runs at a time (a second call waits for the running one): two at once had each
+sent the same Bill. Once, the copies made that way were deleted on Splitwise (same name, amount and
+day as a sent Bill, not the tracked copy). A linked person LifeOS has as square but Splitwise does not
+shows Splitwise's figure (*On Splitwise, not in LifeOS*).
 **Built 17 Nov (v0.0.117, steps 1 to 4)** on the *Splitwise* artboards: then Money ›
 Splitwise (the grid menu; a person's Money section links there), now its own board. Signed out, the
 mint card and *Sign in with Splitwise* (Splitwise's page in a WebView, needing the

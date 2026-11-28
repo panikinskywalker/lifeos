@@ -24,6 +24,9 @@ export function settleFromPayment(os: LifeOSContext, txId: string): AutoSettled 
   if (os.links.forEntity(txId, 'settles').length) return null;
   const payee = payeeOf(os, txId);
   if (!payee || payee.type !== 'person') return null;
+  // Turf's: money that pays a Turf share, or from someone with Turf shares open, is Turf's to match (one payment never settles twice).
+  if (os.links.forEntity(txId, 'pays').length) return null;
+  if (os.records.query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: payee.id }, { field: 'status', op: 'eq', value: 'open' }] } }, { limit: 500 }).some((d) => os.links.forEntity(d.id).some((l) => l.other.object === 'appearance'))) return null;
   const inMoney = tx.data.kind === 'income';
   const sign = inMoney ? 1 : -1;
   const amount = tx.data.amount;
@@ -38,7 +41,8 @@ export function settleFromPayment(os: LifeOSContext, txId: string): AutoSettled 
     // Owed only on Splitwise (added there, or before you linked them): the payment is noted here and sent there.
     const c = swConfig(os);
     const owed = (c.balances[payee.id] ?? 0) * sign;
-    if (c.people[payee.id] && owed > 0) {
+    // Only a payment that just arrived: an old one tied to them later is not for today's Splitwise balance.
+    if (c.people[payee.id] && owed > 0 && Date.now() - tx.createdAt < 7 * 86_400_000) {
       const paid = Math.round(Math.min(amount, owed) * 100) / 100;
       anchor = os.records.create<DebtData>({ object: 'debt', status: 'settled', data: { personId: payee.id, direction: inMoney ? 'i_owe' : 'they_owe', amount: paid, reason: 'Paid, on Splitwise', date: tx.data.date, kind: 'payment', transactionId: txId } }, 'system').id;
       setSwConfig(os, { toSend: [...(c.toSend ?? []), { debtId: anchor, personId: payee.id, amount: paid * sign }], balances: { ...c.balances, [payee.id]: Math.round((c.balances[payee.id]! - paid * sign) * 100) / 100 } });

@@ -7,6 +7,73 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.147 · 28 Nov 2026
+
+**What's added on Splitwise comes into LifeOS too.** An expense or a payment someone adds on Splitwise, outside a trip group you linked, now shows in LifeOS as long as everyone in it is linked and it was made after you linked them. If it's changed or deleted on Splitwise, the same happens here. Before, only rupee payments came across.
+
+**Other currencies come across as they are.** A pound or yen expense keeps its currency on both sides. It counts in rupees at your trip's rate when there is one. Without a rate (pounds today) it shows in its own currency.
+
+People who aren't on Splitwise stay in LifeOS only, and what was between you before linking stays as it was.
+
+## v0.0.146 · 27 Nov 2026
+
+Merged from GitHub's `m1-design-system` (labelled v0.0.136 there, from `claude/serene-edison-o0lpvy`).
+
+**The trip's sections are easier to find.** The bar at the bottom of a trip has a name under each icon: Trip, Plan, Bookings, Money, Prep. Plan, Book, Prep, Travel and Home at the top of the trip each open their section.
+
+**Trains and buses to book are in Bookings.** Each leg says Book now, when seats open, Booked, or that it needs no booking, and the list comes first while something can be booked. Tap a leg for that day's travel and the booking link, then **Mark booked** once you have the ticket, so Bookings, Plan and the reminders stop asking.
+
+Udhari stays as built here in v0.0.136 to v0.0.145 (already balances first, with Splitwise's figures in every currency and linking from each person); that branch's own Udhari front page and Set up page are not taken. Its fix for Splitwise calls on the web ("Illegal invocation") is.
+
+## v0.0.145 · 27 Nov 2026
+
+**Wrong person, on Turf payments.** When Turf matches a payment message to a player (or asks about one), To check now has **Wrong person**: pick who really paid, and the payment comes off the wrong player, pays the right one's shares instead (with Undo), and LifeOS forgets the wrong match so it doesn't happen again.
+
+## v0.0.144 · 27 Nov 2026
+
+**Confirming who paid settles their Turf shares.** A payment message whose sender LifeOS didn't know was looked at by Turf only once, when it came in. Now it's looked at again the moment you confirm who sent it, and their Turf shares are marked paid (with Undo in To check). Payments you already confirmed in the last 60 days are matched on the next start. Money's own settling leaves Turf players' payments to Turf, so nothing is settled twice.
+
+## v0.0.143 · 27 Nov 2026
+
+**Yen counts, and old payments come in.** Splitwise keeps a trip's yen apart from rupees, so it called Parth square while he still owed hostel shares in yen. Udhari now counts other currencies in rupees at your trip's rate, and shows any it can't convert. Payments made in a trip's Splitwise group before you linked it (Parth's ₹4,000 on 17 Nov) now come into the trip, unless they already settled shares here back then.
+
+## v0.0.142 · 27 Nov 2026
+
+**The Japan trip and its Splitwise group, paired properly.** Linking paired expenses only within three days of each other, so Parth's flight (8 Nov here, 23 Aug on Splitwise) was added to both sides. Pairing now looks at who paid and who owes, and the name, too; the Japan group is mended once (the extra copies go on both sides). What Splitwise says is read again after a sync that changed anything.
+
+## v0.0.141 · 27 Nov 2026
+
+**Linking a trip to its Splitwise group keeps both in sync.** The first sync pairs what both already have, including one expense there that's several here (Splitwise's *Visa ₹12,000* and LifeOS's three ₹4,000 visa fees), then adds what's missing on each side: LifeOS's extras go into the group, the group's extras come into the trip.
+
+## v0.0.140 · 27 Nov 2026
+
+**No more doubles on Splitwise.** When two syncs ran at the same time (opening Udhari while one was running in the background), each sent the same expense, so some trip expenses were on Splitwise twice (Parth's flight, the visa fees). Now only one sync runs at a time, and the copies made twice are deleted on Splitwise once. People LifeOS has as square but Splitwise doesn't now show Splitwise's amount instead of *Settled*.
+
+## v0.0.139 · 27 Nov 2026
+
+**Udhari shows everything Splitwise has.**
+- The main page shows what Splitwise says (to you, you owe) under LifeOS's figures.
+- Friends only Splitwise knows are listed with their balance, *Only on Splitwise* and **Link**; a linked person whose Splitwise figure differs shows it.
+- Tap anyone to see both sides, LifeOS's records and their Splitwise expenses, and link them to someone in People (or add them).
+- **Link a group to its Splitwise group** right on its card (the Japan trip to your Splitwise trip group). Its expenses then sync both ways; ones already sent between you move into the group instead of doubling.
+- A trip expense between two other people is no longer sent outside a group (Splitwise refused those).
+
+## v0.0.138 · 27 Nov 2026
+
+**An old payment no longer settles new shares.** A payment only settles what was owed on the day it was made. An August payment from Parth, matched to him later, had paid off his November Japan-trip expenses and gone to Splitwise. An old payment also no longer sends anything to Splitwise for what's owed only there.
+
+## v0.0.137 · 27 Nov 2026
+
+**Udhari, tidied on the phone.** Each person's tags show what most of the money is for first (the Japan trip before a ₹200 game) and drop the venue ("Turf", not "Turf · Joggers 7"); Pay shows whole rupees; the owed and owe bar no longer prints raw numbers under it.
+
+## v0.0.136 · 27 Nov 2026
+
+**Udhari opens on who owes whom.** The new home, as designed: what you're owed overall, who owes you and whom you owe (biggest first, with what it's for, a Splitwise tag when they're linked, and how long the oldest share has been open), Remind or Pay by UPI right on each row, your net in each group, recent activity, and Splitwise underneath (people linked, groups, the toggle, last sync, sign out). It works from LifeOS's own shares even when you're signed out of Splitwise. Udhari has its own bar now: People, Groups, + Add an expense, Activity, Splitwise.
+
+## v0.0.135 · 27 Nov 2026
+
+**One refused expense no longer stops the Splitwise sync** (merged from `claude/serene-edison-o0lpvy`). If Splitwise turns down a trip expense, a share or a payment, the rest still sync. Money › Splitwise lists what wasn't sent, with what Splitwise said, and **Try again**. A refused one also goes again on its own once you change it here. Being signed out still stops the sync, as before.
+
 ## v0.0.134 · 19 Nov 2026
 
 **Everything on Haiku.** Every request LifeOS makes to Claude now goes to Claude Haiku 5.5: Ask Money (still with web search), uploaded statements and fund screens, the brain's passes (including its first day, which used to be Opus), the trip copilot's look-ups, and Talk's smarter tier. A model picked before today in You › Agent moves to Haiku once; you can still choose another there, or turn on Opus for a day.

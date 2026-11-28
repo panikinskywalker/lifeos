@@ -101,3 +101,16 @@ describe('settling from the bank text, Bills and Splitwise', () => {
     expect(settleFromPayment(os, fromThem(p.id, 300).id)).toBeNull();
   });
 });
+
+describe('an old payment tied to someone later', () => {
+  it('never pays for shares or Bills that came after it', () => {
+    const p = os.records.create({ object: 'person', title: 'Parth', data: {} });
+    makeBill(os, 'Parth’s flight', { amount: 1000, date: '2026-11-08', split: { payers: { me: 1000 }, method: 'exact', shares: { [p.id]: 1000 } } });
+    const later = debt(p.id, 200, '2026-11-14');
+    const tx = os.records.create({ object: 'transaction', title: 'Parth', data: { amount: 5000, kind: 'income', category: 'other', date: '2026-08-25' } });
+    os.links.link(tx.id, p.id, 'person', {}, 'system');
+    expect(balanceWith(os, p.id)).toBe(1200);
+    expect(os.records.get(later.id)!.status).toBe('open');
+    expect((os.records.get(tx.id)!.data as { share?: number }).share).toBeUndefined();
+  });
+});

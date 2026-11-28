@@ -28,11 +28,9 @@ export interface SwFriend {
 export interface SwGroup {
   id: number;
   name: string;
-  /** Splitwise's members with their balance in the group (get_groups); only yours is kept. */
+  /** Splitwise's members (get_groups), so a trip's people can be added to its group. */
   members?: Array<{ id: number; balance?: Array<{ currency_code: string; amount: string }> }>;
 }
-/** A balance in each currency Splitwise has one in (plus: owed to you). */
-export type SwBalance = Array<{ currency: string; amount: number }>;
 interface SwShare {
   user_id: number;
   paid_share: string;
@@ -48,6 +46,7 @@ export interface SwExpense {
   deleted_at?: string | null;
   group_id?: number | null;
   updated_at?: string;
+  created_at?: string;
   users: SwShare[];
 }
 
@@ -63,8 +62,8 @@ export interface SwConfig {
   /** New shares for linked people go to Splitwise on their own. */
   auto: boolean;
   /** Your Splitwise friends and groups, as of the last sync, for the link list. */
-  friends: Array<{ id: number; name: string; email?: string; balance?: SwBalance }>;
-  swGroups: Array<{ id: number; name: string; balance?: SwBalance; members?: number[] }>;
+  friends: Array<{ id: number; name: string; email?: string; /** What Splitwise says they owe you in rupees (minus: you owe them), linked or not. */ balance?: number; /** The same in other currencies Splitwise keeps apart (a trip's yen). */ other?: Record<string, number> }>;
+  swGroups: SwGroup[];
   /** Groups you chose to keep off Splitwise ("just between you"): no group is made there for them. */
   noGroup?: string[];
   /** A trip's group → its people who could not be added on Splitwise (not a friend there, and no email to invite them). */
@@ -80,13 +79,19 @@ export interface SwConfig {
   /** Expenses LifeOS made, so a sync never reads its own payments back. */
   ours: number[];
   /** Bill → the Splitwise expense it is kept in step with, and what it looked like when sent (a trip's or a group's Bills, in a group mapped to a Splitwise group). */
-  bills?: Record<string, { id: number; sig: string }>;
+  bills?: Record<string, { id: number; sig: string; /** One of several Bills here that are one expense there (the visa fees, as one Visa): it stays as it is on both sides. */ part?: boolean }>;
   /** What Splitwise refused (a Bill or share by its id, a payment, a group): kept with its reason, not tried again until it changes or you tap Try again. */
   failed?: Record<string, { what: string; error: string; sig: string; at: number }>;
   /** Mapped groups whose Splitwise expenses were already matched once (so the first sync never doubles what both have). */
   billGroupsSeen?: string[];
   /** When a mapped group's Splitwise expenses were last read. */
   billsReadAt?: number;
+  /** Once (27 Nov): copies LifeOS made twice, when two syncs ran at once, were deleted on Splitwise. */
+  dupesCleaned?: boolean;
+  /** Mapped groups whose Bills and Splitwise twins were paired again once (27 Nov), or paired that way from their first sync. */
+  pairedV1?: string[];
+  /** Mapped groups read whole once more, so payments read before they were linked came in (27 Nov). */
+  preLinkV1?: string[];
   /** Payments noted here for what is owed only on Splitwise (+ they paid you), sent at the next sync. */
   toSend?: Array<{ debtId: string; personId: string; amount: number }>;
   lastSync?: number;
@@ -180,6 +185,14 @@ export class SplitwiseClient {
   expenses(updatedAfter?: number) {
     return this.api<{ expenses: SwExpense[] }>('get_expenses', { limit: 200, updated_after: updatedAfter ? new Date(updatedAfter).toISOString() : undefined }).then((r) => r.expenses ?? []);
   }
+  /** Expenses outside any group, dated after a day (for clearing copies LifeOS made twice). */
+  looseExpenses(datedAfter: string) {
+    return this.api<{ expenses: SwExpense[] }>('get_expenses', { dated_after: datedAfter, limit: 0 }).then((r) => (r.expenses ?? []).filter((e) => !e.group_id && !e.deleted_at));
+  }
+  /** Everything with one friend, newest first (Udhari shows it on their row). */
+  friendExpenses(friendId: number) {
+    return this.api<{ expenses: SwExpense[] }>('get_expenses', { friend_id: friendId, limit: 60 }).then((r) => (r.expenses ?? []).filter((e) => !e.deleted_at));
+  }
   groupExpenses(groupId: number, updatedAfter?: number) {
     return this.api<{ expenses: SwExpense[] }>('get_expenses', { group_id: groupId, limit: 0, updated_after: updatedAfter ? new Date(updatedAfter).toISOString() : undefined }).then((r) => r.expenses ?? []);
   }
@@ -236,10 +249,28 @@ export function personFor(os: LifeOSContext, swId: number): string | null {
 }
 
 const money = (n: number) => n.toFixed(2);
-/** Splitwise's balance list, in every currency, rounded; zero ones dropped. */
-export const balanceOf = (b?: SwFriend['balance']): SwBalance =>
-  (b ?? []).map((x) => ({ currency: x.currency_code.toUpperCase(), amount: Math.round(Number(x.amount) * 100) / 100 })).filter((x) => Math.abs(x.amount) >= 0.01);
 const inr = (b?: SwFriend['balance']) => (b ?? []).filter((x) => x.currency_code === 'INR').reduce((n, x) => n + Number(x.amount), 0);
+/** A friend as the link list keeps them: rupees, and each other currency apart. */
+const friendRow = (f: SwFriend): SwConfig['friends'][number] => {
+  const other = Object.fromEntries((f.balance ?? []).filter((x) => x.currency_code !== 'INR' && Math.abs(Number(x.amount)) >= 0.01).map((x) => [x.currency_code, Math.round(Number(x.amount) * 100) / 100]));
+  return { id: f.id, name: friendName(f), email: f.email ?? undefined, balance: Math.round(inr(f.balance) * 100) / 100, ...(Object.keys(other).length ? { other } : {}) };
+};
+
+/**
+ * A payment read before its group was linked (then it only settled old-style
+ * shares) settled something here if one of that person's shares was settled
+ * in the days after it was made.
+ */
+function settledBack(os: LifeOSContext, e: SwExpense, meId: number): boolean {
+  const other = e.users.find((u) => u.user_id !== meId);
+  const personId = other ? personFor(os, other.user_id) : null;
+  if (!personId) return true;
+  const from = Date.parse(e.created_at ?? e.date);
+  return os.records
+    .query<DebtData>('debt', { filter: { and: [{ field: 'data.personId', op: 'eq', value: personId }, { field: 'status', op: 'eq', value: 'settled' }] } }, { limit: 500 })
+    .some((d) => d.data.kind !== 'payment' && d.updatedAt >= from && d.updatedAt <= from + 8 * 86_400_000 && !os.links.forEntity(d.id).some((l) => l.other.object === 'appearance'));
+}
+
 const signed = (d: DebtData) => (d.direction === 'they_owe' ? d.amount : -d.amount);
 
 /** One share in Splitwise's shape: who paid the whole of it, who owes it. */
@@ -290,6 +321,49 @@ export function sameExpense(b: ObjectRecord<BillData>, e: SwExpense): boolean {
   return Math.abs(Date.parse(`${b.data.date}T12:00:00Z`) - Date.parse(`${(e.date ?? '').slice(0, 10)}T12:00:00Z`)) <= 3 * 86_400_000;
 }
 
+const words = (s: string) => new Set(s.toLowerCase().normalize('NFKD').replace(/[^a-z ]/g, ' ').split(/\s+/).map((w) => w.replace(/s$/, '')).filter((w) => w.length >= 4));
+/** How many words two names share ("Parth's flight", "Parth Flight ticket Vietnam Airlines": 2). */
+export const sharedWords = (a: string, b: string) => { const x = words(a); return [...words(b)].filter((w) => x.has(w)).length; };
+const keys = (o: Record<string, number>) => Object.keys(o).filter((k) => (o[k] ?? 0) > 0).sort().join(',');
+/** Who paid and who owes, as two lists, to tell two expenses of the same price apart. */
+const partiesKey = (d: Pick<BillData, 'amount' | 'split'>) => `${keys(d.split.payers)}|${keys(owedOf(d.amount, d.split))}`;
+
+/**
+ * The first link of a group: the expense there that is this Bill, or null.
+ * The same kind, currency, amount (within 0.50) and people (who paid, who
+ * owes), and a date within three days or a word in common; the best fit first.
+ */
+export function twinOf(b: ObjectRecord<BillData>, candidates: SwExpense[], meId: number, people: SwConfig['people'], groupId: string): SwExpense | null {
+  const mine = partiesKey(b.data);
+  const near = (e: SwExpense) => Math.abs(Date.parse(`${b.data.date}T12:00:00Z`) - Date.parse(`${(e.date ?? '').slice(0, 10)}T12:00:00Z`)) <= 3 * 86_400_000;
+  const fits = candidates
+    .filter((e) => (b.data.kind === 'payment') === !!e.payment && (b.data.currency || 'INR').toUpperCase() === (e.currency_code || 'INR').toUpperCase() && Math.abs(b.data.amount - Number(e.cost)) <= 0.5)
+    .filter((e) => {
+      const d = billFromExpense(e, meId, people, groupId);
+      return d ? partiesKey(d) === mine : false;
+    })
+    .map((e) => ({ e, score: sharedWords(b.title, e.description ?? '') * 2 + (near(e) ? 1 : 0) }))
+    .filter((x) => x.score > 0)
+    .sort((a, z) => z.score - a.score);
+  return fits[0]?.e ?? null;
+}
+
+/** Two to four Bills (same kind and currency, within three days of it) that add up to one Splitwise expense, or null. */
+export function partsOf(e: SwExpense, bills: Array<ObjectRecord<BillData>>): Array<ObjectRecord<BillData>> | null {
+  const cost = Number(e.cost);
+  const near = bills.filter((b) => sameExpense({ ...b, data: { ...b.data, amount: cost } }, e)).slice(0, 12);
+  const pick = (from: number, left: number, chosen: Array<ObjectRecord<BillData>>): Array<ObjectRecord<BillData>> | null => {
+    if (chosen.length >= 2 && Math.abs(left) <= 0.5) return chosen;
+    if (chosen.length === 4 || left < -0.5) return null;
+    for (let i = from; i < near.length; i++) {
+      const got = pick(i + 1, left - near[i]!.data.amount, [...chosen, near[i]!]);
+      if (got) return got;
+    }
+    return null;
+  };
+  return pick(0, cost, []);
+}
+
 /** A Splitwise expense as a Bill's data, when everyone in it is you or linked; else null. */
 export function billFromExpense(e: SwExpense, meId: number, people: SwConfig['people'], groupId: string, trip?: { id: string; localCurrency?: string; fxRate?: number } | null): Pick<BillData, 'kind' | 'amount' | 'currency' | 'date' | 'split' | 'groupId'> & Partial<BillData> | null {
   const byId = new Map(Object.entries(people).map(([pid, v]) => [v.sw, pid]));
@@ -307,6 +381,22 @@ export function billFromExpense(e: SwExpense, meId: number, people: SwConfig['pe
   const currency = (e.currency_code || 'INR').toUpperCase();
   const rate = currency !== 'INR' && trip?.localCurrency === currency ? trip.fxRate : undefined;
   return { kind: e.payment ? 'payment' : 'spend', amount, currency, date: (e.date ?? '').slice(0, 10), split: { payers, method: 'exact', shares }, groupId, ...(trip ? { tripId: trip.id } : {}), ...(rate ? { rate } : {}), inr: billInr({ amount, currency, rate }) };
+}
+
+/** ₹ for one of a currency, from your trips (the Japan trip's yen rate). */
+export function tripRatesOf(os: LifeOSContext): Record<string, number> {
+  if (!os.registry.objects.has('trip')) return {};
+  const out: Record<string, number> = {};
+  for (const t of os.records.query<{ localCurrency?: string; fxRate?: number }>('trip', {}, { limit: 500 })) if (t.data.localCurrency && t.data.fxRate) out[t.data.localCurrency] = t.data.fxRate;
+  return out;
+}
+/** A Splitwise expense in no linked group as a Bill's data: in its own currency, in rupees at a trip's rate when there is one. */
+function looseBill(e: SwExpense, meId: number, people: SwConfig['people'], rates: Record<string, number>) {
+  const data = billFromExpense(e, meId, people, '');
+  if (!data) return null;
+  const { groupId: _none, ...rest } = data;
+  const rate = rest.currency !== 'INR' ? rates[rest.currency] : undefined;
+  return { ...rest, ...(rate ? { rate, inr: billInr({ amount: rest.amount, currency: rest.currency, rate }) } : {}) };
 }
 
 /**
@@ -379,7 +469,7 @@ async function syncTripGroups(os: LifeOSContext, sw: SplitwiseClient, c: SwConfi
     }
     const name = g.title || 'Trip';
     let swId = mapped[gid];
-    let inIt: number[] = swId ? (groups.find((x) => x.id === swId)?.members?.map((m) => m.id) ?? swGroups.find((x) => x.id === swId)?.members ?? []) : [];
+    let inIt: number[] = swId ? (groups.find((x) => x.id === swId)?.members?.map((m) => m.id) ?? swGroups.find((x) => x.id === swId)?.members?.map((m) => m.id) ?? []) : [];
     if (!swId) {
       if (failed[`newgroup:${gid}`]) continue;
       // One you already made there ("Japan", "Japan trip"): used, not doubled. Its expenses are matched, not sent twice.
@@ -397,7 +487,7 @@ async function syncTripGroups(os: LifeOSContext, sw: SplitwiseClient, c: SwConfi
           continue;
         }
         inIt = [me.id, ...ids];
-        swGroups.push({ id: swId, name, members: inIt });
+        swGroups.push({ id: swId, name, members: inIt.map((id) => ({ id })) });
         result.groupsMade++;
       }
       mapped[gid] = swId;
@@ -437,6 +527,8 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
   const bills = { ...(c.bills ?? {}) };
   const seen = new Set(c.billGroupsSeen ?? []);
   const tracked = new Set(Object.values(bills).map((v) => v.id));
+  const paired = new Set(c.pairedV1 ?? []);
+  const preLink = new Set(c.preLinkV1 ?? []);
   result.billsSent = 0;
   result.billsMatched = 0;
   result.billsIn = 0;
@@ -467,13 +559,32 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
     ours.add(id);
     result.billsSent!++;
   };
+  // Once: two syncs at once (before they waited for each other) each sent the same Bill; the untracked copy goes.
+  let dupesCleaned = c.dupesCleaned;
+  if (!dupesCleaned) {
+    const sentLoose = Object.entries(bills).map(([id, v]) => [os.records.get<BillData>(id), v] as const).filter((x): x is [ObjectRecord<BillData>, { id: number; sig: string }] => !!x[0] && !(x[0].data.groupId && c.groups[x[0].data.groupId]));
+    if (sentLoose.length) {
+      const oldest = sentLoose.map(([b]) => b.data.date).sort()[0]!;
+      const loose = await sw.looseExpenses(new Date(Date.parse(`${oldest}T00:00:00Z`) - 4 * 86_400_000).toISOString());
+      for (const [b, v] of sentLoose) {
+        for (const e of loose) {
+          if (e.id === v.id || tracked.has(e.id) || e.description !== b.title.slice(0, 100) || !sameExpense(b, e)) continue;
+          await sw.deleteExpense(e.id).catch(() => {});
+          e.deleted_at = new Date(now).toISOString();
+          result.removed++;
+        }
+      }
+    }
+    dupesCleaned = true;
+  }
   for (const [groupId, swGroup] of Object.entries(c.groups)) {
     if (!swGroup) continue;
     const local = billsOf(os, { groupId });
     const first = !seen.has(groupId);
     let theirs: SwExpense[];
     try {
-      theirs = await sw.groupExpenses(swGroup, first ? undefined : c.billsReadAt ? c.billsReadAt - 60_000 : undefined);
+      // A whole read the first time, and once more for groups linked before payments read earlier came in (27 Nov).
+      theirs = await sw.groupExpenses(swGroup, first || !preLink.has(groupId) ? undefined : c.billsReadAt ? c.billsReadAt - 60_000 : undefined);
       delete failed[`group:${groupId}`];
     } catch (e) {
       // A group Splitwise will not read (deleted there, or you left it): the other groups still sync.
@@ -481,13 +592,21 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
       continue;
     }
     const used = new Set<number>();
+    const toSend: Array<ObjectRecord<BillData>> = [];
     // Out: new and changed Bills.
     for (const b of local) {
       const sig = billSig(b);
-      const prev = bills[b.id];
-      if (prev && prev.sig === sig) continue;
+      let prev: { id: number; sig: string; part?: boolean } | undefined = bills[b.id];
+      // The first sync after the group is mapped: a Bill sent between you before (outside the group) moves into it, never doubled.
+      if (prev && first && !theirs.some((e) => e.id === prev!.id)) {
+        await sw.deleteExpense(prev.id).catch(() => {});
+        tracked.delete(prev.id);
+        delete bills[b.id];
+        prev = undefined;
+      }
+      if (prev && (prev.sig === sig || prev.part)) continue;
       if (!prev && first) {
-        const twin = theirs.find((e) => !e.deleted_at && !used.has(e.id) && !tracked.has(e.id) && sameExpense(b, e));
+        const twin = twinOf(b, theirs.filter((e) => !e.deleted_at && !used.has(e.id) && !tracked.has(e.id)), me.id, c.people, groupId);
         if (twin) {
           used.add(twin.id);
           bills[b.id] = { id: twin.id, sig };
@@ -497,34 +616,83 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
           continue;
         }
       }
-      await send(b, swGroup);
+      toSend.push(b);
     }
+    // The first time: one expense there that is several Bills here (the same days, adding up to it) is the same money, not missing.
+    if (first) {
+      for (const e of theirs) {
+        if (e.deleted_at || used.has(e.id) || tracked.has(e.id)) continue;
+        const parts = partsOf(e, toSend.filter((b) => !bills[b.id]));
+        if (!parts) continue;
+        used.add(e.id);
+        tracked.add(e.id);
+        ours.add(e.id);
+        for (const b of parts) bills[b.id] = { id: e.id, sig: billSig(b), part: true };
+        result.billsMatched! += parts.length;
+      }
+    }
+    // What is missing there goes there.
+    for (const b of toSend) if (!bills[b.id]?.part) await send(b, swGroup);
     // In: expenses added (or deleted) on Splitwise.
     const trip = os.registry.objects.has('trip') ? os.records.query<{ localCurrency?: string; fxRate?: number }>('trip', { filter: { and: [{ field: 'data.groupId', op: 'eq', value: groupId }] } }, { limit: 1 })[0] : undefined;
     for (const e of theirs) {
-      const mine = Object.entries(bills).find(([, v]) => v.id === e.id)?.[0];
+      const mineAll = Object.entries(bills).filter(([, v]) => v.id === e.id).map(([id]) => id);
+      const mine = mineAll[0];
       if (e.deleted_at) {
-        if (mine) {
-          os.records.delete(mine, 'system');
-          delete bills[mine];
+        for (const id of mineAll) {
+          os.records.delete(id, 'system');
+          delete bills[id];
         }
         continue;
       }
-      if (mine || ours.has(e.id) || used.has(e.id)) continue;
+      if (mine || used.has(e.id)) continue;
+      // Seen before the group was linked: only a payment comes in, and only if it did not settle shares here back then.
+      if (ours.has(e.id) && (!e.payment || settledBack(os, e, me.id))) continue;
       const data = billFromExpense(e, me.id, c.people, groupId, trip ? { id: trip.id, localCurrency: trip.data.localCurrency, fxRate: trip.data.fxRate } : null);
       if (!data) continue;
-      const b = os.records.create<BillData>({ object: 'bill', title: e.description || 'A Splitwise expense', data: data as BillData }, 'system');
+      const b = os.records.create<BillData>({ object: 'bill', title: e.description || 'A Splitwise expense', data: { ...data, sourceKey: `splitwise:${e.id}` } as BillData }, 'system');
       bills[b.id] = { id: e.id, sig: billSig(b) };
       ours.add(e.id);
       result.billsIn!++;
     }
+    // Once (27 Nov): the first link paired only within three days, so a Bill here and its twin there (Parth's flight, 8 Nov and 23 Aug) were each added to the other side. Pair them now.
+    preLink.add(groupId);
+    if (first) paired.add(groupId);
+    else if (!paired.has(groupId)) {
+      const all = await sw.groupExpenses(swGroup).catch(() => theirs);
+      const here = billsOf(os, { groupId });
+      // Bills that came in from Splitwise (marked since 27 Nov; before, the ones without a trip's key).
+      const cameIn = here.filter((x) => bills[x.id] && (!x.data.sourceKey || x.data.sourceKey.startsWith('splitwise:')));
+      for (const a of here) {
+        if (!bills[a.id] || !a.data.sourceKey || a.data.sourceKey.startsWith('splitwise:') || bills[a.id]!.part) continue;
+        const sentId = bills[a.id]!.id;
+        const sent = all.find((e) => e.id === sentId);
+        // Only a copy LifeOS made (its own name) is deleted; a friend's entry is never touched.
+        if (!sent || sent.description !== a.title.slice(0, 100)) continue;
+        const twinBill = cameIn.filter((x) => bills[x.id] && bills[x.id]!.id !== sentId).map((x) => ({ x, e: all.find((e) => e.id === bills[x.id]!.id) })).find(({ x, e }) => e && !e.deleted_at && x.id !== a.id && twinOf(a, [e], me.id, c.people, groupId))?.x;
+        if (!twinBill) continue;
+        await sw.deleteExpense(sentId).catch(() => {});
+        bills[a.id] = { id: bills[twinBill.id]!.id, sig: billSig(a) };
+        delete bills[twinBill.id];
+        os.records.delete(twinBill.id, 'system');
+        cameIn.splice(cameIn.indexOf(twinBill), 1);
+        result.removed++;
+      }
+      paired.add(groupId);
+    }
     seen.add(groupId);
   }
-  // Any other Bill (a trip or a group not mapped, a payback) with only linked people, made after the last of them was linked: an expense between you.
+  // Any other Bill you are in (a trip or a group not mapped, a payback) with only linked people, made after the last of them was linked: an expense between you.
+  // One between two others is not yours to send outside a group (Splitwise refuses it): it waits for its group to be mapped.
   if (c.auto) {
     for (const b of billsOf(os)) {
       if ((b.data.groupId && c.groups[b.data.groupId]) || bills[b.id]?.sig === billSig(b)) continue;
-      const others = [...new Set([...Object.keys(b.data.split.payers), ...Object.keys(owedOf(b.data.amount, b.data.split))])].filter((p) => p !== 'me');
+      const who = new Set([...Object.keys(b.data.split.payers), ...Object.keys(owedOf(b.data.amount, b.data.split))]);
+      const others = [...who].filter((p) => p !== 'me');
+      if (!who.has('me')) {
+        delete failed[b.id];
+        continue;
+      }
       if (others.length && others.every((p) => c.people[p] && b.createdAt >= c.people[p]!.at)) await send(b, 0);
     }
   }
@@ -532,14 +700,22 @@ async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me
   for (const [billId, v] of Object.entries(bills)) {
     const b = os.records.get(billId);
     if (b && !b.archived) continue;
+    // One of several that are one expense there: that expense stays while the others do.
+    if (v.part && Object.entries(bills).some(([id, x]) => id !== billId && x.id === v.id && os.records.get(id))) {
+      delete bills[billId];
+      continue;
+    }
     await sw.deleteExpense(v.id).catch(() => {});
     delete bills[billId];
     result.removed++;
   }
-  return { bills, billGroupsSeen: [...seen], billsReadAt: now };
+  return { bills, billGroupsSeen: [...seen], billsReadAt: now, dupesCleaned, pairedV1: [...paired], preLinkV1: [...preLink] };
 }
 
 export interface SyncResult {
+  /** Splitwise groups made for trips, and people added to them, this time. */
+  groupsMade?: number;
+  addedToGroups?: number;
   pushed: number;
   removed: number;
   paidThere: number;
@@ -552,9 +728,6 @@ export interface SyncResult {
   /** Refused by Splitwise this time (the reasons are in the config's `failed`). */
   billsFailed?: number;
   sharesFailed?: number;
-  /** Splitwise groups made for trips, and people added to them, this time. */
-  groupsMade?: number;
-  addedToGroups?: number;
 }
 
 /**
@@ -562,7 +735,17 @@ export interface SyncResult {
  * deleted ones removed, settle-ups here sent as payments, and payments
  * recorded there settled here.
  */
-export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now = Date.now()): Promise<SyncResult> {
+let running: Promise<SyncResult> | null = null;
+
+/** One sync at a time: a second call while one runs waits for it (two at once each sent the same expense, 27 Nov). */
+export function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now = Date.now()): Promise<SyncResult> {
+  running ??= syncOnce(os, sw, now).finally(() => {
+    running = null;
+  });
+  return running;
+}
+
+async function syncOnce(os: LifeOSContext, sw: SplitwiseClient, now: number): Promise<SyncResult> {
   const result: SyncResult = { pushed: 0, removed: 0, paidThere: 0, settledHere: 0 };
   let c = swConfig(os);
   try {
@@ -574,7 +757,7 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       const f = friends.find((x) => x.id === link.sw);
       if (f) balances[personId] = Math.round(inr(f.balance) * 100) / 100;
     }
-    c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined, balance: balanceOf(f.balance) })), swGroups: groups.map((g) => ({ id: g.id, name: g.name, balance: balanceOf(g.members?.find((m) => m.id === user.id)?.balance), members: g.members?.map((m) => m.id) })) });
+    c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map(friendRow), swGroups: groups });
     const pushed = { ...c.pushed };
     const amounts = { ...(c.amounts ?? {}) };
     const sent = new Set(c.sent);
@@ -669,8 +852,44 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
     // 4. Payments recorded on Splitwise settle what is open here, Debts then Bills (a mapped group's payments are its Bills, above).
     const mapped = new Set(Object.values(c.groups));
     const since = c.lastSync ? c.lastSync - 60_000 : now - 7 * 86_400_000;
+    const rates = tripRatesOf(os);
     for (const e of await sw.expenses(since)) {
-      if (!e.payment || e.deleted_at || ours.has(e.id) || e.currency_code !== 'INR' || (e.group_id && mapped.has(e.group_id))) continue;
+      if (e.group_id && mapped.has(e.group_id)) continue;
+      const mineIds = Object.entries(billState.bills).filter(([, v]) => v.id === e.id).map(([id]) => id);
+      // Deleted on Splitwise: its Bills here go too.
+      if (e.deleted_at) {
+        for (const id of mineIds) {
+          if (os.records.get(id)) os.records.delete(id, 'system');
+          delete billState.bills[id];
+          result.removed++;
+        }
+        continue;
+      }
+      // One that came in from Splitwise and was changed there: changed here.
+      const cameIn = mineIds.map((id) => os.records.get<BillData>(id)).find((b) => b?.data.sourceKey === `splitwise:${e.id}`);
+      if (cameIn) {
+        const data = looseBill(e, me.id, c.people, rates);
+        if (data && billSig({ ...cameIn, data: { ...cameIn.data, ...data } }) !== billSig(cameIn)) {
+          const b = os.records.update<BillData>(cameIn.id, { data }, 'system');
+          billState.bills[cameIn.id] = { id: e.id, sig: billSig(b) };
+          result.billsIn = (result.billsIn ?? 0) + 1;
+        }
+        continue;
+      }
+      if (ours.has(e.id)) continue;
+      // An expense, or a payment in another currency, between you and people linked before it was made: it comes in as a Bill.
+      if (!e.payment || e.currency_code !== 'INR') {
+        const made = Date.parse(e.created_at ?? e.date ?? '') || now;
+        const others = (e.users ?? []).filter((u) => u.user_id !== me.id);
+        const linked = others.every((u) => Object.values(c.people).some((v) => v.sw === u.user_id && made >= v.at));
+        const data = linked && others.length < (e.users ?? []).length ? looseBill(e, me.id, c.people, rates) : null;
+        if (!data) continue;
+        ours.add(e.id);
+        const b = os.records.create<BillData>({ object: 'bill', title: e.description || 'A Splitwise expense', data: { ...data, sourceKey: `splitwise:${e.id}` } as BillData }, 'system');
+        billState.bills[b.id] = { id: e.id, sig: billSig(b) };
+        result.billsIn = (result.billsIn ?? 0) + 1;
+        continue;
+      }
       ours.add(e.id);
       const payer = e.users.find((u) => Number(u.paid_share) > 0);
       const payee = e.users.find((u) => Number(u.owed_share) > 0);
@@ -689,6 +908,18 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
 
     // A refused Bill or share that has since been deleted here is no longer waiting.
     for (const key of Object.keys(failed)) if (!key.includes(':') && !os.records.get(key)) delete failed[key];
+    // What moved changes what Splitwise says: read the balances again.
+    if (result.pushed || result.removed || result.paidThere || result.billsSent || result.billsIn) {
+      const after = await sw.friends().catch(() => null);
+      if (after) {
+        const balances: Record<string, number> = {};
+        for (const [personId, link] of Object.entries(c.people)) {
+          const f = after.find((x) => x.id === link.sw);
+          if (f) balances[personId] = Math.round(inr(f.balance) * 100) / 100;
+        }
+        setSwConfig(os, { balances, friends: after.map(friendRow) });
+      }
+    }
     const sentQueue = new Set(queued.map((q) => q.debtId).filter((id) => !keepQueued.has(id)));
     setSwConfig(os, { pushed, amounts, sent: [...sent], ours: [...ours].slice(-2000), lastSync: now, ...billState, failed, toSend: (swConfig(os).toSend ?? []).filter((q) => !sentQueue.has(q.debtId)) });
     return result;

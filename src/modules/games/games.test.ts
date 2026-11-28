@@ -816,6 +816,27 @@ describe('shares paid by SMS (R9c.6)', () => {
     expect(asks()).toHaveLength(0);
   });
 
+  it('a payment from a sender nobody knew is matched the moment you confirm who sent it', () => {
+    const tx = sms(450, '2026-10-18', 'PAYTM USER 8812', 'Rs.450.00 credited from VPA 98xxxx8812@paytm');
+    expect(paid()).toHaveLength(0);
+    os.links.link(tx.id, person('Karan').id, 'payee', {}, 'user');
+    expect(appearance('Karan', '2026-10-17').data).toMatchObject({ amountPaid: 450 });
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Karan paid ₹450/)]);
+  });
+
+  it('Wrong person: the match comes off them, the sender is forgotten for them, and it pays who really paid', async () => {
+    const { reassignSmsPayment } = await import('./smsMatch');
+    const tx = sms(450, '2026-10-18', 'KARAN MEHTA', 'Rs.450.00 credited from VPA karan.m@okhdfc');
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(450);
+    const id = reassignSmsPayment(os, paid()[0]!.id, person('Arjun').id);
+    expect(id).toBeTruthy();
+    expect(appearance('Karan', '2026-10-17').data.amountPaid).toBe(0);
+    expect(appearance('Arjun', '2026-10-17').data.amountPaid).toBe(450);
+    expect(os.aliases.lookup('karan.m@okhdfc').map((a) => a.entityId)).toEqual([person('Arjun').id]);
+    expect(os.links.forEntity(tx.id).some((l) => l.relation.kind === 'person' && l.other.id === person('Arjun').id)).toBe(true);
+    expect(paid().map((f) => f.label)).toEqual([expect.stringMatching(/^Arjun paid ₹450/)]);
+  });
+
   it('a smaller amount is asked as a part payment; money from outside the squad or with nothing open is left alone', () => {
     sms(200, '2026-10-18', 'KARAN MEHTA', 'Rs.200.00 credited from VPA karan.m@okhdfc');
     expect(asks().map((f) => f.label)).toEqual(['Karan paid ₹200 of ₹500 for Wed, 14 Oct?']);

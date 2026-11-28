@@ -6,7 +6,8 @@ import type { LifeOSContext } from '@core/registry/context';
 import { bus } from '@core/events/bus';
 import { crmModule } from '../crm';
 import { billBalanceWith, financeModule, makeBill, makePayment, type BillData } from '.';
-import { linkPerson, setSwConfig, swConfig, syncSplitwise, type SplitwiseClient, type SwExpense } from './splitwise';
+import { billSig, linkPerson, setSwConfig, swConfig, syncSplitwise, type SplitwiseClient, type SwExpense } from './splitwise';
+import type { DebtData } from './split';
 
 /**
  * A trip's Bills in a group mapped to a Splitwise group (MODEL.md, *Splitwise
@@ -27,8 +28,9 @@ class FakeSw {
   async me() { return { id: ME, first_name: 'Sam' }; }
   async friends() { return [{ id: ANA, first_name: 'Ana', balance: [] }, { id: BEN, first_name: 'Ben', balance: [] }]; }
   async groups() { return [{ id: GROUP, name: 'Lisbon' }]; }
-  async expenses() { return this.list.filter((e) => e.payment); }
+  async expenses() { return this.list; }
   async groupExpenses(g: number) { return this.list.filter((e) => e.group_id === g); }
+  async looseExpenses() { return this.list.filter((e) => !e.group_id && !e.deleted_at); }
   async createExpense(p: Record<string, string | number | boolean | undefined>) {
     if (this.refuse.has(String(p.description))) throw new Error('Splitwise: Cost must be a positive number');
     this.made.push(p);
@@ -179,5 +181,137 @@ describe('when Splitwise refuses one', () => {
     sw.createExpense = async () => { throw new SplitwiseError('signed out', true); };
     await expect(run()).rejects.toThrow();
     expect(swConfig(os).signedOut).toBe(true);
+  });
+});
+
+describe('mapping a group after its Bills went between you', () => {
+  it('moves them into the Splitwise group: the loose copy goes, the group’s own copy is matched', async () => {
+    setSwConfig(os, { groups: {} });
+    const b = makeBill(os, 'Flight', { amount: 5000, date: '2026-11-08', split: { payers: { me: 5000 }, method: 'exact', shares: { [ana]: 5000 } }, groupId: group });
+    await run();
+    const loose = swConfig(os).bills![b.id]!.id;
+    expect(sw.list.find((e) => e.id === loose)!.group_id).toBeNull();
+    sw.list.push({ id: 61, group_id: GROUP, payment: false, cost: '5000.00', currency_code: 'INR', description: 'Flight (Ana)', date: '2026-11-08T12:00:00Z', users: [{ user_id: ME, paid_share: '5000.00', owed_share: '0.00' }, { user_id: ANA, paid_share: '0.00', owed_share: '5000.00' }] });
+    setSwConfig(os, { groups: { [group]: GROUP } });
+    expect(await run()).toMatchObject({ billsMatched: 1, billsSent: 0 });
+    expect(sw.list.find((e) => e.id === loose)!.deleted_at).toBeTruthy();
+    expect(swConfig(os).bills![b.id]!.id).toBe(61);
+  });
+});
+
+describe('copies LifeOS made twice', () => {
+  it('two syncs at once send a Bill once; a copy made twice before is deleted, once', async () => {
+    setSwConfig(os, { groups: {} });
+    makeBill(os, 'Parth’s flight', { amount: 52129, date: '2026-11-08', split: { payers: { me: 52129 }, method: 'exact', shares: { [ana]: 52129 } } });
+    await Promise.all([run(), run()]);
+    expect(sw.made.filter((p) => p.description === 'Parth’s flight')).toHaveLength(1);
+    // A copy from before the lock: same name, amount and day, not the one LifeOS tracks.
+    setSwConfig(os, { dupesCleaned: false });
+    sw.list.push({ ...sw.list[0]!, id: 999 });
+    await run();
+    expect(sw.list.find((e) => e.id === 999)!.deleted_at).toBeTruthy();
+    expect(sw.list.filter((e) => !e.deleted_at && e.description === 'Parth’s flight')).toHaveLength(1);
+    expect(swConfig(os).dupesCleaned).toBe(true);
+  });
+});
+
+describe('linking a group both sides already have', () => {
+  it('pairs what both have (several here can be one there), and adds what is missing on each side', async () => {
+    for (const who of [ana, ben, 'me']) makeBill(os, `Visa fee (${who})`, { amount: 4000, date: '2026-11-16', split: { payers: { me: 4000 }, method: 'exact', shares: { [who]: 4000 } }, groupId: group });
+    makeBill(os, 'Flight', { amount: 5000, date: '2026-11-08', split: { payers: { me: 5000 }, method: 'exact', shares: { [ana]: 5000 } }, groupId: group });
+    makeBill(os, 'Hostel', { amount: 900, date: '2026-11-09', split: { payers: { me: 900 }, method: 'equal', shares: { me: 1, [ana]: 1, [ben]: 1 } }, groupId: group });
+    const u = (id: number, paid: string, owed: string) => ({ user_id: id, paid_share: paid, owed_share: owed });
+    sw.list.push({ id: 71, group_id: GROUP, payment: false, cost: '12000.00', currency_code: 'INR', description: 'Visa', date: '2026-11-17T12:00:00Z', users: [u(ME, '12000.00', '4000.00'), u(ANA, '0.00', '4000.00'), u(BEN, '0.00', '4000.00')] });
+    sw.list.push({ id: 72, group_id: GROUP, payment: false, cost: '5000.00', currency_code: 'INR', description: 'Flight (Ana)', date: '2026-11-08T12:00:00Z', users: [u(ME, '5000.00', '0.00'), u(ANA, '0.00', '5000.00')] });
+    sw.list.push({ id: 73, group_id: GROUP, payment: false, cost: '600.00', currency_code: 'INR', description: 'Taxi', date: '2026-11-10T12:00:00Z', users: [u(BEN, '600.00', '200.00'), u(ME, '0.00', '200.00'), u(ANA, '0.00', '200.00')] });
+    expect(await run()).toMatchObject({ billsMatched: 4, billsSent: 1, billsIn: 1 });
+    expect(sw.made.map((p) => p.description)).toEqual(['Hostel']);
+    expect(os.records.query<BillData>('bill', {}, { limit: 20 }).some((b) => b.title === 'Taxi')).toBe(true);
+    expect(await run()).toMatchObject({ billsMatched: 0, billsSent: 0, billsIn: 0 });
+    expect(sw.list.filter((e) => e.deleted_at)).toHaveLength(0);
+  });
+});
+
+describe('pairing by the people in it, not only the date', () => {
+  const u = (id: number, paid: string, owed: string) => ({ user_id: id, paid_share: paid, owed_share: owed });
+  const flight = () => os.records.create<BillData>({ object: 'bill', title: 'Ana’s flight', data: { kind: 'spend', amount: 52129, currency: 'INR', date: '2026-11-08', split: { payers: { me: 52129 }, method: 'exact', shares: { [ana]: 52129 } }, groupId: group, sourceKey: 'trip:expense:1' } }, 'user');
+  const theirs = () => sw.list.push({ id: 81, group_id: GROUP, payment: false, cost: '52129.00', currency_code: 'INR', description: 'Ana Flight ticket Vietnam Airlines', date: '2026-08-23T12:00:00Z', users: [u(ME, '52129.00', '0.00'), u(ANA, '0.00', '52129.00')] });
+
+  it('the first link pairs a Bill with its twin weeks apart (same price, same people, a word in common), and not with someone else’s of the same price', async () => {
+    const b = flight();
+    sw.list.push({ id: 80, group_id: GROUP, payment: false, cost: '52129.00', currency_code: 'INR', description: 'Ben’s flight', date: '2026-11-08T12:00:00Z', users: [u(ME, '52129.00', '0.00'), u(BEN, '0.00', '52129.00')] });
+    theirs();
+    expect(await run()).toMatchObject({ billsMatched: 1, billsSent: 0 });
+    expect(swConfig(os).bills![b.id]!.id).toBe(81);
+  });
+
+  it('once, mends a link made before: the copy LifeOS sent there and the copy that came in here go, the two are paired', async () => {
+    const b = flight();
+    theirs();
+    // As v0.0.141 left it: LifeOS's Bill sent into the group, Splitwise's brought in.
+    sw.list.push({ id: 82, group_id: GROUP, payment: false, cost: '52129.00', currency_code: 'INR', description: 'Ana’s flight', date: '2026-11-08T12:00:00Z', users: [u(ME, '52129.00', '0.00'), u(ANA, '0.00', '52129.00')] });
+    const came = os.records.create<BillData>({ object: 'bill', title: 'Ana Flight ticket Vietnam Airlines', data: { kind: 'spend', amount: 52129, currency: 'INR', date: '2026-08-23', split: { payers: { me: 52129 }, method: 'exact', shares: { [ana]: 52129 } }, groupId: group } }, 'system');
+    setSwConfig(os, { billGroupsSeen: [group], billsReadAt: Date.now(), bills: { [b.id]: { id: 82, sig: billSig(b) }, [came.id]: { id: 81, sig: billSig(came) } } });
+    await run();
+    expect(sw.list.find((e) => e.id === 82)!.deleted_at).toBeTruthy();
+    expect(sw.list.find((e) => e.id === 81)!.deleted_at).toBeFalsy();
+    expect(os.records.get(came.id)).toBeUndefined();
+    expect(swConfig(os).bills![b.id]!.id).toBe(81);
+    expect(swConfig(os).pairedV1).toContain(group);
+  });
+});
+
+describe('payments read before a group was linked', () => {
+  const pay = (id: number) => ({ id, group_id: GROUP, payment: true, cost: '4000.00', currency_code: 'INR', description: 'Payment', date: '2026-11-17T12:00:00Z', created_at: '2026-11-17T12:00:00Z', users: [{ user_id: ANA, paid_share: '4000.00', owed_share: '0.00' }, { user_id: ME, paid_share: '0.00', owed_share: '4000.00' }] });
+
+  it('come in once the group is linked, when they settled nothing here back then', async () => {
+    sw.list.push(pay(91));
+    setSwConfig(os, { billGroupsSeen: [group], pairedV1: [group], billsReadAt: Date.now(), ours: [91] });
+    expect((await run()).billsIn).toBe(1);
+    expect(os.records.query<BillData>('bill', {}, { limit: 10 }).find((b) => b.data.kind === 'payment')!.data.split.payers).toEqual({ [ana]: 4000 });
+    expect((await run()).billsIn).toBe(0);
+  });
+
+  it('stay out when one of their shares was settled in the days after', async () => {
+    sw.list.push(pay(92));
+    const d = os.records.create<DebtData>({ object: 'debt', status: 'open', data: { personId: ana, direction: 'they_owe', amount: 4000, reason: 'Dinner', date: '2026-11-10', kind: 'split' } });
+    os.records.setStatus(d.id, 'settled');
+    sw.list[sw.list.length - 1]!.created_at = new Date(Date.now() - 86_400_000).toISOString();
+    setSwConfig(os, { billGroupsSeen: [group], pairedV1: [group], billsReadAt: Date.now(), ours: [92] });
+    expect((await run()).billsIn).toBe(0);
+  });
+});
+
+describe('expenses added on Splitwise outside a linked group', () => {
+  const lunch = (over: Partial<SwExpense> = {}) => ({ id: 70, group_id: null, payment: false, cost: '1200.00', currency_code: 'INR', description: 'Lunch (on Splitwise)', date: '2026-11-20T12:00:00Z', created_at: '2026-11-20T12:00:00Z', users: [{ user_id: ANA, paid_share: '1200.00', owed_share: '600.00' }, { user_id: ME, paid_share: '0.00', owed_share: '600.00' }], ...over });
+
+  it('come in as a Bill between you, are never sent back, and follow a change or a delete there', async () => {
+    sw.list.push(lunch());
+    expect((await run()).billsIn).toBe(1);
+    expect(billBalanceWith(os, ana)).toBe(-600);
+    await run();
+    expect(sw.made).toEqual([]);
+    Object.assign(sw.list[0]!, { cost: '1000.00', users: [{ user_id: ANA, paid_share: '1000.00', owed_share: '500.00' }, { user_id: ME, paid_share: '0.00', owed_share: '500.00' }] });
+    await run();
+    expect(billBalanceWith(os, ana)).toBe(-500);
+    sw.list[0]!.deleted_at = '2026-11-21T12:00:00Z';
+    await run();
+    expect(os.records.query<BillData>('bill', {}, { limit: 10 })).toEqual([]);
+  });
+
+  it('in another currency, keep it, in rupees at a trip’s rate when there is one; a payment in yen comes in too', async () => {
+    sw.list.push(lunch({ cost: '3000.00', currency_code: 'GBP', users: [{ user_id: ANA, paid_share: '3000.00', owed_share: '1500.00' }, { user_id: ME, paid_share: '0.00', owed_share: '1500.00' }] }));
+    sw.list.push({ id: 71, group_id: null, payment: true, cost: '1000.00', currency_code: 'JPY', description: 'Payment', date: '2026-11-21T12:00:00Z', created_at: '2026-11-21T12:00:00Z', users: [{ user_id: ME, paid_share: '1000.00', owed_share: '0.00' }, { user_id: ANA, paid_share: '0.00', owed_share: '1000.00' }] });
+    await run();
+    const bills = os.records.query<BillData>('bill', {}, { limit: 10 });
+    expect(bills.find((b) => b.data.currency === 'GBP')!.data).toMatchObject({ amount: 3000, kind: 'spend' });
+    expect(bills.find((b) => b.data.currency === 'JPY')!.data).toMatchObject({ amount: 1000, kind: 'payment' });
+  });
+
+  it('stay out when someone in them is not linked, or was linked after it was made', async () => {
+    sw.list.push(lunch({ users: [{ user_id: 99, paid_share: '1200.00', owed_share: '600.00' }, { user_id: ME, paid_share: '0.00', owed_share: '600.00' }] }));
+    linkPerson(os, ana, { id: ANA, name: 'Ana' }, Date.parse('2026-11-25T00:00:00Z'));
+    sw.list.push(lunch({ id: 72 }));
+    expect((await run()).billsIn).toBe(0);
   });
 });

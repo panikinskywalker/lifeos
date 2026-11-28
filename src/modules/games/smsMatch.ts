@@ -10,6 +10,8 @@ import { mePersonId } from './lib';
 /**
  * Turf shares paid by SMS (docs/MODEL.md layer 2, *Money*; R9c.6). When finance
  * files a money-in Transaction, games looks for the share it pays:
+ * - looked at when filed, and again the moment it is tied to someone (you
+ *   confirm who sent it): a sender unknown at first is known then;
  * - the **sender** is the UPI id in the text, else the name the bank wrote;
  *   a sender is *known* when it is a learned alias (core `aliases`), one of a
  *   player's UPI ids (core `whoIs`), or the Person finance already matched;
@@ -75,8 +77,8 @@ function footballPeople(os: LifeOSContext): Set<string> {
 /** Who sent it, and whether we know for sure. */
 function whoSent(os: LifeOSContext, tx: Tx, txId?: string): { personId: string | null; known: boolean } {
   const members = footballPeople(os);
-  // The person finance linked the payment to (its payee).
-  const linked = txId ? os.links.forEntity(txId, 'person').find((l) => members.has(l.other.id)) : undefined;
+  // The person finance linked the payment to, or you confirmed as its payee.
+  const linked = txId ? os.links.forEntity(txId).find((l) => (l.relation.kind === 'person' || l.relation.kind === 'payee') && members.has(l.other.id)) : undefined;
   if (linked) return { personId: linked.other.id, known: true };
   const { vpa, name } = senderOf(tx);
   const people = os.records.query('person', {}, { limit: 100_000 });
@@ -333,5 +335,32 @@ export function linkPaymentToPlayer(os: LifeOSContext, txId: string, personId: s
     const paidIds = shares.filter((a) => os.links.forEntity(txId, 'pays').some((l) => l.other.id === a.id)).map((a) => a.id);
     id = os.filings.add({ source: 'turf', sourceRef: txId, kind: SMS_PAID, action: 'logged', entityId: paidIds[0] ?? shares[0]!.id, label: `${name} paid ${os.format.currency(tx.data.amount)} · ${shares.filter((a) => paidIds.includes(a.id)).map((a) => shortDay(a.data.gameDate)).join(', ')}`, flag: null, before: { items, appearanceIds: paidIds, amount: tx.data.amount } }).id;
   });
+  return id;
+}
+
+/**
+ * Wrong person, on a match or a question: the payment is taken back from who
+ * it was matched to (a match or an answered question is undone; an open
+ * question goes), what was learned about the sender for them is forgotten, and
+ * it pays the open shares of who really paid, oldest first, filed in To check
+ * with Undo. The payment is tied to them. Returns the new filing, or null when
+ * they have nothing open (the payment is still tied to them).
+ */
+export function reassignSmsPayment(os: LifeOSContext, filingId: string, personId: string): string | null {
+  const f = os.filings.get(filingId);
+  const txId = f?.sourceRef;
+  const tx = txId ? os.records.get<Tx>(txId) : undefined;
+  if (!f || !txId || !tx) return null;
+  const before = f.before as { appearanceIds?: string[]; personId?: string } | null;
+  const wrong = before?.personId ?? (before?.appearanceIds?.[0] ? os.records.get<AppearanceData>(before.appearanceIds[0])?.data.personId : undefined);
+  if (f.kind === SMS_PAID || smsConfirmed(os, filingId)) undoSmsPayment(os, filingId);
+  else dismissSmsAsk(os, filingId);
+  if (wrong && wrong !== personId) {
+    const sender = senderOf(tx.data).key;
+    if (sender) for (const a of os.aliases.lookup(sender)) if (a.entityId === wrong) os.aliases.forget(a.id);
+    for (const l of os.links.forEntity(txId)) if ((l.relation.kind === 'person' || l.relation.kind === 'payee') && l.other.id === wrong) os.links.unlink(txId, wrong, l.relation.kind, 'user');
+  }
+  const id = linkPaymentToPlayer(os, txId, personId);
+  if (!os.links.forEntity(txId).some((l) => l.other.id === personId && (l.relation.kind === 'person' || l.relation.kind === 'payee'))) os.links.link(txId, personId, 'person', {}, 'user');
   return id;
 }

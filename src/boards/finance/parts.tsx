@@ -11,7 +11,6 @@ import type { RecordControls } from '@core/registry/types';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
 import type { Theme } from '@ui/theme/tokens';
-import { blocks } from '@ui/theme/tokens';
 import { Disc, Icon, IconButton, SectionHead, Text } from '@ui/kit';
 export { Disc, discColor, SectionHead } from '@ui/kit';
 import { TagChips } from '@ui/components/fields';
@@ -24,24 +23,7 @@ import type { SplitRecord } from '@modules/finance/split';
  * artboards'; every Money screen draws from here.
  */
 
-/** The artboards' category colours; a custom category uses its own palette colour. */
-const CATEGORY_COLORS: Record<string, string> = {
-  housing: '#D9B48F',
-  food: '#FF9F5A',
-  groceries: blocks.mint,
-  transport: blocks.sky,
-  subscriptions: '#B8F0D8',
-  shopping: blocks.pink,
-  utilities: '#6FD3C8',
-  entertainment: blocks.lilac,
-  health: '#FF8A7A',
-  travel: '#FF8A6A',
-  education: '#9FB8F7',
-  gifts: blocks.yellow,
-  investment: blocks.lime,
-  salary: blocks.lime,
-  freelance: '#6FD3C8',
-};
+export { catColor } from '../../screens/moneyColors';
 
 /** Amounts as the kit writes them on charts: ₹780, ₹9.2k, ₹1.3L. */
 export function shortMoney(os: LifeOSContext, n: number): string {
@@ -51,7 +33,6 @@ export function shortMoney(os: LifeOSContext, n: number): string {
   return `${n < 0 ? '−' : ''}${sym}${v.replace('.0', '')}`;
 }
 
-export const catColor = (value: string | undefined, t: Theme) => CATEGORY_COLORS[value ?? 'other'] ?? t.paletteColor(categoryOf(value)?.color) ?? t.c.fg.tertiary;
 
 /** A raised 40 disc with an icon. */
 export function IconDisc({ icon, color, size = 40 }: { icon: string; color?: string; size?: number }) {

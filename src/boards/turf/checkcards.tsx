@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import type { Filing } from '@core/repo/filingRepo';
-import { confirmSmsAsk, dismissSmsAsk, isSending, settleSmsAsk, smsConfirmed, SETTING_SUBMISSIONS, undoSmsPayment, undoVenuePayment, type PlayerProfileData, type SmsAsk, type TurfSubmission } from '@modules/games';
+import { confirmSmsAsk, dismissSmsAsk, isSending, playersOwing, reassignSmsPayment, settleSmsAsk, smsConfirmed, SETTING_SUBMISSIONS, undoSmsPayment, undoVenuePayment, type PlayerProfileData, type SmsAsk, type TurfSubmission } from '@modules/games';
 import { useLive, useOS } from '@ui/hooks';
 import { useTheme } from '@ui/theme/ThemeProvider';
-import { Icon, Text, useToast } from '@ui/kit';
+import { Icon, PickerSheet, Text, useToast } from '@ui/kit';
 import { Face } from './teams';
 
 /**
@@ -87,6 +87,30 @@ function StatusLine({ icon, text, tone }: { icon: string; text: string; tone?: '
   );
 }
 
+/** Wrong person: pick who really paid; the payment comes off who it was matched to and pays their shares (with Undo). */
+function WrongPerson({ filing, wrongId }: { filing: Filing; wrongId: string }) {
+  const os = useOS();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const owing = useLive((o) => (open ? playersOwing(o).filter((p) => p.personId !== wrongId) : []), [open, wrongId]);
+  const pick = (personId: string) => {
+    setOpen(false);
+    const name = firstName(os.records.get(personId)?.title ?? 'them');
+    try {
+      const id = reassignSmsPayment(os, filing.id, personId);
+      toast.show(id ? { message: `Moved to ${name} · their share is marked paid`, icon: 'check', undo: () => undoSmsPayment(os, id) } : { message: `${name} has no share open · the payment is tied to them`, icon: 'info' });
+    } catch (e) {
+      toast.show({ message: (e as Error).message, icon: 'info' });
+    }
+  };
+  return (
+    <>
+      <CardButton title="Wrong person" onPress={() => setOpen(true)} />
+      <PickerSheet visible={open} onClose={() => setOpen(false)} title="Who really paid?" items={owing.map((p) => ({ id: p.personId, title: p.name, subtitle: `owes ${os.format.currency(p.owed)}` }))} onSelect={pick} />
+    </>
+  );
+}
+
 /** "Priya paid ₹147 for Sat 19 Sep?" — Yes records it in Turf web and learns the sender; Not this lets it go. */
 export function SmsAskCard({ filing }: { filing: Filing }) {
   const os = useOS();
@@ -121,9 +145,10 @@ export function SmsAskCard({ filing }: { filing: Filing }) {
       {yes ? (
         s.sending ? <StatusLine icon="refresh" text={`Ticking ${firstName(s.name)}’s share paid in Turf web…`} /> : <StatusLine icon="check" tone="ok" text="Ticked in Turf web" />
       ) : (
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <CardButton title="Yes" icon="check" lime onPress={confirm} />
           <CardButton title="Not this" onPress={dismiss} />
+          <WrongPerson filing={filing} wrongId={ask.personId} />
         </View>
       )}
     </CardShell>
@@ -153,8 +178,9 @@ export function SmsPaidCard({ filing }: { filing: Filing }) {
   };
   return (
     <CardShell faceId={s.personId} name={s.name} title={filing.label} line={s.sending ? 'Filed from an SMS · sending to Turf web…' : 'Filed from an SMS · in Turf web'}>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         <CardButton title="Looks right" icon="check" lime onPress={() => os.filings.setChecked(filing.id)} />
+        <WrongPerson filing={filing} wrongId={s.personId} />
         <CardButton title="Undo" icon="undo" onPress={undo} />
       </View>
     </CardShell>
