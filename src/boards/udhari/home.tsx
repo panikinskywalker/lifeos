@@ -17,7 +17,7 @@ export async function runSplitwiseSync(os: LifeOSContext): Promise<string> {
   try {
     const r = await syncSplitwise(os, new SplitwiseClient());
     const notSent = (r.billsFailed ?? 0) + (r.sharesFailed ?? 0);
-    const bits = [r.pushed && `${r.pushed} sent`, r.billsSent && `${r.billsSent} trip expense${r.billsSent === 1 ? '' : 's'} sent`, notSent && `${notSent} not sent, see why in Udhari`, r.removed && `${r.removed} removed`, r.paidThere && `${r.paidThere} payment${r.paidThere === 1 ? '' : 's'} recorded`, r.settledHere && `${r.settledHere} settled here`].filter(Boolean);
+    const bits = [r.groupsMade && `${r.groupsMade} trip group${r.groupsMade === 1 ? '' : 's'} made`, r.addedToGroups && `${r.addedToGroups} added to groups`, r.pushed && `${r.pushed} sent`, r.billsSent && `${r.billsSent} trip expense${r.billsSent === 1 ? '' : 's'} sent`, notSent && `${notSent} not sent, see why in Udhari`, r.removed && `${r.removed} removed`, r.paidThere && `${r.paidThere} payment${r.paidThere === 1 ? '' : 's'} recorded`, r.settledHere && `${r.settledHere} settled here`].filter(Boolean);
     return bits.length ? `Splitwise: ${bits.join(' · ')}` : 'Splitwise is in step';
   } catch (e) {
     return e instanceof SplitwiseError && e.signedOut ? 'Splitwise signed you out. Sign in again.' : `Splitwise: ${(e as Error).message.slice(0, 80)}`;
@@ -93,6 +93,7 @@ export function SplitwiseScreen(_: { ctx: LifeOSContext; params: Record<string, 
   const personOf = (swId: number) => Object.entries(c.people).find(([, v]) => v.sw === swId)?.[0] ?? null;
   const unmapped = localGroups.filter((g) => !c.groups[g.id]);
   const failed = Object.entries(c.failed ?? {});
+  const waitingRows = useLive((o) => Object.entries(swConfig(o).waiting ?? {}).flatMap(([gid, ids]) => ids.filter((id) => !swConfig(o).people[id]).map((id) => ({ id, name: o.records.get(id)?.title ?? 'Someone', group: o.records.get(gid)?.title ?? 'a trip' }))), []);
   const linkedCount = Object.keys(c.people).length;
   const heroBg = !withBalance.length || net >= 0 ? blocks.lime : blocks.pink;
   const amountLines = (b: SwBalance) => b.map((x) => ({ key: x.currency, text: fmt(x.amount, x.currency), owed: x.amount > 0 }));
@@ -171,6 +172,25 @@ export function SplitwiseScreen(_: { ctx: LifeOSContext; params: Record<string, 
                 </View>
                 <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, paddingHorizontal: 4 }}>Everything else synced. These wait until you change them here or try again.</Text>
                 <View style={{ alignSelf: 'flex-start' }}><Chip label={busy ? 'Trying…' : 'Try again'} lime onPress={() => { if (busy) return; retryRefused(os); void sync(); }} /></View>
+              </View>
+            ) : null}
+
+            {waitingRows.length ? (
+              <View style={{ gap: 10 }}>
+                <SectionHead title="Not on Splitwise yet" sub="add an email in People and they are invited" />
+                <View style={{ paddingHorizontal: 16, paddingVertical: 4, borderRadius: 28, backgroundColor: t.c.bg.tile }}>
+                  {waitingRows.map((w, i) => (
+                    <Pressable key={w.id} accessibilityRole="button" accessibilityLabel={`${w.name}, ${w.group}. Open to add an email`} onPress={() => router.push(`/entity/person/${w.id}` as never)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, borderTopWidth: i ? 1 : 0, borderColor: t.c.line, opacity: pressed ? 0.7 : 1 })}>
+                      <Disc name={w.name} colorKey={w.id} size={36} />
+                      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                        <Text numberOfLines={1} style={{ fontSize: 15, lineHeight: 20, fontWeight: '600' }}>{w.name}</Text>
+                        <Text numberOfLines={1} color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>{`in ${w.group} · no email, not a Splitwise friend`}</Text>
+                      </View>
+                      <Icon name="chevron-right" size={18} color={t.c.fg.secondary} />
+                    </Pressable>
+                  ))}
+                </View>
+                <Text color="secondary" style={{ fontSize: 12, lineHeight: 16, paddingHorizontal: 4 }}>Their trip expenses wait until they are in the Splitwise group. Or link them in Set up if they are there under another name.</Text>
               </View>
             ) : null}
 
@@ -348,7 +368,7 @@ export function SplitwiseSetupScreen(_: { ctx: LifeOSContext; params: Record<str
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 24, backgroundColor: t.c.bg.tile }}>
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={{ fontSize: 15, lineHeight: 20, fontWeight: '600' }}>New shares go to Splitwise</Text>
-            <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>for linked people, made after you link them · deleting one here deletes it there</Text>
+            <Text color="secondary" style={{ fontSize: 12, lineHeight: 16 }}>for linked people, made after you link them · a trip with people gets its own Splitwise group, with everyone added · deleting one here deletes it there</Text>
           </View>
           <Toggle value={c.auto} onChange={(v) => setSwConfig(os, { auto: v })} accessibilityLabel="New shares go to Splitwise" />
         </View>
@@ -360,7 +380,7 @@ export function SplitwiseSetupScreen(_: { ctx: LifeOSContext; params: Record<str
       </ScrollView>
 
       <PickerSheet visible={!!picking} onClose={() => setPicking(null)} title={picking ? `Who is ${picking.name}?` : undefined} items={free.map((p) => ({ id: p.id, title: p.title }))} onSelect={(id) => { if (picking) linkPerson(os, id, picking); setPicking(null); }} onCreate={(name) => { if (!picking) return; const p = os.records.create({ object: 'person', title: name, data: {} }, 'user'); linkPerson(os, p.id, picking); setPicking(null); }} />
-      <PickerSheet visible={!!mapping} onClose={() => setMapping(null)} title="Its shares go to" items={[{ id: '0', title: 'Just between you (no group)' }, ...c.swGroups.map((g) => ({ id: String(g.id), title: g.name }))]} selected={mapping && c.groups[mapping] ? [String(c.groups[mapping])] : ['0']} onSelect={(id) => { if (mapping) { const groups = { ...c.groups }; if (id === '0') delete groups[mapping]; else groups[mapping] = Number(id); setSwConfig(os, { groups }); } setMapping(null); }} />
+      <PickerSheet visible={!!mapping} onClose={() => setMapping(null)} title="Its shares go to" items={[{ id: '0', title: 'Just between you (no group)' }, ...c.swGroups.map((g) => ({ id: String(g.id), title: g.name }))]} selected={mapping && c.groups[mapping] ? [String(c.groups[mapping])] : ['0']} onSelect={(id) => { if (mapping) { const groups = { ...c.groups }; const off = new Set(c.noGroup ?? []); if (id === '0') { delete groups[mapping]; off.add(mapping); } else { groups[mapping] = Number(id); off.delete(mapping); } setSwConfig(os, { groups, noGroup: [...off] }); } setMapping(null); }} />
     </View>
   );
 }

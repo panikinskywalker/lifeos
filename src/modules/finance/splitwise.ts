@@ -64,7 +64,11 @@ export interface SwConfig {
   auto: boolean;
   /** Your Splitwise friends and groups, as of the last sync, for the link list. */
   friends: Array<{ id: number; name: string; email?: string; balance?: SwBalance }>;
-  swGroups: Array<{ id: number; name: string; balance?: SwBalance }>;
+  swGroups: Array<{ id: number; name: string; balance?: SwBalance; members?: number[] }>;
+  /** Groups you chose to keep off Splitwise ("just between you"): no group is made there for them. */
+  noGroup?: string[];
+  /** A trip's group → its people who could not be added on Splitwise (not a friend there, and no email to invite them). */
+  waiting?: Record<string, string[]>;
   /** Person → what Splitwise says they owe you in rupees (minus: you owe them). */
   balances: Record<string, number>;
   /** Debt → the Splitwise expense made for it. */
@@ -101,7 +105,7 @@ export function setSwConfig(os: LifeOSContext, patch: Partial<SwConfig>): SwConf
 /** Sign out: what LifeOS knows of Splitwise goes; the links to people stay, for next time. */
 export function forgetSplitwise(os: LifeOSContext): void {
   const c = swConfig(os);
-  os.settings.set(KEY, { ...EMPTY, people: c.people, groups: c.groups, auto: c.auto, pushed: c.pushed, sent: c.sent, ours: c.ours, bills: c.bills, billGroupsSeen: c.billGroupsSeen, toSend: c.toSend, failed: c.failed });
+  os.settings.set(KEY, { ...EMPTY, people: c.people, groups: c.groups, auto: c.auto, pushed: c.pushed, sent: c.sent, ours: c.ours, bills: c.bills, billGroupsSeen: c.billGroupsSeen, toSend: c.toSend, failed: c.failed, noGroup: c.noGroup });
 }
 
 export class SplitwiseError extends Error {
@@ -187,6 +191,20 @@ export class SplitwiseClient {
   }
   deleteExpense(id: number) {
     return this.api(`delete_expense/${id}`, {}, true);
+  }
+  /** A new Splitwise group (a trip), with these friends in it besides you. */
+  async createGroup(name: string, userIds: number[]): Promise<number> {
+    const users: Record<string, number> = {};
+    userIds.forEach((id, i) => (users[`users__${i}__user_id`] = id));
+    const r = await this.api<{ group?: { id: number } }>('create_group', { name: name.slice(0, 100), group_type: 'trip', ...users }, true);
+    if (!r.group?.id) throw new SplitwiseError('Splitwise did not make the group');
+    return r.group.id;
+  }
+  /** Someone into a group: a friend by id, or anyone by name and email (Splitwise invites them). Their Splitwise id. */
+  async addToGroup(groupId: number, who: { user_id: number } | { first_name: string; last_name?: string; email: string }): Promise<number | undefined> {
+    const r = await this.api<{ success?: boolean; user?: { id: number } }>('add_user_to_group', { group_id: groupId, ...who }, true);
+    if (r.success === false) throw new SplitwiseError('Splitwise did not add them to the group');
+    return r.user?.id ?? ('user_id' in who ? who.user_id : undefined);
   }
 }
 
@@ -308,6 +326,113 @@ export function retryRefused(os: LifeOSContext): void {
   setSwConfig(os, { failed: {} });
 }
 
+/** The Splitwise friend a Person is: the same email, else the same full name, else the only friend with that first name (one not linked to someone else). */
+export function matchFriend(person: { title: string; data: { email?: string } }, friends: Array<{ id: number; name: string; email?: string | null }>, taken: Set<number>): { id: number; name: string } | null {
+  const free = friends.filter((f) => !taken.has(f.id));
+  const email = person.data.email?.trim().toLowerCase();
+  const byEmail = email ? free.find((f) => f.email?.trim().toLowerCase() === email) : undefined;
+  if (byEmail) return byEmail;
+  const full = norm(person.title);
+  if (!full) return null;
+  const exact = free.filter((f) => norm(f.name) === full);
+  if (exact.length === 1) return exact[0]!;
+  // "Parth" here and "Parth Shah" there (or the other way round); never two different surnames.
+  const words = full.split(' ');
+  const firsts = free.filter((f) => {
+    const theirs = norm(f.name).split(' ');
+    return theirs[0] === words[0] && (theirs.length === 1 || words.length === 1);
+  });
+  return firsts.length === 1 ? firsts[0]! : null;
+}
+
+/**
+ * A trip with people (one not over yet): its group goes to Splitwise on its
+ * own. Its people already on Splitwise are linked, a Splitwise group of the
+ * same name is used or made, and everyone in the trip's group is added to it
+ * (a friend by id, anyone else by email, which invites them). Someone with
+ * neither waits, and Udhari says so. Off while new shares stay here (auto), and
+ * for a group you chose to keep between you.
+ */
+async function syncTripGroups(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me: { id: number }, friends: SwFriend[], groups: SwGroup[], failed: NonNullable<SwConfig['failed']>, result: SyncResult, now: number): Promise<Partial<SwConfig> | null> {
+  if (!c.auto || !os.registry.objects.has('trip')) return null;
+  const today = new Date(now - 86_400_000).toISOString().slice(0, 10);
+  const trips = os.records.query<{ groupId?: string; endDate?: string; destination?: string }>('trip', {}, { limit: 500 }).filter((t) => t.data.groupId && !t.archived && (!t.data.endDate || t.data.endDate >= today));
+  if (!trips.length) return null;
+  const people = { ...c.people };
+  const mapped = { ...c.groups };
+  const swGroups = [...c.swGroups];
+  const waiting: Record<string, string[]> = {};
+  const skip = new Set(c.noGroup ?? []);
+  const fr = friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email }));
+  result.groupsMade = 0;
+  result.addedToGroups = 0;
+  for (const gid of [...new Set(trips.map((t) => t.data.groupId!))]) {
+    const g = os.records.get<{ memberIds?: string[] }>(gid);
+    if (!g || skip.has(gid)) continue;
+    const members = (g.data.memberIds ?? []).filter((id) => id !== 'me' && os.records.get(id));
+    if (!members.length) continue;
+    // Those already on Splitwise, linked.
+    for (const pid of members) {
+      if (people[pid]) continue;
+      const f = matchFriend(os.records.get<{ email?: string }>(pid)!, fr, new Set(Object.values(people).map((v) => v.sw)));
+      if (f) people[pid] = { sw: f.id, name: f.name, at: now };
+    }
+    const name = g.title || 'Trip';
+    let swId = mapped[gid];
+    let inIt: number[] = swId ? (groups.find((x) => x.id === swId)?.members?.map((m) => m.id) ?? swGroups.find((x) => x.id === swId)?.members ?? []) : [];
+    if (!swId) {
+      if (failed[`newgroup:${gid}`]) continue;
+      // One you already made there ("Japan", "Japan trip"): used, not doubled. Its expenses are matched, not sent twice.
+      const names = new Set([name, ...trips.filter((t) => t.data.groupId === gid).flatMap((t) => [t.title, t.data.destination ?? '', `${t.data.destination ?? ''} trip`])].map(norm).filter(Boolean));
+      const same = groups.find((x) => names.has(norm(x.name)));
+      if (same) {
+        swId = same.id;
+        inIt = same.members?.map((m) => m.id) ?? [];
+      } else {
+        const ids = members.map((p) => people[p]?.sw).filter((x): x is number => !!x);
+        try {
+          swId = await sw.createGroup(name, ids);
+        } catch (e) {
+          refused(e, failed, `newgroup:${gid}`, `Make ${name} on Splitwise`, '', now);
+          continue;
+        }
+        inIt = [me.id, ...ids];
+        swGroups.push({ id: swId, name, members: inIt });
+        result.groupsMade++;
+      }
+      mapped[gid] = swId;
+    }
+    // Everyone in the trip's group, in the Splitwise group too.
+    for (const pid of members) {
+      const link = people[pid];
+      if (link && inIt.includes(link.sw)) continue;
+      const key = `member:${gid}:${pid}`;
+      if (failed[key]) continue;
+      const p = os.records.get<{ email?: string }>(pid)!;
+      try {
+        if (link) {
+          await sw.addToGroup(swId, { user_id: link.sw });
+          inIt.push(link.sw);
+        } else if (p.data.email?.trim()) {
+          const [first, ...rest] = p.title.trim().split(/\s+/);
+          const id = await sw.addToGroup(swId, { first_name: first || p.title, last_name: rest.join(' ') || undefined, email: p.data.email.trim() });
+          if (id) {
+            people[pid] = { sw: id, name: p.title, at: now };
+            inIt.push(id);
+          }
+        } else {
+          (waiting[gid] ??= []).push(pid);
+          continue;
+        }
+        result.addedToGroups++;
+      } catch (e) {
+        refused(e, failed, key, `Add ${p.title} to ${name} on Splitwise`, '', now);
+      }
+    }
+  }
+  return { people, groups: mapped, swGroups, waiting };
+}
+
 async function syncBills(os: LifeOSContext, sw: SplitwiseClient, c: SwConfig, me: { id: number }, ours: Set<number>, result: SyncResult, now: number, failed: NonNullable<SwConfig['failed']>) {
   const bills = { ...(c.bills ?? {}) };
   const seen = new Set(c.billGroupsSeen ?? []);
@@ -427,6 +552,9 @@ export interface SyncResult {
   /** Refused by Splitwise this time (the reasons are in the config's `failed`). */
   billsFailed?: number;
   sharesFailed?: number;
+  /** Splitwise groups made for trips, and people added to them, this time. */
+  groupsMade?: number;
+  addedToGroups?: number;
 }
 
 /**
@@ -446,12 +574,16 @@ export async function syncSplitwise(os: LifeOSContext, sw: SplitwiseClient, now 
       const f = friends.find((x) => x.id === link.sw);
       if (f) balances[personId] = Math.round(inr(f.balance) * 100) / 100;
     }
-    c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined, balance: balanceOf(f.balance) })), swGroups: groups.map((g) => ({ id: g.id, name: g.name, balance: balanceOf(g.members?.find((m) => m.id === user.id)?.balance) })) });
+    c = setSwConfig(os, { me, signedOut: false, balances, friends: friends.map((f) => ({ id: f.id, name: friendName(f), email: f.email ?? undefined, balance: balanceOf(f.balance) })), swGroups: groups.map((g) => ({ id: g.id, name: g.name, balance: balanceOf(g.members?.find((m) => m.id === user.id)?.balance), members: g.members?.map((m) => m.id) })) });
     const pushed = { ...c.pushed };
     const amounts = { ...(c.amounts ?? {}) };
     const sent = new Set(c.sent);
     const ours = new Set(c.ours);
     const failed = { ...(c.failed ?? {}) };
+
+    // 0. A trip's people: those on Splitwise linked, the trip's group made there, everyone in it.
+    const tg = await syncTripGroups(os, sw, c, me, friends, groups, failed, result, now);
+    if (tg) c = setSwConfig(os, tg);
 
     // 1. New shares for linked people, made after you linked them.
     if (c.auto) {

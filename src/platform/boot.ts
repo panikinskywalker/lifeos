@@ -129,12 +129,15 @@ export async function bootLifeOS(): Promise<LifeOSContext> {
   bus.on('app.foreground', () => void syncSources(os));
   // A share or a Bill with a linked person made, changed, settled or deleted: Splitwise hears within seconds (docs/MODEL.md, Splitwise and settling up).
   let swTimer: ReturnType<typeof setTimeout> | null = null;
+  // So does a trip's group: someone added to it, or a trip given one, makes or fills its Splitwise group.
   const swSoon = ({ entity }: { entity: { object: string; data: unknown } }) => {
-    if ((entity.object !== 'debt' && entity.object !== 'bill') || Platform.OS === 'web') return;
+    if (!['debt', 'bill', 'group', 'trip'].includes(entity.object) || Platform.OS === 'web') return;
     const c = swConfig(os);
-    const d = entity.data as { personId?: string; split?: { payers?: Record<string, number>; shares?: Record<string, number> } };
+    if (!c.me || c.signedOut) return;
+    const d = entity.data as { personId?: string; groupId?: string; split?: { payers?: Record<string, number>; shares?: Record<string, number> } };
     const who = d.personId ? [d.personId] : [...Object.keys(d.split?.payers ?? {}), ...Object.keys(d.split?.shares ?? {})];
-    if (!c.me || c.signedOut || !who.some((p) => c.people[p])) return;
+    const tripish = entity.object === 'group' || entity.object === 'trip' || (entity.object === 'bill' && !!d.groupId);
+    if (!tripish && !who.some((p) => c.people[p])) return;
     if (swTimer) clearTimeout(swTimer);
     swTimer = setTimeout(() => void syncSplitwise(os, new SplitwiseClient()).catch(() => {}), 4000);
   };

@@ -2113,6 +2113,18 @@ they do not also settle Debts. (`syncBills` in `src/modules/finance/splitwise.ts
 - *A payment recorded on Splitwise* settles Debts, then Bills (a payback Bill, never sent back).
 - A Debt or a Bill with a linked person, made, changed, settled or deleted, starts a sync within
   seconds; the toggle *New shares go to Splitwise* covers Debts and Bills not in a mapped group.
+
+**A trip with people is on Splitwise on its own (28 Nov, Rutvij: "as soon as we add people in the travel group the subsequent should be created on Splitwise, with the people that are already on Splitwise synced as well"):**
+in each sync, for a trip not over yet whose group has people, and while *New shares go to Splitwise*
+is on: its people already on Splitwise are linked (the same email, else the same full name, else the
+only friend with that first name when no surnames disagree); a Splitwise group with the group's, the
+trip's or the destination's name is used, else one is made (a trip group, with the linked people in
+it); and everyone in the trip's group is added to it, a friend by id, anyone else by their email in
+People (Splitwise invites them and they are linked). Someone with neither waits, and Udhari lists
+them under *Not on Splitwise yet*. The group is then mapped, so its Bills follow as above. Someone
+added to the trip later is added there at the next sync, and a change to a group or trip starts one.
+Choosing *Just between you* for a group in Udhari › Set up keeps it off Splitwise (`noGroup`).
+(`syncTripGroups` in `src/modules/finance/splitwise.ts`.)
 **Its own board, Udhari (18 Nov, Rutvij; v0.0.123, named Udhari in v0.0.124):**
 Splitwise lives in a Browse board called **Udhari** (`src/boards/udhari`, id
 `udhari`), not a Money screen: Browse › Boards › Udhari, shown while Money is.
