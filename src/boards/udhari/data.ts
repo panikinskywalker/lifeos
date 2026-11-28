@@ -3,7 +3,7 @@ import type { ObjectRecord } from '@core/domain/types';
 import { owedOf } from '@core/money/split';
 import { balances, type DebtData } from '@modules/finance/split';
 import { billsOf, type BillData } from '@modules/finance/bills';
-import { swConfig } from '@modules/finance/splitwise';
+import { swConfig, tripRatesOf as tripRates } from '@modules/finance/splitwise';
 
 /**
  * What Udhari's home shows (NR-Udhari-Home): everyone's net with you, from
@@ -31,14 +31,6 @@ export interface PersonRow {
   swOnly: boolean;
   /** Splitwise's balance in other currencies, as Splitwise keeps them (JPY 10,653); counted in swAmount at a trip's rate when one is known. */
   swOther: Record<string, number>;
-}
-
-/** ₹ for one of a currency, from your trips (the Japan trip's yen rate). */
-function tripRates(os: LifeOSContext): Record<string, number> {
-  if (!os.registry.objects.has('trip')) return {};
-  const out: Record<string, number> = {};
-  for (const t of os.records.query<{ localCurrency?: string; fxRate?: number }>('trip', {}, { limit: 500 })) if (t.data.localCurrency && t.data.fxRate) out[t.data.localCurrency] = t.data.fxRate;
-  return out;
 }
 
 /** A friend's Splitwise balance in rupees: rupees, and other currencies at a trip's rate. */

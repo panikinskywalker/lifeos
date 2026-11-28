@@ -28,7 +28,7 @@ class FakeSw {
   async me() { return { id: ME, first_name: 'Sam' }; }
   async friends() { return [{ id: ANA, first_name: 'Ana', balance: [] }, { id: BEN, first_name: 'Ben', balance: [] }]; }
   async groups() { return [{ id: GROUP, name: 'Lisbon' }]; }
-  async expenses() { return this.list.filter((e) => e.payment); }
+  async expenses() { return this.list; }
   async groupExpenses(g: number) { return this.list.filter((e) => e.group_id === g); }
   async looseExpenses() { return this.list.filter((e) => !e.group_id && !e.deleted_at); }
   async createExpense(p: Record<string, string | number | boolean | undefined>) {
@@ -278,6 +278,40 @@ describe('payments read before a group was linked', () => {
     os.records.setStatus(d.id, 'settled');
     sw.list[sw.list.length - 1]!.created_at = new Date(Date.now() - 86_400_000).toISOString();
     setSwConfig(os, { billGroupsSeen: [group], pairedV1: [group], billsReadAt: Date.now(), ours: [92] });
+    expect((await run()).billsIn).toBe(0);
+  });
+});
+
+describe('expenses added on Splitwise outside a linked group', () => {
+  const lunch = (over: Partial<SwExpense> = {}) => ({ id: 70, group_id: null, payment: false, cost: '1200.00', currency_code: 'INR', description: 'Lunch (on Splitwise)', date: '2026-11-20T12:00:00Z', created_at: '2026-11-20T12:00:00Z', users: [{ user_id: ANA, paid_share: '1200.00', owed_share: '600.00' }, { user_id: ME, paid_share: '0.00', owed_share: '600.00' }], ...over });
+
+  it('come in as a Bill between you, are never sent back, and follow a change or a delete there', async () => {
+    sw.list.push(lunch());
+    expect((await run()).billsIn).toBe(1);
+    expect(billBalanceWith(os, ana)).toBe(-600);
+    await run();
+    expect(sw.made).toEqual([]);
+    Object.assign(sw.list[0]!, { cost: '1000.00', users: [{ user_id: ANA, paid_share: '1000.00', owed_share: '500.00' }, { user_id: ME, paid_share: '0.00', owed_share: '500.00' }] });
+    await run();
+    expect(billBalanceWith(os, ana)).toBe(-500);
+    sw.list[0]!.deleted_at = '2026-11-21T12:00:00Z';
+    await run();
+    expect(os.records.query<BillData>('bill', {}, { limit: 10 })).toEqual([]);
+  });
+
+  it('in another currency, keep it, in rupees at a trip’s rate when there is one; a payment in yen comes in too', async () => {
+    sw.list.push(lunch({ cost: '3000.00', currency_code: 'GBP', users: [{ user_id: ANA, paid_share: '3000.00', owed_share: '1500.00' }, { user_id: ME, paid_share: '0.00', owed_share: '1500.00' }] }));
+    sw.list.push({ id: 71, group_id: null, payment: true, cost: '1000.00', currency_code: 'JPY', description: 'Payment', date: '2026-11-21T12:00:00Z', created_at: '2026-11-21T12:00:00Z', users: [{ user_id: ME, paid_share: '1000.00', owed_share: '0.00' }, { user_id: ANA, paid_share: '0.00', owed_share: '1000.00' }] });
+    await run();
+    const bills = os.records.query<BillData>('bill', {}, { limit: 10 });
+    expect(bills.find((b) => b.data.currency === 'GBP')!.data).toMatchObject({ amount: 3000, kind: 'spend' });
+    expect(bills.find((b) => b.data.currency === 'JPY')!.data).toMatchObject({ amount: 1000, kind: 'payment' });
+  });
+
+  it('stay out when someone in them is not linked, or was linked after it was made', async () => {
+    sw.list.push(lunch({ users: [{ user_id: 99, paid_share: '1200.00', owed_share: '600.00' }, { user_id: ME, paid_share: '0.00', owed_share: '600.00' }] }));
+    linkPerson(os, ana, { id: ANA, name: 'Ana' }, Date.parse('2026-11-25T00:00:00Z'));
+    sw.list.push(lunch({ id: 72 }));
     expect((await run()).billsIn).toBe(0);
   });
 });

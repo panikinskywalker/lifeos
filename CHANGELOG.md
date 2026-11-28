@@ -7,6 +7,14 @@ number: **v1** first, then v2, …; changes after v1 are 1.0.1, 1.0.2, …. Each
 version is a git tag and the app's version in `app.json`.
 Turf web has its own numbers and notes (`~/Projects/turf-web/CHANGELOG.md`).
 
+## v0.0.147 · 28 Nov 2026
+
+**What's added on Splitwise comes into LifeOS too.** An expense or a payment someone adds on Splitwise, outside a trip group you linked, now shows in LifeOS as long as everyone in it is linked and it was made after you linked them. If it's changed or deleted on Splitwise, the same happens here. Before, only rupee payments came across.
+
+**Other currencies come across as they are.** A pound or yen expense keeps its currency on both sides. It counts in rupees at your trip's rate when there is one. Without a rate (pounds today) it shows in its own currency.
+
+People who aren't on Splitwise stay in LifeOS only, and what was between you before linking stays as it was.
+
 ## v0.0.146 · 27 Nov 2026
 
 Merged from GitHub's `m1-design-system` (labelled v0.0.136 there, from `claude/serene-edison-o0lpvy`).

@@ -2163,6 +2163,16 @@ both sides). Once, a group linked before that is mended: a Bill here and its twi
 paired, the copy LifeOS sent there (its own name) deleted and the one that came in removed. Bills
 that come in from Splitwise carry `sourceKey: splitwise:<id>`. After a sync that changed anything the
 balances are read again.
+**Both sides in step from linking on (28 Nov, Rutvij: "I just need both of them to be in sync; if
+they are not on Splitwise it just shows on LifeOS"; "we will work from now on"):** what was between
+you before someone was linked stays where it was. From linking on, an expense or payment added on
+Splitwise outside a linked group (between friends, or in a group not linked), with only you and
+people linked before it was made, comes in as a Bill (`sourceKey: splitwise:<id>`); a change there
+changes it here, a delete there deletes it here; it is never sent back. Someone not on Splitwise
+stays only in LifeOS. **Currencies:** a Bill keeps its own currency both ways (sent with its currency
+code, brought in as Splitwise has it); its rupees come from a trip's rate for that currency, and one
+with no rate (GBP) is shown in its currency, not counted in rupees. Rupee payments on Splitwise still
+settle shares here (above); a payment in another currency comes in as a payback Bill in it.
 Splitwise keeps each currency apart (a trip's yen): Udhari counts them in rupees at a trip's rate
 (`localCurrency`, `fxRate`), and shows what has no rate as it is. A payment in a group read before the
 group was linked (when it only settled old-style shares) comes in as a Bill once the group is linked,

@@ -363,6 +363,22 @@ export function billFromExpense(e: SwExpense, meId: number, people: SwConfig['pe
   return { kind: e.payment ? 'payment' : 'spend', amount, currency, date: (e.date ?? '').slice(0, 10), split: { payers, method: 'exact', shares }, groupId, ...(trip ? { tripId: trip.id } : {}), ...(rate ? { rate } : {}), inr: billInr({ amount, currency, rate }) };
 }
 
+/** ₹ for one of a currency, from your trips (the Japan trip's yen rate). */
+export function tripRatesOf(os: LifeOSContext): Record<string, number> {
+  if (!os.registry.objects.has('trip')) return {};
+  const out: Record<string, number> = {};
+  for (const t of os.records.query<{ localCurrency?: string; fxRate?: number }>('trip', {}, { limit: 500 })) if (t.data.localCurrency && t.data.fxRate) out[t.data.localCurrency] = t.data.fxRate;
+  return out;
+}
+/** A Splitwise expense in no linked group as a Bill's data: in its own currency, in rupees at a trip's rate when there is one. */
+function looseBill(e: SwExpense, meId: number, people: SwConfig['people'], rates: Record<string, number>) {
+  const data = billFromExpense(e, meId, people, '');
+  if (!data) return null;
+  const { groupId: _none, ...rest } = data;
+  const rate = rest.currency !== 'INR' ? rates[rest.currency] : undefined;
+  return { ...rest, ...(rate ? { rate, inr: billInr({ amount: rest.amount, currency: rest.currency, rate }) } : {}) };
+}
+
 /**
  * A group mapped to a Splitwise group keeps its Bills in step (a trip's
  * expenses and paybacks): each Bill goes there with who paid and each share;
@@ -702,8 +718,44 @@ async function syncOnce(os: LifeOSContext, sw: SplitwiseClient, now: number): Pr
     // 4. Payments recorded on Splitwise settle what is open here, Debts then Bills (a mapped group's payments are its Bills, above).
     const mapped = new Set(Object.values(c.groups));
     const since = c.lastSync ? c.lastSync - 60_000 : now - 7 * 86_400_000;
+    const rates = tripRatesOf(os);
     for (const e of await sw.expenses(since)) {
-      if (!e.payment || e.deleted_at || ours.has(e.id) || e.currency_code !== 'INR' || (e.group_id && mapped.has(e.group_id))) continue;
+      if (e.group_id && mapped.has(e.group_id)) continue;
+      const mineIds = Object.entries(billState.bills).filter(([, v]) => v.id === e.id).map(([id]) => id);
+      // Deleted on Splitwise: its Bills here go too.
+      if (e.deleted_at) {
+        for (const id of mineIds) {
+          if (os.records.get(id)) os.records.delete(id, 'system');
+          delete billState.bills[id];
+          result.removed++;
+        }
+        continue;
+      }
+      // One that came in from Splitwise and was changed there: changed here.
+      const cameIn = mineIds.map((id) => os.records.get<BillData>(id)).find((b) => b?.data.sourceKey === `splitwise:${e.id}`);
+      if (cameIn) {
+        const data = looseBill(e, me.id, c.people, rates);
+        if (data && billSig({ ...cameIn, data: { ...cameIn.data, ...data } }) !== billSig(cameIn)) {
+          const b = os.records.update<BillData>(cameIn.id, { data }, 'system');
+          billState.bills[cameIn.id] = { id: e.id, sig: billSig(b) };
+          result.billsIn = (result.billsIn ?? 0) + 1;
+        }
+        continue;
+      }
+      if (ours.has(e.id)) continue;
+      // An expense, or a payment in another currency, between you and people linked before it was made: it comes in as a Bill.
+      if (!e.payment || e.currency_code !== 'INR') {
+        const made = Date.parse(e.created_at ?? e.date ?? '') || now;
+        const others = (e.users ?? []).filter((u) => u.user_id !== me.id);
+        const linked = others.every((u) => Object.values(c.people).some((v) => v.sw === u.user_id && made >= v.at));
+        const data = linked && others.length < (e.users ?? []).length ? looseBill(e, me.id, c.people, rates) : null;
+        if (!data) continue;
+        ours.add(e.id);
+        const b = os.records.create<BillData>({ object: 'bill', title: e.description || 'A Splitwise expense', data: { ...data, sourceKey: `splitwise:${e.id}` } as BillData }, 'system');
+        billState.bills[b.id] = { id: e.id, sig: billSig(b) };
+        result.billsIn = (result.billsIn ?? 0) + 1;
+        continue;
+      }
       ours.add(e.id);
       const payer = e.users.find((u) => Number(u.paid_share) > 0);
       const payee = e.users.find((u) => Number(u.owed_share) > 0);
